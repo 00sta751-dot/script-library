@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1e272e">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>腳本庫</title>
+<style>
+:root{--bg:#f2f3f7;--card:#fff;--tx:#1e272e;--tx2:#636e72;--tx3:#adb5bd;--bd:#e9ecef;--hdr:#1e272e;--r:12px;
+--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+background:var(--bg);color:var(--tx);line-height:1.6;padding-bottom:calc(56px + var(--sb));-webkit-font-smoothing:antialiased;}
+
+/* Header */
+.hdr{background:var(--hdr);color:#fff;padding:14px 16px 10px;position:sticky;top:0;z-index:100;
+box-shadow:0 2px 10px rgba(0,0,0,.15);text-align:center;}
+.hdr h1{font-size:1.1rem;font-weight:700;}
+.hdr .sub{font-size:.68rem;color:rgba(255,255,255,.4);margin-top:2px;}
+
+/* Toolbar: search + filter */
+.toolbar{position:sticky;top:52px;z-index:90;background:var(--bg);padding:10px 12px 6px;}
+.search{width:100%;padding:9px 14px;border:none;border-radius:8px;background:var(--card);
+font-size:.88rem;outline:none;box-shadow:0 1px 3px rgba(0,0,0,.05);font-family:inherit;}
+.search::placeholder{color:var(--tx3);}
+
+/* Category menu - 2-column grid */
+.cat-menu{padding:6px 12px 4px;position:sticky;top:102px;z-index:80;background:var(--bg);}
+.cm-toggle{width:100%;padding:9px 14px;border-radius:8px;border:1.5px solid var(--bd);background:var(--card);
+font-size:.82rem;color:var(--tx);cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;font-weight:600;}
+.cm-toggle .cm-arrow{transition:transform .2s;font-size:.7rem;color:var(--tx3);}
+.cm-toggle.open .cm-arrow{transform:rotate(180deg);}
+.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;padding:0;}
+.cm-grid.open{max-height:300px;padding-top:6px;}
+.cm-btn{display:flex;align-items:center;gap:5px;padding:8px 10px;border-radius:8px;
+border:1.5px solid var(--bd);background:var(--card);font-size:.78rem;color:var(--tx2);
+cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;white-space:nowrap;overflow:hidden;}
+.cm-btn.active{background:var(--abg);color:var(--ac);border-color:var(--ac);font-weight:700;}
+.cm-all{grid-column:1/-1;justify-content:center;font-weight:600;}
+.cm-all.active{background:var(--hdr);color:#fff;border-color:var(--hdr);}
+
+/* Version filter */
+.ver-row{display:flex;gap:6px;padding:6px 12px 10px;justify-content:center;}
+.vf{padding:5px 16px;border-radius:20px;border:1.5px solid var(--bd);background:var(--card);
+font-size:.76rem;color:var(--tx2);cursor:pointer;font-family:inherit;transition:all .12s;}
+.vf.active{background:var(--hdr);color:#fff;border-color:var(--hdr);}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 12px 12px;}
+.st-box{background:var(--card);border-radius:10px;padding:12px 8px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+.st-n{font-size:1.4rem;font-weight:800;color:var(--hdr);}
+.st-l{font-size:.65rem;color:var(--tx3);}
+
+/* Cards */
+.cards{padding:0 12px;}
+.card{background:var(--card);border-radius:var(--r);margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;}
+.card-head{padding:14px 16px;cursor:pointer;border-left:4px solid var(--bd);}
+.card-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.vb{padding:2px 8px;border-radius:5px;font-size:.66rem;font-weight:700;}
+.v-mono{background:#e8f5e9;color:#2e7d32;}
+.v-mirror{background:#fff3e0;color:#e65100;}
+.cb{font-size:.7rem;font-weight:600;}
+.ct{font-size:.92rem;font-weight:700;line-height:1.5;margin-bottom:4px;}
+.chips{display:flex;flex-wrap:wrap;gap:4px;}
+.chip{padding:2px 8px;border-radius:4px;font-size:.64rem;font-weight:500;}
+.c-hook{background:#fff8e1;color:#f57f17;}
+.c-mood{background:#fce4ec;color:#c62828;}
+.hint{font-size:.7rem;color:var(--tx3);text-align:center;margin-top:8px;}
+
+/* Card body (collapsed) */
+.card-body{max-height:0;overflow:hidden;transition:max-height .35s ease;padding:0 16px;}
+.card-body.open{max-height:5000px;padding:0 16px 16px;}
+.meta-line{font-size:.75rem;color:var(--tx2);margin-bottom:5px;line-height:1.5;}
+
+/* Timeline */
+.tl{margin-top:10px;}
+.tl-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f4f5f7;}
+.tl-row:last-child{border-bottom:none;}
+.tl-time{width:52px;flex-shrink:0;font-size:.72rem;font-weight:700;padding-top:2px;}
+.tl-txt{flex:1;min-width:0;font-size:.85rem;line-height:1.7;}
+.sub-line{margin-top:5px;padding:5px 10px;background:var(--bg);border-radius:6px;font-size:.74rem;color:var(--tx2);line-height:1.4;}
+
+.sp{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.66rem;color:#fff;vertical-align:middle;margin-right:2px;}
+.sp-m{background:#ff9800;}.sp-h{background:#42a5f5;}
+
+/* Bottom nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);
+display:flex;justify-content:center;gap:32px;padding:6px 0 calc(6px + var(--sb));z-index:100;}
+.bn{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:.62rem;color:var(--tx3);
+cursor:pointer;border:none;background:none;font-family:inherit;padding:4px 10px;}
+.bn.active{color:var(--hdr);font-weight:700;}
+.bn-i{font-size:1.1rem;}
+
+.empty{display:none;text-align:center;padding:50px 20px;color:var(--tx3);font-size:.9rem;}
+
+@media(min-width:600px){
+.cards,.stats,.cat-menu,.toolbar,.ver-row{max-width:540px;margin-left:auto;margin-right:auto;}
+.cm-grid{grid-template-columns:repeat(3,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+<h1>短影音自助腳本之美家未來靠我們了!</h1>
+<div class="sub">16 支腳本 · 8 類型 · 獨白版 + 藏鏡人版</div>
+</div>
+
+<div class="toolbar">
+<input class="search" type="text" placeholder="搜尋關鍵字..." oninput="doFilter()">
+</div>
+
+<div class="cat-menu">
+<button class="cm-toggle" onclick="toggleMenu(this)"><span id="menuLabel">📋 全部類型</span><span class="cm-arrow">▼</span></button>
+<div class="cm-grid" id="cmGrid">
+<button class="cm-btn cm-all active" onclick="pickCat('all',this)" style="--ac:#1e272e;--abg:#1e272e">📋 全部顯示</button>
+<button class="cm-btn" data-cat="揭露型" onclick="pickCat('揭露型',this)" style="--ac:#e74c3c;--abg:#fef5f5">🔍 揭露型</button>
+<button class="cm-btn" data-cat="未來預測型" onclick="pickCat('未來預測型',this)" style="--ac:#8e44ad;--abg:#f9f0fc">🔮 未來預測型</button>
+<button class="cm-btn" data-cat="市場觀點型" onclick="pickCat('市場觀點型',this)" style="--ac:#2980b9;--abg:#f0f7fd">📊 市場觀點型</button>
+<button class="cm-btn" data-cat="真實案例型" onclick="pickCat('真實案例型',this)" style="--ac:#27ae60;--abg:#f0faf4">📖 真實案例型</button>
+<button class="cm-btn" data-cat="暴力直接型" onclick="pickCat('暴力直接型',this)" style="--ac:#d35400;--abg:#fdf5ef">💥 暴力直接型</button>
+<button class="cm-btn" data-cat="隱性植入型" onclick="pickCat('隱性植入型',this)" style="--ac:#c0392b;--abg:#fdf0ef">🎯 隱性植入型</button>
+<button class="cm-btn" data-cat="稅法揭密型" onclick="pickCat('稅法揭密型',this)" style="--ac:#34495e;--abg:#f2f4f5">⚖️ 稅法揭密型</button>
+<button class="cm-btn" data-cat="在地冷知識型" onclick="pickCat('在地冷知識型',this)" style="--ac:#16a085;--abg:#eefaf7">🗺️ 在地冷知識型</button>
+
+</div>
+</div>
+
+<div class="ver-row">
+<button class="vf active" onclick="pickVer('all',this)">全部</button>
+<button class="vf" onclick="pickVer('獨白版',this)">🎤 獨白</button>
+<button class="vf" onclick="pickVer('藏鏡人版',this)">🎭 藏鏡人</button>
+</div>
+
+<div class="stats">
+<div class="st-box"><div class="st-n">16</div><div class="st-l">腳本總數</div></div>
+<div class="st-box"><div class="st-n">8</div><div class="st-l">內容類型</div></div>
+<div class="st-box"><div class="st-n">2</div><div class="st-l">版本形式</div></div>
+</div>
+
+<div class="cards" id="cardList">
+<div class="card" data-cat="揭露型" data-ver="獨白版" id="c0">
+<div class="card-head" style="border-color:#e74c3c" onclick="toggle(0)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#e74c3c">🔍 揭露型</span></div>
+<h3 class="ct">你把房子委託給5家仲介，以為競爭激烈——沒人在認真賣你的房</h3>
+<div class="chips"><span class="chip c-hook">Hook：點名對號入座</span><span class="chip c-mood">揭露 ＋ 反骨 ＋ 衝突</span></div>
+<div class="hint" id="h0">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b0">
+<div class="meta-line">🎬 站在社區外或走廊，邊走邊說</div><div class="meta-line">📎 常見問題 #4（委託一家還是多家）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#e74c3c">0–5秒</div><div class="tl-txt">你有沒有把房子同時委託給5家仲介，然後覺得安心了？<div class="sub-line">📝 委託5家＝沒人在顧你的房</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">5–18秒</div><div class="tl-txt">我告訴你真相——一般約的情況下，每個仲介都知道你還在跑其他家，所以他們不會把你的物件放在最前面打廣告。廣告費要自己出，萬一被別家成交，廣告費打水漂。<div class="sub-line">📝 一般約→沒人願意重兵投入</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">18–30秒</div><div class="tl-txt">結果你的房子掛了3個月，每家仲介都說「有帶看」，但都沒有下文。你以為是市場不好——其實是沒有任何一個人在認真幫你賣。<div class="sub-line">📝 有帶看≠有在認真賣</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">30–40秒</div><div class="tl-txt">賣房不是投票，不是委託越多家越有保障。在北高雄有房想賣，私訊我，我告訴你專任約和一般約的差別在哪。<div class="sub-line">📝 搞懂委託方式，才是起點</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="揭露型" data-ver="藏鏡人版" id="c1">
+<div class="card-head" style="border-color:#e74c3c" onclick="toggle(1)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#e74c3c">🔍 揭露型</span></div>
+<h3 class="ct">委託多家仲介，是不是比較有保障？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">揭露 ＋ 反骨 ＋ 衝突</span></div>
+<div class="hint" id="h1">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b1">
+<div class="meta-line">🎬 社區外或走廊，藏鏡人在側面問，主角站著回答</div><div class="meta-line">📎 常見問題 #4（委託方式）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#e74c3c">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 同時委託多家仲介，是不是比較有保障？<div class="sub-line">📝 很多屋主以為這樣比較穩</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 反而沒有。一般約下，每個仲介都清楚你還在跑其他家，他們不會主動花大錢幫你打廣告——因為成交了可能是別家的功勞。<div class="sub-line">📝 一般約→沒人願意全力投入</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">18–30秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 你看到的是「有人帶看」，但帶看品質、買家篩選、議價策略——這些都要花時間和資源，一般約的狀況下，仲介不會把你的案子列優先。<div class="sub-line">📝 帶看量≠賣出機率</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#e74c3c">30–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 專任約讓仲介有誘因認真幫你，這才是賣掉的起點。<div class="sub-line">📝 了解委託方式，才是真保障</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="未來預測型" data-ver="獨白版" id="c2">
+<div class="card-head" style="border-color:#8e44ad" onclick="toggle(2)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#8e44ad">🔮 未來預測型</span></div>
+<h3 class="ct">2026下半年，高雄房市「量穩」——但你的房子不一定穩</h3>
+<div class="chips"><span class="chip c-hook">Hook：懸念感</span><span class="chip c-mood">懸念 ＋ 恐懼 ＋ 金錢</span></div>
+<div class="hint" id="h2">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b2">
+<div class="meta-line">🎬 坐著，桌前，說話慢，每句停頓</div><div class="meta-line">📎 遠雄房地產2026展望、代銷龍頭謝哲耀「量穩價平」預測</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#8e44ad">0–5秒</div><div class="tl-txt">2026下半年，專家說高雄房市「量穩價平」。聽起來是好消息——但這對正在賣房的你，可能是最危險的訊號。<div class="sub-line">📝 量穩≠你的房子穩</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">5–18秒</div><div class="tl-txt">量穩的意思是：整體市場沒崩，但庫存還在消化。買家的選擇越來越多，開始可以挑。條件更好、包裝更好的物件先被選走，剩下的才輪到你。<div class="sub-line">📝 量穩→買家開始有得挑</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">18–32秒</div><div class="tl-txt">你等的那個「市場好轉」，可能不是讓你的房子比較好賣——而是讓你的競爭對手先賣掉，然後你繼續等。<div class="sub-line">📝 等待≠對你有利</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">32–40秒</div><div class="tl-txt">你的房子在市場上掛了多久了？超過3個月，這個問題你得認真面對了。<div class="sub-line">📝 掛牌超過3個月，要回頭看策略了</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="未來預測型" data-ver="藏鏡人版" id="c3">
+<div class="card-head" style="border-color:#8e44ad" onclick="toggle(3)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#8e44ad">🔮 未來預測型</span></div>
+<h3 class="ct">你敢說現在賣是好時機？高雄房市不是還在盤整嗎？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">懸念 ＋ 恐懼 ＋ 衝突</span></div>
+<div class="hint" id="h3">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b3">
+<div class="meta-line">🎬 社區外，藏鏡人側面問，主角站著</div><div class="meta-line">📎 遠雄房地產2026展望、常見問題 #1（現在賣好嗎）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#8e44ad">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 你敢說現在賣是好時機？高雄房市不是還在盤整嗎？<div class="sub-line">📝 很多人在等「更好的時機」</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 「好時機」這個詞很危險。2026下半年預測量穩價平——但量穩代表庫存還在，買家選擇更多，他們開始挑。這時候你的物件沒亮點，你不是在等好時機，是在等別人先賣掉。<div class="sub-line">📝 量穩→競爭更激烈，不是更輕鬆</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">18–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 賣房的最佳時機是「你準備好的時候」——定價策略、屋況包裝、一個真的有能力幫你找買家的人。<div class="sub-line">📝 準備好了，才有資格等時機</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#8e44ad">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 在北高雄賣房，歡迎找我聊。<div class="sub-line">📝 （帳號資訊）</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="市場觀點型" data-ver="獨白版" id="c4">
+<div class="card-head" style="border-color:#2980b9" onclick="toggle(4)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#2980b9">📊 市場觀點型</span></div>
+<h3 class="ct">同樣在左營，同樣30坪——為什麼他賣掉了，你還在等</h3>
+<div class="chips"><span class="chip c-hook">Hook：懸念感</span><span class="chip c-mood">揭露 ＋ 反差 ＋ 真實感</span></div>
+<div class="hint" id="h4">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b4">
+<div class="meta-line">🎬 站在社區外，走廊，或坐著桌前</div><div class="meta-line">📎 常見問題 #2（同條件為何有人賣得掉）、實價登錄帶看策略分析</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#2980b9">0–5秒</div><div class="tl-txt">左營，30坪，屋齡差不多——A屋主5個月前開賣，現在交屋了。B屋主同時間開賣，今天還掛著。兩間條件幾乎一樣，為什麼？<div class="sub-line">📝 同條件，差在哪？</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">5–18秒</div><div class="tl-txt">答案不是市場，是策略。A屋主第一週就做好三件事：市場行情確認定價、屋況輕整理、第一批帶看篩選真實買家。B屋主定了一個「以後再降」的開價，然後等。<div class="sub-line">📝 差在定價策略和第一週的動作</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">18–32秒</div><div class="tl-txt">買家的注意力有時效性。掛牌前3週是黃金期，超過這個時間，買家開始懷疑「這間是不是有問題才賣不掉」——就算沒問題，也開始砍更兇。<div class="sub-line">📝 掛牌前3週是黃金期</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">32–40秒</div><div class="tl-txt">賣房不是等，是做。在北高雄賣房，你需要的是知道怎麼做的人，不只是幫你掛牌的人。<div class="sub-line">📝 賣房是做出來的，不是等出來的</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="市場觀點型" data-ver="藏鏡人版" id="c5">
+<div class="card-head" style="border-color:#2980b9" onclick="toggle(5)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#2980b9">📊 市場觀點型</span></div>
+<h3 class="ct">高雄房市這麼冷，同樣條件的房子，怎麼才能賣得掉？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">揭露 ＋ 反差 ＋ 衝突</span></div>
+<div class="hint" id="h5">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b5">
+<div class="meta-line">🎬 社區外，藏鏡人側面問，主角站著</div><div class="meta-line">📎 常見問題 #2（同條件為何有人賣得掉）、#5（怎麼定價）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#2980b9">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 高雄房市現在這麼冷，同樣條件的房子，你覺得怎麼才能賣得掉？<div class="sub-line">📝 同樣條件，差在哪裡？</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 同樣條件賣不掉，通常三個問題：定價太高死在起跑點、第一批帶看品質太差沒有真實買家、或者物件包裝沒做好讓買家第一印象扣分。三個缺一個都可能拖很久。<div class="sub-line">📝 定價×帶看品質×物件包裝</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">18–30秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 市場冷只是背景，決定你的起點，但不決定你的結果。定價策略、帶看動線——這些才是可以控制的事。<div class="sub-line">📝 市場是背景，策略才是變數</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#2980b9">30–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 你的房子現在遇到哪一個問題？可以留言或私訊我。<div class="sub-line">📝 歡迎來討論</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="真實案例型" data-ver="獨白版" id="c6">
+<div class="card-head" style="border-color:#27ae60" onclick="toggle(6)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#27ae60">📖 真實案例型</span></div>
+<h3 class="ct">他說「我不要便宜賣」——三個月後，他打電話給我</h3>
+<div class="chips"><span class="chip c-hook">Hook：懸念感</span><span class="chip c-mood">真實感 ＋ 共鳴 ＋ 反差</span></div>
+<div class="hint" id="h6">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b6">
+<div class="meta-line">🎬 坐在車內或走廊，剛從帶看回來的感覺</div><div class="meta-line">📎 常見問題 #12（買家出價怎麼判斷）、改編自帶看實況</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">0–5秒</div><div class="tl-txt">有一個三民的屋主，第一次見面跟我說：「我知道市場不好，但我不要賣便宜。你不要說降價這兩個字。」<div class="sub-line">📝 「不要跟我說降價」</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">5–20秒</div><div class="tl-txt">我說好。我們認真做屋況整理、重新拍照、開了一個有根據的價格。前兩個月，帶看了10幾組，最接近的一組差了15萬沒談成。<div class="sub-line">📝 10幾組帶看，差15萬沒成</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">20–32秒</div><div class="tl-txt">第三個月，他打電話給我。「那組出了比較低的價，你覺得我要接嗎？」我說：你的選擇是接，或繼續等——但你要知道，每多掛一個月，買家就多一個理由懷疑你的房子。這個「便宜感」不是你降出來的，是時間拖出來的。<div class="sub-line">📝 時間本身就是一種降價</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">32–40秒</div><div class="tl-txt">他那週成交了。差的15萬，後來算一算，他省下的管理費和房屋稅差不多補回來了。<div class="sub-line">📝 成交了，也沒有「賣便宜」</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="真實案例型" data-ver="藏鏡人版" id="c7">
+<div class="card-head" style="border-color:#27ae60" onclick="toggle(7)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#27ae60">📖 真實案例型</span></div>
+<h3 class="ct">你有沒有遇過屋主死守價格、最後還是成交的案子？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">真實感 ＋ 共鳴 ＋ 反差</span></div>
+<div class="hint" id="h7">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b7">
+<div class="meta-line">🎬 社區外或走廊，藏鏡人側面問，主角站著</div><div class="meta-line">📎 常見問題 #12（買家出價怎麼判斷）、改編自帶看實況</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 你有沒有遇過屋主死守價格、最後還是成交的案子？<div class="sub-line">📝 有，而且結局出乎意料</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">4–20秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 有。三民區，屋主第一句話就說「不要跟我說降價」。我們認真做包裝做定價，帶了10幾組看，最近的一組差了15萬沒談成。<div class="sub-line">📝 差15萬，沒談成</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">20–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 後來他想通了——每多掛一個月，買家就多一個理由懷疑這間房子。時間本身就是一種降價方式，只是你感覺不到。那週他決定接了那組客人，成交了。<div class="sub-line">📝 時間是另一種降價</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#27ae60">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 不是要屋主妥協，是要在對的時機，做對的決定。<div class="sub-line">📝 對的時機，對的決定</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="暴力直接型" data-ver="獨白版" id="c8">
+<div class="card-head" style="border-color:#d35400" onclick="toggle(8)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#d35400">💥 暴力直接型</span></div>
+<h3 class="ct">「等市場好轉再賣」——這是我聽過最貴的一句話</h3>
+<div class="chips"><span class="chip c-hook">Hook：挑釁衝突感</span><span class="chip c-mood">衝突 ＋ 現實感 ＋ 金錢</span></div>
+<div class="hint" id="h8">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b8">
+<div class="meta-line">🎬 坐著，直視鏡頭，不動，說得很慢</div><div class="meta-line">📎 常見問題 #1（現在賣好嗎）、#14（委託到成交多久）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">0–5秒</div><div class="tl-txt">「等市場好轉再賣。」這是我這幾年聽過最貴的一句話。<div class="sub-line">📝 最貴的不是降價，是等待</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">5–20秒</div><div class="tl-txt">你等的這一年，管理費繳了幾個月？房屋稅呢？地價稅算了嗎？同棟同層的鄰居去年賣了多少，今年又是多少？這些數字加起來，你的「等」是在保護資產，還是在消耗它？<div class="sub-line">📝 等待代價：管理費＋房屋稅＋地價稅＋議價空間縮小</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">20–33秒</div><div class="tl-txt">市場好轉的標準沒有人說得準。但你的房子每多掛一天，就多一天被比較、被懷疑、被砍價。最後你會賣——只是時機更差、心情更差、價格也更差。<div class="sub-line">📝 等到賣，通常三個條件都更差</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">33–40秒</div><div class="tl-txt">如果你手上有房子在觀望，私訊我，我們把等待的實際成本算清楚。<div class="sub-line">📝 把等待的代價算清楚</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="暴力直接型" data-ver="藏鏡人版" id="c9">
+<div class="card-head" style="border-color:#d35400" onclick="toggle(9)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#d35400">💥 暴力直接型</span></div>
+<h3 class="ct">市場這麼爛，你還建議屋主現在賣嗎？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">衝突 ＋ 現實感 ＋ 金錢</span></div>
+<div class="hint" id="h9">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b9">
+<div class="meta-line">🎬 社區外或走廊，藏鏡人問，主角站著</div><div class="meta-line">📎 常見問題 #1（現在賣好嗎）、#14（從委託到成交多久）</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 市場這麼爛，你還建議屋主現在賣嗎？<div class="sub-line">📝 這個問題很多人想問</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 我建議屋主把帳算清楚再決定。放著不動這一年：管理費、房屋稅、地價稅——固定支出跑不掉。然後你的競爭對手趁這時候讓利賣掉了，市場上剩下的都是比你更願意降的屋主。你等到的「好時機」，是更激烈的競爭。<div class="sub-line">📝 等待的代價遠比你想的大</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">18–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 不是叫你便宜賣，是叫你把成本算清楚。有些人算完就會發現，現在動比繼續等划算多了。<div class="sub-line">📝 算清楚再決定，不是盲目等</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#d35400">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 要算嗎？留言告訴我你的情況。<div class="sub-line">📝 歡迎來算</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="隱性植入型" data-ver="獨白版" id="c10">
+<div class="card-head" style="border-color:#c0392b" onclick="toggle(10)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#c0392b">🎯 隱性植入型</span></div>
+<h3 class="ct">我手上有一間房子準備帶看了——但我決定先等一件事</h3>
+<div class="chips"><span class="chip c-hook">Hook：懸念感</span><span class="chip c-mood">共鳴 ＋ 情緒 ＋ 懸念</span></div>
+<div class="hint" id="h10">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b10">
+<div class="meta-line">🎬 走在路上，或坐著，背景不重要</div><div class="meta-line">📎 常見問題 #9（屋況要整理嗎）、無需數據</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">0–5秒</div><div class="tl-txt">上個禮拜，屋主說他的房子準備好了——但我說，先等一下。<div class="sub-line">📝 準備好了？先等一下</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">5–20秒</div><div class="tl-txt">「準備好了」對屋主是心理上準備好了。但對買家來說，走進來的第一眼決定他有沒有想繼續談的慾望。浴室的燈管換了沒有？陽台的雜物清了沒有？前門的鞋子收起來沒有？這些不是裝潢，是尊重。<div class="sub-line">📝 屋況包裝不是裝潢，是尊重買家</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">20–33秒</div><div class="tl-txt">那間房子，我們花了一個週末做輕整理。前兩組帶看，第二組看完就問下一步了。<div class="sub-line">📝 兩組帶看，第二組問下一步</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">33–40秒</div><div class="tl-txt">在北高雄賣房，我在意的不只是掛牌，是你的房子值得被好好介紹。<div class="sub-line">📝 好好介紹每一間房子</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="隱性植入型" data-ver="藏鏡人版" id="c11">
+<div class="card-head" style="border-color:#c0392b" onclick="toggle(11)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#c0392b">🎯 隱性植入型</span></div>
+<h3 class="ct">現在觀望的屋主那麼多，你怎麼讓手上的物件被看見？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">共鳴 ＋ 情緒 ＋ 懸念</span></div>
+<div class="hint" id="h11">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b11">
+<div class="meta-line">🎬 社區外，藏鏡人側面問，主角站著</div><div class="meta-line">📎 常見問題 #9（屋況整理）、#20（好物件賣不掉問題在哪）、無需數據</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 現在觀望的屋主那麼多，你怎麼讓手上的物件被看見？<div class="sub-line">📝 差異化，不是靠等</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 靠準備。帶看前的每個細節——燈光夠不夠亮、味道對不對、屋主在不在場、動線怎麼走——這些都在影響買家的感受。好的物件是需要包裝的，就像好的人也需要清楚的表達。<div class="sub-line">📝 物件包裝＝讓房子自己說話</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">18–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 市場不好的時候，買家在挑的是感覺，不是坪數。感覺對了，什麼都快。<div class="sub-line">📝 買家買的是感覺，不只是坪數</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#c0392b">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 我手上有認真包裝的物件，如果你是真的在找北高雄的房子，可以來聊。<div class="sub-line">📝 準備好的物件，在等準備好的買家</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="稅法揭密型" data-ver="獨白版" id="c12">
+<div class="card-head" style="border-color:#34495e" onclick="toggle(12)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#34495e">⚖️ 稅法揭密型</span></div>
+<h3 class="ct">差一年，差幾十萬——房地合一稅的持有年限你算對了嗎？</h3>
+<div class="chips"><span class="chip c-hook">Hook：懸念感</span><span class="chip c-mood">揭露 ＋ 金錢 ＋ 衝突</span></div>
+<div class="hint" id="h12">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b12">
+<div class="meta-line">🎬 坐著，桌前，語氣走「我要告訴你一個你不知道的事」</div><div class="meta-line">📎 常見問題 #7（持有幾年差多少）、財政部房地合一稅官方稅率</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#34495e">0–5秒</div><div class="tl-txt">賣房之前，有一件事很多人沒去算——你的房子，你持有幾年了？差一年，可能差幾十萬的稅。<div class="sub-line">📝 持有年限不同，稅差幾十萬</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">5–20秒</div><div class="tl-txt">房地合一稅：持有未滿2年賣掉，稅率45%。2到5年，35%。5到10年，20%。超過10年，15%。如果你持有了4年11個月，再撐一個月到5年，稅率從35%降到20%——差的是你獲利的15%。<div class="sub-line">📝 未滿2年45%→超過10年15%，差一節點差幾十萬</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">20–33秒</div><div class="tl-txt">很多屋主不知道這件事，在快要跨越節點的時候賣掉了，多繳了幾十萬。不是市場問題，是時機問題。<div class="sub-line">📝 賣房時機不只看市場，也要看持有年限</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">33–40秒</div><div class="tl-txt">考慮賣房，賣之前先確認你的持有年限在哪個節點上。不確定的可以私訊我。<div class="sub-line">📝 先算，再決定賣的時機</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="稅法揭密型" data-ver="藏鏡人版" id="c13">
+<div class="card-head" style="border-color:#34495e" onclick="toggle(13)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#34495e">⚖️ 稅法揭密型</span></div>
+<h3 class="ct">賣房子稅扣掉很多是真的嗎？怎麼知道我要繳多少？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">揭露 ＋ 金錢 ＋ 衝突</span></div>
+<div class="hint" id="h13">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b13">
+<div class="meta-line">🎬 社區外，藏鏡人問，主角站著</div><div class="meta-line">📎 常見問題 #6（賣房要繳哪些稅）、#7（持有幾年差多少）、財政部官方稅率</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#34495e">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 賣房子稅扣掉很多是真的嗎？怎麼知道我要繳多少？<div class="sub-line">📝 很多人不知道稅怎麼算</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">4–18秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 關鍵在你持有幾年。房地合一稅差很大：不滿2年45%，2到5年35%，5到10年20%，超過10年15%。差一個時間節點，可以差你獲利的10到15%，幾十萬跑不掉。<div class="sub-line">📝 稅率：未滿2年45%→超過10年15%</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">18–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 我遇過屋主差一個月就跨過節點，那一個月他多繳了差不多30幾萬的稅。如果早一點知道，就不會在那個時間點賣。<div class="sub-line">📝 差一個月，多繳30幾萬</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#34495e">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 賣房前，先算一下持有年限在哪個節點。這一步做對，比談價更重要。<div class="sub-line">📝 稅算對了，才是真正的賣價</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="在地冷知識型" data-ver="獨白版" id="c14">
+<div class="card-head" style="border-color:#16a085" onclick="toggle(14)">
+<div class="card-row1"><span class="vb v-mono">🎤 獨白版</span><span class="cb" style="color:#16a085">🗺️ 在地冷知識型</span></div>
+<h3 class="ct">「鼓山」為什麼叫鼓山？高雄人也不一定知道</h3>
+<div class="chips"><span class="chip c-hook">Hook：好奇感提問</span><span class="chip c-mood">趣味 ＋ 在地感 ＋ 驚喜</span></div>
+<div class="hint" id="h14">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b14">
+<div class="meta-line">🎬 戶外走動，背景有鼓山或壽山地標，語氣像在地鄰居閒聊</div><div class="meta-line">📎 壽山/打狗山地名歷史文獻、無需房市數據</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#16a085">0–5秒</div><div class="tl-txt">你住在鼓山，或者每天路過鼓山——但「鼓山」這個名字，你知道從哪裡來的嗎？<div class="sub-line">📝 住鼓山的你，知道為什麼叫鼓山嗎？</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">5–22秒</div><div class="tl-txt">因為壽山。從側面看，壽山的形狀像一面倒扣的鼓，早年的人把這一帶叫做「打鼓山」，後來簡稱鼓山。日治時期山的名字改成「壽山」，但地區的名字鼓山留下來了。你現在去壽山爬山——爬的是壽山，住的是鼓山，名字分家幾百年了。<div class="sub-line">📝 壽山形如倒扣的鼓→打鼓山→鼓山</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">22–34秒</div><div class="tl-txt">我每天在鼓山帶看，有時候路上會跟客人聊到這種事。他們都說：「住這裡這麼久了都不知道。」<div class="sub-line">📝 在地人也不一定知道的事</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">34–40秒</div><div class="tl-txt">追蹤我，每週分享一個你住在北高雄卻可能沒聽過的故事。<div class="sub-line">📝 每週一個在地故事</div></div></div>
+</div>
+</div>
+</div>
+<div class="card" data-cat="在地冷知識型" data-ver="藏鏡人版" id="c15">
+<div class="card-head" style="border-color:#16a085" onclick="toggle(15)">
+<div class="card-row1"><span class="vb v-mirror">🎭 藏鏡人版</span><span class="cb" style="color:#16a085">🗺️ 在地冷知識型</span></div>
+<h3 class="ct">你在鼓山跑了這麼多年，有什麼外地人不知道的事嗎？</h3>
+<div class="chips"><span class="chip c-hook">Hook：辣問開場</span><span class="chip c-mood">趣味 ＋ 在地感 ＋ 驚喜</span></div>
+<div class="hint" id="h15">▼ 展開腳本</div>
+</div>
+<div class="card-body" id="b15">
+<div class="meta-line">🎬 壽山登山口或鼓山街頭，藏鏡人側面問，主角站著</div><div class="meta-line">📎 壽山/打狗山地名歷史文獻、無需房市數據</div>
+<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#16a085">0–4秒</div><div class="tl-txt"><b class="sp sp-m">藏鏡人</b> 你在鼓山跑了這麼多年，有什麼外地人不知道的事嗎？<div class="sub-line">📝 住過不等於了解</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">4–20秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 從壽山說起好了。很多人不知道「鼓山」這個名字怎麼來的——因為壽山從側面看起來像一面倒扣的鼓，以前叫「打鼓山」，後來簡稱鼓山。日治時代把山改叫壽山，但地名沒改，就留下來了。所以鼓山人說「去壽山走走」，是去一座改了名字的山。<div class="sub-line">📝 打鼓山→鼓山；壽山是後來才改的</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">20–32秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 我帶客人看房，走到壽山登山口附近，有時候就會聊到這個。他們都說「原來如此」。在地的感覺就是這樣建立起來的。<div class="sub-line">📝 帶看之外，還帶你認識這個地方</div></div></div>
+<div class="tl-row"><div class="tl-time" style="color:#16a085">32–40秒</div><div class="tl-txt"><b class="sp sp-h">主角</b> 你還想聽什麼在地故事？留言讓我知道。<div class="sub-line">📝 留言點播下一個故事</div></div></div>
+</div>
+</div>
+</div>
+
+</div>
+<div class="empty" id="empty">找不到符合的腳本</div>
+
+<div class="bnav">
+<button class="bn active" onclick="goHome()"><span class="bn-i">🏠</span>首頁</button>
+<button class="bn" onclick="pickVer('獨白版',document.querySelectorAll('.vf')[1])"><span class="bn-i">🎤</span>獨白版</button>
+<button class="bn" onclick="pickVer('藏鏡人版',document.querySelectorAll('.vf')[2])"><span class="bn-i">🎭</span>藏鏡人版</button>
+</div>
+
+<script>
+var cCat='all',cVer='all';
+
+function toggleMenu(btn){
+  var g=document.getElementById('cmGrid');
+  g.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+function pickCat(cat,el){
+  cCat=cat;
+  document.querySelectorAll('.cm-btn').forEach(function(b){b.classList.remove('active');});
+  el.classList.add('active');
+  // Update toggle label & close menu
+  var label=el.textContent.trim();
+  document.getElementById('menuLabel').textContent=cat==='all'?'📋 全部類型':label;
+  document.getElementById('cmGrid').classList.remove('open');
+  document.querySelector('.cm-toggle').classList.remove('open');
+  doFilter();
+}
+
+function pickVer(ver,el){
+  cVer=ver;
+  document.querySelectorAll('.vf').forEach(function(b){b.classList.remove('active');});
+  if(el)el.classList.add('active');
+  // update bottom nav
+  document.querySelectorAll('.bn').forEach(function(b,i){
+    if(i===0) b.classList.toggle('active',ver==='all');
+    else if(i===1) b.classList.toggle('active',ver==='獨白版');
+    else b.classList.toggle('active',ver==='藏鏡人版');
+  });
+  doFilter();
+}
+
+function doFilter(){
+  var q=document.querySelector('.search').value.toLowerCase();
+  var cards=document.querySelectorAll('.card');
+  var any=false;
+  cards.forEach(function(c){
+    var ok1=cCat==='all'||c.dataset.cat===cCat;
+    var ok2=cVer==='all'||c.dataset.ver===cVer;
+    var ok3=!q||c.textContent.toLowerCase().includes(q);
+    var show=ok1&&ok2&&ok3;
+    c.style.display=show?'':'none';
+    if(show)any=true;
+  });
+  document.getElementById('empty').style.display=any?'none':'block';
+}
+
+function toggle(i){
+  var b=document.getElementById('b'+i);
+  var h=document.getElementById('h'+i);
+  if(b.classList.contains('open')){
+    b.classList.remove('open');
+    h.textContent='▼ 展開腳本';
+  }else{
+    b.classList.add('open');
+    h.textContent='▲ 收合';
+  }
+}
+
+function goHome(){
+  cCat='all';cVer='all';
+  document.querySelector('.search').value='';
+  document.querySelectorAll('.cm-btn').forEach(function(b){b.classList.remove('active');});
+  document.querySelector('.cm-all').classList.add('active');
+  document.getElementById('menuLabel').textContent='📋 全部類型';
+  document.getElementById('cmGrid').classList.remove('open');
+  document.querySelector('.cm-toggle').classList.remove('open');
+  document.querySelectorAll('.vf').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('.vf')[0].classList.add('active');
+  document.querySelectorAll('.bn').forEach(function(b,i){b.classList.toggle('active',i===0);});
+  doFilter();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js');}
+</script>
+</body>
+</html>

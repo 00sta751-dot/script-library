@@ -1,0 +1,14 @@
+{
+  "name": "北高雄房產短影音腳本庫",
+  "short_name": "腳本庫",
+  "description": "北高雄房產短影音腳本庫 - 16支腳本隨時查閱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1e272e",
+  "theme_color": "#1e272e",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

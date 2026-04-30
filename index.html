@@ -1,887 +1,1478 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1e272e">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F4EFE6">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<title>腳本庫</title>
+<title>瑞祥 · 房仲腳本誌｜許瑞祥短影音腳本庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Noto+Serif+TC:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f2f3f7;--card:#fff;--tx:#1e272e;--tx2:#636e72;--tx3:#adb5bd;--bd:#e9ecef;--hdr:#1e272e;--r:12px;
---st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{scroll-behavior:smooth;}
-body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
-background:var(--bg);color:var(--tx);line-height:1.6;padding-bottom:calc(56px + var(--sb));-webkit-font-smoothing:antialiased;}
+:root{
+  --paper:#F4EFE6;
+  --paper-2:#FAF7EF;
+  --ink:#1A1814;
+  --ink-2:#3D362F;
+  --ink-3:#6F665C;
+  --ink-4:#A8A096;
+  --line:#D9D2C5;
+  --line-soft:#E8E1D3;
+  --gold:#B8935B;
+  --gold-deep:#6B4A1F;
+  --bronze:#9B7239;
+  --highlight:#FBE9B6;
+  --serif-en:'Playfair Display',Georgia,serif;
+  --serif:'Noto Serif TC','Songti TC',serif;
+  --sans-en:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;line-height:1.78;
+  letter-spacing:.012em;
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"palt";
+  background-image:
+    radial-gradient(ellipse 800px 600px at 10% 0%,rgba(184,147,91,.08) 0,transparent 50%),
+    radial-gradient(ellipse 600px 500px at 90% 80%,rgba(46,58,79,.06) 0,transparent 50%);
+  background-attachment:fixed;
+  padding-bottom:80px;
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:repeating-linear-gradient(
+    115deg,rgba(26,24,20,.012) 0,rgba(26,24,20,.012) 1px,
+    transparent 1px,transparent 4px);
+  opacity:.7;
+}
+img{display:block;max-width:100%}
 
-.hdr{background:var(--hdr);color:#fff;padding:14px 16px 10px;position:sticky;top:0;z-index:100;
-box-shadow:0 2px 10px rgba(0,0,0,.15);text-align:center;}
-.hdr h1{font-size:1.1rem;font-weight:700;}
-.hdr .sub{font-size:.68rem;color:rgba(255,255,255,.4);margin-top:2px;}
+/* ========== HERO MASTHEAD ========== */
+.masthead{
+  position:relative;z-index:2;
+  text-align:center;
+  padding:48px 24px 20px;
+  border-bottom:1.5px solid var(--ink);
+  margin-bottom:0;
+}
+.masthead .top-rule{
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  font-family:var(--sans-en);
+  font-size:11px;letter-spacing:.32em;
+  color:var(--ink-3);
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.masthead .top-rule::before,
+.masthead .top-rule::after{
+  content:'';width:48px;height:1px;background:var(--ink-3);
+}
+.masthead h1{
+  font-family:var(--serif-en);
+  font-weight:900;font-style:italic;
+  font-size:clamp(48px,12vw,96px);
+  line-height:.92;letter-spacing:-.02em;
+  color:var(--ink);
+  margin:6px 0 6px;
+}
+.masthead h1 .amp{
+  font-family:var(--serif-en);
+  font-style:italic;font-weight:500;
+  color:var(--gold-deep);
+  margin:0 4px;
+}
+.masthead .sub{
+  font-family:var(--serif);
+  font-weight:500;font-size:clamp(15px,2.5vw,18px);
+  color:var(--ink-2);
+  margin-bottom:14px;
+}
+.masthead .meta-row{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;
+  font-family:var(--sans-en);
+  font-size:11px;letter-spacing:.18em;color:var(--ink-3);
+  text-transform:uppercase;
+  padding-top:14px;
+  border-top:1px dashed var(--line);
+  max-width:560px;margin:0 auto;
+}
+.masthead .meta-row span b{color:var(--ink);font-weight:600}
 
-.toolbar{position:sticky;top:52px;z-index:90;background:var(--bg);padding:10px 12px 6px;}
-.search{width:100%;padding:9px 14px;border:none;border-radius:8px;background:var(--card);
-font-size:.88rem;outline:none;box-shadow:0 1px 3px rgba(0,0,0,.05);font-family:inherit;}
-.search::placeholder{color:var(--tx3);}
+/* ========== INTRO COLUMN ========== */
+.intro{
+  position:relative;z-index:2;
+  max-width:720px;margin:0 auto;
+  padding:32px 24px 8px;
+  text-align:center;
+  border-bottom:1px solid var(--line);
+}
+.intro .dropcap{
+  font-family:var(--serif-en);
+  font-weight:900;
+  font-size:88px;line-height:1;
+  color:var(--gold-deep);
+  float:left;margin:8px 12px 0 0;
+}
+.intro p{
+  font-size:15.5px;text-align:left;
+  color:var(--ink-2);line-height:1.85;
+}
+.intro p::after{content:'';display:block;clear:both}
+.intro .author{
+  margin-top:18px;
+  font-family:var(--serif);font-style:italic;font-size:13px;
+  color:var(--ink-3);text-align:right;
+}
 
-.cat-menu{padding:6px 12px 4px;position:sticky;top:102px;z-index:80;background:var(--bg);}
-.cm-toggle{width:100%;padding:9px 14px;border-radius:8px;border:1.5px solid var(--bd);background:var(--card);
-font-size:.82rem;color:var(--tx);cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;align-items:center;font-weight:600;}
-.cm-toggle .cm-arrow{transition:transform .2s;font-size:.7rem;color:var(--tx3);}
-.cm-toggle.open .cm-arrow{transform:rotate(180deg);}
-.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;padding:0;}
-.cm-grid.open{max-height:400px;padding-top:6px;}
-.cm-btn{display:flex;align-items:center;gap:5px;padding:8px 10px;border-radius:8px;
-border:1.5px solid var(--bd);background:var(--card);font-size:.78rem;color:var(--tx2);
-cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;white-space:nowrap;overflow:hidden;}
-.cm-btn.active{background:var(--abg);color:var(--ac);border-color:var(--ac);font-weight:700;}
-.cm-all{grid-column:1/-1;justify-content:center;font-weight:600;}
-.cm-all.active{background:var(--hdr);color:#fff;border-color:var(--hdr);}
+/* ========== STICKY FILTER ========== */
+.filter{
+  position:sticky;top:0;z-index:50;
+  background:rgba(244,239,230,.94);
+  backdrop-filter:blur(14px);
+  border-bottom:1.5px solid var(--ink);
+  padding:12px 14px;
+  margin:24px 0 0;
+}
+.filter-inner{
+  max-width:1080px;margin:0 auto;
+  display:flex;gap:8px;flex-wrap:wrap;
+  align-items:center;justify-content:center;
+}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 13px 6px 14px;
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:2px;
+  font-family:var(--sans);font-size:12.5px;
+  color:var(--ink-2);
+  text-decoration:none;font-weight:500;
+  letter-spacing:.04em;
+  transition:all .15s;
+  position:relative;
+}
+.chip::before{
+  content:'';width:6px;height:6px;border-radius:50%;
+  background:var(--pie,var(--ink));
+  margin-right:2px;
+}
+.chip em{
+  font-style:normal;
+  font-family:var(--sans-en);
+  font-size:10.5px;color:var(--ink-4);
+  font-weight:500;
+}
+.chip.active{
+  background:var(--ink);color:var(--paper);
+  border-color:var(--ink);
+}
+.chip.active em{color:var(--paper-2);opacity:.7}
+.chip-all{padding:6px 14px}
+.chip-all::before{display:none}
 
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px 12px;}
-.st-box{background:var(--card);border-radius:10px;padding:12px 8px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04);}
-.st-n{font-size:1.4rem;font-weight:800;color:var(--hdr);}
-.st-l{font-size:.65rem;color:var(--tx3);}
+/* ========== SEARCH ========== */
+.search{
+  display:block;width:100%;max-width:480px;margin:10px auto 0;
+  padding:8px 14px;
+  border:1px solid var(--line);
+  border-radius:2px;
+  background:var(--paper-2);
+  font-family:var(--sans);font-size:13.5px;
+  color:var(--ink);
+  outline:none;
+  letter-spacing:.04em;
+}
+.search:focus{border-color:var(--ink)}
+.search::placeholder{color:var(--ink-4)}
 
-.cards{padding:0 12px;}
-.card{background:var(--card);border-radius:var(--r);margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;}
-.card-head{padding:14px 16px;cursor:pointer;border-left:4px solid var(--bd);}
-.card-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.cb{font-size:.7rem;font-weight:600;}
-.card-num{font-size:.66rem;color:var(--tx3);font-weight:600;}
-.ct{font-size:.92rem;font-weight:700;line-height:1.5;margin-bottom:4px;}
-.insight-line{font-size:.75rem;color:#e65100;background:#fff3e0;padding:6px 10px;border-radius:6px;margin-top:6px;line-height:1.5;}
-.hint{font-size:.7rem;color:var(--tx3);text-align:center;margin-top:8px;}
+/* ========== STATS BAR ========== */
+.stats{
+  position:relative;z-index:1;
+  max-width:1080px;margin:0 auto;
+  padding:20px 24px 12px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-bottom:1px solid var(--line);
+}
+.stat{text-align:center;padding:8px 4px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:none}
+.stat .n{
+  font-family:var(--serif-en);font-style:italic;font-weight:900;
+  font-size:36px;color:var(--ink);line-height:1;
+}
+.stat .l{
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.18em;
+  color:var(--ink-3);text-transform:uppercase;
+  margin-top:6px;
+}
 
-.card-body{max-height:5000px;overflow:hidden;transition:max-height .35s ease;padding:0 16px 16px;}
-.card-body.collapsed{max-height:0;padding:0 16px;}
-.hint{display:none;}
-.meta-line{font-size:.75rem;color:var(--tx2);margin-bottom:5px;line-height:1.5;}
-.cta-line{background:#e8f5e9;padding:6px 10px;border-radius:6px;color:#2e7d32;font-weight:600;margin-top:8px;}
+/* ========== SECTION HEADER ========== */
+.section-head{
+  max-width:1080px;margin:48px auto 18px;
+  padding:0 24px;
+  display:flex;align-items:flex-end;gap:14px;
+}
+.section-head .roman{
+  font-family:var(--serif-en);font-style:italic;font-weight:500;
+  font-size:36px;color:var(--gold-deep);line-height:1;
+}
+.section-head .label{
+  font-family:var(--serif);font-weight:700;
+  font-size:22px;color:var(--ink);line-height:1.2;
+}
+.section-head .label .en{
+  display:block;
+  font-family:var(--sans-en);font-style:italic;font-weight:400;
+  font-size:11px;letter-spacing:.18em;color:var(--ink-3);
+  text-transform:uppercase;margin-top:4px;
+}
+.section-head .rule{flex:1;height:1px;background:var(--ink);margin-bottom:6px}
+.section-head .count{
+  font-family:var(--sans-en);font-size:11px;letter-spacing:.16em;
+  color:var(--ink-3);text-transform:uppercase;padding-bottom:6px;
+}
 
-.tl{margin-top:10px;}
-.tl-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f4f5f7;}
-.tl-row:last-child{border-bottom:none;}
-.tl-time{width:58px;flex-shrink:0;font-size:.72rem;font-weight:700;padding-top:2px;}
-.tl-txt{flex:1;min-width:0;font-size:.85rem;line-height:1.7;}
-.sub-line{margin-top:5px;padding:5px 10px;background:var(--bg);border-radius:6px;font-size:.74rem;color:var(--tx2);line-height:1.4;}
-.sub-line.mirror{background:#fff3e0;color:#e65100;}
+/* ========== CARDS GRID ========== */
+.cards{
+  position:relative;z-index:1;
+  max-width:1080px;margin:0 auto;
+  padding:0 24px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:20px;
+}
+@media(min-width:780px){
+  .cards{grid-template-columns:1fr 1fr;gap:24px}
+}
+@media(min-width:1100px){
+  .cards{grid-template-columns:1fr 1fr 1fr;gap:24px}
+}
 
-.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);
-display:flex;justify-content:center;gap:32px;padding:6px 0 calc(6px + var(--sb));z-index:100;}
-.bn{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:.62rem;color:var(--tx3);
-cursor:pointer;border:none;background:none;font-family:inherit;padding:4px 10px;}
-.bn.active{color:var(--hdr);font-weight:700;}
-.bn-i{font-size:1.1rem;}
+.card{
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:0;
+  position:relative;
+  display:flex;flex-direction:column;
+  transition:transform .2s,box-shadow .2s,border-color .2s;
+}
+.card:hover{
+  border-color:var(--ink);
+  transform:translateY(-2px);
+  box-shadow:0 18px 32px -22px rgba(26,24,20,.25);
+}
+.card-head{
+  padding:22px 22px 16px;
+  border-bottom:1px solid var(--line-soft);
+  position:relative;
+}
+.card-head::before{
+  content:'';position:absolute;top:0;left:0;
+  width:4px;height:100%;
+  background:var(--pie,var(--ink));
+}
+.card-meta{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:14px;
+}
+.pie{
+  font-family:var(--sans);
+  font-size:11px;letter-spacing:.14em;
+  color:var(--pie,var(--ink-2));
+  font-weight:700;
+  display:inline-flex;align-items:center;gap:6px;
+  text-transform:uppercase;
+}
+.pie::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:var(--pie,var(--ink));
+}
+.num{
+  font-family:var(--serif-en);font-style:italic;font-weight:500;
+  font-size:14px;color:var(--ink-3);
+}
+.title{
+  font-family:var(--serif);font-weight:700;
+  font-size:19.5px;line-height:1.45;
+  letter-spacing:.005em;
+  color:var(--ink);
+  margin-bottom:10px;
+}
+.insight{
+  font-family:var(--serif);font-style:italic;
+  font-size:13.5px;line-height:1.6;
+  color:var(--ink-2);
+  padding:8px 0 0;
+  border-top:1px dashed var(--line);
+  margin-top:6px;
+}
 
-.empty{display:none;text-align:center;padding:50px 20px;color:var(--tx3);font-size:.9rem;}
+.card-body{
+  padding:18px 22px 20px;
+  flex:1;display:flex;flex-direction:column;
+}
+.scene{
+  font-size:12.5px;color:var(--ink-3);
+  background:transparent;
+  padding:0 0 14px;
+  border-bottom:1px solid var(--line-soft);
+  margin-bottom:14px;letter-spacing:.02em;
+}
+.scene b{
+  color:var(--ink);font-weight:600;
+  display:inline-block;margin-right:6px;
+  padding:1px 6px;background:var(--paper);
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.ref-link{
+  font-size:11.5px;color:var(--gold-deep);
+  margin-bottom:10px;letter-spacing:.04em;
+}
+.ref-link a{color:var(--gold-deep);text-decoration:underline;text-underline-offset:2px}
+.gift-line{
+  font-size:11.5px;color:var(--ink-3);
+  margin-bottom:10px;letter-spacing:.02em;
+  padding:6px 10px;background:rgba(184,147,91,.08);
+  border-left:2px solid var(--gold);
+}
+.gift-line span{
+  font-family:var(--sans-en);font-size:9.5px;letter-spacing:.18em;
+  color:var(--gold-deep);text-transform:uppercase;font-weight:700;
+  margin-right:6px;
+}
 
-@media(min-width:600px){
-.cards,.stats,.cat-menu,.toolbar{max-width:540px;margin-left:auto;margin-right:auto;}
-.cm-grid{grid-template-columns:repeat(3,1fr);}
+.timeline{
+  position:relative;
+  margin:8px 0 0;
+  padding-left:14px;
+  border-left:1px solid var(--line);
+}
+.row{
+  position:relative;
+  padding:8px 0 14px;
+}
+.row::before{
+  content:'';position:absolute;
+  left:-19px;top:14px;width:9px;height:9px;
+  background:var(--paper-2);
+  border:1.5px solid var(--ink-3);
+  border-radius:50%;
+}
+.row .time{
+  font-family:var(--sans-en);
+  font-size:10.5px;letter-spacing:.16em;
+  color:var(--ink-3);
+  font-weight:600;text-transform:uppercase;
+  margin-bottom:4px;
+}
+.row .say{
+  font-size:14px;line-height:1.78;color:var(--ink);
+}
+.row .sub{
+  margin-top:7px;display:inline-block;
+  font-size:11.5px;
+  font-family:var(--sans);
+  background:var(--paper);
+  border:1px solid var(--line);
+  color:var(--ink-2);
+  padding:3px 9px;
+  letter-spacing:.04em;
+}
+.row .mirror{
+  margin-top:6px;display:inline-block;
+  font-size:11.5px;
+  font-family:var(--serif);font-style:italic;
+  color:var(--gold-deep);
+  padding:3px 0 3px 14px;
+  border-left:2px solid var(--gold);
+  letter-spacing:.02em;
+}
+.row .mirror::before{
+  content:'❝';
+  margin-right:4px;color:var(--gold);font-style:normal;
+}
+
+.cta{
+  margin-top:auto;padding-top:18px;
+  display:flex;align-items:center;gap:10px;
+  font-size:13.5px;
+  color:var(--ink);
+  border-top:2px solid var(--ink);
+  padding:14px 0 0;
+  font-weight:500;letter-spacing:.02em;
+}
+.cta-arrow{
+  font-family:var(--serif-en);font-style:italic;
+  font-size:22px;color:var(--gold-deep);
+  font-weight:700;line-height:1;
+}
+
+/* ========== EMPTY STATE ========== */
+.empty{
+  display:none;text-align:center;padding:80px 24px;
+  color:var(--ink-3);font-family:var(--serif);font-style:italic;font-size:15px;
+}
+.empty.show{display:block}
+
+/* ========== FOOTER ========== */
+footer{
+  margin-top:80px;
+  border-top:1.5px solid var(--ink);
+  padding:36px 24px 24px;
+  text-align:center;
+  background:var(--paper-2);
+  position:relative;z-index:1;
+}
+footer .colophon{
+  font-family:var(--serif-en);font-style:italic;font-weight:500;
+  font-size:24px;color:var(--ink);
+  margin-bottom:10px;
+}
+footer .lines{
+  font-family:var(--sans-en);font-size:11px;letter-spacing:.14em;
+  color:var(--ink-3);text-transform:uppercase;line-height:2;
+}
+footer .lines span{display:inline-block;margin:0 8px}
+
+/* ========== MOBILE ========== */
+@media(max-width:480px){
+  .masthead{padding:36px 18px 16px}
+  .intro{padding:24px 20px 8px}
+  .stats{grid-template-columns:repeat(2,1fr);padding:16px 18px 8px}
+  .stat{padding:10px 4px;border-right:none;border-bottom:1px solid var(--line)}
+  .stat:nth-child(odd){border-right:1px solid var(--line)}
+  .stat:nth-last-child(-n+2){border-bottom:none}
+  .section-head{padding:0 18px;margin:36px auto 16px;gap:10px}
+  .section-head .roman{font-size:28px}
+  .section-head .label{font-size:18px}
+  .cards{padding:0 18px;gap:18px}
+  .card-head,.card-body{padding-left:18px;padding-right:18px}
+  .title{font-size:18px}
 }
 </style>
 </head>
 <body>
 
-<div class="hdr">
-<h1>永慶瑞祥腳本庫</h1>
-<div class="sub">36 支腳本 · 7 類型 · 短影音／報稅 一次到位</div>
+<header class="masthead">
+  <div class="top-rule">Established 2026 · Issue No. 02 · 高雄</div>
+  <h1>Ruisiang <span class="amp">&amp;</span> Co.</h1>
+  <div class="sub">許瑞祥．房仲腳本誌 — 一個房仲對市場的觀察、診斷、與真話</div>
+  <div class="meta-row">
+    <span>Total <b>36</b> Scripts</span>
+    <span>7 Sections</span>
+    <span>Updated <b>2026‧05‧01</b></span>
+    <span>Pian by 陳澤君</span>
+  </div>
+</header>
+
+<section class="intro">
+  <p><span class="dropcap">這</span>本不是賣房型錄。是一個做了 9 年房仲、看過 200 場簽約場面、聽過上千句屋主和買家對話的人，把行業裡沒人講出來的「讀人」、「讀屋」、「讀價格」邏輯，拆成短影音腳本。每一支都是一個現場故事 — 從帶看的瞬間、議價的眼神、屋主的笑聲，到一張《拆》字貼上去那一刻。看完你不一定要買房，但你會多懂一點這個產業。</p>
+  <div class="author">— 許瑞祥．陳澤君監製</div>
+</section>
+
+<nav class="filter" aria-label="篩選">
+  <div class="filter-inner">
+    <a href="#" class="chip chip-all active" data-cat="all">全部 <em>36</em></a>
+    <a href="#filter-0" class="chip" data-cat="澤君派" style="--pie:#6B2A1F">澤君派 <em>8</em></a>
+  <a href="#filter-1" class="chip" data-cat="嗆辣派" style="--pie:#A0331F">嗆辣派 <em>3</em></a>
+  <a href="#filter-2" class="chip" data-cat="人間觀察派" style="--pie:#5C6B4F">人間觀察 <em>6</em></a>
+  <a href="#filter-3" class="chip" data-cat="主委派" style="--pie:#8C5A1F">主委派 <em>8</em></a>
+  <a href="#filter-4" class="chip" data-cat="前陣子派" style="--pie:#2E3A4F">前陣子 <em>3</em></a>
+  <a href="#filter-5" class="chip" data-cat="陸軍／專業" style="--pie:#3A4A5C">陸軍/專業 <em>2</em></a>
+  <a href="#filter-6" class="chip" data-cat="稅法／報稅" style="--pie:#9B7239">稅法/報稅 <em>6</em></a>
+  </div>
+  <input type="text" class="search" placeholder="搜尋關鍵字 — 屋主、議價、稅、社區..." oninput="filterCards()">
+</nav>
+
+<section class="stats">
+  <div class="stat"><div class="n">36</div><div class="l">Total scripts</div></div>
+  <div class="stat"><div class="n">7</div><div class="l">Sections</div></div>
+  <div class="stat"><div class="n">02</div><div class="l">Issues so far</div></div>
+  <div class="stat"><div class="n">′60</div><div class="l">Avg. duration</div></div>
+</section>
+
+<header class="section-head" id="sect-0">
+  <span class="roman">Ⅰ.</span>
+  <span class="label">澤君派<span class="en">The Direct Voice</span></span>
+  <span class="rule"></span>
+  <span class="count">8 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="澤君派" id="c1">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 01</span>
+    </div>
+    <h3 class="title">你說自己「冷靜的買家」 沉不住氣的就是你</h3>
+    <div class="insight">嘴上冷靜=心裡發燙；真正冷靜的買家不會反覆試探。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　帶看現場側拍，客戶在屋內走來走去；房仲面無表情看著</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">每次客戶跟我說「我這個人很冷靜」 我都點頭笑笑</div><div class="sub">「冷靜的買家」</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">然後他每天傳 LINE 三次 問我那間房有沒有人下斡旋</div><div class="mirror">藏鏡人　「冷靜個屁」</div><div class="sub">三次/天</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">第二週開始問我能不能再看一次 客廳的窗戶到底是西曬還是西北曬</div><div class="sub">再去看一次</div></div>
+        <div class="row"><div class="time">22-35秒</div><div class="say">你以為冷靜 是看了不出價就叫冷靜 那不是冷靜 是怕</div><div class="mirror">藏鏡人　「不是冷靜 是怕」</div><div class="sub">怕≠冷靜</div></div>
+        <div class="row"><div class="time">35-45秒</div><div class="say">真正冷靜的買家 看完一次 三天內回我兩個字「下訂」 因為他研究的時候你還不知道他在看</div><div class="mirror">藏鏡人　「下訂的人都不講話」</div><div class="sub">下訂兩個字</div></div>
+        <div class="row"><div class="time">45-50秒</div><div class="say">私訊我「行情」 我幫你查附近實價登錄 看完你冷不冷靜</div><div class="sub">💬 私訊「行情」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「行情」 我幫你查附近實價登錄</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c2">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 02</span>
+    </div>
+    <h3 class="title">預算800想買1200 你不是買不到是不甘心</h3>
+    <div class="insight">你不是買不到 是不想買「現在能買的」。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　客戶坐咖啡廳滑平板，畫面停在 1200 萬的物件</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">你預算 800 看了一年 永遠在看 1200 的房子</div><div class="sub">預算800/看1200</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">然後跟我說「最近高雄房價怎麼這麼貴」 不是房價貴 是你在看你買不到的</div><div class="mirror">藏鏡人　「不是房價貴 是你在看你買不到的」</div><div class="sub">你在看你買不到的</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">800 萬高雄能買的是這 3 種：稍遠的新成屋電梯華廈、中段屋齡的好地段、改格局的中古屋</div><div class="sub">3種選擇</div></div>
+        <div class="row"><div class="time">22-35秒</div><div class="say">你不甘心住這 3 種 但你也買不起 1200 那 5 種 結果就是繼續租 繼續看 繼續心累</div><div class="mirror">藏鏡人　「不甘心 但又買不起」</div><div class="sub">繼續租/繼續看/繼續心累</div></div>
+        <div class="row"><div class="time">35-43秒</div><div class="say">在預算內買最好的 永遠贏「等以後」</div><div class="mirror">藏鏡人　「贏在『現在』」</div><div class="sub">贏在現在</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">私訊「配對」 我用 800 幫你找區域</div><div class="sub">💬 私訊「配對」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「配對」 我用預算幫你找區域</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c3">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 03</span>
+    </div>
+    <h3 class="title">房仲做久了 比你老婆還懂你</h3>
+    <div class="insight">客戶以為自己保密 但行為早就講完話。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　帶看現場，客戶左顧右盼，房仲拿筆記本默默寫東西</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶跟我見面三次 我比他老婆還懂他</div><div class="sub">比老婆還懂你</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">他什麼預算 為什麼急著買 上一段感情怎麼結束的 我都看得出來</div><div class="mirror">藏鏡人　「我們不是猜 是看」</div><div class="sub">我們在讀人</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">因為他選的房 永遠在透露他在意什麼 學區=有小孩計畫 / 美景=想逃離 / 一樓店面=想創業</div><div class="sub">選房=讀心</div></div>
+        <div class="row"><div class="time">22-35秒</div><div class="say">他老婆只看「裝潢漂不漂亮」 我看的是他眼神停在哪</div><div class="mirror">藏鏡人　「眼神不會騙人」</div><div class="sub">眼神停在哪</div></div>
+        <div class="row"><div class="time">35-43秒</div><div class="say">所以下次你跟房仲說話 注意點 我們其實不是在賣房 是在讀人</div><div class="mirror">藏鏡人　「不是賣房 是讀人」</div><div class="sub">讀人</div></div>
+        <div class="row"><div class="time">43-50秒</div><div class="say">私訊「了解」 跟我聊聊你想要什麼 我幫你看清楚</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 跟我聊聊你想要什麼</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c4">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 04</span>
+    </div>
+    <h3 class="title">屋主抱怨上一個房仲 你就要警惕了</h3>
+    <div class="insight">屋主開頭批評別家=信號 你會是下一個被罵的。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋主家中沙發上，邊喝茶邊抱怨；房仲面無表情記錄</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">第一次跟屋主見面 他開口第一句就在罵上一個房仲</div><div class="sub">屋主罵房仲</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">「他都不認真」「他帶的人都不誠意」「他開的價我覺得太低」</div><div class="mirror">藏鏡人　「全是別人的錯」</div><div class="sub">三句台詞</div></div>
+        <div class="row"><div class="time">12-25秒</div><div class="say">我心裡馬上默默把這個案子的難度 +50%</div><div class="mirror">藏鏡人　「自動加碼難度」</div><div class="sub">難度+50%</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">因為今天他罵那個 半年後就會罵我 不是房仲不努力 是屋主對市場有不切實際的期待</div><div class="sub">他罵的會是你</div></div>
+        <div class="row"><div class="time">40-50秒</div><div class="say">你做仲介久就知道 屋主的價值觀比物件本身更會決定能不能成交</div><div class="mirror">藏鏡人　「人比物件難」</div><div class="sub">人>物件</div></div>
+        <div class="row"><div class="time">50-55秒</div><div class="say">私訊「評估」 我幫你看屋主合不合理 再決定要不要委託我</div><div class="sub">💬 私訊「評估」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「評估」 我幫你看屋主好不好搞</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c5">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 05</span>
+    </div>
+    <h3 class="title">嫌我態度不好 我幫你省了200萬</h3>
+    <div class="insight">真正幫你省錢的人 不會討好你。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　議價會議室，房仲堅持不退讓，客戶皺眉</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶跟我議價那天 我態度很硬 他生氣了</div><div class="sub">態度硬</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">「你怎麼這樣 我是來給你錢的」 我說「我是來幫你省錢的」</div><div class="mirror">藏鏡人　「你給的不是錢 是你的決心」</div><div class="sub">省錢≠討好</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">屋主開 1300 我堅持砍到 1100 中間我跟屋主吵了 5 通電話</div><div class="sub">5通電話</div></div>
+        <div class="row"><div class="time">22-32秒</div><div class="say">客戶以為我態度不好 三天後簽約 他發現實價登錄附近最低 1080 他笑了</div><div class="mirror">藏鏡人　「他笑了 我也鬆了」</div><div class="sub">1080對照</div></div>
+        <div class="row"><div class="time">32-43秒</div><div class="say">對你態度好的房仲 通常先把屋主開價塞給你 你開心他輕鬆 你多花錢</div><div class="mirror">藏鏡人　「對你好 = 你多花錢」</div><div class="sub">態度好≠對你好</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">私訊「行情」 我先幫你看實價登錄</div><div class="sub">💬 私訊「行情」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「行情」 我用實價登錄當依據</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c6">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 06</span>
+    </div>
+    <h3 class="title">房仲幫你 不是有業績 是怕你以後罵他</h3>
+    <div class="insight">業績是當下 罵聲是一輩子。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲在電腦前看資料，翻案件評估表，眉頭緊鎖</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">你以為房仲推銷你 是想賺你的錢</div><div class="sub">賺你的錢？</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">對 但更怕的是 你三年後在 PTT 罵他</div><div class="mirror">藏鏡人　「PTT 永不刪文」</div><div class="sub">怕被罵</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">房仲做久了知道 一個成交客戶 後面還有 30 個觀望</div><div class="sub">1：30</div></div>
+        <div class="row"><div class="time">22-35秒</div><div class="say">所以我跟你說「這間我覺得不適合」 不是不要業績 是我覺得你 1 年後會罵我</div><div class="mirror">藏鏡人　「我寧願今天少賺 不要明年被罵」</div><div class="sub">寧願少賺</div></div>
+        <div class="row"><div class="time">35-43秒</div><div class="say">一個會勸你不買的房仲 比一個說「都好」的房仲值錢 100 倍</div><div class="mirror">藏鏡人　「會勸你不買的 才值錢」</div><div class="sub">勸你不買</div></div>
+        <div class="row"><div class="time">43-50秒</div><div class="say">私訊「了解」 我先幫你看這間房適不適合你</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我先幫你看這間房適不適合你</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c7">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 07</span>
+    </div>
+    <h3 class="title">「我朋友也是房仲」 那你找他啊</h3>
+    <div class="insight">你提朋友是房仲是想壓我；你願意來找我代表他幫不到你。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　客戶在房仲面前打電話，房仲表情無奈靠著椅子</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶跟我說「我朋友也是房仲」 然後等我臉色變</div><div class="sub">等我臉色變</div></div>
+        <div class="row"><div class="time">3-10秒</div><div class="say">我說「那你找他啊」 對方愣住</div><div class="mirror">藏鏡人　「那你找他啊」</div><div class="sub">他找他啊</div></div>
+        <div class="row"><div class="time">10-20秒</div><div class="say">你提朋友是想暗示我「我有底牌」 但你來找我 代表他不夠用</div><div class="mirror">藏鏡人　「你來找我 = 他不夠用」</div><div class="sub">他不夠用</div></div>
+        <div class="row"><div class="time">20-27秒</div><div class="say">找朋友做不一定省錢 找對人才省錢</div><div class="mirror">藏鏡人　「對的人 ≠ 認識的人」</div><div class="sub">找對人</div></div>
+        <div class="row"><div class="time">27-30秒</div><div class="say">私訊「了解」 看你需要的我能不能給</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 看你需要的我能不能給</div>
+  </div>
+</article>
+<article class="card" data-cat="澤君派" id="c8">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <span class="pie">澤君派</span>
+      <span class="num">No. 08</span>
+    </div>
+    <h3 class="title">你以為買房是大事 對房仲是日常</h3>
+    <div class="insight">你的「人生大事」我們處理過 200 次。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲一天剪輯：早會、帶看、議價、簽約、拍合照</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">你買第一間房 緊張到睡不著</div><div class="sub">你的第一次</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">對房仲來說 那是這個月的第 7 個案子</div><div class="mirror">藏鏡人　「不是冷血 是經驗」</div><div class="sub">我的第7個</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">不是冷血 是經驗 你怕的雷 我看過 你在意的點 我研究過</div><div class="sub">雷我都看過</div></div>
+        <div class="row"><div class="time">22-32秒</div><div class="say">所以「找對房仲」 不是你買得便宜 是你買得安心 不要走冤枉路</div><div class="mirror">藏鏡人　「便宜≠安心」</div><div class="sub">找對人</div></div>
+        <div class="row"><div class="time">32-43秒</div><div class="say">你的人生大事 找一個處理過 200 次的人比較划算</div><div class="mirror">藏鏡人　「200 次 vs 你的第一次」</div><div class="sub">200次</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">私訊「了解」 我幫你少走 5 年彎路</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我幫你少走 5 年彎路</div>
+  </div>
+</article>
 </div>
 
-<div class="toolbar">
-<input class="search" type="text" placeholder="搜尋關鍵字..." oninput="doFilter()">
+<header class="section-head" id="sect-1">
+  <span class="roman">Ⅱ.</span>
+  <span class="label">嗆辣派<span class="en">The Spicy Edge</span></span>
+  <span class="rule"></span>
+  <span class="count">3 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="嗆辣派" id="c9">
+  <div class="card-head" style="--pie:#A0331F">
+    <div class="card-meta">
+      <span class="pie">嗆辣派</span>
+      <span class="num">No. 09</span>
+    </div>
+    <h3 class="title">「方便加 LINE 嗎」我都知道你不是要買房</h3>
+    <div class="insight">真正要買的人問「我什麼時候能去看」 不是「方便加 LINE 嗎」。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲手機畫面，LINE 訊息列表快速滑過</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">陌生人來訊「方便加 LINE 嗎」 我都點開看一秒就知道他不是要買房</div><div class="sub">1秒判斷</div></div>
+        <div class="row"><div class="time">3-10秒</div><div class="say">要買的人問「我這週末可以去看嗎」 不是「方便加個 LINE 嗎」</div><div class="mirror">藏鏡人　「真要買的話直接約看」</div><div class="sub">直接約看</div></div>
+        <div class="row"><div class="time">10-20秒</div><div class="say">問「方便加 LINE 嗎」九成是同業 一成是無聊 真的買家節省時間</div><div class="mirror">藏鏡人　「9成同業 1成無聊」</div><div class="sub">9:1</div></div>
+        <div class="row"><div class="time">20-27秒</div><div class="say">所以下次有房仲秒不回你 不是擺架子 是先過濾真假</div><div class="mirror">藏鏡人　「過濾才有效率」</div><div class="sub">過濾</div></div>
+        <div class="row"><div class="time">27-30秒</div><div class="say">私訊「了解」 我教你怎麼問才會被認真接</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我教你怎麼問才會被認真接</div>
+  </div>
+</article>
+<article class="card" data-cat="嗆辣派" id="c10">
+  <div class="card-head" style="--pie:#A0331F">
+    <div class="card-meta">
+      <span class="pie">嗆辣派</span>
+      <span class="num">No. 10</span>
+    </div>
+    <h3 class="title">客戶開條件像在徵婚 不是買房</h3>
+    <div class="insight">條件越多=越不想做決定；真要買的人 3 個條件就夠。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　客戶在咖啡廳寫滿一頁條件清單，房仲面無表情看著</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶第一次找我 給我一張 12 條的條件清單</div><div class="sub">12條清單</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">南向、不靠路、3 房、低公設、3 樓以上、有電梯、近捷運、學區、停車位、預算 800、屋齡 10 年內、要中庭</div><div class="mirror">藏鏡人　「徵婚還是買房」</div><div class="sub">12項條件</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">我看完直接說「這條件 1500 萬都不一定買到」</div><div class="sub">1500也不夠</div></div>
+        <div class="row"><div class="time">22-32秒</div><div class="say">開太多條件不是要買 是怕做決定 你開 12 條 是在拖</div><div class="mirror">藏鏡人　「條件多 = 你怕做決定」</div><div class="sub">條件=拖延</div></div>
+        <div class="row"><div class="time">32-43秒</div><div class="say">真要買的人 條件 3 個：能住、能貸、能負擔 其他的看到再說</div><div class="mirror">藏鏡人　「3個就夠」</div><div class="sub">3個夠了</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">私訊「配對」 我幫你刷掉假需求</div><div class="sub">💬 私訊「配對」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「配對」 我幫你刷掉假需求</div>
+  </div>
+</article>
+<article class="card" data-cat="嗆辣派" id="c11">
+  <div class="card-head" style="--pie:#A0331F">
+    <div class="card-meta">
+      <span class="pie">嗆辣派</span>
+      <span class="num">No. 11</span>
+    </div>
+    <h3 class="title">客戶問我「投資客在哪裡」 我都笑而不答</h3>
+    <div class="insight">你問投資客在哪裡=你想抄答案 但你連他的本錢都沒有。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲表情玩味，客戶皺眉等答案</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶問我「投資客都買哪裡」 我都笑笑不回答</div><div class="sub">笑而不答</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">因為你問這個 不是想學 是想抄</div><div class="mirror">藏鏡人　「你不是想學 你是想抄」</div><div class="sub">想抄</div></div>
+        <div class="row"><div class="time">12-22秒</div><div class="say">投資客的特徵不是「買哪裡」 是「同時看 30 間 出價犀利 不囉唆」</div><div class="sub">30間/犀利/不囉唆</div></div>
+        <div class="row"><div class="time">22-35秒</div><div class="say">你看一間糾結三週 怎麼跟投資客比 你不是學不會 是不想做那個強度</div><div class="mirror">藏鏡人　「不是學不會 是不想」</div><div class="sub">強度差距</div></div>
+        <div class="row"><div class="time">35-45秒</div><div class="say">與其問「投資客買哪裡」 不如問「我這預算最該避開哪些」 一個是抄答案 一個是建護城河</div><div class="mirror">藏鏡人　「建你自己的護城河」</div><div class="sub">建護城河</div></div>
+        <div class="row"><div class="time">45-50秒</div><div class="say">私訊「了解」 我教你怎麼判斷自住 vs 投資型物件</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我教你怎麼判斷自住 vs 投資型</div>
+  </div>
+</article>
 </div>
 
-<div class="cat-menu">
-<button class="cm-toggle" onclick="toggleMenu(this)"><span id="menuLabel">📋 全部類型</span><span class="cm-arrow">▼</span></button>
-<div class="cm-grid" id="cmGrid">
-<button class="cm-btn cm-all active" onclick="pickCat('all',this)" style="--ac:#1e272e;--abg:#1e272e">📋 全部顯示</button>
-<button class="cm-btn" data-cat="主委派" onclick="pickCat('主委派',this)" style="--ac:#d35400;--abg:#d3540010">🏢 主委派</button>
-<button class="cm-btn" data-cat="人間觀察派" onclick="pickCat('人間觀察派',this)" style="--ac:#27ae60;--abg:#27ae6010">👁️ 人間觀察派</button>
-<button class="cm-btn" data-cat="前陣子派" onclick="pickCat('前陣子派',this)" style="--ac:#8e44ad;--abg:#8e44ad10">📖 前陣子派</button>
-<button class="cm-btn" data-cat="嗆辣派" onclick="pickCat('嗆辣派',this)" style="--ac:#e74c3c;--abg:#e74c3c10">🌶️ 嗆辣派</button>
-<button class="cm-btn" data-cat="澤君派" onclick="pickCat('澤君派',this)" style="--ac:#c0392b;--abg:#c0392b10">💢 澤君派</button>
-<button class="cm-btn" data-cat="陸軍／專業" onclick="pickCat('陸軍／專業',this)" style="--ac:#2980b9;--abg:#2980b910">📊 陸軍／專業</button>
-<button class="cm-btn" data-cat="稅法／報稅" onclick="pickCat('稅法／報稅',this)" style="--ac:#c8a96a;--abg:#c8a96a10">📜 稅法／報稅</button>
-
-</div>
-</div>
-
-<div class="stats">
-<div class="st-box"><div class="st-n">36</div><div class="st-l">腳本總數</div></div>
-<div class="st-box"><div class="st-n">7</div><div class="st-l">內容類型</div></div>
-<div class="st-box"><div class="st-n">2</div><div class="st-l">批次</div></div>
-</div>
-
-<div class="cards" id="cardList">
-<div class="card" data-cat="澤君派" id="c0">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(0)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#1</span></div>
-<h3 class="ct">你說自己「冷靜的買家」 沉不住氣的就是你</h3>
-<div class="insight-line">💡 嘴上冷靜=心裡發燙；真正冷靜的買家不會反覆試探。</div>
-<div class="hint" id="h0">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b0">
-<div class="meta-line">🎬 帶看現場側拍，客戶在屋內走來走去；房仲面無表情看著</div><div class="meta-line cta-line">💬 私訊「行情」 我幫你查附近實價登錄</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">每次客戶跟我說「我這個人很冷靜」 我都點頭笑笑<div class="sub-line">📝 「冷靜的買家」</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">然後他每天傳 LINE 三次 問我那間房有沒有人下斡旋<div class="sub-line mirror">🎭 藏鏡人：「冷靜個屁」</div><div class="sub-line">📝 三次/天</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">第二週開始問我能不能再看一次 客廳的窗戶到底是西曬還是西北曬<div class="sub-line">📝 再去看一次</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-35秒</div><div class="tl-txt">你以為冷靜 是看了不出價就叫冷靜 那不是冷靜 是怕<div class="sub-line mirror">🎭 藏鏡人：「不是冷靜 是怕」</div><div class="sub-line">📝 怕≠冷靜</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">35-45秒</div><div class="tl-txt">真正冷靜的買家 看完一次 三天內回我兩個字「下訂」 因為他研究的時候你還不知道他在看<div class="sub-line mirror">🎭 藏鏡人：「下訂的人都不講話」</div><div class="sub-line">📝 下訂兩個字</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">45-50秒</div><div class="tl-txt">私訊我「行情」 我幫你查附近實價登錄 看完你冷不冷靜<div class="sub-line">📝 💬 私訊「行情」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c1">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(1)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#2</span></div>
-<h3 class="ct">預算800想買1200 你不是買不到是不甘心</h3>
-<div class="insight-line">💡 你不是買不到 是不想買「現在能買的」。</div>
-<div class="hint" id="h1">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b1">
-<div class="meta-line">🎬 客戶坐咖啡廳滑平板，畫面停在 1200 萬的物件</div><div class="meta-line cta-line">💬 私訊「配對」 我用預算幫你找區域</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">你預算 800 看了一年 永遠在看 1200 的房子<div class="sub-line">📝 預算800/看1200</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">然後跟我說「最近高雄房價怎麼這麼貴」 不是房價貴 是你在看你買不到的<div class="sub-line mirror">🎭 藏鏡人：「不是房價貴 是你在看你買不到的」</div><div class="sub-line">📝 你在看你買不到的</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">800 萬高雄能買的是這 3 種：稍遠的新成屋電梯華廈、中段屋齡的好地段、改格局的中古屋<div class="sub-line">📝 3種選擇</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-35秒</div><div class="tl-txt">你不甘心住這 3 種 但你也買不起 1200 那 5 種 結果就是繼續租 繼續看 繼續心累<div class="sub-line mirror">🎭 藏鏡人：「不甘心 但又買不起」</div><div class="sub-line">📝 繼續租/繼續看/繼續心累</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">35-43秒</div><div class="tl-txt">在預算內買最好的 永遠贏「等以後」<div class="sub-line mirror">🎭 藏鏡人：「贏在『現在』」</div><div class="sub-line">📝 贏在現在</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">43-45秒</div><div class="tl-txt">私訊「配對」 我用 800 幫你找區域<div class="sub-line">📝 💬 私訊「配對」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c2">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(2)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#3</span></div>
-<h3 class="ct">房仲做久了 比你老婆還懂你</h3>
-<div class="insight-line">💡 客戶以為自己保密 但行為早就講完話。</div>
-<div class="hint" id="h2">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b2">
-<div class="meta-line">🎬 帶看現場，客戶左顧右盼，房仲拿筆記本默默寫東西</div><div class="meta-line cta-line">💬 私訊「了解」 跟我聊聊你想要什麼</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">客戶跟我見面三次 我比他老婆還懂他<div class="sub-line">📝 比老婆還懂你</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">他什麼預算 為什麼急著買 上一段感情怎麼結束的 我都看得出來<div class="sub-line mirror">🎭 藏鏡人：「我們不是猜 是看」</div><div class="sub-line">📝 我們在讀人</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">因為他選的房 永遠在透露他在意什麼 學區=有小孩計畫 / 美景=想逃離 / 一樓店面=想創業<div class="sub-line">📝 選房=讀心</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-35秒</div><div class="tl-txt">他老婆只看「裝潢漂不漂亮」 我看的是他眼神停在哪<div class="sub-line mirror">🎭 藏鏡人：「眼神不會騙人」</div><div class="sub-line">📝 眼神停在哪</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">35-43秒</div><div class="tl-txt">所以下次你跟房仲說話 注意點 我們其實不是在賣房 是在讀人<div class="sub-line mirror">🎭 藏鏡人：「不是賣房 是讀人」</div><div class="sub-line">📝 讀人</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">43-50秒</div><div class="tl-txt">私訊「了解」 跟我聊聊你想要什麼 我幫你看清楚<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c3">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(3)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#4</span></div>
-<h3 class="ct">屋主抱怨上一個房仲 你就要警惕了</h3>
-<div class="insight-line">💡 屋主開頭批評別家=信號 你會是下一個被罵的。</div>
-<div class="hint" id="h3">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b3">
-<div class="meta-line">🎬 屋主家中沙發上，邊喝茶邊抱怨；房仲面無表情記錄</div><div class="meta-line cta-line">💬 私訊「評估」 我幫你看屋主好不好搞</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">第一次跟屋主見面 他開口第一句就在罵上一個房仲<div class="sub-line">📝 屋主罵房仲</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">「他都不認真」「他帶的人都不誠意」「他開的價我覺得太低」<div class="sub-line mirror">🎭 藏鏡人：「全是別人的錯」</div><div class="sub-line">📝 三句台詞</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-25秒</div><div class="tl-txt">我心裡馬上默默把這個案子的難度 +50%<div class="sub-line mirror">🎭 藏鏡人：「自動加碼難度」</div><div class="sub-line">📝 難度+50%</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">25-40秒</div><div class="tl-txt">因為今天他罵那個 半年後就會罵我 不是房仲不努力 是屋主對市場有不切實際的期待<div class="sub-line">📝 他罵的會是你</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">40-50秒</div><div class="tl-txt">你做仲介久就知道 屋主的價值觀比物件本身更會決定能不能成交<div class="sub-line mirror">🎭 藏鏡人：「人比物件難」</div><div class="sub-line">📝 人>物件</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">50-55秒</div><div class="tl-txt">私訊「評估」 我幫你看屋主合不合理 再決定要不要委託我<div class="sub-line">📝 💬 私訊「評估」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c4">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(4)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#5</span></div>
-<h3 class="ct">嫌我態度不好 我幫你省了200萬</h3>
-<div class="insight-line">💡 真正幫你省錢的人 不會討好你。</div>
-<div class="hint" id="h4">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b4">
-<div class="meta-line">🎬 議價會議室，房仲堅持不退讓，客戶皺眉</div><div class="meta-line cta-line">💬 私訊「行情」 我用實價登錄當依據</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">客戶跟我議價那天 我態度很硬 他生氣了<div class="sub-line">📝 態度硬</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">「你怎麼這樣 我是來給你錢的」 我說「我是來幫你省錢的」<div class="sub-line mirror">🎭 藏鏡人：「你給的不是錢 是你的決心」</div><div class="sub-line">📝 省錢≠討好</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">屋主開 1300 我堅持砍到 1100 中間我跟屋主吵了 5 通電話<div class="sub-line">📝 5通電話</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-32秒</div><div class="tl-txt">客戶以為我態度不好 三天後簽約 他發現實價登錄附近最低 1080 他笑了<div class="sub-line mirror">🎭 藏鏡人：「他笑了 我也鬆了」</div><div class="sub-line">📝 1080對照</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">32-43秒</div><div class="tl-txt">對你態度好的房仲 通常先把屋主開價塞給你 你開心他輕鬆 你多花錢<div class="sub-line mirror">🎭 藏鏡人：「對你好 = 你多花錢」</div><div class="sub-line">📝 態度好≠對你好</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">43-45秒</div><div class="tl-txt">私訊「行情」 我先幫你看實價登錄<div class="sub-line">📝 💬 私訊「行情」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c5">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(5)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#6</span></div>
-<h3 class="ct">房仲幫你 不是有業績 是怕你以後罵他</h3>
-<div class="insight-line">💡 業績是當下 罵聲是一輩子。</div>
-<div class="hint" id="h5">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b5">
-<div class="meta-line">🎬 房仲在電腦前看資料，翻案件評估表，眉頭緊鎖</div><div class="meta-line cta-line">💬 私訊「了解」 我先幫你看這間房適不適合你</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">你以為房仲推銷你 是想賺你的錢<div class="sub-line">📝 賺你的錢？</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">對 但更怕的是 你三年後在 PTT 罵他<div class="sub-line mirror">🎭 藏鏡人：「PTT 永不刪文」</div><div class="sub-line">📝 怕被罵</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">房仲做久了知道 一個成交客戶 後面還有 30 個觀望<div class="sub-line">📝 1：30</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-35秒</div><div class="tl-txt">所以我跟你說「這間我覺得不適合」 不是不要業績 是我覺得你 1 年後會罵我<div class="sub-line mirror">🎭 藏鏡人：「我寧願今天少賺 不要明年被罵」</div><div class="sub-line">📝 寧願少賺</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">35-43秒</div><div class="tl-txt">一個會勸你不買的房仲 比一個說「都好」的房仲值錢 100 倍<div class="sub-line mirror">🎭 藏鏡人：「會勸你不買的 才值錢」</div><div class="sub-line">📝 勸你不買</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">43-50秒</div><div class="tl-txt">私訊「了解」 我先幫你看這間房適不適合你<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c6">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(6)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#7</span></div>
-<h3 class="ct">「我朋友也是房仲」 那你找他啊</h3>
-<div class="insight-line">💡 你提朋友是房仲是想壓我；你願意來找我代表他幫不到你。</div>
-<div class="hint" id="h6">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b6">
-<div class="meta-line">🎬 客戶在房仲面前打電話，房仲表情無奈靠著椅子</div><div class="meta-line cta-line">💬 私訊「了解」 看你需要的我能不能給</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">客戶跟我說「我朋友也是房仲」 然後等我臉色變<div class="sub-line">📝 等我臉色變</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-10秒</div><div class="tl-txt">我說「那你找他啊」 對方愣住<div class="sub-line mirror">🎭 藏鏡人：「那你找他啊」</div><div class="sub-line">📝 他找他啊</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">10-20秒</div><div class="tl-txt">你提朋友是想暗示我「我有底牌」 但你來找我 代表他不夠用<div class="sub-line mirror">🎭 藏鏡人：「你來找我 = 他不夠用」</div><div class="sub-line">📝 他不夠用</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">20-27秒</div><div class="tl-txt">找朋友做不一定省錢 找對人才省錢<div class="sub-line mirror">🎭 藏鏡人：「對的人 ≠ 認識的人」</div><div class="sub-line">📝 找對人</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">27-30秒</div><div class="tl-txt">私訊「了解」 看你需要的我能不能給<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="澤君派" id="c7">
-<div class="card-head" style="border-color:#c0392b" onclick="toggle(7)">
-<div class="card-row1"><span class="cb" style="color:#c0392b">💢 澤君派</span><span class="card-num">#8</span></div>
-<h3 class="ct">你以為買房是大事 對房仲是日常</h3>
-<div class="insight-line">💡 你的「人生大事」我們處理過 200 次。</div>
-<div class="hint" id="h7">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b7">
-<div class="meta-line">🎬 房仲一天剪輯：早會、帶看、議價、簽約、拍合照</div><div class="meta-line cta-line">💬 私訊「了解」 我幫你少走 5 年彎路</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#c0392b">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">0-3秒</div><div class="tl-txt">你買第一間房 緊張到睡不著<div class="sub-line">📝 你的第一次</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">3-12秒</div><div class="tl-txt">對房仲來說 那是這個月的第 7 個案子<div class="sub-line mirror">🎭 藏鏡人：「不是冷血 是經驗」</div><div class="sub-line">📝 我的第7個</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">12-22秒</div><div class="tl-txt">不是冷血 是經驗 你怕的雷 我看過 你在意的點 我研究過<div class="sub-line">📝 雷我都看過</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">22-32秒</div><div class="tl-txt">所以「找對房仲」 不是你買得便宜 是你買得安心 不要走冤枉路<div class="sub-line mirror">🎭 藏鏡人：「便宜≠安心」</div><div class="sub-line">📝 找對人</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">32-43秒</div><div class="tl-txt">你的人生大事 找一個處理過 200 次的人比較划算<div class="sub-line mirror">🎭 藏鏡人：「200 次 vs 你的第一次」</div><div class="sub-line">📝 200次</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c0392b">43-45秒</div><div class="tl-txt">私訊「了解」 我幫你少走 5 年彎路<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="嗆辣派" id="c8">
-<div class="card-head" style="border-color:#e74c3c" onclick="toggle(8)">
-<div class="card-row1"><span class="cb" style="color:#e74c3c">🌶️ 嗆辣派</span><span class="card-num">#9</span></div>
-<h3 class="ct">「方便加 LINE 嗎」我都知道你不是要買房</h3>
-<div class="insight-line">💡 真正要買的人問「我什麼時候能去看」 不是「方便加 LINE 嗎」。</div>
-<div class="hint" id="h8">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b8">
-<div class="meta-line">🎬 房仲手機畫面，LINE 訊息列表快速滑過</div><div class="meta-line cta-line">💬 私訊「了解」 我教你怎麼問才會被認真接</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#e74c3c">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">0-3秒</div><div class="tl-txt">陌生人來訊「方便加 LINE 嗎」 我都點開看一秒就知道他不是要買房<div class="sub-line">📝 1秒判斷</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">3-10秒</div><div class="tl-txt">要買的人問「我這週末可以去看嗎」 不是「方便加個 LINE 嗎」<div class="sub-line mirror">🎭 藏鏡人：「真要買的話直接約看」</div><div class="sub-line">📝 直接約看</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">10-20秒</div><div class="tl-txt">問「方便加 LINE 嗎」九成是同業 一成是無聊 真的買家節省時間<div class="sub-line mirror">🎭 藏鏡人：「9成同業 1成無聊」</div><div class="sub-line">📝 9:1</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">20-27秒</div><div class="tl-txt">所以下次有房仲秒不回你 不是擺架子 是先過濾真假<div class="sub-line mirror">🎭 藏鏡人：「過濾才有效率」</div><div class="sub-line">📝 過濾</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">27-30秒</div><div class="tl-txt">私訊「了解」 我教你怎麼問才會被認真接<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="嗆辣派" id="c9">
-<div class="card-head" style="border-color:#e74c3c" onclick="toggle(9)">
-<div class="card-row1"><span class="cb" style="color:#e74c3c">🌶️ 嗆辣派</span><span class="card-num">#10</span></div>
-<h3 class="ct">客戶開條件像在徵婚 不是買房</h3>
-<div class="insight-line">💡 條件越多=越不想做決定；真要買的人 3 個條件就夠。</div>
-<div class="hint" id="h9">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b9">
-<div class="meta-line">🎬 客戶在咖啡廳寫滿一頁條件清單，房仲面無表情看著</div><div class="meta-line cta-line">💬 私訊「配對」 我幫你刷掉假需求</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#e74c3c">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">0-3秒</div><div class="tl-txt">客戶第一次找我 給我一張 12 條的條件清單<div class="sub-line">📝 12條清單</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">3-12秒</div><div class="tl-txt">南向、不靠路、3 房、低公設、3 樓以上、有電梯、近捷運、學區、停車位、預算 800、屋齡 10 年內、要中庭<div class="sub-line mirror">🎭 藏鏡人：「徵婚還是買房」</div><div class="sub-line">📝 12項條件</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">12-22秒</div><div class="tl-txt">我看完直接說「這條件 1500 萬都不一定買到」<div class="sub-line">📝 1500也不夠</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">22-32秒</div><div class="tl-txt">開太多條件不是要買 是怕做決定 你開 12 條 是在拖<div class="sub-line mirror">🎭 藏鏡人：「條件多 = 你怕做決定」</div><div class="sub-line">📝 條件=拖延</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">32-43秒</div><div class="tl-txt">真要買的人 條件 3 個：能住、能貸、能負擔 其他的看到再說<div class="sub-line mirror">🎭 藏鏡人：「3個就夠」</div><div class="sub-line">📝 3個夠了</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">43-45秒</div><div class="tl-txt">私訊「配對」 我幫你刷掉假需求<div class="sub-line">📝 💬 私訊「配對」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="嗆辣派" id="c10">
-<div class="card-head" style="border-color:#e74c3c" onclick="toggle(10)">
-<div class="card-row1"><span class="cb" style="color:#e74c3c">🌶️ 嗆辣派</span><span class="card-num">#11</span></div>
-<h3 class="ct">客戶問我「投資客在哪裡」 我都笑而不答</h3>
-<div class="insight-line">💡 你問投資客在哪裡=你想抄答案 但你連他的本錢都沒有。</div>
-<div class="hint" id="h10">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b10">
-<div class="meta-line">🎬 房仲表情玩味，客戶皺眉等答案</div><div class="meta-line cta-line">💬 私訊「了解」 我教你怎麼判斷自住 vs 投資型</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#e74c3c">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">0-3秒</div><div class="tl-txt">客戶問我「投資客都買哪裡」 我都笑笑不回答<div class="sub-line">📝 笑而不答</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">3-12秒</div><div class="tl-txt">因為你問這個 不是想學 是想抄<div class="sub-line mirror">🎭 藏鏡人：「你不是想學 你是想抄」</div><div class="sub-line">📝 想抄</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">12-22秒</div><div class="tl-txt">投資客的特徵不是「買哪裡」 是「同時看 30 間 出價犀利 不囉唆」<div class="sub-line">📝 30間/犀利/不囉唆</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">22-35秒</div><div class="tl-txt">你看一間糾結三週 怎麼跟投資客比 你不是學不會 是不想做那個強度<div class="sub-line mirror">🎭 藏鏡人：「不是學不會 是不想」</div><div class="sub-line">📝 強度差距</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">35-45秒</div><div class="tl-txt">與其問「投資客買哪裡」 不如問「我這預算最該避開哪些」 一個是抄答案 一個是建護城河<div class="sub-line mirror">🎭 藏鏡人：「建你自己的護城河」</div><div class="sub-line">📝 建護城河</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#e74c3c">45-50秒</div><div class="tl-txt">私訊「了解」 我教你怎麼判斷自住 vs 投資型物件<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c11">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(11)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#12</span></div>
-<h3 class="ct">最後悔賣房的人 不是賠錢的</h3>
-<div class="insight-line">💡 後悔的不是價格 是「賣掉了一段人生」。</div>
-<div class="hint" id="h11">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b11">
-<div class="meta-line">🎬 屋主簽完約走出店門，鏡頭跟在後面，沒有對白</div><div class="meta-line cta-line">💬 留言「+1」 追蹤我下一支講買方的故事</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">做仲介 9 年 我見過很多後悔賣房的屋主<div class="sub-line">📝 後悔的屋主</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">你以為他們賠錢 沒有 大部分是賣得不錯<div class="sub-line mirror">🎭 藏鏡人：「不是錢的事」</div><div class="sub-line">📝 其實沒賠</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">他後悔的是 「那是他第一個家」「孩子在那長大」「現在再買回來買不起」<div class="sub-line">📝 三句後悔</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-40秒</div><div class="tl-txt">上禮拜有個阿姨 賣完三天打給我 哽咽說「我們家狗的指甲還在門框上」 那個門框 她記得<div class="sub-line mirror">🎭 藏鏡人：「狗的指甲還在門框上」</div><div class="sub-line">📝 門框上的指甲</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">40-52秒</div><div class="tl-txt">所以做這行做久了 我不只看價錢 我會問「你準備好了嗎」 賣房不只是交易 是告別<div class="sub-line mirror">🎭 藏鏡人：「賣房=告別」</div><div class="sub-line">📝 你準備好了嗎</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">52-55秒</div><div class="tl-txt">留言「+1」 追蹤我下一支講買方的故事<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c12">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(12)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#13</span></div>
-<h3 class="ct">屋主帶看還在掃地 當天就成交</h3>
-<div class="insight-line">💡 屋主對自己家用不用心 寫在每個角落。</div>
-<div class="hint" id="h12">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b12">
-<div class="meta-line">🎬 屋主邊掃地邊聊天，客戶看到笑了</div><div class="meta-line cta-line">💬 留言告訴我 你會買哪種屋主的房</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">上個月我帶看 屋主在掃地 當天他成交了<div class="sub-line">📝 掃地→成交</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">客戶進門 屋主說「不好意思我還沒掃完」 然後繼續掃<div class="sub-line mirror">🎭 藏鏡人：「他繼續掃」</div><div class="sub-line">📝 繼續掃</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">客戶看了 5 分鐘 跟我說「我要買」 我問為什麼 他說「屋主不裝」<div class="sub-line">📝 屋主不裝</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-40秒</div><div class="tl-txt">屋主裝給你看的家 都是假的 屋主自然狀態的家 才是真的住法<div class="sub-line mirror">🎭 藏鏡人：「真實感勝過美感」</div><div class="sub-line">📝 假的vs真的</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">40-52秒</div><div class="tl-txt">所以下次看房 別在意「整不整齊」 看屋主對家的態度 那個騙不了人<div class="sub-line mirror">🎭 藏鏡人：「態度騙不了人」</div><div class="sub-line">📝 看態度</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">52-55秒</div><div class="tl-txt">留言告訴我 你會買哪種屋主的房？<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c13">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(13)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#14</span></div>
-<h3 class="ct">業務做久了 我記得每個客戶的飲料</h3>
-<div class="insight-line">💡 細節是業務的武器；你被記得 你才會回頭。</div>
-<div class="hint" id="h13">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b13">
-<div class="meta-line">🎬 房仲桌上手搖飲杯，旁邊一本筆記本寫滿小字</div><div class="meta-line cta-line">💬 留言一個你最喜歡的飲料 看我能不能猜你個性</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">我做業務 9 年 不記得自己昨天吃什麼 但記得每個客戶的飲料<div class="sub-line">📝 我都記得</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">陳大哥喝半糖去冰紅茶 林姊喝無糖綠 王哥永遠是黑咖啡<div class="sub-line mirror">🎭 藏鏡人：「每個人都不一樣」</div><div class="sub-line">📝 三個客戶/三個飲料</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">不是我記憶力好 是這份工作教我「客戶會被細節打動」<div class="sub-line">📝 細節打動</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-38秒</div><div class="tl-txt">你跟客戶聊一個禮拜 他不會記得你說的話 你下次見面遞他正確的飲料 他會記得一輩子<div class="sub-line mirror">🎭 藏鏡人：「飲料贏過台詞」</div><div class="sub-line">📝 話vs飲料</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">38-47秒</div><div class="tl-txt">業務做的不是嘴 是「你被看見」 房仲做的也是 賣房不是賣磚塊 是建立信任<div class="sub-line mirror">🎭 藏鏡人：「賣磚塊 vs 賣信任」</div><div class="sub-line">📝 信任</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">47-50秒</div><div class="tl-txt">留言一個你最喜歡的飲料 看我能不能猜你個性<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c14">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(14)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#15</span></div>
-<h3 class="ct">看房先看廁所 不是看客廳</h3>
-<div class="insight-line">💡 客廳裝給你看 廁所是真實生活。</div>
-<div class="hint" id="h14">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b14">
-<div class="meta-line">🎬 客戶進門，房仲指向廁所，客戶意外</div><div class="meta-line cta-line">💬 留言你看房第一個看哪</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">我帶看的時候 第一個帶你看的不是客廳 是廁所<div class="sub-line">📝 先看廁所</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">客戶都說「為什麼」 我說「客廳會裝 廁所裝不了」<div class="sub-line mirror">🎭 藏鏡人：「廁所裝不了」</div><div class="sub-line">📝 裝不了</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">你看廁所 看的是排水順不順、磁磚貼平不平、抽風機會不會運轉、地板是不是潮的<div class="sub-line">📝 4個觀察點</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-40秒</div><div class="tl-txt">房子住得好不好 廁所決定 90% 客廳再漂亮 廁所漏水你天天想搬家<div class="sub-line mirror">🎭 藏鏡人：「廁所決定 90%」</div><div class="sub-line">📝 90%</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">40-47秒</div><div class="tl-txt">好房仲不會帶你「看美的」 會帶你「看真的」<div class="sub-line mirror">🎭 藏鏡人：「看真的」</div><div class="sub-line">📝 看真的</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">47-50秒</div><div class="tl-txt">留言你看房第一個看哪？<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c15">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(15)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#16</span></div>
-<h3 class="ct">屋主笑得越大聲 你越要小心</h3>
-<div class="insight-line">💡 過度熱情=隱藏問題的補償；真誠的屋主反而沉默。</div>
-<div class="hint" id="h15">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b15">
-<div class="meta-line">🎬 屋主大笑拍桌，客戶不安側臉</div><div class="meta-line cta-line">💬 留言告訴我你遇過怎樣的屋主</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">你看房遇到屋主一直大笑 跟你拉家常 那一間 9 成有問題<div class="sub-line">📝 大笑=有事</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">因為他想用熱情 蓋過你不該注意的東西<div class="sub-line mirror">🎭 藏鏡人：「熱情是煙霧彈」</div><div class="sub-line">📝 煙霧彈</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">「漏水？沒有啦哈哈」「樓上吵嗎？沒事啦」「管理費高嗎？這小錢」<div class="sub-line">📝 三個哈哈</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-38秒</div><div class="tl-txt">相反 那個沉默不太說話的屋主 通常房子是最乾淨的 因為他沒什麼好藏的<div class="sub-line mirror">🎭 藏鏡人：「沉默 = 沒什麼好藏」</div><div class="sub-line">📝 沉默的最乾淨</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">38-47秒</div><div class="tl-txt">人會用情緒蓋住資訊 房仲做久就懂 笑聲越大 你越要冷靜<div class="sub-line mirror">🎭 藏鏡人：「笑聲越大 你越冷靜」</div><div class="sub-line">📝 你要冷靜</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">47-50秒</div><div class="tl-txt">留言告訴我 你遇過怎樣的屋主<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="人間觀察派" id="c16">
-<div class="card-head" style="border-color:#27ae60" onclick="toggle(16)">
-<div class="card-row1"><span class="cb" style="color:#27ae60">👁️ 人間觀察派</span><span class="card-num">#17</span></div>
-<h3 class="ct">客戶3分鐘就簽 比你想3個月還準</h3>
-<div class="insight-line">💡 速度=共鳴度；慢不是謹慎 是還沒愛上。</div>
-<div class="hint" id="h16">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b16">
-<div class="meta-line">🎬 屋內，客戶看了一眼直接簽約，旁邊另一組看 50 間還在猶豫</div><div class="meta-line cta-line">💬 留言你看房用幾秒下決定</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#27ae60">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">0-3秒</div><div class="tl-txt">上禮拜有個客戶 看完第一間房 3 分鐘就跟我說「我要簽」<div class="sub-line">📝 3分鐘簽</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">3-13秒</div><div class="tl-txt">另一組客戶 看了 50 間 看了 8 個月 還在猶豫<div class="sub-line mirror">🎭 藏鏡人：「8 個月還在挑」</div><div class="sub-line">📝 50間/8個月</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">13-25秒</div><div class="tl-txt">你以為快的不謹慎 慢的才仔細 反過來<div class="sub-line">📝 反過來</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">25-38秒</div><div class="tl-txt">3 分鐘簽的客戶 一進門就感覺到「對」 50 間都不行的客戶 一直在找他想像中的家<div class="sub-line mirror">🎭 藏鏡人：「他在找想像中的家」</div><div class="sub-line">📝 想像中的家</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">38-47秒</div><div class="tl-txt">買房不是「找最好」 是「找對的」 對的會在 3 分鐘內告訴你<div class="sub-line mirror">🎭 藏鏡人：「對的會告訴你」</div><div class="sub-line">📝 找對的</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#27ae60">47-50秒</div><div class="tl-txt">留言你看房用幾秒下決定？<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c17">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(17)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#18</span></div>
-<h3 class="ct">警衛欸 警衛 你進去看他臉色就知道</h3>
-<div class="insight-line">💡 警衛是社區風氣的縮影；冷漠的警衛=管委會通常是亂的。</div>
-<div class="hint" id="h17">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b17">
-<div class="meta-line">🎬 警衛室畫面，警衛擺臉色，主委指鏡頭碎念</div><div class="meta-line cta-line">💬 留言你住的社區警衛態度如何</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">欸大家欸 我跟你講 看房 警衛欸警衛 你看一眼就知道社區好不好<div class="sub-line">📝 看警衛</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-13秒</div><div class="tl-txt">警衛態度好的社區 通常管委會也運作得好 警衛擺臉色 100% 內部有問題<div class="sub-line mirror">🎭 藏鏡人：「警衛=社區體檢」</div><div class="sub-line">📝 100%有問題</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">13-25秒</div><div class="tl-txt">因為警衛是被管委會請的 管委會一直換人 警衛換了又換 你進去看到他冷臉 那個是「累積出來的不爽」<div class="sub-line">📝 累積不爽</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">25-40秒</div><div class="tl-txt">你住進去 警衛跟你不打招呼 包裹放錯位置 來客不通報 那種日子 你住一年就想搬<div class="sub-line mirror">🎭 藏鏡人：「住一年就想搬」</div><div class="sub-line">📝 三個爛點</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">40-50秒</div><div class="tl-txt">所以欸欸欸 你看房進門先看警衛 警衛欸 不是看大廳水晶燈<div class="sub-line mirror">🎭 藏鏡人：「不是看水晶燈」</div><div class="sub-line">📝 別看燈</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">50-55秒</div><div class="tl-txt">留言你住的社區警衛態度如何<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c18">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(18)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#19</span></div>
-<h3 class="ct">機械車位欸 機械車位 認真聽</h3>
-<div class="insight-line">💡 機械車位=5-10 年大修費；維護成本是隱形房價。</div>
-<div class="hint" id="h18">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b18">
-<div class="meta-line">🎬 機械車位升降慢動作，主委指鏡頭碎念</div><div class="meta-line cta-line">💬 留言你車位是哪一種</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">機械車位欸 機械車位 我跟你講你給我認真聽<div class="sub-line">📝 認真聽</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-13秒</div><div class="tl-txt">很多人以為「停下去就好」 我跟你講 機械車位是個「會吃錢的器官」<div class="sub-line mirror">🎭 藏鏡人：「會吃錢的器官」</div><div class="sub-line">📝 吃錢器官</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">13-25秒</div><div class="tl-txt">5 年要保養 10 年要大修 一台升降機壞了 修一次 30 萬到 80 萬都有 全社區一起分攤<div class="sub-line">📝 30-80萬大修</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">25-40秒</div><div class="tl-txt">你以為車位 200 萬 沒有 你買到的是「未來 20 年要繳大修費」的會員制<div class="sub-line mirror">🎭 藏鏡人：「會員制不是房地產」</div><div class="sub-line">📝 會員制</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">40-47秒</div><div class="tl-txt">買機械車位前 一定要去翻管委會帳 看公基金有多少 沒有就免談<div class="sub-line mirror">🎭 藏鏡人：「沒公基金就免談」</div><div class="sub-line">📝 翻帳本</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">47-50秒</div><div class="tl-txt">留言你車位是哪一種<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c19">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(19)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#20</span></div>
-<h3 class="ct">陽台外推 拆字一貼你就知道</h3>
-<div class="insight-line">💡 陽台外推=違建 一張紙就讓你損失幾十萬。</div>
-<div class="hint" id="h19">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b19">
-<div class="meta-line">🎬 陽台外推實景，紅字「拆」字噴漆，屋主臉色慘白</div><div class="meta-line cta-line">💬 留言你的陽台還在嗎</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">陽台外推 你以為划算 我跟你講 一張拆字貼上去你就懂<div class="sub-line">📝 拆字貼上去</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-12秒</div><div class="tl-txt">違建欸違建 鄰居檢舉一張紙 你拆得不拆得 拆裝潢還要再花 30 萬<div class="sub-line mirror">🎭 藏鏡人：「一張紙」</div><div class="sub-line">📝 30萬拆裝潢</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">12-20秒</div><div class="tl-txt">而且銀行估價 陽台外推不算坪數 你買的時候多付坪數錢 賣的時候賣不回去<div class="sub-line mirror">🎭 藏鏡人：「銀行不算坪」</div><div class="sub-line">📝 雙重損失</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">20-27秒</div><div class="tl-txt">陽台外推 = 買的時候被算錢 賣的時候被砍價 雙重損失 千萬不要碰<div class="sub-line mirror">🎭 藏鏡人：「千萬不要碰」</div><div class="sub-line">📝 兩頭虧</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">27-30秒</div><div class="tl-txt">留言你的陽台還在嗎？<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c20">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(20)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#21</span></div>
-<h3 class="ct">公基金欸 公基金 你不查清楚會哭</h3>
-<div class="insight-line">💡 公基金=社區的命 不到 100 萬的大樓=定時炸彈。</div>
-<div class="hint" id="h20">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b20">
-<div class="meta-line">🎬 管委會帳本紅圈圈起餘額數字</div><div class="meta-line cta-line">💬 留言你社區公基金多少</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">50秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">公基金欸 公基金 你買大樓不查這個 你會哭<div class="sub-line">📝 會哭</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-13秒</div><div class="tl-txt">公基金是什麼 就是社區的存款 修電梯 修水管 修頂樓防水 全部從這裡出<div class="sub-line mirror">🎭 藏鏡人：「社區的命」</div><div class="sub-line">📝 社區的命</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">13-25秒</div><div class="tl-txt">30 戶以上的大樓 公基金至少要有 100 萬 我看過很多社區只有 30 萬 那種社區欸 一個事情就垮<div class="sub-line">📝 100萬基準線</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">25-38秒</div><div class="tl-txt">你買進去 第二年管委會跟你收 5 萬「特別費」 你以為買的是房子 你買的是繳費單<div class="sub-line mirror">🎭 藏鏡人：「買的是繳費單」</div><div class="sub-line">📝 5萬特別費</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">38-47秒</div><div class="tl-txt">買大樓前 跟管委會要看「公基金餘額」 不給看的 我跟你講 不要買<div class="sub-line mirror">🎭 藏鏡人：「不給看就不要買」</div><div class="sub-line">📝 不給看=危險</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">47-50秒</div><div class="tl-txt">留言你社區公基金多少<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c21">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(21)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#22</span></div>
-<h3 class="ct">屋頂加蓋 加蓋欸 千萬不要碰</h3>
-<div class="insight-line">💡 頂樓加蓋=共有部分占用；你買的是糾紛。</div>
-<div class="hint" id="h21">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b21">
-<div class="meta-line">🎬 屋頂違建鐵皮屋，主委搖頭碎念</div><div class="meta-line cta-line">💬 留言你住的樓上有沒有加蓋</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">屋頂加蓋欸 加蓋 我跟你講 千萬不要碰<div class="sub-line">📝 千萬不要碰</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-13秒</div><div class="tl-txt">頂樓本來是全社區的 不是頂樓那戶的 那戶蓋鐵皮屋 等於霸占<div class="sub-line mirror">🎭 藏鏡人：「霸占公共空間」</div><div class="sub-line">📝 霸占</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">13-25秒</div><div class="tl-txt">你買進去之後 哪天有人檢舉 拆 你以為頂樓送給你 結果送的是法院<div class="sub-line">📝 送你法院</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">25-37秒</div><div class="tl-txt">而且頂樓加蓋的隔熱很差 夏天像烤箱 冬天像冰櫃 加蓋部分 30-50 度溫差 住到怕<div class="sub-line mirror">🎭 藏鏡人：「住到怕」</div><div class="sub-line">📝 30-50度溫差</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">37-43秒</div><div class="tl-txt">頂樓加蓋 9 成有糾紛 一成沒糾紛是還沒被檢舉<div class="sub-line mirror">🎭 藏鏡人：「9成糾紛 1成倒數中」</div><div class="sub-line">📝 9:1</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">43-45秒</div><div class="tl-txt">留言你住的樓上有沒有加蓋<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c22">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(22)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#23</span></div>
-<h3 class="ct">一樓店面 店面欸 你以為穩賺</h3>
-<div class="insight-line">💡 一樓店面租客頻繁更換=收益不穩。</div>
-<div class="hint" id="h22">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b22">
-<div class="meta-line">🎬 一樓店面，招牌掛了又掛，鐵門半開</div><div class="meta-line cta-line">💬 留言你看店面看過幾間</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">一樓店面欸 店面 你以為穩賺 我跟你講<div class="sub-line">📝 你以為穩賺</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-12秒</div><div class="tl-txt">一樓店面看起來租金高 但你看那個招牌 換了 5 個了<div class="sub-line mirror">🎭 藏鏡人：「招牌換 5 個」</div><div class="sub-line">📝 5次換手</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">12-20秒</div><div class="tl-txt">商圈會死 行業會走 你以為店面金雞母 實際是空屋率高<div class="sub-line mirror">🎭 藏鏡人：「金雞母會死」</div><div class="sub-line">📝 空屋率高</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">20-27秒</div><div class="tl-txt">而且 公設你算了沒 容積你算了沒 銀行貸款願意給幾成 一樓店面 你不是省事 你是麻煩<div class="sub-line">📝 三項要算</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">27-30秒</div><div class="tl-txt">留言你看店面看過幾間<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c23">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(23)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#24</span></div>
-<h3 class="ct">飯店式管理 9成只剩名字而已</h3>
-<div class="insight-line">💡 「飯店式管理」是建商行銷詞 90% 是裝飾。</div>
-<div class="hint" id="h23">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b23">
-<div class="meta-line">🎬 大廳華麗水晶燈，警衛打瞌睡，主委皺眉</div><div class="meta-line cta-line">💬 留言你住的社區叫什麼名字</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">飯店式管理欸 我跟你講 9 成只剩名字<div class="sub-line">📝 9成名字</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-13秒</div><div class="tl-txt">建商賣案子 都寫「飯店式管理」 你住進去 大廳水晶燈 警衛在玩手機<div class="sub-line mirror">🎭 藏鏡人：「水晶燈 vs 玩手機」</div><div class="sub-line">📝 對比</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">13-25秒</div><div class="tl-txt">飯店式管理 = 24 小時 / 代收包裹 / 雙語接待 / 公設保養 / 公共區清潔<div class="sub-line">📝 5項標準</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">25-37秒</div><div class="tl-txt">你住進去 24 小時警衛沒了 雙語接待是台語 公設只剩游泳池水綠掉<div class="sub-line mirror">🎭 藏鏡人：「雙語接待 = 台語」</div><div class="sub-line">📝 現實對照</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">37-43秒</div><div class="tl-txt">「飯店式」三個字 是賣前的形容詞 不是住進去的事實 你買前要問「實際有幾項」<div class="sub-line mirror">🎭 藏鏡人：「實際有幾項」</div><div class="sub-line">📝 問實際項數</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">43-45秒</div><div class="tl-txt">留言你住的社區叫什麼<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="主委派" id="c24">
-<div class="card-head" style="border-color:#d35400" onclick="toggle(24)">
-<div class="card-row1"><span class="cb" style="color:#d35400">🏢 主委派</span><span class="card-num">#25</span></div>
-<h3 class="ct">違停拖吊 管委會敢不敢罰 我講給你聽</h3>
-<div class="insight-line">💡 管委會執法力=社區體質；不敢罰違停的=也不敢做事。</div>
-<div class="hint" id="h24">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b24">
-<div class="meta-line">🎬 違停車輛，拖吊車進場，管委會公告貼在牆上</div><div class="meta-line cta-line">💬 留言你的社區停車狀況</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#d35400">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">0-3秒</div><div class="tl-txt">違停欸 違停 你看管委會敢不敢拖吊 你就知道這個社區有沒有救<div class="sub-line">📝 看執法</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">3-12秒</div><div class="tl-txt">好的社區 違停 5 分鐘 公告貼出來 第三次直接拖<div class="sub-line mirror">🎭 藏鏡人：「5分鐘+三次拖吊」</div><div class="sub-line">📝 5分鐘起算</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">12-20秒</div><div class="tl-txt">壞的社區 違停 3 個月 主委說「先勸導」 一個月後還是擋你車<div class="sub-line mirror">🎭 藏鏡人：「先勸導 = 一輩子勸導」</div><div class="sub-line">📝 永遠勸導</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">20-27秒</div><div class="tl-txt">管委會的執法力 就是社區的「規則感」 你看這個 比看大廳豪華還準<div class="sub-line mirror">🎭 藏鏡人：「執法>豪華」</div><div class="sub-line">📝 規則感</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#d35400">27-30秒</div><div class="tl-txt">留言你的社區停車狀況<div class="sub-line">📝 💬 留言+追蹤</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="前陣子派" id="c25">
-<div class="card-head" style="border-color:#8e44ad" onclick="toggle(25)">
-<div class="card-row1"><span class="cb" style="color:#8e44ad">📖 前陣子派</span><span class="card-num">#26</span></div>
-<h3 class="ct">前陣子發現 LINE 已讀不回的客戶 反而後來都成交</h3>
-<div class="insight-line">💡 已讀不回=還在認真考慮；一直問問題的=還沒進入決定階段。</div>
-<div class="hint" id="h25">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b25">
-<div class="meta-line">🎬 房仲手機畫面 LINE 訊息已讀沒回，靜默</div><div class="meta-line cta-line">💬 私訊「了解」 我幫你判斷自己現在哪一階段</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#8e44ad">秒數</div><div class="tl-txt">60秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">0-3秒</div><div class="tl-txt">前陣子有件事讓我反思<div class="sub-line">📝 反思</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">3-13秒</div><div class="tl-txt">我把過去 3 年的成交客戶調出來 看他們跟我聊天的歷史<div class="sub-line mirror">🎭 藏鏡人：「3 年數據」</div><div class="sub-line">📝 3年數據</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">13-25秒</div><div class="tl-txt">發現 8 成在簽約前一週都「已讀不回」 我以為他們不買了 結果一個禮拜後突然約簽約<div class="sub-line">📝 8成已讀不回</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">25-40秒</div><div class="tl-txt">反而每天問我「這間怎麼樣」「那間呢」 一週聊三次的客戶 9 成沒成交<div class="sub-line mirror">🎭 藏鏡人：「一週聊三次 = 9成沒成交」</div><div class="sub-line">📝 聊太多=沒下文</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">40-52秒</div><div class="tl-txt">因為「已讀不回」 = 在認真看資料 一直發訊息 = 還在「哈拉」 真要買的人 沉默是常態<div class="sub-line mirror">🎭 藏鏡人：「沉默是真客戶的常態」</div><div class="sub-line">📝 沉默=認真</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">52-58秒</div><div class="tl-txt">我教你判斷自己現在哪一階段 私訊「了解」<div class="sub-line">📝 判斷階段</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">58-60秒</div><div class="tl-txt">💬 私訊「了解」<div class="sub-line">📝 💬</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="前陣子派" id="c26">
-<div class="card-head" style="border-color:#8e44ad" onclick="toggle(26)">
-<div class="card-row1"><span class="cb" style="color:#8e44ad">📖 前陣子派</span><span class="card-num">#27</span></div>
-<h3 class="ct">你跟屋主同姓 過戶很麻煩</h3>
-<div class="insight-line">💡 同姓會被國稅局多查，怕「假交易真贈與」。</div>
-<div class="hint" id="h26">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b26">
-<div class="meta-line">🎬 代書桌前翻權狀，同姓客戶愣住</div><div class="meta-line cta-line">💬 私訊「了解」 我幫你預判過戶風險</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#8e44ad">秒數</div><div class="tl-txt">60秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">0-3秒</div><div class="tl-txt">前陣子有個客戶 跟屋主同姓 過戶差點卡 3 個月<div class="sub-line">📝 卡3個月</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">3-13秒</div><div class="tl-txt">他姓陳 屋主也姓陳 兩人不認識 但國稅局看到「陳對陳」就警鈴大作<div class="sub-line mirror">🎭 藏鏡人：「陳對陳警鈴大作」</div><div class="sub-line">📝 警鈴大作</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">13-25秒</div><div class="tl-txt">因為怕你們是親戚 假交易真贈與 逃贈與稅 國稅局會查資金流<div class="sub-line">📝 查資金流</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">25-40秒</div><div class="tl-txt">客戶跟我說「我跟他八竿子打不著」 沒用 國稅局要你提證明 你要拿身分證、戶籍謄本、銀行匯款紀錄 全部交出來<div class="sub-line mirror">🎭 藏鏡人：「八竿子打不著也要證明」</div><div class="sub-line">📝 證明清單</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">40-52秒</div><div class="tl-txt">所以遇到同姓的案子 我都先幫你做心理準備 不是買不到 是過戶要多 1 個月<div class="sub-line mirror">🎭 藏鏡人：「多 1 個月 心理準備」</div><div class="sub-line">📝 +1個月</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">52-58秒</div><div class="tl-txt">過戶風險我幫你預判 私訊「了解」<div class="sub-line">📝 預判</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">58-60秒</div><div class="tl-txt">💬 私訊「了解」<div class="sub-line">📝 💬</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="前陣子派" id="c27">
-<div class="card-head" style="border-color:#8e44ad" onclick="toggle(27)">
-<div class="card-row1"><span class="cb" style="color:#8e44ad">📖 前陣子派</span><span class="card-num">#28</span></div>
-<h3 class="ct">前陣子帶看 客戶問我這牆能不能敲</h3>
-<div class="insight-line">💡 70% 的牆是承重牆 拆了結構出問題。</div>
-<div class="hint" id="h27">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b27">
-<div class="meta-line">🎬 客戶站在牆前用手敲，房仲皺眉伸手擋</div><div class="meta-line cta-line">💬 私訊「評估」 我帶結構技師看</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#8e44ad">秒數</div><div class="tl-txt">45秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">0-3秒</div><div class="tl-txt">前陣子帶看 客戶站在客廳指牆問「這個能敲掉嗎」<div class="sub-line">📝 能敲掉嗎</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">3-13秒</div><div class="tl-txt">我說「等等先別敲」 我請結構技師看一下<div class="sub-line mirror">🎭 藏鏡人：「先別敲」</div><div class="sub-line">📝 先別敲</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">13-25秒</div><div class="tl-txt">很多客戶以為「裝潢可以亂改」 70% 的牆是承重牆 敲掉之後整棟搖<div class="sub-line">📝 70%承重牆</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">25-37秒</div><div class="tl-txt">尤其老公寓 結構單薄 你拆了客廳跟陽台之間的牆 颱風天會給你看好戲<div class="sub-line mirror">🎭 藏鏡人：「颱風天看好戲」</div><div class="sub-line">📝 颱風天</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">37-43秒</div><div class="tl-txt">所以買房前 想改格局 先帶結構技師 不是帶設計師<div class="sub-line mirror">🎭 藏鏡人：「結構技師>設計師」</div><div class="sub-line">📝 順序顛倒</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#8e44ad">43-45秒</div><div class="tl-txt">我幫你帶結構技師看 私訊「評估」<div class="sub-line">📝 💬 私訊「評估」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="陸軍／專業" id="c28">
-<div class="card-head" style="border-color:#2980b9" onclick="toggle(28)">
-<div class="card-row1"><span class="cb" style="color:#2980b9">📊 陸軍／專業</span><span class="card-num">#29</span></div>
-<h3 class="ct">30 年老公寓 你要嫌它老還是要它便宜</h3>
-<div class="insight-line">💡 老公寓便宜=機會；要看 3 件事：地段、結構、未來。</div>
-<div class="hint" id="h28">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b28">
-<div class="meta-line">🎬 老公寓外觀，牆面磨損，但內部看出整修空間</div><div class="meta-line cta-line">💬 私訊「了解」 我幫你看老公寓有沒有價值</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#2980b9">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">0-3秒</div><div class="tl-txt">很多人問我「30 年老公寓能買嗎」 我答「先看你要嫌它老 還是要它便宜」<div class="sub-line">📝 先選一個</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">3-13秒</div><div class="tl-txt">老公寓便宜 比同地段大樓便宜 30-50% 那是「好處」<div class="sub-line mirror">🎭 藏鏡人：「便宜 30-50% 不是小數」</div><div class="sub-line">📝 便宜30-50%</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">13-25秒</div><div class="tl-txt">但缺點 3 個 1 沒電梯 2 公設老 3 結構你要查<div class="sub-line">📝 三大缺點</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">25-40秒</div><div class="tl-txt">值得買的老公寓 地段在主商圈 結構鋼筋沒外露 周圍有都更可能 這 3 件齊 它就是寶<div class="sub-line mirror">🎭 藏鏡人：「地段+結構+未來」</div><div class="sub-line">📝 三件齊</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">40-50秒</div><div class="tl-txt">老公寓不是不能買 是要會挑 不會挑就是負債 會挑就是金雞母<div class="sub-line mirror">🎭 藏鏡人：「會挑=金雞母」</div><div class="sub-line">📝 挑對是寶</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">50-55秒</div><div class="tl-txt">我幫你看 私訊「了解」<div class="sub-line">📝 💬 私訊「了解」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="陸軍／專業" id="c29">
-<div class="card-head" style="border-color:#2980b9" onclick="toggle(29)">
-<div class="card-row1"><span class="cb" style="color:#2980b9">📊 陸軍／專業</span><span class="card-num">#30</span></div>
-<h3 class="ct">加蓋陽光屋 9成被打過官司</h3>
-<div class="insight-line">💡 陽光屋雖看似合法 90% 屬於違建；法院判書一查就知。</div>
-<div class="hint" id="h29">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b29">
-<div class="meta-line">🎬 後院加蓋陽光屋，玻璃屋頂、紅磚地基</div><div class="meta-line cta-line">💬 私訊「評估」 司法紀錄查詢我教你</div>
-<div class="tl"><div class="tl-row"><div class="tl-time" style="color:#2980b9">秒數</div><div class="tl-txt">55秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">0-3秒</div><div class="tl-txt">客戶看透天 看到後院加蓋陽光屋 我都先冷淡<div class="sub-line">📝 看到我冷淡</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">3-13秒</div><div class="tl-txt">因為陽光屋 9 成是違建 法院判書一查 多數有訴訟紀錄<div class="sub-line mirror">🎭 藏鏡人：「9成違建 不誇張」</div><div class="sub-line">📝 9成違建</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">13-25秒</div><div class="tl-txt">你以為「玻璃屋頂應該合法」 不 任何在合法建築範圍外加蓋的 都算違建<div class="sub-line">📝 玻璃也違建</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">25-40秒</div><div class="tl-txt">而且陽光屋造價 30-80 萬 拆掉之後 你以為的「室內坪數」變成戶外 雨天淋濕你的客廳<div class="sub-line mirror">🎭 藏鏡人：「雨天淋濕你的客廳」</div><div class="sub-line">📝 雙重損失</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">40-50秒</div><div class="tl-txt">買透天看到加蓋 第一件事 上司法院網站查屋主名字 有沒有 6 年內的相鄰民事訴訟 那才是真相<div class="sub-line mirror">🎭 藏鏡人：「司法院網站查名字」</div><div class="sub-line">📝 查司法院</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#2980b9">50-55秒</div><div class="tl-txt">司法紀錄查詢我教你 私訊「評估」<div class="sub-line">📝 💬 私訊「評估」</div></div></div>
-</div>
-</div>
-</div>
-<div class="card" data-cat="稅法／報稅" id="c30">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(30)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#31</span></div>
-<h3 class="ct">繼承屋差一年 稅差 30 萬</h3>
-<div class="insight-line">💡 連續繼承＋配偶贈與 持有期可併計；自住免稅 400 萬要 6 年實住。</div>
-<div class="hint" id="h30">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b30">
-<div class="meta-line">🎬 直球派誘餌型｜35 秒｜流量密碼：金錢+揭露+反差</div>
-<div class="meta-line cta-line">💬 私訊「繼承」 拿 5 步驟自查表</div>
-<div class="meta-line">📚 <a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL009961" style="color:#c8a96a">房地合一作業要點 第五點 ‧ 115/4/21 修</a></div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">35秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-5秒</div><div class="tl-txt">你家有繼承來的房嗎？賣掉差一年差好幾十萬<div class="sub-line">📝 繼承屋‧持有期‧差好幾級稅</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">6-15秒</div><div class="tl-txt">2026/4/21 財政部剛改 — 連續繼承來的、配偶贈與來的，可以把前手持有期間整個串起來<div class="sub-line">📝 房地合一作業要點‧115/4/21 修</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">但條件嚴 — 想主張自住免稅 400 萬，要實際居住、6 年沒出租。沒搞清楚白虧<div class="sub-line">📝 自住免稅‧戶籍+實住+無出租</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-30秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「你家有繼承來的房嗎？」</div><div class="sub-line">📝 評論區寫 1</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">31-35秒</div><div class="tl-txt">私訊「繼承」 我給你 5 步驟自查表<div class="sub-line">📝 💬 私訊「繼承」</div></div></div>
-</div>
-</div>
+<header class="section-head" id="sect-2">
+  <span class="roman">Ⅲ.</span>
+  <span class="label">人間觀察<span class="en">Human Observations</span></span>
+  <span class="rule"></span>
+  <span class="count">6 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="人間觀察派" id="c12">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 12</span>
+    </div>
+    <h3 class="title">最後悔賣房的人 不是賠錢的</h3>
+    <div class="insight">後悔的不是價格 是「賣掉了一段人生」。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋主簽完約走出店門，鏡頭跟在後面，沒有對白</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">做仲介 9 年 我見過很多後悔賣房的屋主</div><div class="sub">後悔的屋主</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">你以為他們賠錢 沒有 大部分是賣得不錯</div><div class="mirror">藏鏡人　「不是錢的事」</div><div class="sub">其實沒賠</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">他後悔的是 「那是他第一個家」「孩子在那長大」「現在再買回來買不起」</div><div class="sub">三句後悔</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">上禮拜有個阿姨 賣完三天打給我 哽咽說「我們家狗的指甲還在門框上」 那個門框 她記得</div><div class="mirror">藏鏡人　「狗的指甲還在門框上」</div><div class="sub">門框上的指甲</div></div>
+        <div class="row"><div class="time">40-52秒</div><div class="say">所以做這行做久了 我不只看價錢 我會問「你準備好了嗎」 賣房不只是交易 是告別</div><div class="mirror">藏鏡人　「賣房=告別」</div><div class="sub">你準備好了嗎</div></div>
+        <div class="row"><div class="time">52-55秒</div><div class="say">留言「+1」 追蹤我下一支講買方的故事</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言「+1」 追蹤我下一支講買方的故事</div>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="c13">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 13</span>
+    </div>
+    <h3 class="title">屋主帶看還在掃地 當天就成交</h3>
+    <div class="insight">屋主對自己家用不用心 寫在每個角落。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋主邊掃地邊聊天，客戶看到笑了</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">上個月我帶看 屋主在掃地 當天他成交了</div><div class="sub">掃地→成交</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">客戶進門 屋主說「不好意思我還沒掃完」 然後繼續掃</div><div class="mirror">藏鏡人　「他繼續掃」</div><div class="sub">繼續掃</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">客戶看了 5 分鐘 跟我說「我要買」 我問為什麼 他說「屋主不裝」</div><div class="sub">屋主不裝</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">屋主裝給你看的家 都是假的 屋主自然狀態的家 才是真的住法</div><div class="mirror">藏鏡人　「真實感勝過美感」</div><div class="sub">假的vs真的</div></div>
+        <div class="row"><div class="time">40-52秒</div><div class="say">所以下次看房 別在意「整不整齊」 看屋主對家的態度 那個騙不了人</div><div class="mirror">藏鏡人　「態度騙不了人」</div><div class="sub">看態度</div></div>
+        <div class="row"><div class="time">52-55秒</div><div class="say">留言告訴我 你會買哪種屋主的房？</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言告訴我 你會買哪種屋主的房</div>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="c14">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 14</span>
+    </div>
+    <h3 class="title">業務做久了 我記得每個客戶的飲料</h3>
+    <div class="insight">細節是業務的武器；你被記得 你才會回頭。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲桌上手搖飲杯，旁邊一本筆記本寫滿小字</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">我做業務 9 年 不記得自己昨天吃什麼 但記得每個客戶的飲料</div><div class="sub">我都記得</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">陳大哥喝半糖去冰紅茶 林姊喝無糖綠 王哥永遠是黑咖啡</div><div class="mirror">藏鏡人　「每個人都不一樣」</div><div class="sub">三個客戶/三個飲料</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">不是我記憶力好 是這份工作教我「客戶會被細節打動」</div><div class="sub">細節打動</div></div>
+        <div class="row"><div class="time">25-38秒</div><div class="say">你跟客戶聊一個禮拜 他不會記得你說的話 你下次見面遞他正確的飲料 他會記得一輩子</div><div class="mirror">藏鏡人　「飲料贏過台詞」</div><div class="sub">話vs飲料</div></div>
+        <div class="row"><div class="time">38-47秒</div><div class="say">業務做的不是嘴 是「你被看見」 房仲做的也是 賣房不是賣磚塊 是建立信任</div><div class="mirror">藏鏡人　「賣磚塊 vs 賣信任」</div><div class="sub">信任</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言一個你最喜歡的飲料 看我能不能猜你個性</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言一個你最喜歡的飲料 看我能不能猜你個性</div>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="c15">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 15</span>
+    </div>
+    <h3 class="title">看房先看廁所 不是看客廳</h3>
+    <div class="insight">客廳裝給你看 廁所是真實生活。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　客戶進門，房仲指向廁所，客戶意外</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">我帶看的時候 第一個帶你看的不是客廳 是廁所</div><div class="sub">先看廁所</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">客戶都說「為什麼」 我說「客廳會裝 廁所裝不了」</div><div class="mirror">藏鏡人　「廁所裝不了」</div><div class="sub">裝不了</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">你看廁所 看的是排水順不順、磁磚貼平不平、抽風機會不會運轉、地板是不是潮的</div><div class="sub">4個觀察點</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">房子住得好不好 廁所決定 90% 客廳再漂亮 廁所漏水你天天想搬家</div><div class="mirror">藏鏡人　「廁所決定 90%」</div><div class="sub">90%</div></div>
+        <div class="row"><div class="time">40-47秒</div><div class="say">好房仲不會帶你「看美的」 會帶你「看真的」</div><div class="mirror">藏鏡人　「看真的」</div><div class="sub">看真的</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言你看房第一個看哪？</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你看房第一個看哪</div>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="c16">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 16</span>
+    </div>
+    <h3 class="title">屋主笑得越大聲 你越要小心</h3>
+    <div class="insight">過度熱情=隱藏問題的補償；真誠的屋主反而沉默。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋主大笑拍桌，客戶不安側臉</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">你看房遇到屋主一直大笑 跟你拉家常 那一間 9 成有問題</div><div class="sub">大笑=有事</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">因為他想用熱情 蓋過你不該注意的東西</div><div class="mirror">藏鏡人　「熱情是煙霧彈」</div><div class="sub">煙霧彈</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">「漏水？沒有啦哈哈」「樓上吵嗎？沒事啦」「管理費高嗎？這小錢」</div><div class="sub">三個哈哈</div></div>
+        <div class="row"><div class="time">25-38秒</div><div class="say">相反 那個沉默不太說話的屋主 通常房子是最乾淨的 因為他沒什麼好藏的</div><div class="mirror">藏鏡人　「沉默 = 沒什麼好藏」</div><div class="sub">沉默的最乾淨</div></div>
+        <div class="row"><div class="time">38-47秒</div><div class="say">人會用情緒蓋住資訊 房仲做久就懂 笑聲越大 你越要冷靜</div><div class="mirror">藏鏡人　「笑聲越大 你越冷靜」</div><div class="sub">你要冷靜</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言告訴我 你遇過怎樣的屋主</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言告訴我你遇過怎樣的屋主</div>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="c17">
+  <div class="card-head" style="--pie:#5C6B4F">
+    <div class="card-meta">
+      <span class="pie">人間觀察</span>
+      <span class="num">No. 17</span>
+    </div>
+    <h3 class="title">客戶3分鐘就簽 比你想3個月還準</h3>
+    <div class="insight">速度=共鳴度；慢不是謹慎 是還沒愛上。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋內，客戶看了一眼直接簽約，旁邊另一組看 50 間還在猶豫</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">上禮拜有個客戶 看完第一間房 3 分鐘就跟我說「我要簽」</div><div class="sub">3分鐘簽</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">另一組客戶 看了 50 間 看了 8 個月 還在猶豫</div><div class="mirror">藏鏡人　「8 個月還在挑」</div><div class="sub">50間/8個月</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">你以為快的不謹慎 慢的才仔細 反過來</div><div class="sub">反過來</div></div>
+        <div class="row"><div class="time">25-38秒</div><div class="say">3 分鐘簽的客戶 一進門就感覺到「對」 50 間都不行的客戶 一直在找他想像中的家</div><div class="mirror">藏鏡人　「他在找想像中的家」</div><div class="sub">想像中的家</div></div>
+        <div class="row"><div class="time">38-47秒</div><div class="say">買房不是「找最好」 是「找對的」 對的會在 3 分鐘內告訴你</div><div class="mirror">藏鏡人　「對的會告訴你」</div><div class="sub">找對的</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言你看房用幾秒下決定？</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你看房用幾秒下決定</div>
+  </div>
+</article>
 </div>
 
-<div class="card" data-cat="稅法／報稅" id="c31">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(31)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#32</span></div>
-<h3 class="ct">繼承半間房 銀行不一定卡你</h3>
-<div class="insight-line">💡 央行 2026/3/19 新版 Q&A：繼承建物／持分／房貸 都不計入名下。</div>
-<div class="hint" id="h31">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b31">
-<div class="meta-line">🎬 直球派誘餌型｜30 秒｜流量密碼：揭露+共鳴+反差</div>
-<div class="meta-line cta-line">💬 私訊「首購」 拿重新認定 SOP</div>
-<div class="meta-line">📚 <a href="https://www.cbc.gov.tw/tw/cp-4223-124873-79d4c-1.html" style="color:#c8a96a">央行不動產抵押貸款業務規定問與答 Q11/Q12/Q14</a></div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-6秒</div><div class="tl-txt">跟兄弟姐妹分到半間房的人最痛 — 自己想買房，銀行說你不算首購<div class="sub-line">📝 繼承持分‧卡首購？</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">7-15秒</div><div class="tl-txt">央行 2026 年 3 月 19 日新版 Q&A 寫得很白：繼承的建物、繼承持分、繼承房貸都不計入名下<div class="sub-line">📝 央行 Q11/Q12/Q14 ‧ 2026/3/19</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">只要銀行查證屬實 — 你還是首購族<div class="sub-line">📝 主動跟銀行說 ‧ 備證明</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-28秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「你也卡在半間繼承房嗎？」</div><div class="sub-line">📝 卡的舉個手</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">29-30秒</div><div class="tl-txt">私訊「首購」 我給你重新認定 SOP<div class="sub-line">📝 💬 私訊「首購」</div></div></div>
-</div>
-</div>
+<header class="section-head" id="sect-3">
+  <span class="roman">Ⅳ.</span>
+  <span class="label">主委派<span class="en">The Chairman Notes</span></span>
+  <span class="rule"></span>
+  <span class="count">8 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="主委派" id="c18">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 18</span>
+    </div>
+    <h3 class="title">警衛欸 警衛 你進去看他臉色就知道</h3>
+    <div class="insight">警衛是社區風氣的縮影；冷漠的警衛=管委會通常是亂的。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　警衛室畫面，警衛擺臉色，主委指鏡頭碎念</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">欸大家欸 我跟你講 看房 警衛欸警衛 你看一眼就知道社區好不好</div><div class="sub">看警衛</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">警衛態度好的社區 通常管委會也運作得好 警衛擺臉色 100% 內部有問題</div><div class="mirror">藏鏡人　「警衛=社區體檢」</div><div class="sub">100%有問題</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">因為警衛是被管委會請的 管委會一直換人 警衛換了又換 你進去看到他冷臉 那個是「累積出來的不爽」</div><div class="sub">累積不爽</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">你住進去 警衛跟你不打招呼 包裹放錯位置 來客不通報 那種日子 你住一年就想搬</div><div class="mirror">藏鏡人　「住一年就想搬」</div><div class="sub">三個爛點</div></div>
+        <div class="row"><div class="time">40-50秒</div><div class="say">所以欸欸欸 你看房進門先看警衛 警衛欸 不是看大廳水晶燈</div><div class="mirror">藏鏡人　「不是看水晶燈」</div><div class="sub">別看燈</div></div>
+        <div class="row"><div class="time">50-55秒</div><div class="say">留言你住的社區警衛態度如何</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你住的社區警衛態度如何</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c19">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 19</span>
+    </div>
+    <h3 class="title">機械車位欸 機械車位 認真聽</h3>
+    <div class="insight">機械車位=5-10 年大修費；維護成本是隱形房價。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　機械車位升降慢動作，主委指鏡頭碎念</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">機械車位欸 機械車位 我跟你講你給我認真聽</div><div class="sub">認真聽</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">很多人以為「停下去就好」 我跟你講 機械車位是個「會吃錢的器官」</div><div class="mirror">藏鏡人　「會吃錢的器官」</div><div class="sub">吃錢器官</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">5 年要保養 10 年要大修 一台升降機壞了 修一次 30 萬到 80 萬都有 全社區一起分攤</div><div class="sub">30-80萬大修</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">你以為車位 200 萬 沒有 你買到的是「未來 20 年要繳大修費」的會員制</div><div class="mirror">藏鏡人　「會員制不是房地產」</div><div class="sub">會員制</div></div>
+        <div class="row"><div class="time">40-47秒</div><div class="say">買機械車位前 一定要去翻管委會帳 看公基金有多少 沒有就免談</div><div class="mirror">藏鏡人　「沒公基金就免談」</div><div class="sub">翻帳本</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言你車位是哪一種</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你車位是哪一種</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c20">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 20</span>
+    </div>
+    <h3 class="title">陽台外推 拆字一貼你就知道</h3>
+    <div class="insight">陽台外推=違建 一張紙就讓你損失幾十萬。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　陽台外推實景，紅字「拆」字噴漆，屋主臉色慘白</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">陽台外推 你以為划算 我跟你講 一張拆字貼上去你就懂</div><div class="sub">拆字貼上去</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">違建欸違建 鄰居檢舉一張紙 你拆得不拆得 拆裝潢還要再花 30 萬</div><div class="mirror">藏鏡人　「一張紙」</div><div class="sub">30萬拆裝潢</div></div>
+        <div class="row"><div class="time">12-20秒</div><div class="say">而且銀行估價 陽台外推不算坪數 你買的時候多付坪數錢 賣的時候賣不回去</div><div class="mirror">藏鏡人　「銀行不算坪」</div><div class="sub">雙重損失</div></div>
+        <div class="row"><div class="time">20-27秒</div><div class="say">陽台外推 = 買的時候被算錢 賣的時候被砍價 雙重損失 千萬不要碰</div><div class="mirror">藏鏡人　「千萬不要碰」</div><div class="sub">兩頭虧</div></div>
+        <div class="row"><div class="time">27-30秒</div><div class="say">留言你的陽台還在嗎？</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你的陽台還在嗎</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c21">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 21</span>
+    </div>
+    <h3 class="title">公基金欸 公基金 你不查清楚會哭</h3>
+    <div class="insight">公基金=社區的命 不到 100 萬的大樓=定時炸彈。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　管委會帳本紅圈圈起餘額數字</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">公基金欸 公基金 你買大樓不查這個 你會哭</div><div class="sub">會哭</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">公基金是什麼 就是社區的存款 修電梯 修水管 修頂樓防水 全部從這裡出</div><div class="mirror">藏鏡人　「社區的命」</div><div class="sub">社區的命</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">30 戶以上的大樓 公基金至少要有 100 萬 我看過很多社區只有 30 萬 那種社區欸 一個事情就垮</div><div class="sub">100萬基準線</div></div>
+        <div class="row"><div class="time">25-38秒</div><div class="say">你買進去 第二年管委會跟你收 5 萬「特別費」 你以為買的是房子 你買的是繳費單</div><div class="mirror">藏鏡人　「買的是繳費單」</div><div class="sub">5萬特別費</div></div>
+        <div class="row"><div class="time">38-47秒</div><div class="say">買大樓前 跟管委會要看「公基金餘額」 不給看的 我跟你講 不要買</div><div class="mirror">藏鏡人　「不給看就不要買」</div><div class="sub">不給看=危險</div></div>
+        <div class="row"><div class="time">47-50秒</div><div class="say">留言你社區公基金多少</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你社區公基金多少</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c22">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 22</span>
+    </div>
+    <h3 class="title">屋頂加蓋 加蓋欸 千萬不要碰</h3>
+    <div class="insight">頂樓加蓋=共有部分占用；你買的是糾紛。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　屋頂違建鐵皮屋，主委搖頭碎念</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">屋頂加蓋欸 加蓋 我跟你講 千萬不要碰</div><div class="sub">千萬不要碰</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">頂樓本來是全社區的 不是頂樓那戶的 那戶蓋鐵皮屋 等於霸占</div><div class="mirror">藏鏡人　「霸占公共空間」</div><div class="sub">霸占</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">你買進去之後 哪天有人檢舉 拆 你以為頂樓送給你 結果送的是法院</div><div class="sub">送你法院</div></div>
+        <div class="row"><div class="time">25-37秒</div><div class="say">而且頂樓加蓋的隔熱很差 夏天像烤箱 冬天像冰櫃 加蓋部分 30-50 度溫差 住到怕</div><div class="mirror">藏鏡人　「住到怕」</div><div class="sub">30-50度溫差</div></div>
+        <div class="row"><div class="time">37-43秒</div><div class="say">頂樓加蓋 9 成有糾紛 一成沒糾紛是還沒被檢舉</div><div class="mirror">藏鏡人　「9成糾紛 1成倒數中」</div><div class="sub">9:1</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">留言你住的樓上有沒有加蓋</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你住的樓上有沒有加蓋</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c23">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 23</span>
+    </div>
+    <h3 class="title">一樓店面 店面欸 你以為穩賺</h3>
+    <div class="insight">一樓店面租客頻繁更換=收益不穩。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　一樓店面，招牌掛了又掛，鐵門半開</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">一樓店面欸 店面 你以為穩賺 我跟你講</div><div class="sub">你以為穩賺</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">一樓店面看起來租金高 但你看那個招牌 換了 5 個了</div><div class="mirror">藏鏡人　「招牌換 5 個」</div><div class="sub">5次換手</div></div>
+        <div class="row"><div class="time">12-20秒</div><div class="say">商圈會死 行業會走 你以為店面金雞母 實際是空屋率高</div><div class="mirror">藏鏡人　「金雞母會死」</div><div class="sub">空屋率高</div></div>
+        <div class="row"><div class="time">20-27秒</div><div class="say">而且 公設你算了沒 容積你算了沒 銀行貸款願意給幾成 一樓店面 你不是省事 你是麻煩</div><div class="sub">三項要算</div></div>
+        <div class="row"><div class="time">27-30秒</div><div class="say">留言你看店面看過幾間</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你看店面看過幾間</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c24">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 24</span>
+    </div>
+    <h3 class="title">飯店式管理 9成只剩名字而已</h3>
+    <div class="insight">「飯店式管理」是建商行銷詞 90% 是裝飾。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　大廳華麗水晶燈，警衛打瞌睡，主委皺眉</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">飯店式管理欸 我跟你講 9 成只剩名字</div><div class="sub">9成名字</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">建商賣案子 都寫「飯店式管理」 你住進去 大廳水晶燈 警衛在玩手機</div><div class="mirror">藏鏡人　「水晶燈 vs 玩手機」</div><div class="sub">對比</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">飯店式管理 = 24 小時 / 代收包裹 / 雙語接待 / 公設保養 / 公共區清潔</div><div class="sub">5項標準</div></div>
+        <div class="row"><div class="time">25-37秒</div><div class="say">你住進去 24 小時警衛沒了 雙語接待是台語 公設只剩游泳池水綠掉</div><div class="mirror">藏鏡人　「雙語接待 = 台語」</div><div class="sub">現實對照</div></div>
+        <div class="row"><div class="time">37-43秒</div><div class="say">「飯店式」三個字 是賣前的形容詞 不是住進去的事實 你買前要問「實際有幾項」</div><div class="mirror">藏鏡人　「實際有幾項」</div><div class="sub">問實際項數</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">留言你住的社區叫什麼</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你住的社區叫什麼名字</div>
+  </div>
+</article>
+<article class="card" data-cat="主委派" id="c25">
+  <div class="card-head" style="--pie:#8C5A1F">
+    <div class="card-meta">
+      <span class="pie">主委派</span>
+      <span class="num">No. 25</span>
+    </div>
+    <h3 class="title">違停拖吊 管委會敢不敢罰 我講給你聽</h3>
+    <div class="insight">管委會執法力=社區體質；不敢罰違停的=也不敢做事。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　違停車輛，拖吊車進場，管委會公告貼在牆上</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">違停欸 違停 你看管委會敢不敢拖吊 你就知道這個社區有沒有救</div><div class="sub">看執法</div></div>
+        <div class="row"><div class="time">3-12秒</div><div class="say">好的社區 違停 5 分鐘 公告貼出來 第三次直接拖</div><div class="mirror">藏鏡人　「5分鐘+三次拖吊」</div><div class="sub">5分鐘起算</div></div>
+        <div class="row"><div class="time">12-20秒</div><div class="say">壞的社區 違停 3 個月 主委說「先勸導」 一個月後還是擋你車</div><div class="mirror">藏鏡人　「先勸導 = 一輩子勸導」</div><div class="sub">永遠勸導</div></div>
+        <div class="row"><div class="time">20-27秒</div><div class="say">管委會的執法力 就是社區的「規則感」 你看這個 比看大廳豪華還準</div><div class="mirror">藏鏡人　「執法>豪華」</div><div class="sub">規則感</div></div>
+        <div class="row"><div class="time">27-30秒</div><div class="say">留言你的社區停車狀況</div><div class="sub">💬 留言+追蹤</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>留言你的社區停車狀況</div>
+  </div>
+</article>
 </div>
 
-<div class="card" data-cat="稅法／報稅" id="c32">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(32)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#33</span></div>
-<h3 class="ct">結婚生子 115 年租補加倍給</h3>
-<div class="insight-line">💡 月所得 3 倍→3.5 倍；基礎 30%／2026 後結婚 +50%／新生兒 +100%／每多 1 子 +50%。</div>
-<div class="hint" id="h32">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b32">
-<div class="meta-line">🎬 直球派誘餌型｜35 秒｜流量密碼：金錢+共鳴+真實感</div>
-<div class="meta-line cta-line">💬 私訊「租補」 拿 115 年資格速查</div>
-<div class="meta-line">📚 <a href="https://www.moi.gov.tw/News_Content.aspx?n=4&s=337001" style="color:#c8a96a">內政部 115/02/25 — 14 萬戶婚育家庭享加碼</a></div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">35秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-5秒</div><div class="tl-txt">2026 年 1 月 1 日後登記結婚的、有新生兒的 — 租補加碼到爆<div class="sub-line">📝 115 年租補‧婚育加碼</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">6-15秒</div><div class="tl-txt">門檻：每人月所得從最低生活費 3 倍放寬到 3.5 倍<div class="sub-line">📝 3 倍 → 3.5 倍</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">加碼：基礎 30%、2026 後結婚再 +50%、新生兒 +100%、每多 1 個未成年子女再 +50%<div class="sub-line">📝 30% / 50% / 100% / +50%</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-30秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「你符合婚育租補嗎？」</div><div class="sub-line">📝 自查資格</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">31-35秒</div><div class="tl-txt">私訊「租補」 給你 115 年資格速查<div class="sub-line">📝 💬 私訊「租補」</div></div></div>
-</div>
-</div>
-</div>
-
-<div class="card" data-cat="稅法／報稅" id="c33">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(33)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#34</span></div>
-<h3 class="ct">接手免稅屋 一過戶就要繳稅</h3>
-<div class="insight-line">💡 財政部 115/4/2 函釋：免稅屋移轉後自次期起恢復課徵；落入非自住法定 2%-4.8%。</div>
-<div class="hint" id="h33">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b33">
-<div class="meta-line">🎬 直球派誘餌型｜30 秒｜流量密碼：恐懼+揭露+反差</div>
-<div class="meta-line cta-line">💬 私訊「免稅屋」 拿接手前查核清單</div>
-<div class="meta-line">📚 <a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL011726" style="color:#c8a96a">財政部函釋 — 免稅房屋移轉變應稅</a></div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-6秒</div><div class="tl-txt">你以為買到免稅屋就一直免稅？2026 新函釋告訴你 — 不是<div class="sub-line">📝 免稅屋‧移轉‧立刻變應稅</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">7-15秒</div><div class="tl-txt">財政部 2026 年 4 月 2 日新函釋：免稅房屋一移轉，自移轉日次期起恢復課徵房屋稅<div class="sub-line">📝 財政部 ‧ 115/4/2 函釋</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">落到一般非自住，法定 2%-4.8%。買之前要先查<div class="sub-line">📝 非自住 2% - 4.8%</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-28秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「你買的房子前任是免稅嗎？」</div><div class="sub-line">📝 留言告訴我</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">29-30秒</div><div class="tl-txt">私訊「免稅屋」 給你接手前查核清單<div class="sub-line">📝 💬 私訊「免稅屋」</div></div></div>
-</div>
-</div>
-</div>
-
-<div class="card" data-cat="稅法／報稅" id="c34">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(34)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#35</span></div>
-<h3 class="ct">115 房屋稅 最後一天不是 5/31</h3>
-<div class="insight-line">💡 5/1 開徵；末日 5/31 逢週六順延至 6/1；3 萬以下可超商繳。</div>
-<div class="hint" id="h34">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b34">
-<div class="meta-line">🎬 直球派誘餌型｜30 秒｜流量密碼：真實感+互動+自嘲</div>
-<div class="meta-line cta-line">💬 私訊「房屋稅」 拿 5 種繳費管道速查</div>
-<div class="meta-line">📚 <a href="https://www.mof.gov.tw/singlehtml/384fb3077bb349ea973e7fc6f13b6974?cntId=f5646ca7e21444f483a3b3ca97fe26fe" style="color:#c8a96a">財政部 115/04/22 公告 — 5/1 開徵</a></div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">30秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-5秒</div><div class="tl-txt">全台屋主注意 — 你的房屋稅截止日不是 5 月 31 號<div class="sub-line">📝 115 年期‧房屋稅‧截止日</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">6-15秒</div><div class="tl-txt">115 年房屋稅 5/1 開徵 — 末日逢假日順延到 6 月 1 日<div class="sub-line">📝 5/1 開徵 ‧ 6/1 截止</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">3 萬以下可超商繳，沒收到繳款書線上查也行<div class="sub-line">📝 3 萬以下‧超商繳</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-28秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「已經收到繳款書的舉手」</div><div class="sub-line">📝 收到的留言 1</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">29-30秒</div><div class="tl-txt">私訊「房屋稅」 給你 5 種繳費管道速查<div class="sub-line">📝 💬 私訊「房屋稅」</div></div></div>
-</div>
-</div>
-</div>
-
-<div class="card" data-cat="稅法／報稅" id="c35">
-<div class="card-head" style="border-color:#c8a96a" onclick="toggle(35)">
-<div class="card-row1"><span class="cb" style="color:#c8a96a">📜 稅法／報稅</span><span class="card-num">#36</span></div>
-<h3 class="ct">租屋族 18 萬扣除 用標準扣除也能扣</h3>
-<div class="insight-line">💡 113/1/1 起：列舉→特別扣除額；上限 12 萬→18 萬；標扣也能加扣。</div>
-<div class="hint" id="h35">▼ 展開腳本</div>
-</div>
-<div class="card-body" id="b35">
-<div class="meta-line">🎬 直球派誘餌型｜35 秒｜流量密碼：金錢+揭露+共鳴</div>
-<div class="meta-line cta-line">💬 私訊「租金」 拿 18 萬扣除資格 + 文件清單</div>
-<div class="meta-line">📚 <a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?PCode=G0340003" style="color:#c8a96a">所得稅法第 17 條第 1 項第 2 款第 3 目之 8</a></div>
-<div class="meta-line">🎁 加分點：2024/12/03 函釋 5 種「有房視為無房」（危樓／重大毀損／繼承共有／異地需求／分居家暴）</div>
-<div class="tl">
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">秒數</div><div class="tl-txt">35秒</div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">0-5秒</div><div class="tl-txt">租屋族注意 — 113 年起的新規定，很多人沒用到<div class="sub-line">📝 113 起‧租金‧特別扣除額</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">6-15秒</div><div class="tl-txt">房屋租金支出從「列舉扣除」改成「特別扣除額」，上限從 12 萬升到 18 萬<div class="sub-line">📝 列舉 → 特別扣除‧12 → 18 萬</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">16-25秒</div><div class="tl-txt">最大利多：用標準扣除額也能加扣（以前要選列舉才能用）<div class="sub-line">📝 標準扣除 + 18 萬租金扣除</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">26-30秒</div><div class="tl-txt"><div class="sub-line mirror">🎭 藏鏡人：「你今年報稅有列租金嗎？」</div><div class="sub-line">📝 沒列的舉手</div></div></div>
-<div class="tl-row"><div class="tl-time" style="color:#c8a96a">31-35秒</div><div class="tl-txt">私訊「租金」 給你 18 萬扣除資格 + 文件清單<div class="sub-line">📝 💬 私訊「租金」</div></div></div>
-</div>
-</div>
+<header class="section-head" id="sect-4">
+  <span class="roman">Ⅴ.</span>
+  <span class="label">前陣子<span class="en">Recent Reflections</span></span>
+  <span class="rule"></span>
+  <span class="count">3 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="前陣子派" id="c26">
+  <div class="card-head" style="--pie:#2E3A4F">
+    <div class="card-meta">
+      <span class="pie">前陣子</span>
+      <span class="num">No. 26</span>
+    </div>
+    <h3 class="title">前陣子發現 LINE 已讀不回的客戶 反而後來都成交</h3>
+    <div class="insight">已讀不回=還在認真考慮；一直問問題的=還沒進入決定階段。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　房仲手機畫面 LINE 訊息已讀沒回，靜默</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">前陣子有件事讓我反思</div><div class="sub">反思</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">我把過去 3 年的成交客戶調出來 看他們跟我聊天的歷史</div><div class="mirror">藏鏡人　「3 年數據」</div><div class="sub">3年數據</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">發現 8 成在簽約前一週都「已讀不回」 我以為他們不買了 結果一個禮拜後突然約簽約</div><div class="sub">8成已讀不回</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">反而每天問我「這間怎麼樣」「那間呢」 一週聊三次的客戶 9 成沒成交</div><div class="mirror">藏鏡人　「一週聊三次 = 9成沒成交」</div><div class="sub">聊太多=沒下文</div></div>
+        <div class="row"><div class="time">40-52秒</div><div class="say">因為「已讀不回」 = 在認真看資料 一直發訊息 = 還在「哈拉」 真要買的人 沉默是常態</div><div class="mirror">藏鏡人　「沉默是真客戶的常態」</div><div class="sub">沉默=認真</div></div>
+        <div class="row"><div class="time">52-58秒</div><div class="say">我教你判斷自己現在哪一階段 私訊「了解」</div><div class="sub">判斷階段</div></div>
+        <div class="row"><div class="time">58-60秒</div><div class="say">💬 私訊「了解」</div><div class="sub">💬</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我幫你判斷自己現在哪一階段</div>
+  </div>
+</article>
+<article class="card" data-cat="前陣子派" id="c27">
+  <div class="card-head" style="--pie:#2E3A4F">
+    <div class="card-meta">
+      <span class="pie">前陣子</span>
+      <span class="num">No. 27</span>
+    </div>
+    <h3 class="title">你跟屋主同姓 過戶很麻煩</h3>
+    <div class="insight">同姓會被國稅局多查，怕「假交易真贈與」。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　代書桌前翻權狀，同姓客戶愣住</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">前陣子有個客戶 跟屋主同姓 過戶差點卡 3 個月</div><div class="sub">卡3個月</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">他姓陳 屋主也姓陳 兩人不認識 但國稅局看到「陳對陳」就警鈴大作</div><div class="mirror">藏鏡人　「陳對陳警鈴大作」</div><div class="sub">警鈴大作</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">因為怕你們是親戚 假交易真贈與 逃贈與稅 國稅局會查資金流</div><div class="sub">查資金流</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">客戶跟我說「我跟他八竿子打不著」 沒用 國稅局要你提證明 你要拿身分證、戶籍謄本、銀行匯款紀錄 全部交出來</div><div class="mirror">藏鏡人　「八竿子打不著也要證明」</div><div class="sub">證明清單</div></div>
+        <div class="row"><div class="time">40-52秒</div><div class="say">所以遇到同姓的案子 我都先幫你做心理準備 不是買不到 是過戶要多 1 個月</div><div class="mirror">藏鏡人　「多 1 個月 心理準備」</div><div class="sub">+1個月</div></div>
+        <div class="row"><div class="time">52-58秒</div><div class="say">過戶風險我幫你預判 私訊「了解」</div><div class="sub">預判</div></div>
+        <div class="row"><div class="time">58-60秒</div><div class="say">💬 私訊「了解」</div><div class="sub">💬</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我幫你預判過戶風險</div>
+  </div>
+</article>
+<article class="card" data-cat="前陣子派" id="c28">
+  <div class="card-head" style="--pie:#2E3A4F">
+    <div class="card-meta">
+      <span class="pie">前陣子</span>
+      <span class="num">No. 28</span>
+    </div>
+    <h3 class="title">前陣子帶看 客戶問我這牆能不能敲</h3>
+    <div class="insight">70% 的牆是承重牆 拆了結構出問題。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　客戶站在牆前用手敲，房仲皺眉伸手擋</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">前陣子帶看 客戶站在客廳指牆問「這個能敲掉嗎」</div><div class="sub">能敲掉嗎</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">我說「等等先別敲」 我請結構技師看一下</div><div class="mirror">藏鏡人　「先別敲」</div><div class="sub">先別敲</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">很多客戶以為「裝潢可以亂改」 70% 的牆是承重牆 敲掉之後整棟搖</div><div class="sub">70%承重牆</div></div>
+        <div class="row"><div class="time">25-37秒</div><div class="say">尤其老公寓 結構單薄 你拆了客廳跟陽台之間的牆 颱風天會給你看好戲</div><div class="mirror">藏鏡人　「颱風天看好戲」</div><div class="sub">颱風天</div></div>
+        <div class="row"><div class="time">37-43秒</div><div class="say">所以買房前 想改格局 先帶結構技師 不是帶設計師</div><div class="mirror">藏鏡人　「結構技師>設計師」</div><div class="sub">順序顛倒</div></div>
+        <div class="row"><div class="time">43-45秒</div><div class="say">我幫你帶結構技師看 私訊「評估」</div><div class="sub">💬 私訊「評估」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「評估」 我帶結構技師看</div>
+  </div>
+</article>
 </div>
 
-<div class="empty" id="empty">找不到符合的腳本</div>
+<header class="section-head" id="sect-5">
+  <span class="roman">Ⅵ.</span>
+  <span class="label">陸軍/專業<span class="en">Field Expertise</span></span>
+  <span class="rule"></span>
+  <span class="count">2 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="陸軍／專業" id="c29">
+  <div class="card-head" style="--pie:#3A4A5C">
+    <div class="card-meta">
+      <span class="pie">陸軍/專業</span>
+      <span class="num">No. 29</span>
+    </div>
+    <h3 class="title">30 年老公寓 你要嫌它老還是要它便宜</h3>
+    <div class="insight">老公寓便宜=機會；要看 3 件事：地段、結構、未來。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　老公寓外觀，牆面磨損，但內部看出整修空間</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">很多人問我「30 年老公寓能買嗎」 我答「先看你要嫌它老 還是要它便宜」</div><div class="sub">先選一個</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">老公寓便宜 比同地段大樓便宜 30-50% 那是「好處」</div><div class="mirror">藏鏡人　「便宜 30-50% 不是小數」</div><div class="sub">便宜30-50%</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">但缺點 3 個 1 沒電梯 2 公設老 3 結構你要查</div><div class="sub">三大缺點</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">值得買的老公寓 地段在主商圈 結構鋼筋沒外露 周圍有都更可能 這 3 件齊 它就是寶</div><div class="mirror">藏鏡人　「地段+結構+未來」</div><div class="sub">三件齊</div></div>
+        <div class="row"><div class="time">40-50秒</div><div class="say">老公寓不是不能買 是要會挑 不會挑就是負債 會挑就是金雞母</div><div class="mirror">藏鏡人　「會挑=金雞母」</div><div class="sub">挑對是寶</div></div>
+        <div class="row"><div class="time">50-55秒</div><div class="say">我幫你看 私訊「了解」</div><div class="sub">💬 私訊「了解」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「了解」 我幫你看老公寓有沒有價值</div>
+  </div>
+</article>
+<article class="card" data-cat="陸軍／專業" id="c30">
+  <div class="card-head" style="--pie:#3A4A5C">
+    <div class="card-meta">
+      <span class="pie">陸軍/專業</span>
+      <span class="num">No. 30</span>
+    </div>
+    <h3 class="title">加蓋陽光屋 9成被打過官司</h3>
+    <div class="insight">陽光屋雖看似合法 90% 屬於違建；法院判書一查就知。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　後院加蓋陽光屋，玻璃屋頂、紅磚地基</div>
+    
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒</div><div class="say">客戶看透天 看到後院加蓋陽光屋 我都先冷淡</div><div class="sub">看到我冷淡</div></div>
+        <div class="row"><div class="time">3-13秒</div><div class="say">因為陽光屋 9 成是違建 法院判書一查 多數有訴訟紀錄</div><div class="mirror">藏鏡人　「9成違建 不誇張」</div><div class="sub">9成違建</div></div>
+        <div class="row"><div class="time">13-25秒</div><div class="say">你以為「玻璃屋頂應該合法」 不 任何在合法建築範圍外加蓋的 都算違建</div><div class="sub">玻璃也違建</div></div>
+        <div class="row"><div class="time">25-40秒</div><div class="say">而且陽光屋造價 30-80 萬 拆掉之後 你以為的「室內坪數」變成戶外 雨天淋濕你的客廳</div><div class="mirror">藏鏡人　「雨天淋濕你的客廳」</div><div class="sub">雙重損失</div></div>
+        <div class="row"><div class="time">40-50秒</div><div class="say">買透天看到加蓋 第一件事 上司法院網站查屋主名字 有沒有 6 年內的相鄰民事訴訟 那才是真相</div><div class="mirror">藏鏡人　「司法院網站查名字」</div><div class="sub">查司法院</div></div>
+        <div class="row"><div class="time">50-55秒</div><div class="say">司法紀錄查詢我教你 私訊「評估」</div><div class="sub">💬 私訊「評估」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「評估」 司法紀錄查詢我教你</div>
+  </div>
+</article>
 </div>
 
-<div class="bnav">
-<button class="bn active" onclick="goHome()"><span class="bn-i">🏠</span>全部</button>
-<button class="bn" onclick="scrollTop()"><span class="bn-i">⬆️</span>回頂</button>
+<header class="section-head" id="sect-6">
+  <span class="roman">Ⅶ.</span>
+  <span class="label">稅法/報稅<span class="en">Tax & Policy</span></span>
+  <span class="rule"></span>
+  <span class="count">6 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="稅法／報稅" id="c31">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 31</span>
+    </div>
+    <h3 class="title">繼承屋差一年 稅差 30 萬</h3>
+    <div class="insight">連續繼承＋配偶贈與 持有期可併計；自住免稅 400 萬要 6 年實住。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜35 秒｜流量密碼：金錢+揭露+反差</div>
+    <div class="ref-link">📖 <a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL009961" style="color:#c8a96a">房地合一作業要點 第五點 ‧ 115/4/21 修</a></div>
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-5秒</div><div class="say">你家有繼承來的房嗎？賣掉差一年差好幾十萬</div><div class="sub">繼承屋‧持有期‧差好幾級稅</div></div>
+        <div class="row"><div class="time">6-15秒</div><div class="say">2026/4/21 財政部剛改 — 連續繼承來的、配偶贈與來的，可以把前手持有期間整個串起來</div><div class="sub">房地合一作業要點‧115/4/21 修</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">但條件嚴 — 想主張自住免稅 400 萬，要實際居住、6 年沒出租。沒搞清楚白虧</div><div class="sub">自住免稅‧戶籍+實住+無出租</div></div>
+        <div class="row"><div class="time">26-30秒</div><div class="say"></div><div class="mirror">藏鏡人　「你家有繼承來的房嗎？」</div><div class="sub">評論區寫 1</div></div>
+        <div class="row"><div class="time">31-35秒</div><div class="say">私訊「繼承」 我給你 5 步驟自查表</div><div class="sub">💬 私訊「繼承」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「繼承」 拿 5 步驟自查表</div>
+  </div>
+</article>
+<article class="card" data-cat="稅法／報稅" id="c32">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 32</span>
+    </div>
+    <h3 class="title">繼承半間房 銀行不一定卡你</h3>
+    <div class="insight">央行 2026/3/19 新版 Q&A：繼承建物／持分／房貸 都不計入名下。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜30 秒｜流量密碼：揭露+共鳴+反差</div>
+    <div class="ref-link">📖 <a href="https://www.cbc.gov.tw/tw/cp-4223-124873-79d4c-1.html" style="color:#c8a96a">央行不動產抵押貸款業務規定問與答 Q11/Q12/Q14</a></div>
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-6秒</div><div class="say">跟兄弟姐妹分到半間房的人最痛 — 自己想買房，銀行說你不算首購</div><div class="sub">繼承持分‧卡首購？</div></div>
+        <div class="row"><div class="time">7-15秒</div><div class="say">央行 2026 年 3 月 19 日新版 Q&A 寫得很白：繼承的建物、繼承持分、繼承房貸都不計入名下</div><div class="sub">央行 Q11/Q12/Q14 ‧ 2026/3/19</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">只要銀行查證屬實 — 你還是首購族</div><div class="sub">主動跟銀行說 ‧ 備證明</div></div>
+        <div class="row"><div class="time">26-28秒</div><div class="say"></div><div class="mirror">藏鏡人　「你也卡在半間繼承房嗎？」</div><div class="sub">卡的舉個手</div></div>
+        <div class="row"><div class="time">29-30秒</div><div class="say">私訊「首購」 我給你重新認定 SOP</div><div class="sub">💬 私訊「首購」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「首購」 拿重新認定 SOP</div>
+  </div>
+</article>
+<article class="card" data-cat="稅法／報稅" id="c33">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 33</span>
+    </div>
+    <h3 class="title">結婚生子 115 年租補加倍給</h3>
+    <div class="insight">月所得 3 倍→3.5 倍；基礎 30%／2026 後結婚 +50%／新生兒 +100%／每多 1 子 +50%。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜35 秒｜流量密碼：金錢+共鳴+真實感</div>
+    <div class="ref-link">📖 <a href="https://www.moi.gov.tw/News_Content.aspx?n=4&s=337001" style="color:#c8a96a">內政部 115/02/25 — 14 萬戶婚育家庭享加碼</a></div>
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-5秒</div><div class="say">2026 年 1 月 1 日後登記結婚的、有新生兒的 — 租補加碼到爆</div><div class="sub">115 年租補‧婚育加碼</div></div>
+        <div class="row"><div class="time">6-15秒</div><div class="say">門檻：每人月所得從最低生活費 3 倍放寬到 3.5 倍</div><div class="sub">3 倍 → 3.5 倍</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">加碼：基礎 30%、2026 後結婚再 +50%、新生兒 +100%、每多 1 個未成年子女再 +50%</div><div class="sub">30% / 50% / 100% / +50%</div></div>
+        <div class="row"><div class="time">26-30秒</div><div class="say"></div><div class="mirror">藏鏡人　「你符合婚育租補嗎？」</div><div class="sub">自查資格</div></div>
+        <div class="row"><div class="time">31-35秒</div><div class="say">私訊「租補」 給你 115 年資格速查</div><div class="sub">💬 私訊「租補」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「租補」 拿 115 年資格速查</div>
+  </div>
+</article>
+<article class="card" data-cat="稅法／報稅" id="c34">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 34</span>
+    </div>
+    <h3 class="title">接手免稅屋 一過戶就要繳稅</h3>
+    <div class="insight">財政部 115/4/2 函釋：免稅屋移轉後自次期起恢復課徵；落入非自住法定 2%-4.8%。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜30 秒｜流量密碼：恐懼+揭露+反差</div>
+    <div class="ref-link">📖 <a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL011726" style="color:#c8a96a">財政部函釋 — 免稅房屋移轉變應稅</a></div>
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-6秒</div><div class="say">你以為買到免稅屋就一直免稅？2026 新函釋告訴你 — 不是</div><div class="sub">免稅屋‧移轉‧立刻變應稅</div></div>
+        <div class="row"><div class="time">7-15秒</div><div class="say">財政部 2026 年 4 月 2 日新函釋：免稅房屋一移轉，自移轉日次期起恢復課徵房屋稅</div><div class="sub">財政部 ‧ 115/4/2 函釋</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">落到一般非自住，法定 2%-4.8%。買之前要先查</div><div class="sub">非自住 2% - 4.8%</div></div>
+        <div class="row"><div class="time">26-28秒</div><div class="say"></div><div class="mirror">藏鏡人　「你買的房子前任是免稅嗎？」</div><div class="sub">留言告訴我</div></div>
+        <div class="row"><div class="time">29-30秒</div><div class="say">私訊「免稅屋」 給你接手前查核清單</div><div class="sub">💬 私訊「免稅屋」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「免稅屋」 拿接手前查核清單</div>
+  </div>
+</article>
+<article class="card" data-cat="稅法／報稅" id="c35">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 35</span>
+    </div>
+    <h3 class="title">115 房屋稅 最後一天不是 5/31</h3>
+    <div class="insight">5/1 開徵；末日 5/31 逢週六順延至 6/1；3 萬以下可超商繳。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜30 秒｜流量密碼：真實感+互動+自嘲</div>
+    <div class="ref-link">📖 <a href="https://www.mof.gov.tw/singlehtml/384fb3077bb349ea973e7fc6f13b6974?cntId=f5646ca7e21444f483a3b3ca97fe26fe" style="color:#c8a96a">財政部 115/04/22 公告 — 5/1 開徵</a></div>
+    
+    <div class="timeline">
+        <div class="row"><div class="time">0-5秒</div><div class="say">全台屋主注意 — 你的房屋稅截止日不是 5 月 31 號</div><div class="sub">115 年期‧房屋稅‧截止日</div></div>
+        <div class="row"><div class="time">6-15秒</div><div class="say">115 年房屋稅 5/1 開徵 — 末日逢假日順延到 6 月 1 日</div><div class="sub">5/1 開徵 ‧ 6/1 截止</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">3 萬以下可超商繳，沒收到繳款書線上查也行</div><div class="sub">3 萬以下‧超商繳</div></div>
+        <div class="row"><div class="time">26-28秒</div><div class="say"></div><div class="mirror">藏鏡人　「已經收到繳款書的舉手」</div><div class="sub">收到的留言 1</div></div>
+        <div class="row"><div class="time">29-30秒</div><div class="say">私訊「房屋稅」 給你 5 種繳費管道速查</div><div class="sub">💬 私訊「房屋稅」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「房屋稅」 拿 5 種繳費管道速查</div>
+  </div>
+</article>
+<article class="card" data-cat="稅法／報稅" id="c36">
+  <div class="card-head" style="--pie:#9B7239">
+    <div class="card-meta">
+      <span class="pie">稅法/報稅</span>
+      <span class="num">No. 36</span>
+    </div>
+    <h3 class="title">租屋族 18 萬扣除 用標準扣除也能扣</h3>
+    <div class="insight">113/1/1 起：列舉→特別扣除額；上限 12 萬→18 萬；標扣也能加扣。</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直球派誘餌型｜35 秒｜流量密碼：金錢+揭露+共鳴</div>
+    <div class="ref-link">📖 <a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?PCode=G0340003" style="color:#c8a96a">所得稅法第 17 條第 1 項第 2 款第 3 目之 8</a></div>
+    <div class="gift-line"><span>加分點</span> 加分點：2024/12/03 函釋 5 種「有房視為無房」（危樓／重大毀損／繼承共有／異地需求／分居家暴）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-5秒</div><div class="say">租屋族注意 — 113 年起的新規定，很多人沒用到</div><div class="sub">113 起‧租金‧特別扣除額</div></div>
+        <div class="row"><div class="time">6-15秒</div><div class="say">房屋租金支出從「列舉扣除」改成「特別扣除額」，上限從 12 萬升到 18 萬</div><div class="sub">列舉 → 特別扣除‧12 → 18 萬</div></div>
+        <div class="row"><div class="time">16-25秒</div><div class="say">最大利多：用標準扣除額也能加扣（以前要選列舉才能用）</div><div class="sub">標準扣除 + 18 萬租金扣除</div></div>
+        <div class="row"><div class="time">26-30秒</div><div class="say"></div><div class="mirror">藏鏡人　「你今年報稅有列租金嗎？」</div><div class="sub">沒列的舉手</div></div>
+        <div class="row"><div class="time">31-35秒</div><div class="say">私訊「租金」 給你 18 萬扣除資格 + 文件清單</div><div class="sub">💬 私訊「租金」</div></div>
+    </div>
+    <div class="cta"><span class="cta-arrow">→</span>私訊「租金」 拿 18 萬扣除資格 + 文件清單</div>
+  </div>
+</article>
 </div>
+
+<div class="empty" id="empty">沒有符合條件的腳本</div>
+
+<footer>
+  <div class="colophon">— Fin. —</div>
+  <div class="lines">
+    <span>許瑞祥 ‧ 房仲腳本誌</span> · <span>Issue 02 ‧ 2026</span> · <span>陳澤君監製</span>
+  </div>
+  <div class="lines" style="margin-top:8px;font-size:10px;letter-spacing:.1em;text-transform:none">
+    腳本生產三層架構（L0 v1.1 · 房仲層 v1.2 · 個人偏好 v1.2）
+  </div>
+</footer>
 
 <script>
-var cCat='all';
+const chips = document.querySelectorAll('.chip');
+const cards = document.querySelectorAll('.card');
+const sections = document.querySelectorAll('.section-head');
+const sectionGrids = document.querySelectorAll('.cards');
+const search = document.querySelector('.search');
+const empty = document.getElementById('empty');
 
-function toggleMenu(el){
-  el.classList.toggle('open');
-  document.getElementById('cmGrid').classList.toggle('open');
-}
+let activeCat = 'all';
 
-function pickCat(cat,el){
-  cCat=cat;
-  document.querySelectorAll('.cm-btn').forEach(function(b){b.classList.remove('active');});
-  if(el)el.classList.add('active');
-  var label=cat==='all'?'📋 全部類型':el.textContent;
-  document.getElementById('menuLabel').textContent=label;
-  document.getElementById('cmGrid').classList.remove('open');
-  document.querySelector('.cm-toggle').classList.remove('open');
-  doFilter();
-}
-
-function doFilter(){
-  var q=document.querySelector('.search').value.toLowerCase();
-  var cards=document.querySelectorAll('.card');
-  var any=false;
-  cards.forEach(function(c){
-    var ok1=cCat==='all'||c.dataset.cat===cCat;
-    var ok2=!q||c.textContent.toLowerCase().includes(q);
-    var show=ok1&&ok2;
-    c.style.display=show?'':'none';
-    if(show)any=true;
+function filterCards(){
+  const q = (search?.value || '').toLowerCase().trim();
+  let any = false;
+  cards.forEach(c => {
+    const ok1 = activeCat === 'all' || c.dataset.cat === activeCat;
+    const ok2 = !q || c.textContent.toLowerCase().includes(q);
+    const show = ok1 && ok2;
+    c.style.display = show ? '' : 'none';
+    if(show) any = true;
   });
-  document.getElementById('empty').style.display=any?'none':'block';
+  // hide empty section headers
+  sections.forEach((sh, i) => {
+    const grid = sectionGrids[i];
+    if (!grid) return;
+    const visibleInSection = Array.from(grid.querySelectorAll('.card'))
+      .some(c => c.style.display !== 'none');
+    sh.style.display = visibleInSection ? '' : 'none';
+    grid.style.display = visibleInSection ? '' : 'none';
+  });
+  empty.classList.toggle('show', !any);
 }
 
-function toggle(i){
-  var b=document.getElementById('b'+i);
-  var h=document.getElementById('h'+i);
-  if(!b)return;
-  b.classList.toggle('collapsed');
-  if(h)h.textContent=b.classList.contains('collapsed')?'▼ 展開腳本':'▲ 收合';
-}
+chips.forEach(chip => {
+  chip.addEventListener('click', e => {
+    e.preventDefault();
+    chips.forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeCat = chip.dataset.cat;
+    filterCards();
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+});
 
-function goHome(){
-  cCat='all';
-  document.querySelector('.search').value='';
-  document.querySelectorAll('.cm-btn').forEach(function(b){b.classList.remove('active');});
-  document.querySelector('.cm-all').classList.add('active');
-  document.getElementById('menuLabel').textContent='📋 全部類型';
-  document.getElementById('cmGrid').classList.remove('open');
-  document.querySelector('.cm-toggle').classList.remove('open');
-  doFilter();
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-function scrollTop(){window.scrollTo({top:0,behavior:'smooth'});}
-
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js');}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script>
+
 </body>
 </html>

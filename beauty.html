@@ -597,6 +597,35 @@ body.view-list .card.open .card-body{
 }
 .group.collapsed{margin-bottom:8px}
 
+/* ========== SHOT TOGGLE (已拍過按鈕 v6：inline 排在 card-meta 第一位) ========== */
+.shot-toggle{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 9px;
+  font-family:var(--sans);
+  font-size:11px;font-weight:500;
+  letter-spacing:.05em;
+  color:var(--ink-muted);
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:999px;
+  cursor:pointer;
+  transition:all .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.shot-toggle::before{
+  content:'○';font-size:12px;line-height:1;
+}
+.shot-toggle:hover{border-color:var(--gold);color:var(--gold-deep)}
+.card.shot .shot-toggle{
+  background:var(--sage);
+  color:#3d6438;
+  border-color:#a9c89e;
+}
+.card.shot .shot-toggle::before{content:'\2713';font-weight:700}
+.card.shot{opacity:.7;background:linear-gradient(180deg,var(--sage) 0,var(--paper) 60%)}
+.card.shot:hover{opacity:.95}
+.card.shot .card-corner{opacity:.3}
+
 /* ========== DOWNLOAD BUTTON (圖卡下載) ========== */
 .card-image-actions{
   display:flex;justify-content:flex-end;gap:8px;
@@ -695,7 +724,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 
 <section>
 <h2 class="section-title">腳本</h2>
-<div class="section-sub">scroll & read</div>
+<div class="section-sub">scroll & read · 點「已拍過」標記進度</div>
 
 <!-- 主題分組容器（JS 動態填入 article） -->
 <div class="group" data-group="A">
@@ -738,6 +767,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.1</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">01</div>
@@ -762,6 +792,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.2</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">02</div>
@@ -786,6 +817,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.3</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">22s</span>
   </div>
   <div class="card-num">03</div>
@@ -810,6 +842,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.5</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">05</div>
@@ -834,6 +867,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.6</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">06</div>
@@ -858,6 +892,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.7</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">30s</span>
   </div>
   <div class="card-num">07</div>
@@ -881,6 +916,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">★ no.8</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 
     <span class="tag mute">60s</span>
   </div>
@@ -914,6 +950,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">★ no.9</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">09</div>
@@ -938,6 +975,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.10</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">10</div>
@@ -962,6 +1000,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">★ no.11</div>
 <div class="card-head" style="background:linear-gradient(180deg,var(--paper) 0,var(--rose) 100%)">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">11</div>
@@ -985,6 +1024,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.12</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1009,6 +1049,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.13</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1033,6 +1074,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.14</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1057,6 +1099,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.15</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1081,6 +1124,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.16</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1105,6 +1149,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.17</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1129,6 +1174,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.18</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1153,6 +1199,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.19</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1177,6 +1224,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.20</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1201,6 +1249,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.21</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-11</span>
 
     <span class="tag mute">60s</span>
@@ -1225,6 +1274,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">no.22</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
     <span class="tag">2026-04-27</span>
 
     <span class="tag mute">45s</span>
@@ -1249,6 +1299,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">配套圖卡篇</div>
 <div class="card-head">
   <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 
     <span class="tag mute">60s</span>
   </div>
@@ -1418,7 +1469,7 @@ window.addEventListener('hashchange', openByHash);
 window.addEventListener('load', openByHash);
 renderActiveFilters();
 
-// === 主題分組 reorder + 折疊 (霸告 2026-05-02 v5：砍已拍過 chip + 全收起) ===
+// === 主題分組 reorder + 折疊 + 已拍過 toggle (霸告 2026-05-02 v6：chip 移到 card-meta 第一位) ===
 (function(){
   var GROUPS = {
     A: ['s1','s2','s3','s5','s6','s9','s13','s15','s18'],
@@ -1447,8 +1498,24 @@ renderActiveFilters();
     });
   });
 
-  // 清掉舊 localStorage 殘留（已拍過 chip 已移除）
-  try { localStorage.removeItem('beauty.shot.v1'); } catch(e){}
+  // 已拍過 toggle（localStorage 持久化）
+  var KEY = 'beauty.shot.v1';
+  var shot = [];
+  try { shot = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ shot = []; }
+  document.querySelectorAll('article.card').forEach(function(card){
+    var id = card.dataset.id;
+    if (!id) return;
+    if (shot.indexOf(id) >= 0) card.classList.add('shot');
+    var btn = card.querySelector('.shot-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var idx = shot.indexOf(id);
+      if (idx >= 0) { shot.splice(idx,1); card.classList.remove('shot'); }
+      else { shot.push(id); card.classList.add('shot'); }
+      try { localStorage.setItem(KEY, JSON.stringify(shot)); } catch(e){}
+    });
+  });
 })();
 </script>
 

@@ -376,126 +376,6 @@ img{display:block;max-width:100%}
   color:var(--ink);border-color:var(--ink);
   background:var(--paper-2);
 }
-.view-toggle{
-  display:inline-flex;border:1px solid var(--line);
-}
-.view-toggle .view-btn{
-  border:none !important;
-  border-right:1px solid var(--line) !important;
-  margin:0;padding:8px 12px;
-  background:var(--paper);
-}
-.view-toggle .view-btn:last-child{border-right:none !important}
-.view-toggle .view-btn.active{
-  background:var(--ink);color:var(--paper);
-}
-.active-filter-bar{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  max-width:1280px;margin:0 auto;
-  padding:12px 24px 0;
-  font-family:var(--sans);font-size:12.5px;
-}
-.active-filter-bar[hidden]{display:none !important}
-.active-filter-label{
-  font-family:var(--sans-en);font-size:10.5px;letter-spacing:.22em;
-  color:var(--ink-3);text-transform:uppercase;
-}
-.active-filter-chips{
-  display:inline-flex;gap:8px;flex-wrap:wrap;
-}
-.active-filter-chips .af-chip{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:4px 10px;
-  background:var(--ink);color:var(--paper);
-  border-radius:2px;
-  font-size:11.5px;letter-spacing:.05em;
-}
-.active-filter-chips .af-chip .x{
-  cursor:pointer;opacity:.7;font-size:14px;line-height:1;
-}
-.active-filter-chips .af-chip .x:hover{opacity:1}
-.active-filter-clear{
-  font-family:var(--sans-en);font-size:10.5px;letter-spacing:.18em;
-  text-transform:uppercase;
-  color:var(--ink-3);
-  background:transparent;border:none;cursor:pointer;
-  padding:4px 8px;
-  text-decoration:underline;text-underline-offset:3px;
-}
-.active-filter-clear:hover{color:var(--ink)}
-
-/* ========== LIST VIEW ========== */
-body.view-list .cards{
-  display:block;
-  padding:0 24px;
-  max-width:980px;margin:0 auto;
-}
-body.view-list .card{
-  display:block;
-  border:none;border-bottom:1px solid var(--line-soft);
-  background:transparent;
-  border-radius:0;
-  padding:0;
-  margin-bottom:0;
-}
-body.view-list .card:hover{
-  transform:none;box-shadow:none;
-  background:var(--paper-2);
-  border-color:transparent;
-  border-bottom-color:var(--line);
-}
-body.view-list .card-head{
-  padding:12px 50px 12px 22px;
-  display:flex;
-  align-items:center;
-  gap:14px;
-  flex-wrap:wrap;
-  border-bottom:none !important;
-}
-body.view-list .card-head::before{
-  width:3px;
-}
-body.view-list .card-head::after{
-  top:50%;transform:translateY(-50%) rotate(90deg);
-  font-size:20px;
-}
-body.view-list .card.open .card-head::after{
-  transform:translateY(-50%) rotate(-90deg);
-}
-body.view-list .card-meta{
-  margin:0;
-  flex-shrink:0;
-  display:inline-flex;align-items:center;gap:10px;
-}
-body.view-list .card-meta .pie{
-  font-size:10.5px;letter-spacing:.1em;
-  white-space:nowrap;
-}
-body.view-list .card-meta .num{font-size:12px;font-style:italic;color:var(--ink-3)}
-body.view-list .title{
-  font-size:15px;line-height:1.45;
-  margin:0;font-weight:500;
-  flex:1;min-width:200px;
-}
-body.view-list .insight,
-body.view-list .section-head{
-  display:none;
-}
-body.view-list .card.open .insight{
-  display:block;padding:0 22px 14px;
-  border-top:1px dashed var(--line);
-  margin:0;background:var(--paper-2);
-  font-size:12.5px;color:var(--ink-2);
-  padding-top:10px;
-}
-body.view-list .card.open .card-head{
-  background:var(--paper-2);
-}
-body.view-list .card-body{
-  padding:14px 22px 18px;
-  background:var(--paper-2);
-  border-top:1px solid var(--line-soft);
-}
 .scene{
   font-size:12.5px;color:var(--ink-3);
   background:transparent;
@@ -643,6 +523,132 @@ footer .lines span{display:inline-block;margin:0 8px}
   color:var(--ink-3);letter-spacing:.04em;
   line-height:1.7;
 }
+
+/* ========== GROUP (主題分組折疊) ========== */
+.group{
+  margin-top:0;
+}
+.group-head{
+  max-width:1080px;margin:48px auto 0;
+  padding:14px 24px;
+  display:flex;align-items:center;gap:14px;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  border-top:1.5px solid var(--ink);
+  border-bottom:1px solid var(--line);
+  background:var(--paper-2);
+  transition:background .15s;
+  position:relative;z-index:2;
+}
+.group-head:hover{background:var(--highlight)}
+.group-head .gh-roman{
+  font-family:var(--serif-en);font-style:italic;font-weight:500;
+  font-size:28px;color:var(--gold-deep);line-height:1;
+  flex-shrink:0;
+}
+.group-head .gh-label{
+  font-family:var(--serif);font-weight:700;
+  font-size:18px;color:var(--ink);line-height:1.2;
+  flex:1;
+}
+.group-head .gh-count{
+  font-family:var(--sans-en);font-size:10.5px;letter-spacing:.18em;
+  color:var(--ink-3);text-transform:uppercase;
+  flex-shrink:0;
+}
+.group-head .gh-icon{
+  font-family:var(--serif-en);font-size:18px;color:var(--ink-3);
+  flex-shrink:0;
+  transition:transform .25s ease;
+}
+.group.collapsed .group-head .gh-icon{
+  transform:rotate(-90deg);
+}
+.group.collapsed > .section-head,
+.group.collapsed > .cards{
+  display:none;
+}
+.group:not(.collapsed) .group-head{
+  border-bottom:1px solid var(--line);
+}
+
+/* ========== SHOT TOGGLE (已拍過按鈕，排 card-meta 第一位) ========== */
+.shot-toggle{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 9px;
+  font-family:var(--sans);
+  font-size:11px;font-weight:500;
+  letter-spacing:.05em;
+  color:var(--ink-4);
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:999px;
+  cursor:pointer;
+  transition:all .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.shot-toggle::before{
+  content:'○';font-size:12px;line-height:1;
+}
+.shot-toggle:hover{border-color:var(--gold);color:var(--gold-deep)}
+.card.shot .shot-toggle{
+  background:rgba(92,107,79,.15);
+  color:#3d6438;
+  border-color:#a9c89e;
+}
+.card.shot .shot-toggle::before{content:'\2713';font-weight:700}
+.card.shot{opacity:.72}
+.card.shot:hover{opacity:.95}
+
+/* ========== CARD IMAGE (圖卡嵌入) ========== */
+.card-image{
+  padding:0 22px 18px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.card-image img{
+  width:100%;border:1px solid var(--line);
+  display:block;cursor:zoom-in;
+  transition:opacity .2s;
+}
+.card-image img:hover{opacity:.88}
+.card-image-download{
+  display:inline-flex;align-items:center;gap:6px;
+  align-self:flex-end;
+  padding:7px 14px;
+  font-family:var(--sans);font-size:12px;font-weight:500;
+  letter-spacing:.04em;
+  color:var(--paper);
+  background:var(--ink);
+  border:1px solid var(--ink);
+  text-decoration:none;
+  transition:all .2s;
+}
+.card-image-download:hover{background:var(--gold-deep);border-color:var(--gold-deep)}
+
+/* ========== LIGHTBOX ========== */
+.lightbox-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:999;
+  background:rgba(26,24,20,.88);
+  align-items:center;justify-content:center;
+  cursor:zoom-out;
+}
+.lightbox-overlay.open{display:flex}
+.lightbox-overlay img{
+  max-width:90vw;max-height:88vh;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+  pointer-events:none;
+}
+
+/* ========== FOOTER 署名 ========== */
+footer .bagao-sig{
+  margin-top:14px;
+  font-family:var(--sans-en);
+  font-size:10px;letter-spacing:.28em;
+  color:var(--ink-4);
+  text-transform:uppercase;
+}
 </style>
 </head>
 <body>
@@ -659,41 +665,13 @@ footer .lines span{display:inline-block;margin:0 8px}
   </div>
 </header>
 
-<section class="intro">
-  <p><span class="dropcap">這</span>本不是賣房型錄。是一個做了 9 年房仲、看過 200 場簽約場面、聽過上千句屋主和買家對話的人，把行業裡沒人講出來的「讀人」、「讀屋」、「讀價格」邏輯，拆成短影音腳本。每一支都是一個現場故事 — 從帶看的瞬間、議價的眼神、屋主的笑聲，到一張《拆》字貼上去那一刻。看完你不一定要買房，但你會多懂一點這個產業。</p>
-  <div class="author">— 許瑞祥．陳澤君監製</div>
-</section>
-
 <nav class="filter" aria-label="篩選">
-  <div class="filter-inner">
-    <a href="#" class="chip chip-all active" data-cat="all">全部 <em>36</em></a>
-    <a href="#filter-0" class="chip" data-cat="直球派" style="--pie:#6B2A1F">直球派 <em>8</em></a>
-  <a href="#filter-1" class="chip" data-cat="嗆辣派" style="--pie:#A0331F">嗆辣派 <em>3</em></a>
-  <a href="#filter-2" class="chip" data-cat="人間觀察派" style="--pie:#5C6B4F">人間觀察 <em>6</em></a>
-  <a href="#filter-3" class="chip" data-cat="老前輩權威派" style="--pie:#8C5A1F">老前輩權威 <em>8</em></a>
-  <a href="#filter-4" class="chip" data-cat="時事追擊派" style="--pie:#2E3A4F">時事追擊 <em>3</em></a>
-  <a href="#filter-5" class="chip" data-cat="陸軍／專業" style="--pie:#3A4A5C">陸軍/專業 <em>2</em></a>
-  <a href="#filter-6" class="chip" data-cat="稅法／報稅" style="--pie:#9B7239">稅法/報稅 <em>6</em></a>
-  </div>
   <div class="search-wrap" id="searchWrap">
-    <input type="text" class="search" id="searchInput" placeholder="搜尋關鍵字 — 屋主、議價、稅、社區..." oninput="filterCards()">
+    <input type="text" class="search" id="searchInput" placeholder="搜尋 — 屋主／議價／稅／社區..." oninput="filterCards()">
     <span class="search-hint" id="searchHint">⌘ K</span>
   </div>
 </nav>
 
-<div class="active-filter-bar" id="activeFilterBar" hidden>
-  <span class="active-filter-label">目前篩選</span>
-  <span class="active-filter-chips" id="activeFilterChips"></span>
-  <button class="active-filter-clear" id="clearFiltersBtn" type="button">× 清除全部</button>
-</div>
-
-<div class="expand-all-bar">
-  <div class="view-toggle">
-    <button class="view-btn active" data-view="card" type="button">卡片視圖</button>
-    <button class="view-btn" data-view="list" type="button">清單視圖</button>
-  </div>
-  <button id="toggleAllBtn" type="button">展開全部</button>
-</div>
 
 <section class="stats">
   <div class="stat"><div class="n">36</div><div class="l">Total scripts</div></div>
@@ -712,6 +690,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c1">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 01</span>
     </div>
@@ -737,6 +716,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c2">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 02</span>
     </div>
@@ -762,6 +742,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c3">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 03</span>
     </div>
@@ -787,6 +768,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c4">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 04</span>
     </div>
@@ -812,6 +794,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c5">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 05</span>
     </div>
@@ -837,6 +820,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c6">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 06</span>
     </div>
@@ -862,6 +846,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c7">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 07</span>
     </div>
@@ -886,6 +871,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="直球派" id="c8">
   <div class="card-head" style="--pie:#6B2A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">直球派</span>
       <span class="num">No. 08</span>
     </div>
@@ -920,6 +906,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="嗆辣派" id="c9">
   <div class="card-head" style="--pie:#A0331F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">嗆辣派</span>
       <span class="num">No. 09</span>
     </div>
@@ -944,6 +931,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="嗆辣派" id="c10">
   <div class="card-head" style="--pie:#A0331F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">嗆辣派</span>
       <span class="num">No. 10</span>
     </div>
@@ -969,6 +957,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="嗆辣派" id="c11">
   <div class="card-head" style="--pie:#A0331F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">嗆辣派</span>
       <span class="num">No. 11</span>
     </div>
@@ -1003,6 +992,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c12">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 12</span>
     </div>
@@ -1028,6 +1018,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c13">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 13</span>
     </div>
@@ -1053,6 +1044,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c14">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 14</span>
     </div>
@@ -1078,6 +1070,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c15">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 15</span>
     </div>
@@ -1103,6 +1096,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c16">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 16</span>
     </div>
@@ -1128,6 +1122,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="人間觀察派" id="c17">
   <div class="card-head" style="--pie:#5C6B4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">人間觀察</span>
       <span class="num">No. 17</span>
     </div>
@@ -1162,6 +1157,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c18">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 18</span>
     </div>
@@ -1187,6 +1183,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c19">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 19</span>
     </div>
@@ -1212,6 +1209,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c20">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 20</span>
     </div>
@@ -1236,6 +1234,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c21">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 21</span>
     </div>
@@ -1261,6 +1260,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c22">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 22</span>
     </div>
@@ -1286,6 +1286,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c23">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 23</span>
     </div>
@@ -1310,6 +1311,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c24">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 24</span>
     </div>
@@ -1335,6 +1337,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="老前輩權威派" id="c25">
   <div class="card-head" style="--pie:#8C5A1F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">老前輩權威派</span>
       <span class="num">No. 25</span>
     </div>
@@ -1368,6 +1371,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="時事追擊派" id="c26">
   <div class="card-head" style="--pie:#2E3A4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">時事追擊派</span>
       <span class="num">No. 26</span>
     </div>
@@ -1394,6 +1398,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="時事追擊派" id="c27">
   <div class="card-head" style="--pie:#2E3A4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">時事追擊派</span>
       <span class="num">No. 27</span>
     </div>
@@ -1420,6 +1425,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="時事追擊派" id="c28">
   <div class="card-head" style="--pie:#2E3A4F">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">時事追擊派</span>
       <span class="num">No. 28</span>
     </div>
@@ -1454,6 +1460,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="陸軍／專業" id="c29">
   <div class="card-head" style="--pie:#3A4A5C">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">陸軍/專業</span>
       <span class="num">No. 29</span>
     </div>
@@ -1479,6 +1486,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="陸軍／專業" id="c30">
   <div class="card-head" style="--pie:#3A4A5C">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">陸軍/專業</span>
       <span class="num">No. 30</span>
     </div>
@@ -1513,6 +1521,7 @@ footer .lines span{display:inline-block;margin:0 8px}
 <article class="card" data-cat="稅法／報稅" id="c31">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 31</span>
     </div>
@@ -1532,11 +1541,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「繼承」 拿 5 步驟自查表</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c31.jpg" alt="繼承屋怎麼算稅 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c31.jpg" download="繼承屋怎麼算稅.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #房地合一稅 #自用住宅 #報稅 #重購退稅 #節稅 #知識型短影音 #房仲日常</div>
   </article>
 <article class="card" data-cat="稅法／報稅" id="c32">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 32</span>
     </div>
@@ -1556,11 +1570,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「首購」 拿重新認定 SOP</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c32.jpg" alt="繼承房不卡首購 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c32.jpg" download="繼承房不卡首購.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #公益出租人 #繼承 #報稅 #節稅 #知識型短影音 #房仲日常 #房屋</div>
   </article>
 <article class="card" data-cat="稅法／報稅" id="c33">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 33</span>
     </div>
@@ -1580,11 +1599,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「租補」 拿 115 年資格速查</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c33.jpg" alt="115 婚育租補加碼 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c33.jpg" download="115婚育租補加碼.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #報稅 #節稅 #知識型短影音 #房仲日常 #房屋 #不動產 #房市</div>
   </article>
 <article class="card" data-cat="稅法／報稅" id="c34">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 34</span>
     </div>
@@ -1604,11 +1628,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「免稅屋」 拿接手前查核清單</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c34.jpg" alt="免稅屋接手前查核 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c34.jpg" download="免稅屋接手前查核.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #房地合一稅 #自用住宅 #報稅 #重購退稅 #節稅 #知識型短影音 #房仲日常</div>
   </article>
 <article class="card" data-cat="稅法／報稅" id="c35">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 35</span>
     </div>
@@ -1628,11 +1657,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「房屋稅」 拿 5 種繳費管道速查</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c35.jpg" alt="115 房屋稅 5 種繳費 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c35.jpg" download="115房屋稅5種繳費.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #房地合一稅 #自用住宅 #報稅 #重購退稅 #節稅 #知識型短影音 #房仲日常</div>
   </article>
 <article class="card" data-cat="稅法／報稅" id="c36">
   <div class="card-head" style="--pie:#9B7239">
     <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
       <span class="pie">稅法/報稅</span>
       <span class="num">No. 36</span>
     </div>
@@ -1652,8 +1686,16 @@ footer .lines span{display:inline-block;margin:0 8px}
     </div>
     <div class="cta"><span class="cta-arrow">→</span>私訊「租金」 拿 18 萬扣除資格 + 文件清單</div>
   </div>
+  <div class="card-image">
+    <img src="./card-c36.jpg" alt="18 萬租金扣除 (圖卡)" loading="lazy" onclick="openLightbox(this)">
+    <a class="card-image-download" href="./card-c36.jpg" download="18萬租金扣除.jpg">⬇ 下載圖卡</a>
+  </div>
       <div class="hashtags">#房地產 #房仲 #高雄房地產 #租金扣除 #報稅 #租屋族 #節稅 #知識型短影音 #房仲日常 #房屋</div>
   </article>
+</div>
+
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <img id="lightboxImg" src="" alt="">
 </div>
 
 <div class="empty" id="empty">沒有符合條件的腳本</div>
@@ -1666,175 +1708,223 @@ footer .lines span{display:inline-block;margin:0 8px}
   <div class="lines" style="margin-top:8px;font-size:10px;letter-spacing:.1em;text-transform:none">
     腳本生產三層架構（L0 v1.1 · 房仲層 v1.2 · 個人偏好 v1.2）
   </div>
+  <div class="bagao-sig">by 霸告 製作</div>
 </footer>
 
 <script>
-const chips = document.querySelectorAll('.chip');
-const cards = document.querySelectorAll('.card');
-const sections = document.querySelectorAll('.section-head');
-const sectionGrids = document.querySelectorAll('.cards');
-const search = document.querySelector('.search');
-const empty = document.getElementById('empty');
-const activeFilterBar = document.getElementById('activeFilterBar');
-const activeFilterChips = document.getElementById('activeFilterChips');
-const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+(function(){
 
-let activeCat = 'all';
+// ====== 1. 主題分組 DOM 殼子 ======
+// 7 個 section 定義（roman / label / data-cat）
+var SECTION_DEFS = [
+  {roman:'Ⅰ.', label:'直球派', en:'The Direct Voice', cat:'直球派'},
+  {roman:'Ⅱ.', label:'嗆辣派', en:'The Sharp Voice', cat:'嗆辣派'},
+  {roman:'Ⅲ.', label:'人間觀察派', en:'Human Observation', cat:'人間觀察派'},
+  {roman:'Ⅳ.', label:'老前輩權威派', en:'The Elder Authority', cat:'老前輩權威派'},
+  {roman:'Ⅴ.', label:'時事追擊派', en:'News Attack', cat:'時事追擊派'},
+  {roman:'Ⅵ.', label:'陸軍／專業', en:'Professional', cat:'陸軍／專業'},
+  {roman:'Ⅶ.', label:'稅法/報稅', en:'Tax & Policy', cat:'稅法／報稅'}
+];
 
-function getCatLabel(cat){
-  const chip = Array.from(chips).find(c => c.dataset.cat === cat);
-  if (!chip) return cat;
-  // 取 chip 文字但去掉計數
-  return chip.textContent.replace(/\s*\d+\s*$/, '').trim();
-}
-
-function getCatColor(cat){
-  const chip = Array.from(chips).find(c => c.dataset.cat === cat);
-  return chip?.style.getPropertyValue('--pie') || '#1A1814';
-}
-
-function renderActiveFilters(){
-  if (!activeFilterBar) return;
-  const items = [];
-  if (activeCat !== 'all') items.push({type:'cat', label:`派系：${getCatLabel(activeCat)}`, color:getCatColor(activeCat)});
-  const q = (search?.value || '').trim();
-  if (q) items.push({type:'q', label:`搜尋：${q}`});
-
-  if (items.length === 0){
-    activeFilterBar.hidden = true;
-    return;
-  }
-  activeFilterBar.hidden = false;
-  activeFilterChips.innerHTML = items.map(it => `
-    <span class="af-chip" ${it.color ? `style="background:${it.color}"` : ''}>
-      ${it.label}
-      <span class="x" data-clear="${it.type}" role="button" aria-label="清除">×</span>
-    </span>
-  `).join('');
-  activeFilterChips.querySelectorAll('.x').forEach(el => {
-    el.addEventListener('click', e => {
-      e.stopPropagation();
-      const type = el.dataset.clear;
-      if (type === 'cat'){
-        activeCat = 'all';
-        chips.forEach(c => c.classList.toggle('active', c.dataset.cat === 'all'));
-      } else if (type === 'q'){
-        if (search) search.value = '';
-      }
-      filterCards();
-    });
-  });
-}
-
-function filterCards(){
-  const q = (search?.value || '').toLowerCase().trim();
-  let any = false;
-  let count = 0;
-  cards.forEach(c => {
-    const ok1 = activeCat === 'all' || c.dataset.cat === activeCat;
-    const ok2 = !q || c.textContent.toLowerCase().includes(q);
-    const show = ok1 && ok2;
-    c.style.display = show ? '' : 'none';
-    if(show){ any = true; count++; }
-  });
-  // hide empty section headers
-  sections.forEach((sh, i) => {
-    const grid = sectionGrids[i];
-    if (!grid) return;
-    const visibleInSection = Array.from(grid.querySelectorAll('.card'))
-      .some(c => c.style.display !== 'none');
-    sh.style.display = visibleInSection ? '' : 'none';
-    grid.style.display = visibleInSection ? '' : 'none';
-  });
-  empty.classList.toggle('show', !any);
-  renderActiveFilters();
-}
-
-chips.forEach(chip => {
-  chip.addEventListener('click', e => {
-    e.preventDefault();
-    chips.forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    activeCat = chip.dataset.cat;
-    filterCards();
-    window.scrollTo({top:0, behavior:'smooth'});
+// 找每個 section-head + 緊接的 .cards，包入 .group 殼
+var sectionHeads = document.querySelectorAll('.section-head');
+sectionHeads.forEach(function(sh, i){
+  var next = sh.nextElementSibling;
+  if (!next || !next.classList.contains('cards')) return;
+  // 算這組有幾張
+  var count = next.querySelectorAll('.card').length;
+  // 建 group 殼
+  var group = document.createElement('div');
+  group.className = 'group';
+  var def = SECTION_DEFS[i] || {};
+  group.innerHTML =
+    '<div class="group-head">' +
+      '<span class="gh-roman">' + (def.roman||'') + '</span>' +
+      '<span class="gh-label">' + (def.label||'') + '</span>' +
+      '<span class="gh-count">' + count + ' scripts</span>' +
+      '<span class="gh-icon">▼</span>' +
+    '</div>';
+  // 把 sh 和 next 移進 group
+  sh.parentNode.insertBefore(group, sh);
+  group.appendChild(sh);
+  group.appendChild(next);
+  // 點 group-head toggle
+  group.querySelector('.group-head').addEventListener('click', function(){
+    group.classList.toggle('collapsed');
   });
 });
 
-if (clearFiltersBtn){
-  clearFiltersBtn.addEventListener('click', () => {
-    activeCat = 'all';
-    chips.forEach(c => c.classList.toggle('active', c.dataset.cat === 'all'));
-    if (search) search.value = '';
-    filterCards();
-  });
-}
+// 第 1 組展開，其餘折疊
+var groups = document.querySelectorAll('.group');
+groups.forEach(function(g, i){
+  if (i !== 0) g.classList.add('collapsed');
+});
 
-// 卡片預設摺疊 — 點 card-head 展開（依 2026-05-01 改版）
-cards.forEach(card => {
-  const head = card.querySelector('.card-head');
+// ====== 2. ★ 含配套圖卡 獨立群組 ======
+// clone c31-c36 進獨立群組（原位置不動，clone 顯示在最後）
+var cardImageIds = ['c31','c32','c33','c34','c35','c36'];
+var starGroup = document.createElement('div');
+starGroup.className = 'group collapsed';
+starGroup.innerHTML =
+  '<div class="group-head">' +
+    '<span class="gh-roman">★</span>' +
+    '<span class="gh-label">含配套圖卡</span>' +
+    '<span class="gh-count">6 scripts</span>' +
+    '<span class="gh-icon">▼</span>' +
+  '</div>';
+var starGrid = document.createElement('div');
+starGrid.className = 'cards';
+cardImageIds.forEach(function(id){
+  var orig = document.getElementById(id);
+  if (!orig) return;
+  var clone = orig.cloneNode(true);
+  // clone 的 shot-toggle 要重新綁定（在後面 shot 段落統一處理）
+  clone.id = id + '-star';
+  clone.dataset.clone = id;
+  starGrid.appendChild(clone);
+});
+starGroup.appendChild(starGrid);
+// 點 group-head toggle
+starGroup.querySelector('.group-head').addEventListener('click', function(){
+  starGroup.classList.toggle('collapsed');
+});
+// 插在 .empty 之前
+var emptyEl = document.getElementById('empty');
+emptyEl.parentNode.insertBefore(starGroup, emptyEl);
+
+// ====== 3. 卡片展開 (card-head click) ======
+document.querySelectorAll('.card').forEach(function(card){
+  var head = card.querySelector('.card-head');
   if (!head) return;
-  head.addEventListener('click', () => {
+  head.addEventListener('click', function(){
     card.classList.toggle('open');
   });
 });
 
-// 展開/收合全部
-const toggleAllBtn = document.getElementById('toggleAllBtn');
-if (toggleAllBtn) {
-  toggleAllBtn.addEventListener('click', () => {
-    const visibleCards = Array.from(cards).filter(c => c.style.display !== 'none');
-    const anyClosed = visibleCards.some(c => !c.classList.contains('open'));
-    visibleCards.forEach(c => {
-      if (anyClosed) c.classList.add('open');
-      else c.classList.remove('open');
-    });
-    toggleAllBtn.textContent = anyClosed ? '收合全部' : '展開全部';
+// ====== 4. 搜尋 ======
+var search = document.querySelector('.search');
+var empty = document.getElementById('empty');
+var searchWrap = document.getElementById('searchWrap');
+var searchHint = document.getElementById('searchHint');
+
+function filterCards(){
+  var q = (search ? search.value : '').toLowerCase().trim();
+  var any = false;
+  // 只操作原始 article（不含 clone）
+  document.querySelectorAll('article.card:not([data-clone])').forEach(function(c){
+    var ok = !q || c.textContent.toLowerCase().indexOf(q) >= 0;
+    c.style.display = ok ? '' : 'none';
+    if (ok) any = true;
   });
+  // 搜尋時強制展開所有 group（包含 star group）
+  document.querySelectorAll('.group').forEach(function(g){
+    if (q) g.classList.remove('collapsed');
+  });
+  // 搜尋時 clone 同步顯示/隱藏
+  document.querySelectorAll('article.card[data-clone]').forEach(function(clone){
+    var origId = clone.dataset.clone;
+    var orig = document.getElementById(origId);
+    clone.style.display = orig ? orig.style.display : '';
+  });
+  // 同步 section-head + cards 的可見性（當有搜尋篩選時）
+  document.querySelectorAll('.group').forEach(function(g){
+    var cards = g.querySelectorAll('article.card:not([data-clone])');
+    var anyVisible = false;
+    cards.forEach(function(c){ if(c.style.display !== 'none') anyVisible = true; });
+    g.style.display = anyVisible || !q ? '' : 'none';
+  });
+  if (empty) empty.classList.toggle('show', !any);
 }
 
-// 視圖切換（卡片 / 清單）
-const viewBtns = document.querySelectorAll('.view-btn');
-viewBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    viewBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const v = btn.dataset.view;
-    document.body.classList.toggle('view-list', v === 'list');
-    document.body.classList.toggle('view-card', v === 'card');
-  });
-});
+if (search) {
+  search.addEventListener('input', filterCards);
+}
 
-// cmd+K / ctrl+K / `/` 全域捷徑開搜尋
-const searchWrap = document.getElementById('searchWrap');
-const searchHint = document.getElementById('searchHint');
-const isMac = navigator.platform.toUpperCase().includes('MAC');
+// ====== 5. cmd+K / ctrl+K / '/' 捷徑 ======
+var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 if (searchHint) searchHint.textContent = isMac ? '⌘ K' : 'Ctrl K';
 
-document.addEventListener('keydown', e => {
-  const isMod = (isMac && e.metaKey) || (!isMac && e.ctrlKey);
-  const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);
+document.addEventListener('keydown', function(e){
+  var isMod = (isMac && e.metaKey) || (!isMac && e.ctrlKey);
+  var inField = ['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement ? document.activeElement.tagName : '') >= 0;
   if (isMod && (e.key === 'k' || e.key === 'K')){
     e.preventDefault();
-    search?.focus();
-    search?.select();
+    if (search){ search.focus(); search.select(); }
   } else if (e.key === '/' && !inField){
     e.preventDefault();
-    search?.focus();
+    if (search) search.focus();
   } else if (e.key === 'Escape' && document.activeElement === search){
     search.blur();
   }
 });
 
 if (search){
-  search.addEventListener('focus', () => searchWrap?.classList.add('is-focused'));
-  search.addEventListener('blur', () => searchWrap?.classList.remove('is-focused'));
+  search.addEventListener('focus', function(){ if(searchWrap) searchWrap.classList.add('is-focused'); });
+  search.addEventListener('blur', function(){ if(searchWrap) searchWrap.classList.remove('is-focused'); });
 }
 
-// 初始化 active filter 顯示
-renderActiveFilters();
+// ====== 6. 已拍過 toggle（localStorage ruisiang.shot.v1）======
+var SHOT_KEY = 'ruisiang.shot.v1';
+var shotData = {};
+try {
+  var raw = localStorage.getItem(SHOT_KEY);
+  shotData = raw ? JSON.parse(raw) : {};
+} catch(e){ shotData = {}; }
 
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+function saveShot(){ try{ localStorage.setItem(SHOT_KEY, JSON.stringify(shotData)); }catch(e){} }
+
+function initShotToggle(card){
+  var id = card.id;
+  if (!id) return;
+  // 若是 clone，使用原始 id
+  var realId = card.dataset.clone || id;
+  if (shotData[realId]) card.classList.add('shot');
+  var btn = card.querySelector('.shot-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (shotData[realId]){
+      delete shotData[realId];
+      // 同步原始卡 + 所有 clone
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.remove('shot'); });
+    } else {
+      shotData[realId] = true;
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.add('shot'); });
+    }
+    saveShot();
+  });
+}
+
+document.querySelectorAll('article.card').forEach(initShotToggle);
+
+// ====== 7. Lightbox ======
+var overlay = document.getElementById('lightboxOverlay');
+var lbImg = document.getElementById('lightboxImg');
+
+function openLightbox(img){
+  if (!overlay || !lbImg) return;
+  lbImg.src = img.src;
+  lbImg.alt = img.alt;
+  overlay.classList.add('open');
+}
+
+if (overlay){
+  overlay.addEventListener('click', function(){
+    overlay.classList.remove('open');
+  });
+}
+
+// 暴露 openLightbox 到全域（img onclick= 呼叫用）
+window.openLightbox = openLightbox;
+
+// ====== 8. Service Worker ======
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
+
+})();
 </script>
 
 </body>

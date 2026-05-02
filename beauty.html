@@ -549,6 +549,82 @@ body.view-list .card.open .card-body{
   font-size:11px;color:var(--ink-muted);margin-top:4px;letter-spacing:.05em;
 }
 
+/* ========== GROUP TITLE (主題分組) ========== */
+.group{margin-top:40px}
+.group:first-of-type{margin-top:8px}
+.group-head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding:0 4px 12px;margin-bottom:18px;
+  border-bottom:1px solid var(--line);
+}
+.group-name{
+  font-family:var(--serif);
+  font-size:20px;font-weight:700;
+  letter-spacing:.04em;
+  display:flex;align-items:baseline;gap:10px;
+}
+.group-name::before{
+  content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--gold);
+}
+.group-count{
+  font-family:var(--hand);
+  font-size:18px;color:var(--gold-deep);
+}
+
+/* ========== SHOT TOGGLE (已拍過按鈕) ========== */
+.shot-toggle{
+  position:absolute;top:14px;left:14px;
+  z-index:2;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;
+  font-family:var(--sans);
+  font-size:11.5px;font-weight:500;
+  letter-spacing:.05em;
+  color:var(--ink-muted);
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:999px;
+  cursor:pointer;
+  transition:all .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.shot-toggle::before{
+  content:'○';font-size:13px;line-height:1;
+}
+.shot-toggle:hover{border-color:var(--gold);color:var(--gold-deep)}
+.card.shot .shot-toggle{
+  background:var(--sage);
+  color:#3d6438;
+  border-color:#a9c89e;
+}
+.card.shot .shot-toggle::before{content:'\2713';font-weight:700}
+.card.shot{opacity:.55;background:linear-gradient(180deg,var(--sage) 0,var(--paper) 60%)}
+.card.shot:hover{opacity:.85}
+.card.shot .card-corner{opacity:.25}
+
+/* ========== DOWNLOAD BUTTON (圖卡下載) ========== */
+.card-image-actions{
+  display:flex;justify-content:flex-end;gap:8px;
+  margin-top:10px;
+}
+.download-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px;
+  font-family:var(--sans);
+  font-size:12.5px;font-weight:500;
+  letter-spacing:.05em;
+  color:var(--paper);
+  background:var(--ink);
+  border:1px solid var(--ink);
+  border-radius:999px;
+  text-decoration:none;
+  transition:all .2s;
+  cursor:pointer;
+}
+.download-btn:hover{background:var(--gold-deep);border-color:var(--gold-deep)}
+.download-btn::before{content:'\2B07';font-size:13px;line-height:1}
+
 /* ========== FOOTER ========== */
 footer{
   margin-top:64px;
@@ -565,7 +641,15 @@ footer .sig{
 footer .credit{
   font-size:11px;color:var(--ink-muted);
   letter-spacing:.05em;
+  margin-bottom:4px;
 }
+footer .by{
+  font-family:var(--hand);
+  font-size:14px;color:var(--ink-muted);
+  letter-spacing:.08em;
+  margin-top:6px;
+}
+footer .by b{color:var(--gold-deep);font-weight:700}
 
 /* ========== SMALL ========== */
 @media(max-width:480px){
@@ -584,40 +668,13 @@ footer .credit{
 <span class="hero-deco bl">●</span>
 <div class="hero-badge">— skin care notes —</div>
 <h1>昀臻 · <em>油痘肌</em> 教學筆記</h1>
-<p class="lede">高雄美容師 / 11 部一批，每一部都是真實客人帶來的提醒。<br>不推銷，不洗腦，只把專業說清楚。</p>
+<p class="lede">高雄美容師 · 每一部都是真實客人帶來的提醒。<br>不推銷，不洗腦，只把專業說清楚。</p>
 <div class="hero-meta">
   <span>2026-05-01</span>
-  <span>共 11 部</span>
-  <span>油痘肌 / 痘疤 / 敏感屏障 / 心法</span>
+  <span>共 22 部 · 配套圖卡 2 張</span>
+  <span>油痘肌 / 痘疤 / 敏感屏障 / 美業心法</span>
 </div>
 </header>
-
-<nav class="nav" aria-label="目錄">
-<div class="nav-inner">
-  <a href="#s1">#1 洗臉力道</a>
-  <a href="#s2">#2 粉刺崩潰</a>
-  <a href="#s3">#3 顆粒不是粉刺</a>
-  <a href="#s5">#5 痘痘同位置</a>
-  <a href="#s6">#6 第一次清粉刺</a>
-  <a href="#s7">#7 化妝水</a>
-  <a href="#s8">#8 美容師曲線</a>
-  <a href="#s9">#9 油痘 3 禁忌</a>
-  <a href="#s10">#10 轉行招生</a>
-  <a href="#s11">#11 不急著變美</a>
-  <a href="#s12">#12 教學生第一件事</a>
-  <a href="#s13">#13 油痘肌擦這個</a>
-  <a href="#s14">#14 換季爆痘 屏障</a>
-  <a href="#s15">#15 油痘肌 10 年</a>
-  <a href="#s16">#16 油痘肌敢不敢接</a>
-  <a href="#s17">#17 客人 100 次同題</a>
-  <a href="#s18">#18 梅雨季閉口</a>
-  <a href="#s19">#19 不是變老 是忘了愛自己</a>
-  <a href="#s20">#20 皮膚記得熬的夜</a>
-  <a href="#s21">#21 美容師最值錢</a>
-  <a href="#s22">#22 按摩越按越垮</a>
-  <a href="#s4" class="gold">★ 配套圖卡 痘疤禁忌</a>
-</div>
-</nav>
 
 <div class="search-section">
   <div class="search-wrap" id="searchWrap">
@@ -644,12 +701,47 @@ footer .credit{
 
 <section>
 <h2 class="section-title">腳本</h2>
-<div class="section-sub">scroll & read</div>
+<div class="section-sub">scroll & read · 點左上角「已拍過」標記進度</div>
 
-<div class="cards">
+<!-- 主題分組容器（JS 動態填入 article） -->
+<div class="group" data-group="A">
+  <div class="group-head">
+    <div class="group-name">油痘肌處理</div>
+    <div class="group-count">9 部</div>
+  </div>
+  <div class="cards" data-slot="A"></div>
+</div>
+
+<div class="group" data-group="B">
+  <div class="group-head">
+    <div class="group-name">保養手法 / 屏障</div>
+    <div class="group-count">3 部</div>
+  </div>
+  <div class="cards" data-slot="B"></div>
+</div>
+
+<div class="group" data-group="C">
+  <div class="group-head">
+    <div class="group-name">痘疤恢復</div>
+    <div class="group-count">1 部 · 含配套圖卡</div>
+  </div>
+  <div class="cards" data-slot="C"></div>
+</div>
+
+<div class="group" data-group="D">
+  <div class="group-head">
+    <div class="group-name">美業心法 / 教學招生</div>
+    <div class="group-count">9 部 · 含配套圖卡</div>
+  </div>
+  <div class="cards" data-slot="D"></div>
+</div>
+
+<!-- 待分配池（JS 載入後 article 會被搬到對應群組） -->
+<div class="cards pool" id="card-pool">
 
 <!-- ===== #1 ===== -->
-<article class="card" id="s1">
+<article class="card" id="s1" data-id="s1">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.1</div>
 <div class="card-head">
   <div class="card-meta">
@@ -673,7 +765,8 @@ footer .credit{
 </article>
 
 <!-- ===== #2 ===== -->
-<article class="card" id="s2">
+<article class="card" id="s2" data-id="s2">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.2</div>
 <div class="card-head">
   <div class="card-meta">
@@ -697,7 +790,8 @@ footer .credit{
 </article>
 
 <!-- ===== #3 ===== -->
-<article class="card" id="s3">
+<article class="card" id="s3" data-id="s3">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.3</div>
 <div class="card-head">
   <div class="card-meta">
@@ -721,7 +815,8 @@ footer .credit{
 
 
 <!-- ===== #5 ===== -->
-<article class="card" id="s5">
+<article class="card" id="s5" data-id="s5">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.5</div>
 <div class="card-head">
   <div class="card-meta">
@@ -745,7 +840,8 @@ footer .credit{
 </article>
 
 <!-- ===== #6 ===== -->
-<article class="card" id="s6">
+<article class="card" id="s6" data-id="s6">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.6</div>
 <div class="card-head">
   <div class="card-meta">
@@ -769,7 +865,8 @@ footer .credit{
 </article>
 
 <!-- ===== #7 ===== -->
-<article class="card" id="s7">
+<article class="card" id="s7" data-id="s7">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.7</div>
 <div class="card-head">
   <div class="card-meta">
@@ -792,7 +889,8 @@ footer .credit{
 </article>
 
 <!-- ===== #8 ===== -->
-<article class="card" id="s8">
+<article class="card" id="s8" data-id="s8">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">★ no.8</div>
 <div class="card-head">
   <div class="card-meta">
@@ -817,12 +915,16 @@ footer .credit{
 <div class="card-image">
   <div class="card-image-title">配套圖卡</div>
   <img src="card-08.png" alt="美容師成長曲線 配套圖卡" style="width:100%;border-radius:10px;border:1px solid var(--line);display:block;margin-top:8px">
+  <div class="card-image-actions">
+    <a href="card-08.png" download="昀臻_美容師成長曲線.png" class="download-btn">下載圖卡</a>
+  </div>
 </div>
 </div>
 </article>
 
 <!-- ===== #9 ===== -->
-<article class="card" id="s9">
+<article class="card" id="s9" data-id="s9">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">★ no.9</div>
 <div class="card-head">
   <div class="card-meta">
@@ -846,7 +948,8 @@ footer .credit{
 </article>
 
 <!-- ===== #10 ===== -->
-<article class="card" id="s10">
+<article class="card" id="s10" data-id="s10">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.10</div>
 <div class="card-head">
   <div class="card-meta">
@@ -870,7 +973,8 @@ footer .credit{
 </article>
 
 <!-- ===== #11 ===== -->
-<article class="card full" id="s11">
+<article class="card full" id="s11" data-id="s11">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">★ no.11</div>
 <div class="card-head" style="background:linear-gradient(180deg,var(--paper) 0,var(--rose) 100%)">
   <div class="card-meta">
@@ -893,7 +997,8 @@ footer .credit{
 </article>
 
 <!-- ===== 4-11 已拍 10 部（s12-s21）===== -->
-<article class="card" id="s12">
+<article class="card" id="s12" data-id="s12">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.12</div>
 <div class="card-head">
   <div class="card-meta">
@@ -917,7 +1022,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s13">
+<article class="card" id="s13" data-id="s13">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.13</div>
 <div class="card-head">
   <div class="card-meta">
@@ -941,7 +1047,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s14">
+<article class="card" id="s14" data-id="s14">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.14</div>
 <div class="card-head">
   <div class="card-meta">
@@ -965,7 +1072,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s15">
+<article class="card" id="s15" data-id="s15">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.15</div>
 <div class="card-head">
   <div class="card-meta">
@@ -989,7 +1097,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s16">
+<article class="card" id="s16" data-id="s16">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.16</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1013,7 +1122,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s17">
+<article class="card" id="s17" data-id="s17">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.17</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1037,7 +1147,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s18">
+<article class="card" id="s18" data-id="s18">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.18</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1061,7 +1172,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s19">
+<article class="card" id="s19" data-id="s19">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.19</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1085,7 +1197,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s20">
+<article class="card" id="s20" data-id="s20">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.20</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1109,7 +1222,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s21">
+<article class="card" id="s21" data-id="s21">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.21</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1133,7 +1247,8 @@ footer .credit{
 </div>
 </article>
 
-<article class="card" id="s22">
+<article class="card" id="s22" data-id="s22">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">no.22</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1157,7 +1272,8 @@ footer .credit{
 </article>
 
 <!-- ===== #4 (full width, has image card) ===== -->
-<article class="card full" id="s4" data-final="true">
+<article class="card full" id="s4" data-id="s4">
+<button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
 <div class="card-corner">配套圖卡篇</div>
 <div class="card-head">
   <div class="card-meta">
@@ -1182,6 +1298,9 @@ footer .credit{
 <div class="card-image">
   <div class="card-image-title">配套圖卡</div>
   <img src="card-04.png" alt="痘疤千萬不要踩這 3 件事 配套圖卡" style="width:100%;border-radius:10px;border:1px solid var(--line);display:block;margin-top:8px">
+  <div class="card-image-actions">
+    <a href="card-04.png" download="昀臻_痘疤千萬不要踩這3件事.png" class="download-btn">下載圖卡</a>
+  </div>
 </div>
 </div>
 </article>
@@ -1193,6 +1312,7 @@ footer .credit{
 <footer>
 <div class="sig">— 美容師 昀臻 ·  小工作室 ·  高雄 —</div>
 <div class="credit">2026-05-01</div>
+<div class="by">by <b>霸告</b> 製作</div>
 </footer>
 
 <script>
@@ -1320,6 +1440,44 @@ function openByHash() {
 window.addEventListener('hashchange', openByHash);
 window.addEventListener('load', openByHash);
 renderActiveFilters();
+
+// === 主題分組 reorder + 已拍過 toggle (霸告 2026-05-02) ===
+(function(){
+  var GROUPS = {
+    A: ['s1','s2','s3','s5','s6','s9','s13','s15','s18'],
+    B: ['s7','s14','s22'],
+    C: ['s4'],
+    D: ['s8','s10','s11','s12','s16','s17','s19','s20','s21']
+  };
+  Object.keys(GROUPS).forEach(function(gid){
+    var slot = document.querySelector('[data-slot="'+gid+'"]');
+    if (!slot) return;
+    GROUPS[gid].forEach(function(id){
+      var c = document.getElementById(id);
+      if (c) slot.appendChild(c);
+    });
+  });
+  var pool = document.getElementById('card-pool');
+  if (pool && !pool.children.length) pool.style.display = 'none';
+
+  var KEY = 'beauty.shot.v1';
+  var shot = [];
+  try { shot = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ shot = []; }
+  document.querySelectorAll('article.card').forEach(function(card){
+    var id = card.dataset.id;
+    if (!id) return;
+    if (shot.indexOf(id) >= 0) card.classList.add('shot');
+    var btn = card.querySelector('.shot-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var idx = shot.indexOf(id);
+      if (idx >= 0) { shot.splice(idx,1); card.classList.remove('shot'); }
+      else { shot.push(id); card.classList.add('shot'); }
+      try { localStorage.setItem(KEY, JSON.stringify(shot)); } catch(e){}
+    });
+  });
+})();
 </script>
 
 </body>

@@ -584,7 +584,11 @@ footer .lines span{display:inline-block;margin:0 8px}
 /* ========== CARD IMAGE (圖卡嵌入) ========== */
 .card-image{
   padding:0 22px 18px;
-  display:flex;flex-direction:column;gap:8px;
+  display:none;flex-direction:column;gap:8px;
+}
+.card.open .card-image{
+  display:flex;
+  animation:slideDown .25s ease both;
 }
 .card-image img{
   width:100%;border:1px solid var(--line);
@@ -638,10 +642,9 @@ footer .bagao-sig{
   <h1>Ruisiang <span class="amp">&amp;</span> Co.</h1>
   <div class="sub">許瑞祥．房仲腳本誌 — 一個房仲對市場的觀察、診斷、與真話</div>
   <div class="meta-row">
-    <span>Total <b>36</b> Scripts</span>
-    <span>7 Sections</span>
-    <span>Updated <b>2026‧05‧01</b></span>
-    <span>Pian by 陳澤君</span>
+    <span>共 <b>36</b> 部</span>
+    <span>7 主題</span>
+    <span><b>2026‧05‧01</b> 更新</span>
   </div>
 </header>
 
@@ -1685,9 +1688,6 @@ footer .bagao-sig{
   <div class="lines">
     <span>許瑞祥 ‧ 房仲腳本誌</span> · <span>Issue 02 ‧ 2026</span> · <span>陳澤君監製</span>
   </div>
-  <div class="lines" style="margin-top:8px;font-size:10px;letter-spacing:.1em;text-transform:none">
-    腳本生產三層架構（L0 v1.1 · 房仲層 v1.2 · 個人偏好 v1.2）
-  </div>
   <div class="bagao-sig">by 霸告 製作</div>
 </footer>
 
@@ -1734,10 +1734,10 @@ sectionHeads.forEach(function(sh, i){
   });
 });
 
-// 第 1 組展開，其餘折疊
+// 全部主題預設折疊（澤君 2026-05-02 拍板）
 var groups = document.querySelectorAll('.group');
-groups.forEach(function(g, i){
-  if (i !== 0) g.classList.add('collapsed');
+groups.forEach(function(g){
+  g.classList.add('collapsed');
 });
 
 // ====== 2. ★ 含配套圖卡 獨立群組 ======

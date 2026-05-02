@@ -556,21 +556,46 @@ body.view-list .card.open .card-body{
   display:flex;align-items:baseline;justify-content:space-between;
   padding:0 4px 12px;margin-bottom:18px;
   border-bottom:1px solid var(--line);
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  position:relative;
+  transition:opacity .2s;
 }
+.group-head:hover{opacity:.7}
+.group-head::after{
+  content:'−';
+  position:absolute;right:6px;top:50%;
+  transform:translateY(-50%);
+  font-family:var(--serif);font-size:22px;font-weight:500;
+  color:var(--ink-soft);
+  width:24px;height:24px;line-height:22px;text-align:center;
+  border:1px solid var(--line);border-radius:50%;
+  background:var(--paper);
+  transition:transform .2s ease;
+}
+.group.collapsed .group-head::after{content:'+'}
 .group-name{
   font-family:var(--serif);
   font-size:20px;font-weight:700;
   letter-spacing:.04em;
   display:flex;align-items:baseline;gap:10px;
+  padding-right:34px;
 }
 .group-name::before{
   content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
   background:var(--gold);
+  flex-shrink:0;
 }
 .group-count{
   font-family:var(--hand);
   font-size:18px;color:var(--gold-deep);
+  margin-right:34px;
 }
+.group.collapsed > .cards{
+  display:none !important;
+}
+.group.collapsed{margin-bottom:8px}
 
 /* ========== SHOT TOGGLE (已拍過按鈕) ========== */
 .shot-toggle{
@@ -720,20 +745,20 @@ footer .by b{color:var(--gold-deep);font-weight:700}
   <div class="cards" data-slot="B"></div>
 </div>
 
-<div class="group" data-group="C">
-  <div class="group-head">
-    <div class="group-name">痘疤恢復</div>
-    <div class="group-count">1 部 · 含配套圖卡</div>
-  </div>
-  <div class="cards" data-slot="C"></div>
-</div>
-
 <div class="group" data-group="D">
   <div class="group-head">
     <div class="group-name">美業心法 / 教學招生</div>
-    <div class="group-count">9 部 · 含配套圖卡</div>
+    <div class="group-count">8 部</div>
   </div>
   <div class="cards" data-slot="D"></div>
+</div>
+
+<div class="group" data-group="E">
+  <div class="group-head">
+    <div class="group-name">★ 含配套圖卡</div>
+    <div class="group-count">2 部</div>
+  </div>
+  <div class="cards" data-slot="E"></div>
 </div>
 
 <!-- 待分配池（JS 載入後 article 會被搬到對應群組） -->
@@ -894,7 +919,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">★ no.8</div>
 <div class="card-head">
   <div class="card-meta">
-    <span class="tag gold">★ 含配套圖卡</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">08</div>
@@ -1003,7 +1028,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">12</div>
@@ -1028,7 +1053,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">13</div>
@@ -1053,7 +1078,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">14</div>
@@ -1078,7 +1103,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">15</div>
@@ -1103,7 +1128,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">16</div>
@@ -1128,7 +1153,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">17</div>
@@ -1153,7 +1178,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">18</div>
@@ -1178,7 +1203,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">19</div>
@@ -1203,7 +1228,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">20</div>
@@ -1228,7 +1253,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-11</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">21</div>
@@ -1253,7 +1278,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-head">
   <div class="card-meta">
     <span class="tag">2026-04-27</span>
-    <span class="tag mute">已拍</span>
+
     <span class="tag mute">45s</span>
   </div>
   <div class="card-num">22</div>
@@ -1277,7 +1302,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="card-corner">配套圖卡篇</div>
 <div class="card-head">
   <div class="card-meta">
-    <span class="tag gold">★ 含配套圖卡</span>
+
     <span class="tag mute">60s</span>
   </div>
   <div class="card-num">04</div>
@@ -1362,6 +1387,11 @@ function filterCards(){
     c.style.display = ok ? '' : 'none';
     if(ok) any = true;
   });
+  // 搜尋時強制全展開（不然點擊時看不到結果）
+  document.querySelectorAll('.group').forEach(g => {
+    if (q) g.classList.remove('collapsed');
+    // 搜尋清空時不自動回到 collapsed — 讓使用者保留當下的展開狀態
+  });
   if (empty) empty.classList.toggle('show', !any);
   renderActiveFilters();
 }
@@ -1441,13 +1471,13 @@ window.addEventListener('hashchange', openByHash);
 window.addEventListener('load', openByHash);
 renderActiveFilters();
 
-// === 主題分組 reorder + 已拍過 toggle (霸告 2026-05-02) ===
+// === 主題分組 reorder + 折疊 + 已拍過 toggle (霸告 2026-05-02 v4) ===
 (function(){
   var GROUPS = {
     A: ['s1','s2','s3','s5','s6','s9','s13','s15','s18'],
     B: ['s7','s14','s22'],
-    C: ['s4'],
-    D: ['s8','s10','s11','s12','s16','s17','s19','s20','s21']
+    D: ['s10','s11','s12','s16','s17','s19','s20','s21'],
+    E: ['s4','s8']
   };
   Object.keys(GROUPS).forEach(function(gid){
     var slot = document.querySelector('[data-slot="'+gid+'"]');
@@ -1459,6 +1489,16 @@ renderActiveFilters();
   });
   var pool = document.getElementById('card-pool');
   if (pool && !pool.children.length) pool.style.display = 'none';
+
+  // 主題折疊：預設第 1 個展開、其他收起；點 group-head 切換
+  var groups = document.querySelectorAll('.group');
+  groups.forEach(function(g, i){
+    if (i > 0) g.classList.add('collapsed');
+    var head = g.querySelector('.group-head');
+    if (head) head.addEventListener('click', function(){
+      g.classList.toggle('collapsed');
+    });
+  });
 
   var KEY = 'beauty.shot.v1';
   var shot = [];

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f0f0f0">
+<title>仲豪</title>
+<style>
+  :root {
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --card: #fafafa;
+    --border: #d8d8d0;
+    --border-soft: #e8e8e0;
+    --accent: #2d2d2d;
+    --accent-soft: #555550;
+    --tag-green: #5c8a5c;
+    --tag-blue: #4a7aaa;
+    --tag-brown: #8a6040;
+    --tag-rose: #aa5870;
+    --text: #2a2a25;
+    --muted: #888880;
+    --chiik-line: #1a1a1a;
+    --chiik-bg: #fffef8;
+    --chiik-yellow: #f0d060;
+    --chiik-pink: #f0b0a0;
+    --chiik-green: #90c090;
+    --font-main: 'Segoe UI', 'Microsoft JhengHei', 'Hiragino Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--chiik-bg);
+    border-bottom: 2px solid var(--chiik-line);
+    position: relative;
+    overflow: hidden;
+  }
+  /* 手帳風頂部裝飾 */
+  header::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: repeating-linear-gradient(90deg,
+      var(--chiik-yellow) 0,var(--chiik-yellow) 16px,
+      var(--chiik-pink) 16px,var(--chiik-pink) 32px,
+      var(--chiik-green) 32px,var(--chiik-green) 48px,
+      var(--border-soft) 48px,var(--border-soft) 64px
+    );
+  }
+
+  .header-inner {
+    max-width: 960px; margin: 0 auto;
+    padding: 24px 24px 20px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap;
+  }
+
+  /* 草稿圈圈風 logo 區 */
+  .logo-zone { display: flex; gap: 16px; align-items: center; }
+  .chiik-doodle {
+    width: 68px; height: 68px; position: relative; flex-shrink: 0;
+  }
+  .chiik-doodle svg { width: 100%; height: 100%; }
+  .brand-text {}
+  .brand-main {
+    font-size: clamp(18px, 3.5vw, 26px);
+    font-weight: 900;
+    color: var(--chiik-line);
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .brand-sub {
+    font-size: 11px; color: var(--muted);
+    margin-top: 5px; letter-spacing: .5px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .brand-sub span { position: relative; }
+  .brand-sub span::before { content: '·'; margin-right: 4px; color: var(--border); }
+  .brand-sub span:first-child::before { display: none; }
+
+  /* 手繪風貼紙 badge */
+  .sticker {
+    background: var(--chiik-yellow);
+    border: 2px solid var(--chiik-line);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 11px; font-weight: 700; color: var(--chiik-line);
+    transform: rotate(-2deg);
+    box-shadow: 2px 2px 0 var(--chiik-line);
+    letter-spacing: .5px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .header-stats {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  .hstat {
+    background: var(--surface);
+    border: 1.5px solid var(--chiik-line);
+    border-radius: 8px;
+    padding: 8px 16px;
+    text-align: center;
+    box-shadow: 2px 2px 0 var(--chiik-line);
+  }
+  .hstat-num { font-size: 22px; font-weight: 900; color: var(--chiik-line); line-height: 1; }
+  .hstat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    background: var(--surface);
+    border-bottom: 1.5px solid var(--border);
+    padding: 12px 24px;
+  }
+  .toolbar-inner {
+    max-width: 960px; margin: 0 auto;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .search-wrap { flex: 1; position: relative; min-width: 180px; }
+  .search-wrap::before {
+    content: '🔍';
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%) scale(0.8);
+    pointer-events: none;
+  }
+  input[type=search] {
+    width: 100%;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px 8px 34px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none; transition: border-color .2s;
+  }
+  input[type=search]:focus { border-color: var(--chiik-line); box-shadow: 2px 2px 0 var(--chiik-line); }
+  input[type=search]::placeholder { color: var(--muted); }
+
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 5px 12px; border-radius: 4px;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+    letter-spacing: .3px;
+    box-shadow: 1px 1px 0 var(--border);
+  }
+  .chip:hover { border-color: var(--chiik-line); color: var(--chiik-line); }
+  .chip.active {
+    background: var(--chiik-yellow);
+    border-color: var(--chiik-line);
+    color: var(--chiik-line);
+    box-shadow: 2px 2px 0 var(--chiik-line);
+    font-weight: 700;
+  }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 960px; margin: 0 auto;
+    padding: 28px 24px 64px;
+  }
+
+  /* ── GROUP ── */
+  .group { margin-bottom: 36px; }
+  .group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1.5px solid var(--chiik-line);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer; user-select: none;
+    box-shadow: 2px 2px 0 var(--chiik-line);
+    transition: background .15s;
+  }
+  .group-header:hover { background: #f8f8f4; }
+  .group-header-left { display: flex; align-items: center; gap: 8px; }
+  .group-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1.5px solid var(--chiik-line);
+    flex-shrink: 0;
+  }
+  .group-title { font-size: 14px; font-weight: 700; }
+  .group-count { font-size: 12px; color: var(--muted); }
+  .group-toggle { color: var(--muted); font-size: 12px; transition: transform .2s; }
+  .group-header.collapsed .group-toggle { transform: rotate(-90deg); }
+
+  .group-body {
+    border: 1.5px solid var(--chiik-line); border-top: none;
+    border-radius: 0 0 6px 6px;
+    background: var(--chiik-bg);
+    overflow: hidden;
+  }
+  .group-body.hidden { display: none; }
+
+  /* ── SCRIPT CARD ── */
+  .script-card {
+    background: var(--chiik-bg);
+    border-bottom: 1.5px dashed var(--border);
+    padding: 20px;
+    transition: background .15s;
+    position: relative;
+  }
+  .script-card:last-child { border-bottom: none; }
+  .script-card:hover { background: #fffff8; }
+
+  .card-top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .card-num {
+    background: var(--chiik-line);
+    color: #fff;
+    font-size: 10px; font-weight: 700;
+    padding: 4px 8px; border-radius: 3px;
+    flex-shrink: 0; letter-spacing: .5px;
+  }
+  .card-title-block { flex: 1; }
+  .card-title {
+    font-size: 16px; font-weight: 700;
+    line-height: 1.35; margin-bottom: 4px;
+    color: var(--chiik-line);
+  }
+  .card-meta { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* 手帳風進度條 */
+  .progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .prog-label { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .prog-bg { flex: 1; height: 5px; background: var(--border-soft); border-radius: 2px; overflow: hidden; position: relative; }
+  .prog-fill { height: 100%; background: var(--chiik-line); border-radius: 2px; }
+  /* 格子紋 */
+  .prog-bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(90deg,transparent 0,transparent 9px,var(--bg) 9px,var(--bg) 10px);
+    opacity: .4;
+  }
+  .prog-txt { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+
+  /* 摘要段 */
+  .card-summary {
+    font-size: 13px; line-height: 1.7; color: var(--accent-soft);
+    padding: 10px 12px;
+    background: rgba(240,208,96,.2);
+    border: 1px solid rgba(240,208,96,.5);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  /* 左上角小貼紙 */
+  .card-summary::before {
+    content: '✏️';
+    position: absolute; top: -8px; left: 10px;
+    font-size: 14px;
+  }
+
+  /* 分段 tags */
+  .segment-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .seg-tag {
+    font-size: 10px; padding: 3px 9px; border-radius: 3px;
+    font-weight: 600; letter-spacing: .3px;
+    border: 1px solid;
+  }
+  .seg-hook { color: var(--tag-rose); border-color: rgba(170,88,112,.3); background: rgba(170,88,112,.08); }
+  .seg-body { color: var(--tag-blue); border-color: rgba(74,122,170,.3); background: rgba(74,122,170,.08); }
+  .seg-cta { color: var(--tag-green); border-color: rgba(92,138,92,.3); background: rgba(92,138,92,.08); }
+  .seg-hidden { color: var(--tag-brown); border-color: rgba(138,96,64,.3); background: rgba(138,96,64,.08); }
+
+  /* footer */
+  .card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .platform-tags { display: flex; gap: 5px; }
+  .ptag { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; border: 1px solid; }
+  .ptag-ig { color: #c13584; border-color: rgba(193,53,132,.25); background: rgba(193,53,132,.06); }
+  .ptag-th { color: #666; border-color: rgba(102,102,102,.25); background: rgba(102,102,102,.06); }
+  .ptag-fb { color: #1877f2; border-color: rgba(24,119,242,.25); background: rgba(24,119,242,.06); }
+
+  .card-actions { display: flex; gap: 6px; }
+  .btn-shot {
+    padding: 5px 14px; border-radius: 4px;
+    border: 1.5px solid var(--border);
+    background: var(--bg); color: var(--muted);
+    font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+    box-shadow: 1px 1px 0 var(--border);
+  }
+  .btn-shot:hover { border-color: var(--chiik-line); color: var(--chiik-line); box-shadow: 2px 2px 0 var(--chiik-line); }
+  .btn-shot.shot {
+    background: var(--chiik-yellow);
+    border-color: var(--chiik-line);
+    color: var(--chiik-line);
+    box-shadow: 2px 2px 0 var(--chiik-line);
+  }
+  .btn-open {
+    padding: 5px 14px; border-radius: 4px;
+    border: 1.5px solid var(--border);
+    background: var(--bg); color: var(--accent-soft);
+    font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+    box-shadow: 1px 1px 0 var(--border);
+  }
+  .btn-open:hover { background: var(--chiik-line); color: #fff; border-color: var(--chiik-line); box-shadow: 2px 2px 0 rgba(0,0,0,.3); }
+
+  /* 展開詳情 */
+  .card-detail { margin-top: 16px; padding-top: 16px; border-top: 1.5px dashed var(--border); display: none; }
+  .card-detail.open { display: block; }
+  .det-label { font-size: 10px; font-weight: 700; color: var(--chiik-line); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .script-text {
+    font-size: 13px; line-height: 1.9; color: var(--accent-soft);
+    border-left: 3px solid var(--chiik-line);
+    padding: 10px 14px;
+    background: rgba(255,255,255,.6);
+    border-radius: 0 4px 4px 0;
+    white-space: pre-wrap; margin-bottom: 14px;
+  }
+  .ts-row { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+  .ts-time { background: var(--chiik-line); color: #fff; font-size: 11px; font-weight: 700; padding: 5px 10px; min-width: 55px; text-align: center; flex-shrink: 0; }
+  .ts-desc { font-size: 12px; padding: 5px 10px; color: var(--accent-soft); line-height: 1.5; }
+  .note-box {
+    background: rgba(240,176,160,.15);
+    border: 1px solid rgba(240,176,160,.5);
+    border-radius: 4px; padding: 10px 12px;
+    font-size: 12px; color: var(--tag-brown); line-height: 1.6;
+    margin-top: 8px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--surface);
+    border-top: 2px solid var(--chiik-line);
+    padding: 16px 24px;
+    text-align: center;
+    color: var(--muted); font-size: 11px;
+    letter-spacing: .5px;
+  }
+
+  .script-card.filtered { display: none; }
+  .group.all-filtered { opacity: .4; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .header-inner { flex-direction: column; }
+    .header-stats { justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-zone">
+      <!-- 草稿風 SVG 小圖示 -->
+      <div class="chiik-doodle">
+        <svg viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- 身體圓 -->
+          <ellipse cx="34" cy="40" rx="24" ry="22" fill="#fffef8" stroke="#1a1a1a" stroke-width="2.2"/>
+          <!-- 頭圓 -->
+          <circle cx="34" cy="22" r="18" fill="#fffef8" stroke="#1a1a1a" stroke-width="2.2"/>
+          <!-- 耳朵 -->
+          <ellipse cx="18" cy="10" rx="6" ry="8" fill="#f0d060" stroke="#1a1a1a" stroke-width="1.8"/>
+          <ellipse cx="50" cy="10" rx="6" ry="8" fill="#f0d060" stroke="#1a1a1a" stroke-width="1.8"/>
+          <!-- 眼睛 -->
+          <circle cx="27" cy="21" r="3" fill="#1a1a1a"/>
+          <circle cx="41" cy="21" r="3" fill="#1a1a1a"/>
+          <circle cx="28.5" cy="19.5" r="1" fill="#fff"/>
+          <circle cx="42.5" cy="19.5" r="1" fill="#fff"/>
+          <!-- 嘴 -->
+          <path d="M29 27 Q34 31 39 27" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <!-- 領帶 -->
+          <path d="M31 36 L34 44 L37 36 L34 34 Z" fill="#f5c518" stroke="#1a1a1a" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-main">仲豪</div>
+      </div>
+    </div>
+    <div class="sticker">房仲豪<br>腳本帳</div>
+    <div class="header-stats">
+      <div class="hstat">
+        <div class="hstat-num" id="total-count">1</div>
+        <div class="hstat-label">本季腳本</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num" id="shot-count">0</div>
+        <div class="hstat-label">已拍攝</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <div class="search-wrap">
+      <input type="search" id="search" placeholder="搜尋腳本… (⌘K)" autocomplete="off">
+    </div>
+    <div class="tag-row">
+      <div class="chip active" data-filter="all">全部</div>
+      <div class="chip" data-filter="反擊">反擊系</div>
+      <div class="chip" data-filter="工具">工具展示</div>
+      <div class="chip" data-filter="釣魚">釣魚部</div>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+
+  <div class="group" data-group="反擊">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <div class="group-header-left">
+        <div class="group-dot" style="background:#f0d060"></div>
+        <span class="group-title">反擊系</span>
+        <span class="group-count" id="gc-1">1 部</span>
+      </div>
+      <span class="group-toggle">▾</span>
+    </div>
+    <div class="group-body" id="gb-1">
+
+      <div class="script-card" data-tags="反擊 工具 maskbago 房地合一" data-id="s01">
+        <div class="card-top">
+          <div class="card-num">#01</div>
+          <div class="card-title-block">
+            <div class="card-title">直球反擊 v6｜房地合一稅工具</div>
+            <div class="card-meta">
+              <span>55–60 秒</span>
+              <span>第 01 批 · 2026-05-04</span>
+              <span>專業位</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-summary">
+          直接「你」開戰：你說反推要點返回？你說一頁式整個看得清楚？你說 BUG 都修完整？— 我來告訴你「完整」是什麼意思。設計嗆 + 反推嗆 + 3 細節碾壓（滿幾年提醒 / 必要費用 / 列印傳 LINE），收尾「你做的是 demo，我做的是給客戶實際報稅用的」。
+        </div>
+
+        <div class="segment-tags">
+          <span class="seg-tag seg-hook">Hook 0-8s</span>
+          <span class="seg-tag seg-body">設計嗆 8-22s</span>
+          <span class="seg-tag seg-body">反推嗆 22-30s</span>
+          <span class="seg-tag seg-body">細節 ×3 30-50s</span>
+          <span class="seg-tag seg-hidden">藏鏡人 ×1</span>
+          <span class="seg-tag seg-cta">CTA 50-60s</span>
+        </div>
+
+        <div class="card-footer">
+          <div class="platform-tags">
+            <span class="ptag ptag-ig">IG Reels</span>
+            <span class="ptag ptag-th">Threads</span>
+            <span class="ptag ptag-fb">FB Reels</span>
+          </div>
+          <div class="card-actions">
+            <button class="btn-shot" onclick="toggleShot('s01',this)">已拍</button>
+            <button class="btn-open" onclick="toggleDetail('s01-d',this)">展開</button>
+          </div>
+        </div>
+
+        <div class="card-detail" id="s01-d">
+          <div class="det-label">時間軸</div>
+          <div style="margin-bottom:14px">
+            <div class="ts-row"><div class="ts-time">0-8s</div><div class="ts-desc">Hook：「你說我反推要點返回上一步。你說一頁式整個看得清楚。你說 BUG 都修完整——好，我來告訴你『完整』是什麼意思。」</div></div>
+            <div class="ts-row"><div class="ts-time">8-10s</div><div class="ts-desc">藏鏡人 1（畫外音同事驚疑）：「他真的這樣講喔？」</div></div>
+            <div class="ts-row"><div class="ts-time">8-22s</div><div class="ts-desc">設計嗆：「你做的是給房仲看的，所以一頁式房仲確實清楚。問題是客戶不是房仲，整頁那麼多欄位你以為每個人都熟？我做 9 步驟、每步問一個東西，是要讓一般人也填得對，不是給你看 demo 的。」</div></div>
+            <div class="ts-row"><div class="ts-time">22-30s</div><div class="ts-desc">反推嗆：「你批我反推要點返回上一步。我們有獨立的反推區塊，沒走到就批——叫沒用過。」</div></div>
+            <div class="ts-row"><div class="ts-time">25-28s</div><div class="ts-desc">藏鏡人 2（畫外音同事吐槽）：「連用都沒用就講喔。」</div></div>
+            <div class="ts-row"><div class="ts-time">30-38s</div><div class="ts-desc">細節 1 滿幾年提醒：「客戶再過半年就滿 6 年自住，可以省一筆稅，系統自動提醒他。你那個有嗎？」</div></div>
+            <div class="ts-row"><div class="ts-time">38-45s</div><div class="ts-desc">細節 2 必要費用：「成交價 3% 或 30 萬——兩個有一個沒滿，系統提醒可以用哪個對客戶最有利。你那個有嗎？」⚠ 算盤抓錯</div></div>
+            <div class="ts-row"><div class="ts-time">45-50s</div><div class="ts-desc">細節 3 列印傳 LINE：「客戶現場帶看就想看稅的數字，你那個還在叫人點返回。」</div></div>
+            <div class="ts-row"><div class="ts-time">50-52s</div><div class="ts-desc">藏鏡人 3（畫外音同事共鳴）：「這個差太多了啦。」</div></div>
+            <div class="ts-row"><div class="ts-time">52-60s</div><div class="ts-desc">CTA：「你做的是給仲介看的 demo，我做的是給一般客戶實際報稅用的。maskbago.com 連結在下面，自己跑一次比一下。」</div></div>
+          </div>
+
+          <div class="det-label">殺手句</div>
+          <div class="script-text">你做的，是給仲介看的 demo。
+我做的，是給一般客戶實際報稅用的。
+
+— 反推：「沒走到就批，叫沒用過」
+— 藏鏡人：「連用都沒用就講喔」
+— 設計：「客戶不是房仲，整頁那麼多欄位你以為每個人都熟」
+— 收尾：「demo vs 報稅用」</div>
+
+          <div class="note-box">
+            ⚠ <strong>必要費用第 2 條算盤 FAIL（信心 92%）</strong>：腳本「3% 或 30 萬擇高」概念錯。真機制 min(成交價×3%, 30萬) 是推計上限；真正「擇高」是「推計 vs 核實」二擇高。改字方案 B 已備，明天驗 maskbago 工具邏輯後重派 scripter v7。<br>
+            ✅ §4-5 自住 6 年條件 PASS（信心 95%）。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <img src="maskbago-logo.jpg" alt="MasKBago" style="height:28px; vertical-align:middle; margin-right:10px; border-radius:4px;">
+  <strong>MasKBago</strong> 製作 · 仲豪 · 2026-05-04
+</footer>
+
+<script>
+function toggleGroup(h) {
+  const b = h.nextElementSibling;
+  h.classList.toggle('collapsed');
+  b.classList.toggle('hidden');
+}
+function toggleDetail(id, btn) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  btn.textContent = el.classList.contains('open') ? '收起' : '展開';
+}
+function toggleShot(id, btn) {
+  const key = 'shot_kenny_chiik_' + id;
+  const done = localStorage.getItem(key) === '1';
+  if (done) { localStorage.removeItem(key); btn.classList.remove('shot'); btn.textContent = '已拍'; }
+  else { localStorage.setItem(key,'1'); btn.classList.add('shot'); btn.textContent = '✓ 已拍'; }
+  updateCount();
+}
+function updateCount() {
+  let s = 0;
+  document.querySelectorAll('.btn-shot').forEach(b => { if(b.classList.contains('shot')) s++; });
+  document.getElementById('shot-count').textContent = s;
+  document.getElementById('total-count').textContent = document.querySelectorAll('.script-card').length;
+}
+document.querySelectorAll('.script-card').forEach(c => {
+  const k = 'shot_kenny_chiik_' + c.dataset.id;
+  if(localStorage.getItem(k)==='1') {
+    const b=c.querySelector('.btn-shot');
+    if(b){b.classList.add('shot');b.textContent='✓ 已拍';}
+  }
+});
+updateCount();
+
+const si = document.getElementById('search');
+let af = 'all';
+si.addEventListener('input', filter);
+document.querySelectorAll('.chip').forEach(ch=>{
+  ch.addEventListener('click',()=>{
+    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+    ch.classList.add('active'); af=ch.dataset.filter; filter();
+  });
+});
+function filter(){
+  const q=si.value.toLowerCase().trim();
+  if(q) document.querySelectorAll('.group').forEach(g=>{
+    g.querySelector('.group-header').classList.remove('collapsed');
+    g.querySelector('.group-body').classList.remove('hidden');
+  });
+  document.querySelectorAll('.script-card').forEach(c=>{
+    const tags=(c.dataset.tags||'').toLowerCase();
+    const title=c.querySelector('.card-title').textContent.toLowerCase();
+    const mq=!q||title.includes(q)||tags.includes(q);
+    const mf=af==='all'||tags.includes(af);
+    c.classList.toggle('filtered',!(mq&&mf));
+  });
+  document.querySelectorAll('.group').forEach(g=>{
+    const v=[...g.querySelectorAll('.script-card')].some(c=>!c.classList.contains('filtered'));
+    g.classList.toggle('all-filtered',!v);
+  });
+}
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();si.focus();si.select();}
+});
+</script>
+</body>
+</html>

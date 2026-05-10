@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#FFFFFF">
+<title>叭噗 × 小 C｜情侶 IP 第 01 批｜共 11 部</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Noto+Serif+TC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF;
+  --bg-2:#FAFAF8;
+  --bg-3:#F0EFEB;
+  --bg-dark:#000000;
+  --text:#404040;
+  --text-d:#1A1A1A;
+  --muted:#888888;
+  --accent:#C8503A;
+  --accent-2:#4A6B5C;
+  --line:#E5E3DC;
+  --border:#D8D5CC;
+  --done:#4A6B5C;
+  --f:"Karla","Noto Sans TC",system-ui,sans-serif;
+  --fs:"Noto Serif TC",serif;
+  --tr:.3s ease;
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--f);font-size:13px;line-height:1.75;letter-spacing:.04em;padding:0 0 0;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;background:none;border:none}
+header{background:var(--bg);border-bottom:1px solid var(--line);padding:64px 32px 36px}
+.hd{max-width:1000px;margin:0 auto}
+.ep{font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:var(--muted);margin-bottom:20px;font-weight:500}
+.ep .acc{color:var(--accent)}
+h1{font-family:var(--f);font-weight:600;font-size:clamp(34px,5.5vw,58px);line-height:1.05;letter-spacing:-.015em;color:var(--text-d);margin-bottom:14px}
+h1 .x{font-style:italic;font-weight:400;color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;line-height:1.75;letter-spacing:.05em;margin-bottom:28px;max-width:60ch}
+.stats{display:flex;gap:28px;flex-wrap:wrap;font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:24px;font-weight:500}
+.stats .st-acc{color:var(--accent)}
+.sr{display:flex;gap:14px;align-items:center}
+.sb{flex:1;position:relative;max-width:520px}
+.sb input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text-d);font-family:inherit;font-size:14px;letter-spacing:.05em;padding:10px 0 10px 24px;outline:none;transition:border-color var(--tr)}
+.sb input::placeholder{color:var(--muted)}
+.sb input:focus{border-bottom-color:var(--text-d)}
+.sb::before{content:"⌕";position:absolute;left:2px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+.kb{font-size:10px;color:var(--muted);letter-spacing:.2em;padding:5px 11px;border:1px solid var(--line);text-transform:uppercase;font-weight:500}
+main{max-width:1000px;margin:0 auto;padding:24px 32px 0}
+.gp{border-bottom:1px solid var(--line)}
+.gh{padding:24px 0;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:baseline;transition:opacity var(--tr)}
+.gh:hover{opacity:.6}
+.gt{display:flex;align-items:baseline;gap:24px;flex-wrap:wrap}
+.gc{font-family:var(--f);color:var(--accent);font-size:13px;font-weight:600;letter-spacing:.4em;min-width:24px;text-transform:uppercase}
+.gn{font-family:var(--f);font-size:22px;font-weight:500;color:var(--text-d);letter-spacing:.01em}
+.gx{font-size:10px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;font-weight:500}
+.gy{font-size:18px;color:var(--muted);transition:transform var(--tr);font-weight:300;line-height:1}
+.gp.op .gy{transform:rotate(45deg);color:var(--text-d)}
+.gb{display:none;padding:0 0 28px}
+.gp.op .gb{display:block}
+.gp--star .gc{color:var(--accent-2)}
+.gp--star .gn::before{content:"★ ";color:var(--accent-2)}
+.gp--pending .gc{color:var(--muted)}
+.sc{background:var(--bg-2);border:1px solid var(--line);margin-top:12px;overflow:hidden;transition:border-color var(--tr)}
+.sc:hover{border-color:var(--border)}
+.sc.dn{opacity:.45}
+.sc.dn .ti{text-decoration:line-through;text-decoration-color:var(--done)}
+.sh{padding:22px 24px;cursor:pointer;user-select:none}
+.tp{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:16px}
+.nm{font-family:var(--f);font-style:italic;font-size:14px;color:var(--accent);font-weight:500;letter-spacing:.2em;min-width:32px}
+.ac{display:flex;gap:8px;align-items:center}
+.db{border:1px solid var(--line);color:var(--muted);font-size:9px;letter-spacing:.25em;padding:7px 13px;transition:all var(--tr);text-transform:uppercase;font-weight:600}
+.db:hover{border-color:var(--text-d);color:var(--text-d)}
+.sc.dn .db{border-color:var(--done);color:var(--done)}
+.tg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tag{font-size:9px;padding:4px 10px;background:var(--bg);border:1px solid var(--line);color:var(--muted);letter-spacing:.2em;text-transform:uppercase;font-weight:500}
+.tag.fi{border-color:var(--accent-2);color:var(--accent-2)}
+.tag.pe{border-color:var(--accent);color:var(--accent)}
+.tag.so{border-color:var(--muted);color:var(--muted)}
+.ti{font-family:var(--f);font-size:19px;font-weight:600;line-height:1.4;color:var(--text-d);margin-bottom:10px;letter-spacing:.005em}
+.vi{font-size:12px;color:var(--muted);line-height:1.75;letter-spacing:.04em}
+.ht{margin-top:14px;font-size:9px;color:var(--accent);letter-spacing:.4em;text-transform:uppercase;font-weight:600}
+.sc.op .ht{display:none}
+.sb-body{display:none;padding:24px;border-top:1px solid var(--line);background:var(--bg)}
+.sc.op .sb-body{display:block}
+.sg{margin-top:20px;border-left:2px solid var(--accent);padding-left:18px}
+.sg:first-child{margin-top:0}
+.tm{font-size:10px;color:var(--accent);font-weight:600;letter-spacing:.3em;margin-bottom:10px;text-transform:uppercase}
+.ln{margin:6px 0;font-size:14px;line-height:1.85;color:var(--text-d);letter-spacing:.02em}
+.lb{display:inline-block;min-width:42px;color:var(--muted);font-size:9px;font-weight:600;margin-right:8px;letter-spacing:.25em;text-transform:uppercase;vertical-align:1px}
+.su{padding:9px 13px;margin-top:9px;font-size:13px;background:var(--bg-3);color:var(--text-d);letter-spacing:.04em}
+.su .lb{color:var(--accent)}
+.vo{padding:9px 13px;margin-top:9px;font-size:13px;background:rgba(74,107,92,.08);font-style:italic;color:var(--text-d);border-left:2px solid var(--accent-2);margin-left:-18px;padding-left:16px}
+.vo .lb{color:var(--accent-2);font-style:normal}
+.ct{margin-top:24px;padding:20px;background:var(--bg-dark);color:var(--bg)}
+.cl{font-size:10px;letter-spacing:.35em;text-transform:uppercase;margin-bottom:10px;font-weight:600;color:var(--accent)}
+.ct.fi{background:var(--accent-2);color:var(--bg)}
+.ct.fi .cl{color:#FFE5DC}
+.ct.so{background:var(--bg-3);color:var(--text-d)}
+.ct.so .cl{color:var(--accent)}
+.mr{margin-top:16px;font-size:10px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+.hs{margin-top:16px;font-size:11px;color:var(--muted);line-height:1.85;letter-spacing:.05em}
+.nt{margin-top:16px;padding:12px 14px;font-size:12px;color:var(--text-d);background:var(--bg-3);border-left:2px solid var(--accent)}
+.nl{color:var(--accent);font-weight:600;text-transform:uppercase;font-size:9px;letter-spacing:.25em;margin-right:8px}
+.fc{margin-top:20px;padding:20px;background:var(--bg-3);border:1px solid var(--accent-2)}
+.ft{font-family:var(--f);font-size:11px;color:var(--accent-2);font-weight:600;margin-bottom:14px;letter-spacing:.3em;text-transform:uppercase}
+.fp{aspect-ratio:4/5;max-width:200px;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:14px}
+.fb-pts{font-size:13px;line-height:1.85;margin-top:12px}
+.fb-pts li{margin-bottom:8px;list-style:none;padding-left:20px;position:relative;letter-spacing:.03em}
+.fb-pts li::before{content:"—";position:absolute;left:0;color:var(--accent-2);font-weight:600}
+.pd{background:var(--bg-2);border:1px dashed var(--muted);padding:32px 20px;margin-top:12px;text-align:center}
+.pl{font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:600}
+.pt{font-family:var(--f);font-size:14px;color:var(--text);font-style:italic;letter-spacing:.04em}
+footer{margin-top:80px;padding:56px 32px;background:var(--bg-dark);color:var(--bg);text-align:center}
+.sg-ft{font-family:var(--f);font-size:11px;letter-spacing:.5em;text-transform:uppercase;margin-bottom:8px;color:var(--bg);font-weight:500}
+.sg-ft .ac{color:var(--accent)}
+.pa{font-family:ui-monospace,monospace;font-size:9px;color:rgba(255,255,255,.4);word-break:break-all;letter-spacing:.05em;margin-top:12px}
+@media(max-width:640px){header{padding:40px 22px 26px}main{padding:20px 22px 0}h1{font-size:30px}.gn{font-size:18px}.ti{font-size:16px}.tp{flex-direction:column;gap:12px}.stats{gap:14px}.gt{gap:14px}.sg-ft{font-size:10px;letter-spacing:.35em}}
+.hi{display:none}
+.sc.hi{display:none}
+</style>
+</head>
+<body>
+
+<header>
+<div class="hd">
+<div class="ep"><span class="acc">EP 01</span> · 2026.05.11 · LIGHT EDITION</div>
+<h1>叭噗 <span class="x">×</span> 小 C 情侶 IP</h1>
+<p class="sub">共 11 部 · 配套圖卡 1 張 · 釣魚部 1 部 · 純情侶 IP（不講房仲業務）</p>
+<div class="stats">
+<span class="st-acc">11 部</span><span>60 秒</span><span>8 戲路</span><span>1 + 9 + 1</span><span>19 年 · 6935 天</span><span>2024.02.27 公證</span>
+</div>
+<div class="sr">
+<div class="sb"><input type="search" id="q" placeholder="搜尋標題、戲路、台詞..."></div>
+<span class="kb">⌘K</span>
+</div>
+</div>
+</header>
+
+<main id="main">
+
+<div class="gp op" data-g="A">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">A</span><span class="gn">19 年感情成長</span><span class="gx">1 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="01">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.01</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">A 戲路</span><span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">19 年前那天他說「交往好不好」</h2>
+<p class="vi">兩人合拍。小 C 舊照翻拍（底片相機取景框感）+ 現在兩人同框對比剪接。背景：高雄街景或客廳日常光。底片顆粒感、手寫字幕、低飽和暖色調。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「我跟他，從 2006 年 12 月 26 日——到現在。」</div>
+<div class="su"><span class="lb">字幕</span>【2006.12.26 → 現在】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「那時候我們還在念高中。他不是什麼特別帥的男生，也不是什麼會說話的人——但他說了一句話，我就答應了。」</div>
+<div class="su"><span class="lb">字幕</span>【高中 → 現在，19 年】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「等等高中就在一起？！現在還在一起？！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「那句話很平凡——他說：『交往好不好。』」「我說好。」「然後就這樣，一路到現在。」</div>
+<div class="su"><span class="lb">字幕</span>【「交往好不好。」「好。」】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 深度</div>
+<div class="ln"><span class="lb">台詞</span>「6935 天裡，我們吵過、冷戰過、各自在不同城市待過。有人問我秘訣是什麼——我真的不知道。」「我只知道每次想起那句話，我就覺得，要繼續。」</div>
+<div class="su"><span class="lb">字幕</span>【6935 天】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「6935 天......我數學不好，但好猛」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「人生有幾個 19 年？我把其中一個，給了他。」「現在回頭看——一點也不後悔。」</div>
+<div class="su"><span class="lb">字幕</span>【人生有幾個 19 年？】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你跟你的人，幾年了？留言告訴我。」</div>
+<div class="su"><span class="lb">字幕</span>【你們幾年了？留言說說】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你跟你的人，幾年了？留言告訴我。」</div>
+<div class="mr"><span>真實感 / 數字 / 情緒 / 故事 / 代入感</span><span>PO 週五 19-21 / 週日 20-21:30</span></div>
+<div class="hs">#19年 #高中情侶 #長期感情 #高雄情侶 #交往紀念日 #感情故事 #叭噗小C #真實愛情</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp" data-g="F">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">F</span><span class="gn">幽默笑點</span><span class="gx">1 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="02">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.02</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">F 戲路</span><span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">前一天才決定、不是懷孕的那場婚禮</h2>
+<p class="vi">小 C 鏡頭為主說故事（單人 talking head 或兩人並坐）。背景：家裡日常角落或咖啡廳。底片質感，輕鬆日常感，不需正式妝髮。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「我結婚的前一天，才知道自己隔天要去公證。」</div>
+<div class="su"><span class="lb">字幕</span>【結婚前一天才知道】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「228 連假，他突然說——要不要去公證？」「我說……好啊。」「就這樣，隔天我們去了。」</div>
+<div class="su"><span class="lb">字幕</span>【228 前一天，臨時決定】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「真的假的？！這也太任性了吧！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「我跟大家說——不是懷孕的。」「（停頓）——請勿再問。」「是真的在一起 17 年多，覺得好像可以結婚了，就結了。」</div>
+<div class="su"><span class="lb">字幕</span>【不是懷孕的。請勿再問。】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「哈哈哈好可愛，這個聲明！」</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「我 sis 知道以後說——你這樣沒有儀式感。」「但她還是特地趕來，幫我弄了一點小儀式感。」「我覺得很夠了。」</div>
+<div class="su"><span class="lb">字幕</span>【謝謝我的 sis 給的儀式感】</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「那天，正式結束了 6263 天的男女朋友關係。」「開始了夫妻關係的第一天。」「其實跟前一天沒什麼不同——只是踏實很多。」</div>
+<div class="su"><span class="lb">字幕</span>【6263 天男女朋友 → 夫妻第一天】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你的求婚或結婚故事，也是這麼「隨便」嗎？留言說說你的版本。」</div>
+<div class="su"><span class="lb">字幕</span>【你的結婚故事是什麼？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你的求婚或結婚故事，也是這麼「隨便」嗎？留言說說你的版本。」</div>
+<div class="mr"><span>真實感 / 情緒 / 故事 / 反差 / 代入感</span><span>PO 週六 18-20</span></div>
+<div class="hs">#公證結婚 #228 #臨時決定 #不是懷孕的 #高中情侶 #結婚 #叭噗小C #愛情故事</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp" data-g="D">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">D</span><span class="gn">共同興趣</span><span class="gx">2 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="03">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.03</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">D 戲路</span><span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">我們的共同語言：音樂祭 + 露營</h2>
+<p class="vi">兩人在音樂祭現場或露營場的底片照片翻拍 + 現場剪接。底片顆粒、livehouse 燈光感、噪點暖色。手寫感字體。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「跟一個人在一起 19 年，你們一定要有共同語言。」</div>
+<div class="su"><span class="lb">字幕</span>【19 年，共同語言是什麼？】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「我們的，是音樂——和露營。」「他把我帶進音樂祭，我把他帶進底片世界。」</div>
+<div class="su"><span class="lb">字幕</span>【音樂祭 + 底片 + 露營】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「這個 combo 太文青了吧，我也想去！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「說真的，我一開始不懂他為什麼那麼愛擠在人堆裡聽歌。」「後來我也愛上了。」「那種感覺——幾百個人一起看同一個樂團，沒有手機，只有當下。」</div>
+<div class="su"><span class="lb">字幕</span>【幾百人 + 同一首歌 + 當下】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「露營也是——他搭帳篷，我負責不斷抱怨『好睡嗎』。」「但每次睡醒看到那個早晨的光，我就覺得——值了。」</div>
+<div class="su"><span class="lb">字幕</span>【他搭帳 / 我抱怨 / 然後值了】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「哈哈好真實，我也是這樣！」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「找到共同語言，不代表你們要完全一樣。」「是願意進入對方的世界——哪怕只是陪著。」</div>
+<div class="su"><span class="lb">字幕</span>【進入對方的世界，哪怕只是陪著】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你跟你的人，共同語言是什麼？」</div>
+<div class="su"><span class="lb">字幕</span>【你們的共同語言是什麼？留言說】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你跟你的人，共同語言是什麼？」</div>
+<div class="mr"><span>真實感 / 共鳴 / 情緒 / 代入感 / 故事</span><span>PO 週五 20-22</span></div>
+<div class="hs">#音樂祭 #露營 #底片相機 #長期感情 #情侶日常 #高雄情侶 #叭噗小C #共同興趣</div>
+</div>
+</article>
+
+<article class="sc" data-id="10">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.10</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">D 戲路</span><span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">我們拍旅遊底片，不是為了 IG——是為了記住</h2>
+<p class="vi">底片照片翻拍為主（沖繩 / 北海道 / 台東旅遊影像）。兩人旅遊底片質感，不是手機高清，要有顆粒和色偏。說話段可用兩人在家翻看底片相本的畫面。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「旅遊的照片，我喜歡用底片拍。」「因為底片——不能馬上看到。」</div>
+<div class="su"><span class="lb">字幕</span>【底片，不能馬上看到】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「數位照片，我拍了幾百張，但記住的沒幾張。」「底片一卷 36 張，我每一張記得在哪裡拍的。」</div>
+<div class="su"><span class="lb">字幕</span>【底片 36 張，每張記得】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「對......底片好有感覺，我也想試試」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「我們去沖繩，去北海道，去台東。」「每次旅遊他說——你又帶底片機了。」「我說——對，等等你也要入鏡。」</div>
+<div class="su"><span class="lb">字幕</span>【沖繩 × 北海道 × 台東】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「底片沖洗回來的那天，是旅遊結束後的第二次旅遊。」「他本來不懂底片——後來他說，欸底片好像真的比較有記憶的感覺。」</div>
+<div class="su"><span class="lb">字幕</span>【第二次旅遊，是底片沖出來的那天】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「第二次旅遊這說法！被說服了！」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「旅遊不是為了有照片貼。」「是為了——你離開那個地方以後，還記得那個人跟你站在哪裡。」</div>
+<div class="su"><span class="lb">字幕</span>【記得那個人跟你站在哪裡】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你旅遊喜歡底片還是手機？或者根本不拍？」</div>
+<div class="su"><span class="lb">字幕</span>【你旅遊怎麼拍？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你旅遊喜歡底片還是手機？或者根本不拍？」</div>
+<div class="mr"><span>真實感 / 情緒 / 共鳴 / 代入感 / 故事</span><span>PO 週四 19-21</span></div>
+<div class="hs">#底片相機 #底片旅遊 #沖繩 #北海道 #台東 #情侶旅遊 #叭噗小C #底片攝影</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp gp--star" data-g="G-fish">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">★</span><span class="gn">含配套圖卡</span><span class="gx">1 部 · 釣魚</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="04">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.04</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">G 戲路</span><span class="tag">直球派</span><span class="tag fi">釣魚部</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">【釣魚部】19 年長情，到底靠什麼撐過去的？</h2>
+<p class="vi">小 C 或兩人對坐，態度認真不是開玩笑的，底片質感或柔光室內。字幕全白底深字，強調「問題感」。影片結尾留懸念，不給答案，讓觀眾去留言。</p>
+<p class="ht">▼ Open · 含私訊圖卡規格</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「19 年，6935 天。很多人問我——你們靠什麼撐下去的？」</div>
+<div class="su"><span class="lb">字幕</span>【6935 天，靠什麼撐下去？】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 重要性</div>
+<div class="ln"><span class="lb">台詞</span>「我覺得這個問題，很多人問錯了方向。」「大家以為長期感情有什麼秘方——有幾個步驟、幾個公式。」</div>
+<div class="su"><span class="lb">字幕</span>【感情有公式嗎？】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「對啊，我也以為有標準答案！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 懸念</div>
+<div class="ln"><span class="lb">台詞</span>「我整理了一下——我們 19 年裡真的沒有崩掉的那幾個時刻，背後有一件共同的事。」「不是靠愛情，也不是靠習慣。」</div>
+<div class="su"><span class="lb">字幕</span>【不是愛情，也不是習慣】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「那是什麼？！快說！」</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 加大懸念</div>
+<div class="ln"><span class="lb">台詞</span>「我整理成一張圖，把那幾個時刻、那件事，還有我們後來怎麼做到的——整個寫進去了。」</div>
+<div class="su"><span class="lb">字幕</span>【整理成一張圖了】</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 圖卡價值</div>
+<div class="ln"><span class="lb">台詞</span>「如果你也在一段長期感情裡，或者你想讓感情更長久——這張圖你用得到。」</div>
+<div class="su"><span class="lb">字幕</span>【長期感情的人用得到】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「留言『19年』，我私訊你。」</div>
+<div class="su"><span class="lb">字幕</span>【留言「19年」→ 私訊你】</div></div>
+<div class="ct fi"><div class="cl">CTA · 釣魚部</div>留言「19年」→ 私訊端發解答圖卡（影片不給答案）</div>
+
+<div class="fc">
+<div class="ft">私訊端解答圖卡規格</div>
+<div class="fp">[ IMAGE 4:5 / 1080×1350 ]</div>
+<div><strong>圖卡標題</strong>：叭噗 × 小 C｜19 年沒崩掉的 3 件事</div>
+<ul class="fb-pts">
+<li><strong>陪在場，不是給答案</strong> — 最難撐的時候，對方不需要你解決問題，只需要你在</li>
+<li><strong>各自有生活，不是黏在一起</strong> — 她有溫罐工作室，他有朋友圈，互不干涉是尊重</li>
+<li><strong>紀念日當成對方的 review 時間</strong> — 每年 12/26 不是慶祝，是問彼此「這一年你還好嗎」</li>
+</ul>
+<div class="nt"><span class="nl">需業主確認</span>以上 3 點需叭噗 / 小 C 確認是否同意對外分享，確認後再製圖卡發出</div>
+</div>
+
+<div class="mr"><span>知識落差 / 疑問 / 情緒 / 代入感</span><span>PO 週日 19-21</span></div>
+<div class="hs">#長期感情 #高中情侶 #19年 #感情經營 #情侶日常 #叭噗小C #感情真心話</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp gp--pending" data-g="E">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">E</span><span class="gn">人生深度</span><span class="gx">1 部 · 待替換</span></div><span class="gy">+</span></div>
+<div class="gb">
+<div class="pd"><div class="pl">⚠ 待替換</div><div class="pt">#05 媽媽離世 — 業主明示替換，新主題待編劇補（避開敏感題材）</div></div>
+</div>
+</div>
+
+<div class="gp" data-g="B">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">B</span><span class="gn">夫妻日常</span><span class="gx">1 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="06">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.06</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">B 戲路</span><span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">恆春人嫁到高雄，勃店到底有多難適應</h2>
+<p class="vi">小 C 主說。日常便服，高雄街景 / 客廳 / 咖啡廳皆可。底片感或日常手機感，不需過度製作。說到「勃店」時可搭字卡彈出特效。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「我從恆春嫁到高雄。」「婆家叫做——勃店。」</div>
+<div class="su"><span class="lb">字幕</span>【恆春媳婦 × 勃店】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「第一次去勃店，我整個人傻掉。」「不是因為很豪華——是因為他們家的生活節奏，跟我完全不一樣。」</div>
+<div class="su"><span class="lb">字幕</span>【生活節奏，完全不同】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「哈哈勃店！我超喜歡這個稱呼！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「恆春人的慢——跟高雄的快，說起來沒什麼。」「但細節裡有好多要磨合的事。」「吃飯時間、說話方式、連過年要去哪家也是。」</div>
+<div class="su"><span class="lb">字幕</span>【細節裡的磨合】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「但你知道最後讓我接受勃店的是什麼嗎？」「是他媽媽有次跟我說——『你來了，這裡就是你家。』」「就一句話，我就覺得——這裡是我家了。」</div>
+<div class="su"><span class="lb">字幕</span>【「你來了，這裡就是你家。」】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「我哭了，婆婆說的！」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「現在每個月去福安宮的路上，我覺得——」「高雄也是我的城市了。」</div>
+<div class="su"><span class="lb">字幕</span>【高雄，也是我的城市了】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「有沒有也是嫁到異鄉的——你怎麼找到家的感覺？」</div>
+<div class="su"><span class="lb">字幕</span>【你怎麼找到「家」的感覺？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「有沒有也是嫁到異鄉的——你怎麼找到家的感覺？」</div>
+<div class="nt"><span class="nl">需業主確認</span>媽媽相關台詞（媽媽已去世）是否適合入鏡，待叭噗拍板</div>
+<div class="mr"><span>真實感 / 共鳴 / 幽默 / 代入感 / 地域</span><span>PO 週六 12-14</span></div>
+<div class="hs">#恆春媳婦 #嫁到高雄 #夫妻日常 #婆家 #磨合 #叭噗小C #勃店 #高雄</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp" data-g="C">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">C</span><span class="gn">互補個性</span><span class="gx">1 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="07">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.07</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">C 戲路</span><span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">他很外向，我很內省——我們怎麼不吵架的</h2>
+<p class="vi">兩人對坐或各自說 talking head，剪接交替。視覺上呈現「兩種狀態」對比：他在朋友堆裡 vs 她在工作室靜靜工作。底片質感，字幕用對話感排列。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「他在一個房間裡認識十個新朋友。我在同一個房間裡，躲角落喝飲料。」</div>
+<div class="su"><span class="lb">字幕</span>【他 × 認識十個人 / 她 × 躲角落喝飲料】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「我們個性，剛好反過來。」「他外向，社交不費力。我內省，一個人待著才充電。」</div>
+<div class="su"><span class="lb">字幕</span>【他：外向 / 她：內省】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「等等這不是在說我和我男友嗎」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 觀察</div>
+<div class="ln"><span class="lb">台詞</span>「剛在一起的時候，我覺得壓力很大——他的朋友那麼多，我怎麼跟得上？」「後來我才知道——他其實不是要我跟他一樣，他只是要我存在。」</div>
+<div class="su"><span class="lb">字幕</span>【他不是要你跟他一樣，只是要你在】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「我有時候說——我今晚不去了，你自己去。」「他說好，然後去了，然後回來跟我講今晚的事。」「我覺得這樣很好——我有我的靜，他有他的熱鬧，互不缺。」</div>
+<div class="su"><span class="lb">字幕</span>【我有靜，他有熱鬧，互不缺】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「這個模式好健康！學起來」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「個性相反，不代表不合。」「是你讓不讓對方做自己——那才是合不合。」</div>
+<div class="su"><span class="lb">字幕</span>【讓對方做自己，才是真的合】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你跟你的人，個性像還是反？哪種比較好相處？留言說說。」</div>
+<div class="su"><span class="lb">字幕</span>【你們個性像還是反？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你跟你的人，個性像還是反？哪種比較好相處？留言說說。」</div>
+<div class="mr"><span>真實感 / 共鳴 / 代入感 / 情緒 / 反差</span><span>PO 週三 19-21</span></div>
+<div class="hs">#個性互補 #外向內向 #情侶日常 #長期感情 #感情觀察 #叭噗小C #高雄情侶</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp" data-g="H">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">H</span><span class="gn">在地高雄</span><span class="gx">1 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="08">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.08</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">H 戲路</span><span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">高雄在地：我們兩個人的城市地圖</h2>
+<p class="vi">高雄街景 / 鼓山區 / 美術館公園 / 三多商圈取景。兩人牽手走路 or 咖啡廳坐著，底片感。可搭高雄日落或街頭燈光。字幕：手寫風，標地名用小地圖感。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「問我高雄哪裡好——我只知道我們兩個人走過的那些地方。」</div>
+<div class="su"><span class="lb">字幕</span>【我們兩個人的高雄地圖】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「住在鼓山，我喜歡美術館那一帶。」「她說——美術館的下午，讓她覺得高雄值得待。」</div>
+<div class="su"><span class="lb">字幕</span>【鼓山 × 美術館 × 下午】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「美術館周邊真的超好走！」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「但高雄給我最深的印象，不是景點——」「是下班以後，我們兩個坐在機車上，不知道要去哪，然後就這樣亂繞。」</div>
+<div class="su"><span class="lb">字幕</span>【不知道要去哪，就這樣亂繞】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 故事</div>
+<div class="ln"><span class="lb">台詞</span>「有時候繞到三多，有時候到鹽埕。」「沒有計畫——但那種沒有計畫，反而是最記得住的。」</div>
+<div class="su"><span class="lb">字幕</span>【沒有計畫，最記得住】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「這才是高雄生活！你說到我了」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「城市是死的，是人讓它活著。」「我喜歡高雄，因為她在這裡。」</div>
+<div class="su"><span class="lb">字幕</span>【城市是死的，是人讓它活著】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你在高雄，有沒有屬於你們兩個人的地方？」</div>
+<div class="su"><span class="lb">字幕</span>【你們兩個人的地方在哪？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你在高雄，有沒有屬於你們兩個人的地方？」</div>
+<div class="mr"><span>地域 / 真實感 / 共鳴 / 代入感 / 故事</span><span>PO 週六 17-19</span></div>
+<div class="hs">#高雄 #鼓山 #美術館 #高雄情侶 #高雄日常 #叭噗小C #在地生活 #城市地圖</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<div class="gp" data-g="G">
+<div class="gh" onclick="g(this)"><div class="gt"><span class="gc">G</span><span class="gn">情感共鳴</span><span class="gx">2 部</span></div><span class="gy">+</span></div>
+<div class="gb">
+
+<article class="sc" data-id="09">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.09</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">G 戲路</span><span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">給還在等那個人的你，19 年後的真心話</h2>
+<p class="vi">小 C 主說（或兩人交替）。溫柔語氣，不說教。背景：室內暖光、工作室角落、或底片感外景。字幕：白底清晰字，關鍵句放大。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「如果你現在是一個人——這支影片是給你的。」</div>
+<div class="su"><span class="lb">字幕</span>【給現在一個人的你】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 破題</div>
+<div class="ln"><span class="lb">台詞</span>「我跟他在一起 19 年，很多人覺得我們很厲害。」「但我想說——我們不是一開始就厲害的。」</div>
+<div class="su"><span class="lb">字幕</span>【我們不是一開始就厲害的】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「對啊，說得好像很輕鬆...到底怎麼做到的」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 核心</div>
+<div class="ln"><span class="lb">台詞</span>「那個讓你心動的人，不一定是最後在你身邊的人。」「但那個願意在你難的時候不說話只是陪著的人——往往才是。」</div>
+<div class="su"><span class="lb">字幕</span>【願意陪在難的時候，往往才是那個人】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 轉折</div>
+<div class="ln"><span class="lb">台詞</span>「我沒辦法告訴你，那個人什麼時候會出現。」「我只知道——你要先讓自己有個值得被陪的生活。」「不是等，是活。」</div>
+<div class="su"><span class="lb">字幕</span>【不是等，是活】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「哭了......就是這句話」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「19 年前他說『交往好不好』，我說好。」「但那個『好』背後——是我們沒有停止成為自己。」</div>
+<div class="su"><span class="lb">字幕</span>【沒有停止成為自己】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · CTA</div>
+<div class="ln"><span class="lb">台詞</span>「你現在的狀態是什麼？留言說說，我想知道。」</div>
+<div class="su"><span class="lb">字幕</span>【你現在的狀態是什麼？】</div></div>
+<div class="ct"><div class="cl">CTA · 個人化諮詢</div>「你現在的狀態是什麼？留言說說，我想知道。」</div>
+<div class="mr"><span>情緒 / 共鳴 / 代入感 / 真實感 / 故事</span><span>PO 週五 20-22</span></div>
+<div class="hs">#單身 #感情真心話 #長期感情 #等待 #19年 #叭噗小C #情感共鳴 #給你的話</div>
+</div>
+</article>
+
+<article class="sc" data-id="11">
+<div class="sh" onclick="s(this)">
+<div class="tp"><span class="nm">No.11</span><div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div></div>
+<div class="tg"><span class="tag">G 戲路</span><span class="tag">人間觀察派</span><span class="tag so">純雞湯</span><span class="tag">IG Reels</span></div>
+<h2 class="ti">19 年後，才懂愛是什麼意思</h2>
+<p class="vi">兩人靜態合影或單人靜止鏡頭。不需要說話的段落可以靜音，只有字幕和 BGM。BGM：輕柔吉他 or lo-fi。底片質感，低對比，黃調暖光。</p>
+<p class="ht">▼ Open</p>
+</div>
+<div class="sb-body">
+<div class="sg"><div class="tm">⏱ 0-3 SEC · HOOK</div>
+<div class="ln"><span class="lb">台詞</span>「19 年前，我以為愛就是——心跳加速、睡不著、腦子裡只有那個人。」</div>
+<div class="su"><span class="lb">字幕</span>【19 年前，以為愛就是心跳加速】</div></div>
+<div class="sg"><div class="tm">⏱ 3-12 SEC · 對比</div>
+<div class="ln"><span class="lb">台詞</span>「19 年後，我才知道——愛是你不舒服，他在旁邊不說話。」「愛是你說去哪，他說好。」</div>
+<div class="su"><span class="lb">字幕</span>【愛是不說話，也是好】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「我哭了，說到我心裡去了」</div></div>
+<div class="sg"><div class="tm">⏱ 12-25 SEC · 深化</div>
+<div class="ln"><span class="lb">台詞</span>「愛是你連吵架以後，還是拿他最喜歡的東西給他。」「愛是不需要儀式，但你會記得每一個小日子。」</div>
+<div class="su"><span class="lb">字幕</span>【記得每一個小日子】</div></div>
+<div class="sg"><div class="tm">⏱ 25-40 SEC · 金句</div>
+<div class="ln"><span class="lb">台詞</span>「年輕的時候我愛他，是因為心跳。」「現在我愛他，是因為習慣了他在——而且不想改。」</div>
+<div class="su"><span class="lb">字幕</span>【習慣了他在，不想改】</div>
+<div class="vo"><span class="lb">藏鏡人</span>「這句話我要截圖」</div></div>
+<div class="sg"><div class="tm">⏱ 40-52 SEC · 收束</div>
+<div class="ln"><span class="lb">台詞</span>「愛，不是一件想清楚再做的事。」「是你做了，才慢慢懂它是什麼。」</div>
+<div class="su"><span class="lb">字幕</span>【做了，才慢慢懂】</div></div>
+<div class="sg"><div class="tm">⏱ 52-60 SEC · 收尾</div>
+<div class="ln"><span class="lb">台詞</span>（靜音 or 輕聲）「謝謝你，19 年。」</div>
+<div class="su"><span class="lb">字幕</span>【謝謝你，19 年 ❤】</div></div>
+<div class="ct so"><div class="cl">純雞湯 · 無 CTA</div>無 CTA / 不引流 / 純語錄金句</div>
+<div class="nt"><span class="nl">需業主確認</span>第 12-25 秒原本含媽媽相關句，已泛化為「不需要儀式 / 記得小日子」，待業主拍板</div>
+<div class="mr"><span>情緒 / 共鳴 / 代入感 / 真實感</span><span>PO 週日 21-23</span></div>
+<div class="hs">#愛情語錄 #19年 #長期感情 #情感 #叭噗小C #愛是什麼 #感情真心話 #雞湯</div>
+</div>
+</article>
+
+</div>
+</div>
+
+</main>
+
+<footer>
+<div class="sg-ft">霸告製作 <span class="ac">×</span> 2026.05.11</div>
+<div class="pa">腳本生產 / 情侶 / 叭噗_小C / 第01批_2026-05-11</div>
+</footer>
+
+<script>
+function g(el){el.parentElement.classList.toggle("op")}
+function s(el){el.parentElement.classList.toggle("op")}
+function d(e,el){e.stopPropagation();const sc=el.closest(".sc");const id=sc.dataset.id;sc.classList.toggle("dn");const set=JSON.parse(localStorage.getItem("done")||"{}");set[id]=sc.classList.contains("dn");localStorage.setItem("done",JSON.stringify(set));el.textContent=sc.classList.contains("dn")?"已拍 ✓":"已拍"}
+window.addEventListener("DOMContentLoaded",()=>{
+  const set=JSON.parse(localStorage.getItem("done")||"{}");
+  document.querySelectorAll(".sc").forEach(sc=>{if(set[sc.dataset.id]){sc.classList.add("dn");const b=sc.querySelector(".db");if(b)b.textContent="已拍 ✓"}});
+  const q=document.getElementById("q");
+  if(q){
+    q.addEventListener("input",e=>{
+      const v=e.target.value.toLowerCase().trim();
+      document.querySelectorAll(".sc").forEach(sc=>{const t=sc.textContent.toLowerCase();sc.classList.toggle("hi",v && !t.includes(v))});
+      if(v)document.querySelectorAll(".gp").forEach(gp=>gp.classList.add("op"));
+    });
+  }
+  document.addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();q.focus()}
+    if(e.key==="Escape"){q.value="";q.dispatchEvent(new Event("input"));q.blur()}
+  });
+});
+</script>
+</body>
+</html>

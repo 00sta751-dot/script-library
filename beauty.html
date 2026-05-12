@@ -674,12 +674,102 @@ footer .by{
 }
 footer .by b{color:var(--gold-deep);font-weight:700}
 
+/* ========== THREADS SECTION ========== */
+.threads-section{
+  max-width:880px;margin:56px auto 0;padding:0 20px;
+}
+.threads-section .section-title{
+  font-family:var(--serif);
+  font-size:22px;font-weight:700;
+  color:var(--gold-deep);
+  letter-spacing:.04em;
+  text-align:center;
+  margin-bottom:6px;
+}
+.threads-section .section-sub{
+  font-size:13px;color:var(--ink-muted);
+  text-align:center;
+  margin-bottom:32px;
+  letter-spacing:.04em;
+}
+.thread-card{
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:26px 26px 22px;
+  margin-bottom:24px;
+  position:relative;
+}
+.thread-card::before{
+  content:'✿';
+  position:absolute;top:-14px;left:24px;
+  width:28px;height:28px;
+  background:var(--rose-deep);
+  color:var(--gold-deep);
+  font-size:14px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  line-height:28px;
+  text-align:center;
+}
+.thread-title{
+  font-family:var(--serif);
+  font-size:17px;font-weight:700;
+  color:var(--ink);
+  letter-spacing:.03em;
+  margin-bottom:6px;
+  padding-left:10px;
+  border-left:3px solid var(--gold);
+}
+.thread-batch{
+  font-size:11.5px;color:var(--ink-muted);
+  letter-spacing:.05em;
+  margin-bottom:14px;
+  padding-left:10px;
+}
+.thread-body{
+  font-size:14.5px;line-height:1.85;
+  color:var(--ink-soft);
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.thread-hashtag{
+  margin-top:12px;
+  font-size:12px;color:var(--gold-deep);
+  font-weight:500;
+}
+
+/* ========== CONTACT SECTION ========== */
+.contact-section{
+  max-width:880px;margin:40px auto 0;padding:0 20px;
+  text-align:center;
+}
+.contact-line-id{
+  font-family:var(--serif);
+  font-size:18px;font-weight:700;
+  color:var(--gold-deep);
+  margin-bottom:14px;
+}
+.contact-qr{
+  display:inline-block;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px;
+  background:var(--paper);
+}
+.contact-qr img{max-width:180px;display:block}
+.contact-qr-caption{
+  font-size:12px;color:var(--ink-muted);
+  margin-top:8px;
+}
+
 /* ========== SMALL ========== */
 @media(max-width:480px){
   .hero{padding:48px 20px 36px}
   .card-num{font-size:38px}
   .card-title{font-size:19px}
   .card-head,.card-body{padding-left:18px;padding-right:18px}
+  .thread-card{padding:20px 18px 16px}
 }
 </style>
 </head>
@@ -1309,9 +1399,171 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 </div>
 </section>
 
+<!-- ===== 脆文 Threads 區 ===== -->
+<section class="threads-section">
+  <h2 class="section-title">脆文 · Threads 短文</h2>
+  <div class="section-sub">7 篇 · 2026-05-12 第 06 批</div>
+
+  <!-- 脆文 01 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 01｜你真的在保養，還是在「感覺有保養」？</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">有件事我想直說。
+
+很多人的保養，其實不是在保養皮膚，是在「完成一個儀式」——塗了、拍了、心安了。
+
+問題是：妳用的東西，進到皮膚了嗎？妳的保濕，是在保「皮膚本身的水分」，還是只在皮膚表面建了一層膜，摸起來滑但底層還是乾？
+
+有效的保養，皮膚會告訴妳。
+
+換季不爆——屏障穩定的訊號。妝前不起皮——保濕到位的訊號。不需要每天想「今天臉怎麼了」——皮膚在正常工作的訊號。
+
+妳的皮膚最近有沒有給妳這些訊號？
+
+如果沒有，妳的保養只是「感覺有保養」，不是真的有在保養。
+
+這不是妳的問題，是沒有人告訴妳這兩件事的差別在哪裡。</div>
+    <div class="thread-hashtag">#保養 #護膚 #美容師 #成分學</div>
+  </div>
+
+  <!-- 脆文 02 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 02｜果酸對粉刺有效，但有一個前提</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">很多人開始用果酸，是因為看到別人說果酸讓她粉刺清光了。
+
+我不想說謊——果酸對粉刺真的有效。但有一個前提妳要知道。
+
+妳的皮膚屏障，要先夠穩。
+
+果酸是去角質用的，它在清粉刺的同時，也在剝離皮膚的保護層。屏障完整的皮膚，在去角質的同時快速修復。屏障已經受損的皮膚，一用果酸就爛給妳看。
+
+所以我通常會問：「妳最近皮膚有沒有乾、紅、緊繃感？」有的話，先修護屏障，再說果酸。沒有的話，從低濃度果酸開始試。
+
+屏障修護的成分：神經醯胺、B5、角鯊烷。
+
+先把這三個弄清楚，再來說果酸。</div>
+    <div class="thread-hashtag">#成分學 #果酸 #保養 #美容師</div>
+  </div>
+
+  <!-- 脆文 03 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 03｜我每天看皮膚，讓我最有感的一件事</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">在這行幾年，每天接觸不同的皮膚狀況，有一件事讓我一直很有感：
+
+皮膚是誠實的。
+
+壓力大的人，臉上會有。睡眠不夠的人，暗沉、毛孔粗大，再貴的保養品都壓不住。長期焦慮的人，皮膚屏障幾乎都受損。
+
+這不是玄學，這是生理機制——皮質醇升高會破壞皮膚的抗炎能力，讓問題肌更不穩定。
+
+我見過很多人花很多錢在保養品上，但生活習慣不改，皮膚就是改善不了。不是產品不好，是妳的皮膚在反映妳的生活。
+
+保養品是輔助，妳的生活是主體。
+
+今天睡夠了嗎？</div>
+    <div class="thread-hashtag">#保養 #美容師 #肌膚保養 #美容知識</div>
+  </div>
+
+  <!-- 脆文 04 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 04｜成分看不懂？教你看成分表最快的方式</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">很多人說「我看不懂成分表」，然後就直接略過，靠廣告或網友說好才買。
+
+我教妳最快的入門方式：只看前五個。
+
+成分表依濃度高低排列。前五個成分，通常佔了這瓶產品 80% 以上。知道前五個是什麼，妳就知道這瓶的主體是什麼。
+
+然後學三個關鍵成分：
+
+神經醯胺（Ceramide）：修護屏障，油痘肌和敏感肌的基礎。
+
+菸鹼醯胺（Niacinamide）：控油、淡化色素、修護，萬用。
+
+玻尿酸（Hyaluronic Acid / Sodium Hyaluronate）：保濕，分子大小不同，效果深淺也不同。
+
+這三個出現在前五個，這瓶通常有做正事。
+
+其他的慢慢學，先從這裡開始。</div>
+    <div class="thread-hashtag">#成分學 #保養成分 #保養 #護膚 #美容師</div>
+  </div>
+
+  <!-- 脆文 05 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 05｜做美容師讓我明白：不是每個問題都要「修」</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">做美容師之前，我以為我的工作是「幫人修復皮膚」。
+
+做了幾年之後，我發現工作的一半，其實是「讓人放下對皮膚的焦慮」。
+
+很多人把皮膚上的每一個細節都當成「要修的問題」——毛孔、紋路、偶爾長的一顆痘。但這些，有些是正常的皮膚功能，不是缺陷。
+
+毛孔是皮膚呼吸的出口，沒辦法「消失」，只能讓它看起來不那麼明顯。細紋是表情留下的痕跡，不是失敗。
+
+真正讓一個人皮膚狀況好，不是所有細節都「修好」，是整體的屏障穩定、保濕到位、防曬做足。
+
+妳的臉，已經夠好了。</div>
+    <div class="thread-hashtag">#美容師 #保養 #護膚 #女生保養 #肌膚保養</div>
+  </div>
+
+  <!-- 脆文 06 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 06｜換季爆痘的人，先回答我這三個問題</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">換季爆痘的人，在去買新產品之前，先回答我三個問題：
+
+一、妳最近有沒有換保養品？
+換季同時換產品，是兩個刺激重疊在一起，任何一個都是爆痘的原因，妳不知道是哪個。
+
+二、妳的洗臉方式有沒有跟著換季調整？
+夏天的泡沫豐富洗面乳，換到秋冬會洗太乾，讓皮膚過度乾燥、代償出油、然後爆痘。
+
+三、妳最近睡眠規律嗎？
+換季加上睡眠不穩，是問題肌最不穩定的組合。
+
+這三個問題，有任何一個答案是「有問題」，就先從那裡下手。
+
+不是換季讓妳爆痘，是換季放大了妳平常忽略的問題。</div>
+    <div class="thread-hashtag">#換季保養 #保養 #護膚 #美容師 #成分學</div>
+  </div>
+
+  <!-- 脆文 07 -->
+  <div class="thread-card">
+    <h3 class="thread-title">脆文 07｜我最愛的一個客人，是那個最不在乎「變美」的</h3>
+    <div class="thread-batch">第 06 批 · 2026-05-12</div>
+    <div class="thread-body">我遇過一個客人，讓我印象非常深。
+
+她來找我，不是因為要變美，是因為「臉很癢、很不舒服」。她說：「妳幫我讓它舒服就好。」
+
+那次我做了最簡單的舒緩療程。她離開的時候說：「謝謝，我今天終於舒服了。」
+
+就這樣。沒有問毛孔有沒有縮、臉有沒有比較亮、看起來有沒有變年輕。
+
+後來她固定來，皮膚越來越穩定。有一次我說「妳的皮膚狀態比剛來的時候好很多」，她說「是嗎？我就是覺得比較舒服啊。」
+
+那一刻我覺得：這個人比很多人都更懂保養的本質。
+
+保養的起點，不是「我要變美」，是「我要讓自己舒服」。
+
+從這裡開始，會走得更長。</div>
+    <div class="thread-hashtag">#保養 #美容師 #肌膚保養 #女生保養 #美容知識</div>
+  </div>
+</section>
+
+<!-- ===== 聯絡區 ===== -->
+<section class="contact-section">
+  <div class="contact-line-id">LINE ID：@cpc2319d</div>
+  <div class="contact-qr">
+    <img src="./yunzhen-line-qr.png" alt="昀臻 LINE QR Code">
+    <div class="contact-qr-caption">掃碼加 LINE · 免費諮詢</div>
+  </div>
+</section>
+
 <footer>
 <div class="sig">— 美容師 昀臻 ·  小工作室 ·  高雄 —</div>
-<div class="credit">2026-05-01</div>
+<div class="credit">2026-05-12</div>
 <div class="by">by <b>霸告</b> 製作</div>
 </footer>
 

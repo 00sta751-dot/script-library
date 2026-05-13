@@ -648,6 +648,34 @@ body.view-list .card.open .card-body{
 .download-btn:hover{background:var(--gold-deep);border-color:var(--gold-deep)}
 .download-btn::before{content:'\2B07';font-size:13px;line-height:1}
 
+/* ========== CARD IMAGE PREVIEW + LIGHTBOX ========== */
+/* NOTE: 此段由碼農 2026-05-13 手改，若重跑 build_beauty.py 會洗掉 lightbox 結構，需補回 */
+.card-image-actions{
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-top:12px;
+}
+.card-image-preview{
+  display:block;border:1px solid var(--gold-deep);border-radius:6px;overflow:hidden;
+  width:120px;cursor:zoom-in;transition:transform .15s ease, box-shadow .15s ease;
+}
+.card-image-preview:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.card-image-preview img{display:block;width:100%;height:auto}
+
+.lightbox-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;
+  align-items:center;justify-content:center;z-index:9999;padding:24px;
+  cursor:zoom-out;
+}
+.lightbox-overlay.active{display:flex}
+.lightbox-overlay img{
+  max-width:min(90vw,900px);max-height:90vh;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);border-radius:4px;
+}
+.lightbox-close{
+  position:absolute;top:20px;right:24px;
+  background:none;border:none;color:#fff;font-size:32px;cursor:pointer;
+  font-family:var(--sans);line-height:1;
+}
+
 /* ========== FOOTER ========== */
 footer{
   margin-top:64px;
@@ -784,7 +812,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <p class="lede">高雄美容師 · 每一部都是真實客人帶來的提醒。<br>不推銷，不洗腦，只把專業說清楚。</p>
 <div class="hero-meta">
   <span>2026-05-01</span>
-  <span>共 22 部 · 配套圖卡 2 張</span>
+  <span>共 33 部 · 配套圖卡 1 張</span>
   <span>油痘肌 / 痘疤 / 敏感屏障 / 美業心法</span>
 </div>
 </header>
@@ -820,7 +848,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="group" data-group="A">
   <div class="group-head">
     <div class="group-name">油痘肌處理</div>
-    <div class="group-count">9 部</div>
+    <div class="group-count">14 部</div>
   </div>
   <div class="cards" data-slot="A"></div>
 </div>
@@ -828,7 +856,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="group" data-group="B">
   <div class="group-head">
     <div class="group-name">保養手法 / 屏障</div>
-    <div class="group-count">3 部</div>
+    <div class="group-count">5 部</div>
   </div>
   <div class="cards" data-slot="B"></div>
 </div>
@@ -836,7 +864,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="group" data-group="D">
   <div class="group-head">
     <div class="group-name">美業心法 / 教學招生</div>
-    <div class="group-count">8 部</div>
+    <div class="group-count">12 部</div>
   </div>
   <div class="cards" data-slot="D"></div>
 </div>
@@ -844,7 +872,7 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 <div class="group" data-group="E">
   <div class="group-head">
     <div class="group-name">★ 含配套圖卡</div>
-    <div class="group-count">2 部</div>
+    <div class="group-count">1 部</div>
   </div>
   <div class="cards" data-slot="E"></div>
 </div>
@@ -1393,6 +1421,309 @@ footer .by b{color:var(--gold-deep);font-weight:700}
 </div>
 </article>
 
+<!-- ===== #21 ===== -->
+<article class="card" id="s21" data-id="s21">
+<div class="card-corner">no.21</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">直球派</span>
+  </div>
+  <div class="card-num">21</div>
+  <h3 class="card-title">防曬買了三年，你選的根本不對</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「你選防曬是看 SPF？那你可能選錯了。」</div><div class="sub">看 SPF？你可能選錯了</div></div>
+  <div class="row"><div class="time">3–12 秒</div><div class="line">「我遇過太多油痘肌，防曬用了一堆，臉還是黏膩悶痘。問我為什麼——因為你選的類型根本不對。」</div><div class="sub">類型選錯 才是問題根源</div></div>
+  <div class="row"><div class="time">12–35 秒</div><div class="line">「防曬有兩種：物理防曬跟化學防曬。油痘肌首選物理，成分表看到氧化鋅（Zinc Oxide）或二氧化鈦（Titanium Dioxide）開頭就對了。化學防曬吸收型，部分成分會悶痘——這不是你的問題，是你選錯類型。」</div><div class="sub">油痘肌首選物理防曬</div><div class="mirror">藏鏡人　「等等這合法吧——對，物理防曬就是這樣簡單。」</div></div>
+  <div class="row"><div class="time">35–48 秒</div><div class="line">「挑防曬不用複雜：第一，看成分表前三位有沒有氧化鋅。第二，質地選乳液狀不選霜狀。油痘肌按這兩點選，就能避免悶痘。」</div><div class="sub">成分前三有氧化鋅 + 乳液質地</div></div>
+  <div class="row"><div class="time">48–55 秒</div><div class="line">「你是不是也踩過這個坑？」</div><div class="sub">你也踩過嗎？</div></div>
+  <div class="row"><div class="time">55–60 秒</div><div class="line">「想知道你現在在用的防曬適不適合你的膚況，私訊我『防曬』我幫你看一下，不用怕。」</div><div class="sub">私訊「防曬」我幫你看</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-xh">小紅書</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（私訊防曬）</div>
+</div>
+</article>
+
+<!-- ===== #22 ===== -->
+<article class="card" id="s22" data-id="s22">
+<div class="card-corner">no.22</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">故事戲劇派</span>
+  </div>
+  <div class="card-num">22</div>
+  <h3 class="card-title">她的粉刺擠了五年，越擠越多——我教她換一件事</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「她跟我說，她的粉刺擠了五年。」</div><div class="sub">粉刺擠了五年</div></div>
+  <div class="row"><div class="time">3–15 秒</div><div class="line">「第一次做臉，她給我看她鼻頭——密密麻麻的，但她說她每週都擠。我問她有沒有越來越少？她搖頭。」</div><div class="sub">每週擠 但沒越來越少</div></div>
+  <div class="row"><div class="time">15–30 秒</div><div class="line">「問題不是她懶，是她的清潔方式在傷屏障。屏障受損，皮脂腺分泌更多——粉刺當然越長越多。擠只是清空表面，根源沒解決。」</div><div class="sub">清潔傷屏障 根源沒解決</div><div class="mirror">藏鏡人　「我也可以這樣嗎——可以。但先知道你現在的清潔有沒有傷到屏障。」</div></div>
+  <div class="row"><div class="time">30–48 秒</div><div class="line">「我讓她換了一件事：洗臉不超過 60 秒，溫水，不用力搓。一個月後她傳訊息給我：粉刺沒消光，但長得慢多了。這就夠了——先讓皮膚停止發炎，再慢慢清。」</div><div class="sub">洗臉 60 秒溫水 一個月就有感</div></div>
+  <div class="row"><div class="time">48–55 秒</div><div class="line">「你現在清潔方式對嗎？」</div><div class="sub">你的清潔方式對嗎？</div></div>
+  <div class="row"><div class="time">55–60 秒</div><div class="line">「跟她情況一樣的留言『諮詢』，我加你 LINE 看一下，不收費。」</div><div class="sub">留言「諮詢」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-ig">IG Reels</span> <span class="tag tag-tk">TikTok</span></div>
+<div class="card-cta">個人化諮詢（留言諮詢）</div>
+</div>
+</article>
+
+<!-- ===== #23 ===== -->
+<article class="card" id="s23" data-id="s23">
+<div class="card-corner">no.23</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">人間觀察派</span>
+  </div>
+  <div class="card-num">23</div>
+  <h3 class="card-title">做美容師第一年，沒人告訴我這三件事</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「做美容師第一年，我走過三個彎路。現在的學生不用繞了。」</div><div class="sub">第一年三個彎路</div></div>
+  <div class="row"><div class="time">3–20 秒</div><div class="line">「第一件事：技術再好，不會跟客人聊天也留不住人。我第一年接的客人做完臉不再來。後來才明白，她要的不只是皮膚變好——她要有人懂她的擔心。」</div><div class="sub">技術好 ≠ 客人留下</div><div class="mirror">藏鏡人　「這也要美容師教？——對，因為沒人教我，我摔了一跤。」</div></div>
+  <div class="row"><div class="time">20–38 秒</div><div class="line">「第二件事：新手美容師最容易把油痘肌客人推走——不是技術不夠好，是太急著替她改變。皮膚需要時間。你急她也急，然後她就去別人那裡了。」</div><div class="sub">太急改變 客人就走了</div></div>
+  <div class="row"><div class="time">38–52 秒</div><div class="line">「第三件事：進修不是買課。我第一年買很多課，實際進步來自做臉經驗，不是課本。找一位願意給你回饋的老師，比買課更重要。」</div><div class="sub">找願意給回饋的老師 比買課重要</div></div>
+  <div class="row"><div class="time">52–56 秒</div><div class="line">「在做美容師的，這三件有沒有中你？」</div><div class="sub">有沒有中你？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「現在在入行的，或是在思考要不要做的，留言『+1』我私訊你課程細節。」</div><div class="sub">留言「+1」我私訊你</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-th">Threads</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">B2B 招生（留言+1）</div>
+</div>
+</article>
+
+<!-- ===== #24 ===== -->
+<article class="card" id="s24" data-id="s24">
+<div class="card-corner">no.24</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">直球派</span>
+  </div>
+  <div class="card-num">24</div>
+  <h3 class="card-title">A醇讓你爛臉？你犯了這個錯【留言領取圖卡】</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「A醇爛臉？我看過太多人都犯同一個錯。」</div><div class="sub">A醇爛臉 = 犯了同一個錯</div></div>
+  <div class="row"><div class="time">3–15 秒</div><div class="line">「買了 A 醇，第一週就爆痘脫皮，然後放棄——不是 A 醇的問題，是有 3 個關鍵用法錯了。只要犯一件，皮膚就會用爛臉給你答案。」</div><div class="sub">不是A醇的問題 是用法錯了</div></div>
+  <div class="row"><div class="time">15–35 秒</div><div class="line">「這 3 個錯誤很多人以為自己沒犯，但其實在每天犯。成分搭配的問題、使用時段的問題、還有頻率的問題——任一個沒注意，A 醇的好處你拿不到。」</div><div class="sub">3 個錯誤：搭配 / 時段 / 頻率</div><div class="mirror">藏鏡人　「等等，這成分安全嗎？——就是太有用所以才要對的方法，不然皮膚會抗議。」</div></div>
+  <div class="row"><div class="time">35–52 秒</div><div class="line">「正確的起手方式是什麼？什麼時候用？不能跟哪些成分同時上？每個人膚況不一樣，這 3 件事要對應你自己的狀況才有用——我整理成完整圖卡了。」</div><div class="sub">答案在圖卡 依膚況對應</div></div>
+  <div class="row"><div class="time">52–56 秒</div><div class="line">「等等，這樣是不是很難？——圖卡一張清楚，不用自己找。」</div><div class="sub">圖卡一張清楚</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「留言『A醇』，我把《A醇入門避坑4步》圖卡私訊給你，存起來對照用。」</div><div class="sub">留言「A醇」私訊圖卡</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-xh">小紅書</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">釣魚部（留言A醇取得圖卡）</div>
+<div class="card-image-actions">
+  <a class="card-image-preview" href="./card-26.png" data-lightbox="card-26" aria-label="預覽圖卡">
+    <img src="./card-26.png" alt="A 醇入門避坑 4 步 圖卡預覽" loading="lazy">
+  </a>
+  <a class="download-btn" href="./card-26.png" download="昀臻-A醇入門避坑4步.png">下載圖卡</a>
+</div>
+</div>
+</article>
+
+<!-- ===== #25 ===== -->
+<article class="card" id="s25" data-id="s25">
+<div class="card-corner">no.25</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">市場觀察派</span>
+  </div>
+  <div class="card-num">25</div>
+  <h3 class="card-title">換季皮膚突然敏感？不是過敏，是屏障在說「夠了」</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「換季臉突然發紅刺癢——不是過敏，你的屏障在告訴你它撐不住了。」</div><div class="sub">不是過敏 是屏障在說夠了</div></div>
+  <div class="row"><div class="time">3–15 秒</div><div class="line">「每年這時候我都收到同樣的訊息：昀臻，我換季又敏感了。我問：有改保養嗎？十個八個說沒有。」</div><div class="sub">換季沒改保養 所以每年敏感</div></div>
+  <div class="row"><div class="time">15–35 秒</div><div class="line">「皮膚屏障是保水加隔離。溫度濕度一變，屏障壓力變大。這時還用控油洗面乳或酸類，屏障撐不住就泛紅刺痛——這不是過敏，是沒給它休息。」</div><div class="sub">屏障壓力大 + 繼續用酸 = 泛紅刺痛</div></div>
+  <div class="row"><div class="time">35–50 秒</div><div class="line">「換季修護三步：一，停掉酸類和 A 醇，屏障才能喘口氣；二，洗面乳換溫和的；三，保濕多一層。不用貴的，能鎖住水就行。按這三步做，兩週內大多會穩定。」</div><div class="sub">三步：停酸 / 換溫和洗面乳 / 多一層保濕</div><div class="mirror">藏鏡人　「就是說，我每年都這樣——對啦，因為大家都沒改保養。你也卡在這嗎？」</div></div>
+  <div class="row"><div class="time">50–56 秒</div><div class="line">「你換季有改過保養嗎？」</div><div class="sub">你換季有改保養嗎？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「換季敏感一直好不了的，私訊我『敏感』，我看你現在的保養哪裡出問題，不用怕。」</div><div class="sub">私訊「敏感」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-xh">小紅書</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（私訊敏感）</div>
+</div>
+</article>
+
+<!-- ===== #26 ===== -->
+<article class="card" id="s26" data-id="s26">
+<div class="card-corner">no.26</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">故事戲劇派</span>
+  </div>
+  <div class="card-num">26</div>
+  <h3 class="card-title">她做了六個月的臉，痘疤才真的在淡——我懂她等的那種心情</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「她第三個月問我：昀臻，我的痘疤還要多久才會好？」</div><div class="sub">痘疤還要多久才好？</div></div>
+  <div class="row"><div class="time">3–18 秒</div><div class="line">「她是我的老客人了。油痘肌，疤從青春期開始留。她不是沒保養——她換過很多瓶，試過很多方法。但痘疤這種東西，方向不對，花再多時間都在原地。」</div><div class="sub">方向不對 花再多時間都在原地</div></div>
+  <div class="row"><div class="time">18–38 秒</div><div class="line">「我告訴她：痘疤不是洗掉的，得靠皮膚自己代謝。她需要的不是堆產品，是停下來讓屏障修好，讓代謝慢慢推進。我幫她調整保養順序，把酸類停掉，改成修護優先。」</div><div class="sub">先修屏障 再讓代謝推進</div><div class="mirror">藏鏡人　「我也踩過這個坑——對啦。你現在是不是也在等痘疤？」</div></div>
+  <div class="row"><div class="time">38–52 秒</div><div class="line">「第六個月，她傳照片給我。她說：真的在淡了。我看到照片，比她更開心。這種事急不來——但方向對了，就只是時間的問題。」</div><div class="sub">方向對了 只是時間的問題</div></div>
+  <div class="row"><div class="time">52–56 秒</div><div class="line">「你現在是不是也在等痘疤？」</div><div class="sub">你也在等痘疤？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「跟她情況像的私訊我『痘疤』，我看一下你的狀況，不用怕，問問不用錢。」</div><div class="sub">私訊「痘疤」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（私訊痘疤）</div>
+</div>
+</article>
+
+<!-- ===== #27 ===== -->
+<article class="card" id="s27" data-id="s27">
+<div class="card-corner">no.27</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">人間觀察派</span>
+  </div>
+  <div class="card-num">27</div>
+  <h3 class="card-title">做這行讓我看皮膚的方式變了</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「做這行久了，我看皮膚的方式跟以前完全不一樣。」</div><div class="sub">看皮膚的方式變了</div></div>
+  <div class="row"><div class="time">3–18 秒</div><div class="line">「以前我看皮膚，第一眼是看好不好看——有沒有痘、有沒有疤。現在我先看：這個人最近壓力大不大？有沒有睡好？她的皮膚在說話，我就是要讀懂它。」</div><div class="sub">皮膚在說話 我要讀懂它</div></div>
+  <div class="row"><div class="time">18–35 秒</div><div class="line">「有一次客人說『我今天臉突然變差』，我問她：妳昨晚幾點睡？她說三點。皮膚比她自己更誠實。這種事發生多了，我開始覺得：皮膚是我們對自己的態度的一面鏡子。」</div><div class="sub">皮膚比妳自己更誠實</div><div class="mirror">藏鏡人　「對啦我也是混合肌，我懂那種『搞不定自己臉』的感覺。」</div></div>
+  <div class="row"><div class="time">35–50 秒</div><div class="line">「做美容師這件事，改變我最大的不是技術——是我開始認真看自己的皮膚了。以前我也懶得保養，覺得麻煩。現在我明白：好好對臉，其實是好好對自己。」</div><div class="sub">好好對臉 其實是好好對自己</div></div>
+  <div class="row"><div class="time">50–56 秒</div><div class="line">「你做了讓你看事情方式改變的事嗎？」</div><div class="sub">有讓你看事情改變的事嗎？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「在做美容師的、或在思考事業切換的，留言『心境』我跟你聊。」</div><div class="sub">留言「心境」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-th">Threads</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（留言心境）</div>
+</div>
+</article>
+
+<!-- ===== #28 ===== -->
+<article class="card" id="s28" data-id="s28">
+<div class="card-corner">no.28</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">市場觀察派</span>
+  </div>
+  <div class="card-num">28</div>
+  <h3 class="card-title">玻尿酸保濕這件事，你可能一直搞錯了</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「玻尿酸保濕，但很多人越用越乾——我來告訴你為什麼。」</div><div class="sub">越用越乾？我來告訴你為什麼</div></div>
+  <div class="row"><div class="time">3–15 秒</div><div class="line">「市面上玻尿酸產品多到眼花，都說保濕有效。但我看過很多客人說擦了還是乾。」</div><div class="sub">大家都說有效 但擦了還是乾</div></div>
+  <div class="row"><div class="time">15–38 秒</div><div class="line">「玻尿酸有大分子跟小分子。大分子停在皮膚表面，形成保濕膜；小分子滲透進去，補充真皮層水分。如果你只買大分子的——就只是表面保濕，等乾了就乾了。再一個關鍵：玻尿酸是抓水劑，它抓空氣裡的水。空氣太乾的地方，它反而會抽走皮膚的水——要搭保濕霜封住才有用。」</div><div class="sub">大小分子都要 + 接保濕霜封住</div><div class="mirror">藏鏡人　「天啊我也是這樣——你以前也沒搭保濕霜嗎？」</div></div>
+  <div class="row"><div class="time">38–50 秒</div><div class="line">「挑選邏輯：成分表上看到 Sodium Hyaluronate（小分子）跟 Hyaluronic Acid（大分子）都有，才是完整。擦完之後，一定要接一層保濕霜。少這步，玻尿酸幫不了你。」</div><div class="sub">Sodium Hyaluronate + Hyaluronic Acid 都有才完整</div></div>
+  <div class="row"><div class="time">50–56 秒</div><div class="line">「你現在的玻尿酸有接保濕霜嗎？」</div><div class="sub">有接保濕霜嗎？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「想知道你的保濕順序有沒有問題，私訊我『保濕』，我跟你說你的狀況。」</div><div class="sub">私訊「保濕」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-xh">小紅書</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（私訊保濕）</div>
+</div>
+</article>
+
+<!-- ===== #29 ===== -->
+<article class="card" id="s29" data-id="s29">
+<div class="card-corner">no.29</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">直球派</span>
+  </div>
+  <div class="card-num">29</div>
+  <h3 class="card-title">油痘肌為什麼保濕這麼難？</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「油痘肌跟我說不需要保濕——這是我聽過最多的錯誤。」</div><div class="sub">油痘肌不需要保濕？最常見的錯誤</div></div>
+  <div class="row"><div class="time">3–18 秒</div><div class="line">「臉出油，代表皮脂腺在補水。為什麼要補水？因為皮膚缺水了。出油不是水分多——是身體在告訴你，皮膚的水分已經不夠，要用油來保護。」</div><div class="sub">出油 = 皮膚在告訴你缺水了</div></div>
+  <div class="row"><div class="time">18–40 秒</div><div class="line">「油痘肌保濕難，是因為很多人挑錯產品。油脂重的乳霜、矽靈開頭的質地——這些確實悶痘。但油痘肌需要的保濕是『含水不含油』：成分表有甘油（Glycerin）、丁二醇（Butylene Glycol）這類水溶性的，才是對的。」</div><div class="sub">含水不含油：Glycerin / 丁二醇</div><div class="mirror">藏鏡人　「怕用不起？——甘油成本很低，重點是你要挑對產品。」</div></div>
+  <div class="row"><div class="time">40–52 秒</div><div class="line">「找保濕產品，兩件事：第一，質地選乳液，不選霜；第二，成分表看到 Glycerin 排前五——這樣油痘肌才能補到水，又不悶痘。」</div><div class="sub">Glycerin 排前五 + 乳液質地</div></div>
+  <div class="row"><div class="time">52–56 秒</div><div class="line">「你現在的保濕適合油痘肌嗎？」</div><div class="sub">你的保濕適合油痘肌嗎？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「油痘肌一直找不到對的保濕，私訊我『油痘』，我跟你說怎麼挑。」</div><div class="sub">私訊「油痘」</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-ig">IG Reels</span> <span class="tag tag-xh">小紅書</span></div>
+<div class="card-cta">個人化諮詢（私訊油痘）</div>
+</div>
+</article>
+
+<!-- ===== #30 ===== -->
+<article class="card" id="s30" data-id="s30">
+<div class="card-corner">no.30</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">人間觀察派</span>
+  </div>
+  <div class="card-num">30</div>
+  <h3 class="card-title">做這行讓我懂了一件事：最值錢的不是眼力，是這個</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「做美容師，大家都說眼力要好——我覺得這不是最值錢的。」</div><div class="sub">眼力不是最值錢的</div></div>
+  <div class="row"><div class="time">3–20 秒</div><div class="line">「眼力好，看得出皮膚狀況，是基本的。但我觀察做得久的美容師，她們最厲害的一件事是：讓客人說話。不急著分析，先聽。客人講三分鐘，我已經知道她今天的狀態、她的焦慮、她真正在意的是什麼。」</div><div class="sub">讓客人說話 先聽不急分析</div></div>
+  <div class="row"><div class="time">20–38 秒</div><div class="line">「最值錢的是讓人放鬆說話的能力。這個能力不是天生的，是你願不願意真的在意眼前這個人。客人感覺到被在意，她才願意說實話——皮膚最近怎樣、生活最近怎樣。這些資訊，才是我幫她做出正確判斷的基礎。」</div><div class="sub">最值錢：讓人放鬆說話的能力</div><div class="mirror">藏鏡人　「不然你想怎樣——對，光靠眼力看，只看得到表面。」</div></div>
+  <div class="row"><div class="time">38–52 秒</div><div class="line">「所以我教學生的第一件事，不是手法，是：下次做臉，讓客人先說三分鐘，你只聽。試試看，你看客人的方式會不一樣。」</div><div class="sub">讓客人先說三分鐘 你只聽</div></div>
+  <div class="row"><div class="time">52–56 秒</div><div class="line">「光靠眼力，只看得到表面。」</div><div class="sub">眼力只看表面</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「在做美容師的或想做的，有什麼問題可以私訊我，我盡量回。」</div><div class="sub">有問題私訊我</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-th">Threads</span> <span class="tag tag-ig">IG Reels</span></div>
+<div class="card-cta">個人化諮詢（軟引流，有問題私訊）</div>
+</div>
+</article>
+
+<!-- ===== #31 ===== -->
+<article class="card" id="s31" data-id="s31">
+<div class="card-corner">no.31</div>
+<div class="card-head">
+  <div class="card-meta">
+    <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+    <span class="tag mute">60s</span>
+    <span class="tag">直球派</span>
+  </div>
+  <div class="card-num">31</div>
+  <h3 class="card-title">你有多久沒有好好說謝謝自己了？</h3>
+  <div class="card-batch">第 07 批 · 2026-05-13</div>
+  </div>
+<div class="card-body">
+<div class="timeline">
+  <div class="row"><div class="time">0–3 秒</div><div class="line">「你有多久沒有好好說謝謝自己了？」</div><div class="sub">你有多久沒說謝謝自己了？</div></div>
+  <div class="row"><div class="time">3–18 秒</div><div class="line">「我們很習慣說謝謝——謝謝幫我的人、謝謝陪我的人。但說謝謝自己這件事，好像很少做。」</div><div class="sub">習慣謝謝別人 很少謝謝自己</div></div>
+  <div class="row"><div class="time">18–38 秒</div><div class="line">「我在做臉時常想：來我工作室的人，每個都在照顧家人、工作、生活。躺下來的這一小時，她們才對自己好一點。我覺得還是不夠。不是每個人都能每週來做臉。但謝謝自己其實很簡單，今天只需要一個念頭。」</div><div class="sub">躺下來的一小時 才對自己好一點</div></div>
+  <div class="row"><div class="time">38–50 秒</div><div class="line">「今天有沒有好好吃一頓？有沒有休息？有的話就夠了。謝謝你這樣撐著。」</div><div class="sub">謝謝你，這樣撐著</div><div class="mirror">藏鏡人　「對啦我也試過——難開口。你也覺得說謝謝自己有點奇怪嗎？」</div></div>
+  <div class="row"><div class="time">50–56 秒</div><div class="line">「說謝謝自己有點奇怪嗎？」</div><div class="sub">說謝謝自己有點奇怪嗎？</div></div>
+  <div class="row"><div class="time">56–60 秒</div><div class="line">「留言說說你今天對自己好的一件事，我都看。」</div><div class="sub">留言說今天對自己好的一件事</div></div>
+</div>
+<div class="platform-tags"><span class="tag tag-ig">IG Reels</span> <span class="tag tag-th">Threads</span></div>
+<div class="card-cta">純雞湯（留言對自己好的一件事）</div>
+</div>
+</article>
+
 
 
 
@@ -1701,10 +2032,10 @@ renderActiveFilters();
 // === 主題分組 reorder + 折疊 + 已拍過 toggle (霸告 2026-05-02 v6：chip 移到 card-meta 第一位) ===
 (function(){
   var GROUPS = {
-    A: ['s1','s2','s3','s5','s6','s9','s13','s15','s18'],
-    B: ['s7','s14','s22'],
-    D: ['s10','s11','s12','s16','s17','s19','s20','s21'],
-    E: ['s4','s8']
+    A: ['s1','s2','s3','s5','s6','s8','s9','s13','s15','s18','s21','s22','s26','s29'],
+    B: ['s7','s14','s24','s25','s28'],
+    D: ['s4','s10','s11','s12','s16','s17','s19','s20','s23','s27','s30','s31'],
+    E: ['s24']
   };
   Object.keys(GROUPS).forEach(function(gid){
     var slot = document.querySelector('[data-slot="'+gid+'"]');
@@ -1746,7 +2077,41 @@ renderActiveFilters();
     });
   });
 })();
+
+// lightbox 圖卡預覽
+// NOTE: 此段由碼農 2026-05-13 手改，若重跑 build_beauty.py 會洗掉，需補回
+(function(){
+  var overlay = document.getElementById('lightboxOverlay');
+  var img = document.getElementById('lightboxImg');
+  var closeBtn = document.getElementById('lightboxClose');
+  if(!overlay || !img) return;
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('.card-image-preview');
+    if(!a) return;
+    e.preventDefault();
+    img.src = a.getAttribute('href');
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden','false');
+  });
+  function close(){
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden','true');
+    img.src = '';
+  }
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) close();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && overlay.classList.contains('active')) close();
+  });
+})();
 </script>
+
+<div class="lightbox-overlay" id="lightboxOverlay" role="dialog" aria-hidden="true">
+  <button class="lightbox-close" id="lightboxClose" aria-label="關閉預覽">×</button>
+  <img id="lightboxImg" src="" alt="圖卡預覽大圖">
+</div>
 
 </body>
 </html>

@@ -781,6 +781,53 @@ footer {
   .hero-logo-slot { top: 4.8rem; right: 1.2rem; }
   .logo-placeholder { width: 60px; height: 60px; }
 }
+
+/* ========== V2 GROUP COLLAPSED + copyScript (build_bappu.py v2) ========== */
+.gp.collapsed > .gb{display:none !important}
+.gp.collapsed > div.threads-grid{display:none !important}
+.group.collapsed > .threads-grid{display:none !important}
+.gy{transition:transform .2s;display:inline-block;}
+.gp.collapsed .gy{transform:rotate(-90deg);}
+.card-meta-extra{font-size:11px;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;}
+.platform{font-size:11px;background:rgba(224,64,251,.12);padding:2px 7px;border-radius:4px;font-weight:600;color:#c800e0;}
+.po-time{font-size:11px;opacity:.7;}
+.hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px;}
+.hashtag{background:rgba(0,229,255,.1);color:#00b8cc;padding:2px 8px;border-radius:12px;font-size:11px;border:1px solid rgba(0,229,255,.3);}
+.sc-img img.card-thumb{max-width:120px;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;border:1px solid rgba(224,64,251,.4);}
+.download-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 14px;margin:6px 0;
+  font-size:12px;font-weight:500;color:white;
+  background:linear-gradient(135deg,#E040FB,#00E5FF);
+  border:none;border-radius:999px;text-decoration:none;cursor:pointer;
+  transition:opacity .2s;
+}
+.download-btn:hover{opacity:.85;}
+.copy-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 14px;margin:8px 0;
+  font-size:12px;font-weight:500;color:white;
+  background:linear-gradient(135deg,#E040FB,#00E5FF);
+  border:none;border-radius:999px;cursor:pointer;
+  transition:opacity .2s;
+}
+.copy-btn:hover{opacity:.85;}
+.copy-btn.copied{background:#5c8a5c;}
+.threads-grid{display:grid;grid-template-columns:1fr;gap:14px;padding:8px 0;}
+@media(min-width:720px){.threads-grid{grid-template-columns:1fr 1fr}}
+.thread-card{background:rgba(255,255,255,.06);border:1px solid rgba(224,64,251,.3);border-radius:10px;padding:16px;}
+.thread-meta{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+.thread-id{font-weight:700;color:#E040FB;font-size:14px;}
+.thread-label{font-size:11px;opacity:.6;background:rgba(255,255,255,.08);padding:2px 7px;border-radius:4px;}
+.thread-text{font-size:13px;line-height:1.85;opacity:.85;white-space:pre-wrap;word-break:break-word;}
+.thread-hash{margin-top:6px;font-size:11px;color:#00E5FF;font-weight:500;}
+.lightbox-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;
+  align-items:center;justify-content:center;z-index:9999;padding:24px;cursor:zoom-out;
+}
+.lightbox-overlay.active{display:flex}
+.lightbox-overlay img{max-width:min(90vw,900px);max-height:90vh;border-radius:4px;}
+.lightbox-close{position:absolute;top:20px;right:24px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -863,19 +910,21 @@ footer {
 <!-- 19 年日常 -->
 
 <!-- 故事戲劇派 -->
-<div class="gp" data-g="A">
-<div class="gh" onclick="g(this)">
+
+<!-- 故事戲劇派 -->
+<div class="gp collapsed" data-g="A">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
   <div class="gt">
     <span class="gc">A</span>
     <span class="gn">故事戲劇派</span>
-    <span class="gx">4 部 · 故事戲劇</span>
+    <span class="gx">7 部</span>
   </div>
-  <span class="gy">+</span>
+  <span class="gy">▼</span>
 </div>
 <div class="gb">
 
-<!-- #01 -->
-<article class="sc" data-id="01">
+<!-- #01b -->
+<article class="sc" data-id="01b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.01</span>
@@ -890,16 +939,17 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 對鏡頭：他在冷戰，我在吃飯。</p><p class="sc-sub">他冷戰，我吃飯</p></div>
-<div class="sl"><span class="st">3-12秒 破題</span><p class="sd">小C：冷戰的時候餓著自己，等他先開口，這件事我早就不幹了。</p><p class="sc-sub">餓著等他，不幹了</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：你就不覺得你這樣很涼嗎。小C：我很涼，但我吃飽了。你要冷多久？叭噗沉默兩秒：你剩幾口。藏鏡人：就是我跟我男朋友！他先說話的那刻我什麼都好了！</p><p class="sc-sub">你剩幾口——他開口了</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他在冷戰，我在吃飯。</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：冷戰的時候餓著自己，等他先開口，這件事我早就不幹了。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：你就不覺得你這樣很涼嗎。小C：我很涼，但我吃飽了。你要冷多久？叭噗沉默兩秒：你剩幾口。藏鏡人：就是我跟我男朋友！他先說話的那刻我什麼都好了！</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你們怎麼和好的？底下說說。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #03 -->
-<article class="sc" data-id="03">
+<!-- #03b -->
+<article class="sc" data-id="03b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.03</span>
@@ -914,16 +964,17 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：客戶有沒有簽？叭噗換鞋，沒回頭：沒有。</p><p class="sc-sub">他帶看回來沒簽到</p></div>
-<div class="sl"><span class="st">3-12秒 破題</span><p class="sd">小C 繼續看手機：那就下次。叭噗走進來，坐下。沉默三秒。</p><p class="sc-sub">沒有安慰，只有那就下次</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：我不太會說你辛苦了這種話。說出口有點怪。但我會去弄個東西給他吃。他知道的。藏鏡人：我也不會說這種話，但我懂這種感覺...</p><p class="sc-sub">不說，但他知道</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：客戶有沒有簽？叭噗換鞋，沒回頭：沒有。</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C 繼續看手機：那就下次。叭噗走進來，坐下。沉默三秒。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：我不太會說你辛苦了。但我會去弄個東西給他吃。他知道的。藏鏡人：我也不會說這種話，但我懂這種感覺...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半怎麼陪對方的？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #04 -->
-<article class="sc" data-id="04">
+<!-- #04b -->
+<article class="sc" data-id="04b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.04</span>
@@ -938,16 +989,17 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 輕聲：昨晚他說了一句話，我整個睡不著。</p><p class="sc-sub">深夜那句話</p></div>
-<div class="sl"><span class="st">3-12秒 破題</span><p class="sd">叭噗眼睛閉著，很平淡：謝謝你在。小C 停頓：你幹嘛突然說這個。</p><p class="sc-sub">謝謝你在</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：他是那種——不是每天說我愛你的人。但他偶爾說一句，就比 365 天都說還準確。藏鏡人：有沒有這種人！不常說但說了就直接中！</p><p class="sc-sub">偶爾一句，比每天都說還重</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 輕聲：昨晚他說了一句話，我整個睡不著。</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">叭噗眼睛閉著，很平淡：謝謝你在。小C 停頓：你幹嘛突然說這個。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：他是那種——偶爾說一句，就比 365 天都說還準確。藏鏡人：有沒有這種人！不常說但說了就直接中！</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：存起來，傳給你另一半。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #05 -->
-<article class="sc" data-id="05">
+<!-- #05b -->
+<article class="sc" data-id="05b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.05</span>
@@ -962,13 +1014,101 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：我們差點因為一件事，沒去成北海道。</p><p class="sc-sub">差點沒去北海道</p></div>
-<div class="sl"><span class="st">3-12秒 破題</span><p class="sd">小C：出發前一天，我們大吵了一架。叭噗：是很大的那種。那晚我們沒說話。</p><p class="sc-sub">出發前一天大吵</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：那個時候我在想，這個旅行要不要取消。機票退不退。或者乾脆一個人去。叭噗：我在想同一件事。藏鏡人：哦不...他們最後有去嗎...</p><p class="sc-sub">兩個人都在想同一件事</p></div>
-<div class="sl"><span class="st">40-52秒 收束</span><p class="sd">小C：北海道那次是我們最好的旅行之一。不是因為沒吵架，是因為我們吵完，還是決定出發。藏鏡人：我想存起來！這句話太準了！</p><p class="sc-sub">吵完，還是出發</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：我們差點因為一件事，沒去成北海道。</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：出發前一天，我們大吵了一架。叭噗：是很大的那種。那晚我們沒說話。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：那個時候我在想，這個旅行要不要取消。叭噗：我在想同一件事。藏鏡人：哦不...他們最後有去嗎...</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：北海道那次是我們最好的旅行之一。不是因為沒吵架，是因為我們吵完，還是決定出發。藏鏡人：我想存起來！這句話太準了！</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你跟另一半有沒有這種經歷？底下說。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+<!-- #101 -->
+<article class="sc" data-id="101" data-caption="帶看六組，全說考慮。他回來推門進來，第一句「累死了」。我沒說加油，我去把飯拿出來。19 年——他的累，不用他說我就知道了。你記住另一半的哪個習慣？底下說說" data-hashtags="#情侶日常 #長情 #台灣情侶 #高雄情侶 #房仲老婆 #真實情侶 #19年">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.101</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / FB Reels</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">他帶看一整天，進門第一件事</h2>
+  <p class="vi">家中客廳或玄關，叭噗剛開門進來，小C 在客廳，晚上室內燈光，真實生活感</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗（推門進來，扶著門）：累死了。字幕：他帶看一整天，進門第一句</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">叭噗：今天帶六組，全部說要考慮。字幕：六組，全考慮</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C（從廚房探頭）：我有留飯。先去換衣服。字幕：留了飯，催他洗。藏鏡人：19 年，她看懂了他的累⋯⋯</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：你怎麼知道我想先吃飯？小C：你每次累到不行才說累。字幕：每次累到不行才說</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">（小C 把飯推過去，兩人沒再說話）字幕：一眼看出他累到什麼程度</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗（對鏡頭）：你記住另一半的哪個習慣？底下說說。</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#長情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#高雄情侶</span><span class="hashtag">#房仲老婆</span><span class="hashtag">#真實情侶</span><span class="hashtag">#19年</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
+</div>
+</article>
+<!-- #109 -->
+<article class="sc" data-id="109" data-caption="他說他不在乎那件事。結果記了 4 年。4 年後突然說——那個沖繩，規劃一下。就去了。他的愛不說出口，但它在那邊。你另一半也有這樣的事嗎？存起來傳給他" data-hashtags="#情侶日常 #長情 #台灣情侶 #感情 #19年 #真實情侶 #旅遊">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.109</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">故事戲劇派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">TikTok</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / TikTok</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">他說他不在乎，但他記了 4 年</h2>
+  <p class="vi">兩人同框，家中或旅遊畫面，叭噗稍微不好意思的表情，小C 笑</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他說不在乎。記了 4 年。字幕：嘴上不在乎，心裡記著。藏鏡人：什麼事？！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：我說想去沖繩，他說現在沒辦法。我說沒關係。就結束了。字幕：沒在一起時說的話</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：4 年後他說，你不是想去沖繩？我說對。他說那規劃一下。就去了。字幕：4 年後才提起，還真的去</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：只是記在腦袋裡。沒什麼大事。小C：你說不在乎。記了 4 年。字幕：說不在乎，真的記著。藏鏡人：這就是長情⋯⋯他的愛在行動裡⋯⋯</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：他常這樣。說不在乎，記著，哪天就做。字幕：他的愛，在行動裡</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你另一半有這樣的事嗎？存起來傳給他看。</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#長情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#感情</span><span class="hashtag">#19年</span><span class="hashtag">#真實情侶</span><span class="hashtag">#旅遊</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
+</div>
+</article>
+<!-- #110 -->
+<article class="sc" data-id="110" data-caption="婚前沒發現的事——他吃得超慢。他吃第三口，我快吃完了。一開始會等急，後來我帶書去，他吃完我們再走。婚前不知道，婚後學著接受——這才是生活。你婚後發現什麼？底下說說" data-hashtags="#情侶日常 #夫妻日常 #台灣情侶 #長情 #已婚日常 #真實情侶">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.110</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / FB Reels</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">我嫁給他之前不知道的一件事</h2>
+  <p class="vi">兩人同框，家中，小C 說話，叭噗在旁邊作為「被揭露者」</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：嫁給他之前，有件事我不知道。字幕：婚前沒發現的事。藏鏡人：什麼事？！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：他吃得很慢。叭噗：我在享受。小C：吃飯他吃第三口，我快吃完。字幕：他超級慢，我卡著</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">字幕：不會吵？小C：一開始會等急。後來我帶書，他吃完我們再走。字幕：學著等，現在沒問題</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：她也有我不知道的。小C：什麼？叭噗：妳睡前一定要聊天。小C：對啦。字幕：她睡前必聊天。藏鏡人：互相揭露⋯⋯婚前不知道，婚後接受⋯⋯這才是生活！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：婚前不知道，婚後就接受。字幕：發現怪癖，學著包容</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你嫁給他（或娶了她）之後，發現什麼你之前不知道的？底下說說。</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#夫妻日常</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#長情</span><span class="hashtag">#已婚日常</span><span class="hashtag">#真實情侶</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
 
@@ -976,19 +1116,19 @@ footer {
 </div>
 
 <!-- 人間觀察派 -->
-<div class="gp" data-g="B">
-<div class="gh" onclick="g(this)">
+<div class="gp collapsed" data-g="B">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
   <div class="gt">
     <span class="gc">B</span>
     <span class="gn">人間觀察派</span>
-    <span class="gx">6 部 · 人間觀察</span>
+    <span class="gx">8 部</span>
   </div>
-  <span class="gy">+</span>
+  <span class="gy">▼</span>
 </div>
 <div class="gb">
 
-<!-- #02 -->
-<article class="sc" data-id="02">
+<!-- #02b -->
+<article class="sc" data-id="02b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.02</span>
@@ -1003,15 +1143,16 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗放菜單看她：我已經點完了。小C 眼睛沒離菜單：我知道。再等一下。</p><p class="sc-sub">他 3 秒，我 5 分鐘</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C 探頭：我在想這個跟那個搭不搭，跟我現在的狀態配不配，再考慮份量——叭噗：我吃飽再看你。小C 放下菜單：我決定了。我要你點的那個。藏鏡人：哈哈哈哈這個操作我懂！！</p><p class="sc-sub">我研究 5 分鐘，點你點的那個</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗放菜單看她：我已經點完了。小C 眼睛沒離菜單：我知道。再等一下。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：再考慮份量——叭噗：我吃飽再看你。小C 放下菜單：我決定了。我要你點的那個。藏鏡人：哈哈哈哈這個操作我懂！！</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你們誰更快做決定？轉給另一半看。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #07 -->
-<article class="sc" data-id="07">
+<!-- #07b -->
+<article class="sc" data-id="07b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.07</span>
@@ -1026,15 +1167,16 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他朋友比我了解他。我承認。</p><p class="sc-sub">他朋友比我了解他</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：那些事情不是秘密，就是——沒想到要說。小C：我後來想，朋友了解你的某一個版本，我了解另一個。沒有誰比較全面。只是不同面。藏鏡人：這個說法有點讓我想傳給另一半看...</p><p class="sc-sub">朋友了解一個版本，我了解另一個</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他朋友比我了解他。我承認。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：那些事情不是秘密，就是——沒想到要說。小C：朋友了解你的某一個版本，我了解另一個。沒有誰比較全面。只是不同面。藏鏡人：這個說法有點讓我想傳給另一半看...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你跟另一半有這種感覺嗎？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #08 -->
-<article class="sc" data-id="08">
+<!-- #08b -->
+<article class="sc" data-id="08b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.08</span>
@@ -1049,15 +1191,16 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗穿好外出服看小C：我去了。小C 沒抬頭：嗯。</p><p class="sc-sub">我去了。嗯。——我們的早上</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：以前我以為，兩個人住在一起，要一起做很多事。後來發現，有自己的生活才不會膩。藏鏡人：天啊這就是我跟另一半的共識...</p><p class="sc-sub">有自己的生活，才不會膩</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗穿好外出服看小C：我去了。小C 沒抬頭：嗯。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：以前我以為，兩個人住在一起，要一起做很多事。後來發現，有自己的生活才不會膩。藏鏡人：天啊這就是我跟另一半的共識...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半是各自有生活，還是要在一起？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #09 -->
-<article class="sc" data-id="09">
+<!-- #09b -->
+<article class="sc" data-id="09b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.09</span>
@@ -1072,15 +1215,16 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 若有所思：我不記得那天說了什麼，但我記得他的表情。</p><p class="sc-sub">不記得說什麼，記得表情</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：是某個很普通的下午，我隨口講了一件事——他看我的那個眼神，我到現在還記得。不是驚喜，不是感動，就是一種——你說什麼我都在聽的眼神。那個很難裝出來。藏鏡人：我突然想起我另一半看我也有這種眼神...</p><p class="sc-sub">你說什麼我都在聽——這個眼神</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：我不記得那天說了什麼，但我記得他的表情。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：他看我的那個眼神，到現在還記得。不是驚喜，不是感動，就是一種——你說什麼我都在聽的眼神。那個很難裝出來。藏鏡人：我突然想起我另一半看我也有這種眼神...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">字幕：轉給另一半，問他你有這個眼神嗎</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #19 -->
-<article class="sc" data-id="19">
+<!-- #19b -->
+<article class="sc" data-id="19b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.19</span>
@@ -1090,20 +1234,21 @@ footer {
 <span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">小紅書</span>
   </div>
   <h2 class="ti">第一次帶他回東港</h2>
-  <p class="vi">旅程回憶，室內對談（注意：以情侶互動為主軸，地域只作背景）</p>
+  <p class="vi">旅程回憶，室內對談</p>
   <p class="ht">&#9660; Open</p>
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：第一次帶他回我家，他說了一句話，我現在還記得。</p><p class="sc-sub">第一次帶他回家</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：她家附近的魚市場，早上五點就很多人。我跟她說，你從這裡來的，怪不得你聞魚不怕。她說：這叫做習慣，不叫怪。小C：我那時候心想，他在學我。藏鏡人：他在學她的東西好暖啊...</p><p class="sc-sub">你在學我的語言——他在學</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：第一次帶他回我家，他說了一句話，我現在還記得。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：她家附近的魚市場，早上五點就很多人。我跟她說，你從這裡來的，怪不得你聞魚不怕。她說：這叫做習慣，不叫怪。小C：我那時候心想，他在學我。藏鏡人：他在學她的東西好暖啊...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你帶另一半回過你長大的地方嗎？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #20 -->
-<article class="sc" data-id="20">
+<!-- #20b -->
+<article class="sc" data-id="20b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.20</span>
@@ -1118,75 +1263,70 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他聽的音樂我有一半聽不懂，但他喜歡的，我都記得歌詞。</p><p class="sc-sub">我不懂，但我記得歌詞</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：我不一定喜歡那種音樂，但他喜歡，我就記住了。這不是勉強自己，是因為那是他的一部分，我不想錯過。藏鏡人：我要傳給我另一半看！！他從來不記我喜歡什麼！！</p><p class="sc-sub">那是他的一部分，我不想錯過</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他聽的音樂我有一半聽不懂，但他喜歡的，我都記得歌詞。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：我不一定喜歡那種音樂，但他喜歡，我就記住了。那是他的一部分，我不想錯過。藏鏡人：我要傳給我另一半看！！他從來不記我喜歡什麼！！</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你記得另一半喜歡的歌嗎？傳給他看。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-
-</div>
-</div>
-
-<!-- 家人朋友模擬派 -->
-<div class="gp" data-g="C">
-<div class="gh" onclick="g(this)">
-  <div class="gt">
-    <span class="gc">C</span>
-    <span class="gn">家人朋友模擬派</span>
-    <span class="gx">2 部 · 家人朋友</span>
-  </div>
-  <span class="gy">+</span>
-</div>
-<div class="gb">
-
-<!-- #14 -->
-<article class="sc" data-id="14">
+<!-- #102 -->
+<article class="sc" data-id="102" data-caption="我們沒有不過夜規定。19 年，從來沒訂過。有人說這樣不安全——但我發現，訂了規定反而更焦慮。有底氣，就不需要規定。你是規定派還是自然派？轉給另一半看看他怎麼說" data-hashtags="#情侶日常 #感情 #長期感情 #台灣情侶 #愛情觀 #真實情侶">
 <div class="sh" onclick="s(this)">
   <div class="tp">
-    <span class="nm">No.14</span>
+    <span class="nm">No.102</span>
     <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
   </div>
   <div class="tg">
-<span class="tag">家人朋友模擬派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+<span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">TikTok</span>
   </div>
-  <h2 class="ti">他帶我第一次去他朋友家</h2>
-  <p class="vi">兩人回憶式對話</p>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / TikTok</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">不過夜規定這件事，我們的答案</h2>
+  <p class="vi">家中沙發，夜間場景，輕鬆對話感</p>
   <p class="ht">&#9660; Open</p>
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他帶我去他朋友家，是交往之後一段時間，那一次，我好緊張。</p><p class="sc-sub">第一次見他朋友</p></div>
-<div class="sl"><span class="st">3-12秒 破題</span><p class="sd">叭噗：她出門前換了三套衣服。小C 白眼：我沒有，是兩套。</p><p class="sc-sub">換了兩套，不是三套</p></div>
-<div class="sl"><span class="st">25-40秒 轉折</span><p class="sd">叭噗：去了之後，她比我想的放得開。他們開她玩笑，她直接回嗆。小C 笑：因為他們說的，我都有跟叭噗確認過了。</p><p class="sc-sub">我都有跟他確認過了——她備課了</p></div>
-<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你第一次見另一半的朋友緊張嗎？</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C（直視鏡頭）：我跟他在一起的時候沒有不過夜規定這件事。字幕：沒有不過夜規定</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：對，一開始就這樣，從來沒訂過。字幕：從來沒訂過規定</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：有人非常需要不過夜規定。有人根本不需要。小C：對，我是那種，訂了規定更焦慮的人。字幕：訂了規定反而焦慮</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：差在哪？我覺得差在你對那個人有沒有底氣。字幕：差在有沒有底氣。藏鏡人：靠的不是規定，是底氣——這個說法！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：有底氣，就不需要規定。字幕：有底氣就夠了</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你是規定派還是自然派？轉給另一半，看他怎麼回答。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#感情</span><span class="hashtag">#長期感情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#愛情觀</span><span class="hashtag">#真實情侶</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
-<!-- #15 -->
-<article class="sc" data-id="15">
+<!-- #111 -->
+<article class="sc" data-id="111" data-caption="19 年，「我愛你」說得很少。但上週他幫我換了漏了很久的水管。天天說愛你、水管漏三個月不理，和不說但換水管——我要哪種？我知道我要哪種。你另一半是話多派還是動作派？底下說說" data-hashtags="#情侶日常 #台灣情侶 #長情 #感情觀 #長期感情 #真實愛情">
 <div class="sh" onclick="s(this)">
   <div class="tp">
-    <span class="nm">No.15</span>
+    <span class="nm">No.111</span>
     <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
   </div>
   <div class="tg">
-<span class="tag">家人朋友模擬派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">小紅書</span>
+<span class="tag">人間觀察派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">Threads</span>
   </div>
-  <h2 class="ti">他的朋友叫我嫂子，那天我哭了</h2>
-  <p class="vi">小C 對鏡頭，叭噗在旁邊聽</p>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / Threads</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">「我愛你」這三個字，我們好像很少說</h2>
+  <p class="vi">兩人同框，家中，認真但輕鬆的氛圍</p>
   <p class="ht">&#9660; Open</p>
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 認真：他朋友第一次叫我嫂子，我那天哭了。</p><p class="sc-sub">第一次被叫嫂子，我哭了</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：我跟叭噗在一起很久了，但外面的人認不認識你，認不認定你，那是另一件事。他朋友喊了那一聲，我覺得我是真的成為他的人了。藏鏡人：哦不...這個太有感了...有沒有人跟我一樣...</p><p class="sc-sub">喊了那一聲，我才覺得我是他的人了</p></div>
-<div class="sl"><span class="st">25-40秒 轉折</span><p class="sd">叭噗從旁邊說：我跟他們說，她很好，好好對她。他們就叫嫂子了。小C 看他：你跟他們說什麼？叭噗語氣很自然：就這樣。</p><p class="sc-sub">那聲嫂子，是他同意的</p></div>
-<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：存起來，傳給讓你哭過的那個人。</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我們好像很少說「我愛你」。字幕：19 年沒說過幾次。藏鏡人：不浪漫欸——</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：上週他幫我換水管。漏水很久。字幕：他去換了漏了很久的水管</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我愛你三個字讓我覺得假。做不就好。小C：他邏輯這樣。我一開始也覺得少了什麼。字幕：他覺得三個字作假，說還不如做</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：後來我想，如果天天說愛你，水管漏三個月不理——我選哪種？字幕：說愛你 vs 換水管，我要哪種。藏鏡人：毒但真！！！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：沒說幾次，但水管換了，燈泡換了，我出門他說等一下。夠了。字幕：他的愛在細節裡</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你另一半是話多派還是動作派？底下說說。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#長情</span><span class="hashtag">#感情觀</span><span class="hashtag">#長期感情</span><span class="hashtag">#真實愛情</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
 
@@ -1194,19 +1334,19 @@ footer {
 </div>
 
 <!-- 拆解派 -->
-<div class="gp" data-g="D">
-<div class="gh" onclick="g(this)">
+<div class="gp collapsed" data-g="D">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
   <div class="gt">
     <span class="gc">D</span>
     <span class="gn">拆解派</span>
-    <span class="gx">2 部 · 拆解</span>
+    <span class="gx">3 部</span>
   </div>
-  <span class="gy">+</span>
+  <span class="gy">▼</span>
 </div>
 <div class="gb">
 
-<!-- #12 -->
-<article class="sc" data-id="12">
+<!-- #12b -->
+<article class="sc" data-id="12b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.12</span>
@@ -1221,16 +1361,17 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：長情不是天生的，是做到了一件事。</p><p class="sc-sub">長情只需要一件事</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗開始拆解：不是不吵架。不是一直有激情。是：他不好的時候，你還是想留下來。藏鏡人：哦...這個好準...</p><p class="sc-sub">不是不吵架 不是有激情 是他不好的時候你還是在</p></div>
-<div class="sl"><span class="st">25-40秒 深化</span><p class="sd">小C 接話：有激情的時候待在一起很容易，吵架的時候選擇留下來很難——長情靠的是那個難。不是甜蜜，是決定。</p><p class="sc-sub">長情靠的是決定，不是甜蜜</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：長情不是天生的，是做到了一件事。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：不是不吵架。不是一直有激情。是：他不好的時候，你還是想留下來。藏鏡人：哦...這個好準...</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：長情靠的是那個難。不是甜蜜，是決定。</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半有這個決定嗎？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #13 -->
-<article class="sc" data-id="13">
+<!-- #13b -->
+<article class="sc" data-id="13b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.13</span>
@@ -1245,12 +1386,42 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：我們不說沒關係。說了反而麻煩。</p><p class="sc-sub">我們不說沒關係</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：我們試過了——沒關係說完，三天後我們在吵同一件事。有關係的話，不如當下說。藏鏡人：不是我！絕對不是我！（是我）</p><p class="sc-sub">沒關係說完，三天後還是吵同一件事</p></div>
-<div class="sl"><span class="st">25-40秒 深化</span><p class="sd">叭噗：我們後來的規定是，有關係就說，說完才能說沒關係。順序不能反。</p><p class="sc-sub">說完才能說沒關係——順序不能反</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：我們不說沒關係。說了反而麻煩。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：沒關係說完，三天後我們在吵同一件事。有關係的話，不如當下說。藏鏡人：不是我！絕對不是我！（是我）</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：我們後來的規定是，有關係就說，說完才能說沒關係。順序不能反。</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你跟另一半說沒關係的次數多嗎？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+<!-- #108 -->
+<article class="sc" data-id="108" data-caption="19 年不分的原因，很多人猜不到。不是因為相似——是因為相反。我出去他在家，我說話他安靜，各做各的。但晚餐一定一起吃。互補才完整，不是完全合拍才長久。你們是哪種搭法？底下說" data-hashtags="#長期感情 #情侶日常 #台灣情侶 #感情觀 #長情 #互補情侶">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.108</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">拆解派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / FB Reels</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">有一種人，19 年不分的原因你想不到</h2>
+  <p class="vi">兩人同框，室內，認真說話的氛圍，小C 為主說話者</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年不分的原因，你猜不到。字幕：他為什麼一直都在。藏鏡人：什麼原因？！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：不是相似，是相反。字幕：其實是互補，不是匹配</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我出去她在家。我安靜她說話。各做各的。小C：晚餐一定一起吃。字幕：各自的世界，晚餐聚</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：有人說要非常契合——其實是互補。你一方，他另一方，加起來才完整。字幕：互補，不是完全合拍。藏鏡人：互補才完整——這個說法我沒想過！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：我們也是試了很久才知道的。字幕：試了很久才知道</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半是哪種搭法？底下說說。</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#長期感情</span><span class="hashtag">#情侶日常</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#感情觀</span><span class="hashtag">#長情</span><span class="hashtag">#互補情侶</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
 
@@ -1258,19 +1429,19 @@ footer {
 </div>
 
 <!-- 自嘲反差派 -->
-<div class="gp" data-g="F">
-<div class="gh" onclick="g(this)">
+<div class="gp collapsed" data-g="F">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
   <div class="gt">
     <span class="gc">F</span>
     <span class="gn">自嘲反差派</span>
-    <span class="gx">2 部 · 自嘲反差</span>
+    <span class="gx">3 部</span>
   </div>
-  <span class="gy">+</span>
+  <span class="gy">▼</span>
 </div>
 <div class="gb">
 
-<!-- #10 -->
-<article class="sc" data-id="10">
+<!-- #10b -->
+<article class="sc" data-id="10b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.10</span>
@@ -1285,16 +1456,17 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 蹲在鞋櫃前，苦惱：我的鞋子比他的格子還多。叭噗站著：對，你的那格我放不進去。</p><p class="sc-sub">我的鞋子佔了他的格子</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：我怎麼說？我說，沒差，放吧。然後我的拖鞋就擺在外面了。小C 驚訝：你沒有跟我說過這件事。叭噗：說了幹嘛。藏鏡人：哦不...這個細節有點溫...</p><p class="sc-sub">他把拖鞋擺外面了，但沒說</p></div>
-<div class="sl"><span class="st">40-52秒 收束</span><p class="sd">小C：鞋子這件事，我一直以為是我贏了，然後才發現，是他讓我的。</p><p class="sc-sub">我以為我贏了，其實是他讓的</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 蹲在鞋櫃前，苦惱：我的鞋子比他的格子還多。叭噗站著：對，你的那格我放不進去。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我說沒差，放吧。然後我的拖鞋就擺在外面了。小C 驚訝：你沒有跟我說過這件事。叭噗：說了幹嘛。藏鏡人：哦不...這個細節有點溫...</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：鞋子這件事，我一直以為是我贏了，然後才發現，是他讓我的。</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你們家誰佔了誰的位置？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #11 -->
-<article class="sc" data-id="11">
+<!-- #11b -->
+<article class="sc" data-id="11b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.11</span>
@@ -1309,55 +1481,128 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 突然：你愛不愛我？叭噗沒有停下手上的事：你問這個幹嘛。</p><p class="sc-sub">你問這個幹嘛——這就是他的答案</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：後來我慢慢懂了，他的意思是——你知道嗎，這個問題你幹嘛問，你不知道答案嗎。藏鏡人：哈哈哈哈等等這個說法我要傳給另一半看！</p><p class="sc-sub">你不知道答案嗎？——他的意思</p></div>
-<div class="sl"><span class="st">25-40秒 轉折</span><p class="sd">叭噗放下東西，看她：你問這個，是沒安全感，還是想讓我說出來？小C 考慮一下：想讓你說出來。叭噗嘆口氣，語氣認真：愛。</p><p class="sc-sub">愛。</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 突然：你愛不愛我？叭噗沒有停下手上的事：你問這個幹嘛。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：他的意思是——你知道嗎，這個問題你幹嘛問，你不知道答案嗎。藏鏡人：哈哈哈哈等等這個說法我要傳給另一半看！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗放下東西，看她：你問這個，是沒安全感，還是想讓我說出來？小C 考慮一下：想讓你說出來。叭噗嘆口氣，語氣認真：愛。</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你的另一半是主動說，還是要問才說？底下說說。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-
-</div>
-</div>
-
-<!-- 釣魚部 / 直球 / 雞湯 -->
-<div class="gp" data-g="G">
-<div class="gh" onclick="g(this)">
-  <div class="gt">
-    <span class="gc">G</span>
-    <span class="gn">釣魚部 / 直球 / 雞湯</span>
-    <span class="gx">4 部 · 釣魚/直球/雞湯</span>
-  </div>
-  <span class="gy">+</span>
-</div>
-<div class="gb">
-
-<!-- #06 -->
-<article class="sc" data-id="06">
+<!-- #107 -->
+<article class="sc" data-id="107" data-caption="我們旅遊 19 年，從來沒一次完全一致。他要走路，我要進咖啡廳。北海道——他拍兩小時，我在民宿看書，晚餐一起吃。各自玩再聚，比全程黏在一起更好玩。你們也各玩各的嗎？底下說說" data-hashtags="#情侶旅遊 #情侶日常 #台灣情侶 #長情 #旅遊情侶 #底片旅遊">
 <div class="sh" onclick="s(this)">
   <div class="tp">
-    <span class="nm">No.06</span>
+    <span class="nm">No.107</span>
     <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
   </div>
   <div class="tg">
-<span class="tag">釣魚部</span><span class="tag pe">釣魚型（留言和好取圖卡）</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+<span class="tag">自嘲反差派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">TikTok</span>
   </div>
-  <h2 class="ti">【釣魚部】吵架後你說的第一句話，決定了你們</h2>
-  <p class="vi">兩人面對面，事後回憶狀態</p>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / TikTok</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">旅遊這件事，我們從來沒有完全意見一致</h2>
+  <p class="vi">兩人同框，底片相機畫面或家中，輕鬆表情</p>
   <p class="ht">&#9660; Open</p>
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 直視鏡頭：你們吵架後說的第一句話，是什麼？</p><p class="sc-sub">吵完，你說的第一句話</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：不是道歉，不是算了算了，也不是沉默讓對方先說。是有一種說法，讓對方軟下來。叭噗：我們試過很多次，有用的只有幾種。答案在私訊。藏鏡人：我需要知道！我跟我男友每次都卡在這邊！</p><p class="sc-sub">有用的只有幾種</p></div>
-<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">留言「和好」，私訊給你 3 個和好開場白</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：我們旅遊，19 年沒有一次完全一致過。字幕：旅遊計畫從來沒全一致。藏鏡人：哈哈哈哈哈這不就是我們！！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：我要曬太陽，他要走路。叭噗：我要走路，她要待在旁邊的咖啡廳。小C：對。字幕：他走路，她進咖啡廳</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：去北海道，我拍兩小時，她在民宿看書。晚餐一起吃。小C：完美。字幕：各玩各的，晚餐聚</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：各自玩，再一起吃飯，比全黏在一起更好玩。字幕：各自玩，聚一起，更有趣。藏鏡人：這個模式聽起來很解放⋯⋯我要跟我另一半講！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：19 年了，我試過帶他去咖啡廳三次。三次他都出去繞一圈再回來找我。叭噗（聳肩）：確實。字幕：帶他去咖啡廳三次，三次都跑掉</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半旅遊也是各玩各的嗎？底下說說。</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+<div class="hashtag-pool"><span class="hashtag">#情侶旅遊</span><span class="hashtag">#情侶日常</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#長情</span><span class="hashtag">#旅遊情侶</span><span class="hashtag">#底片旅遊</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
-<!-- #16 -->
-<article class="sc" data-id="16">
+
+</div>
+</div>
+
+<!-- 家人朋友模擬派 -->
+<div class="gp collapsed" data-g="C">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
+  <div class="gt">
+    <span class="gc">C</span>
+    <span class="gn">家人朋友模擬派</span>
+    <span class="gx">2 部</span>
+  </div>
+  <span class="gy">▼</span>
+</div>
+<div class="gb">
+
+<!-- #14b -->
+<article class="sc" data-id="14b">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.14</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">家人朋友模擬派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <h2 class="ti">他帶我第一次去他朋友家</h2>
+  <p class="vi">兩人回憶式對話</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他帶我去他朋友家，是交往之後一段時間，那一次，我好緊張。</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">叭噗：她出門前換了三套衣服。小C 白眼：我沒有，是兩套。</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：她出去之後，她比我想的放得開。他們開她玩笑，她直接回嗆。小C 笑：因為他們說的，我都有跟叭噗確認過了。</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你第一次見另一半的朋友緊張嗎？</p></div>
+  </div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+<!-- #15b -->
+<article class="sc" data-id="15b">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.15</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">家人朋友模擬派</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">小紅書</span>
+  </div>
+  <h2 class="ti">他的朋友叫我嫂子，那天我哭了</h2>
+  <p class="vi">小C 對鏡頭，叭噗在旁邊聽</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 認真：他朋友第一次叫我嫂子，我那天哭了。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：喊了那一聲，我覺得我是真的成為他的人了。藏鏡人：哦不...這個太有感了...有沒有人跟我一樣...</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗從旁邊說：我跟他們說，她很好，好好對她。他們就叫嫂子了。小C 看他：你跟他們說什麼？叭噗語氣很自然：就這樣。</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：存起來，傳給讓你哭過的那個人。</p></div>
+  </div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<!-- 直球情侶版 / 純雞湯 -->
+<div class="gp collapsed" data-g="G">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
+  <div class="gt">
+    <span class="gc">G</span>
+    <span class="gn">直球情侶版 / 純雞湯</span>
+    <span class="gx">5 部</span>
+  </div>
+  <span class="gy">▼</span>
+</div>
+<div class="gb">
+
+<!-- #16b -->
+<article class="sc" data-id="16b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.16</span>
@@ -1372,15 +1617,16 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：19年，我只有一個發現。</p><p class="sc-sub">19年只有一個發現</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：不是感情需要什麼秘訣，不是哪個公式，就是一件事。你願意繼續認識他，不是你認識了才愛他，是你愛他才繼續認識。藏鏡人：這個說法...我要消化一下...</p><p class="sc-sub">不是認識才愛 是愛了才繼續認識</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：19年，我只有一個發現。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：不是感情需要什麼秘訣，就是一件事。你願意繼續認識他，不是你認識了才愛他，是你愛他才繼續認識。藏鏡人：這個說法...我要消化一下...</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你還在認識你的另一半嗎？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #17 -->
-<article class="sc" data-id="17">
+<!-- #17b -->
+<article class="sc" data-id="17b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.17</span>
@@ -1395,23 +1641,24 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗在廚房弄東西：她不起來，我就自己做。</p><p class="sc-sub">她不起來，我自己做</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">叭噗：我不是每天都做。但如果我先醒，就弄一下。不是什麼大事，就是習慣了。藏鏡人：這個畫面好暖...我也想要...</p><p class="sc-sub">不是每天，就是習慣了</p></div>
-<div class="sl"><span class="st">25-40秒 轉折</span><p class="sd">小C：他做的不一定好吃，但他做，比好不好吃更重要。</p><p class="sc-sub">做了，比好不好吃更重要</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗在廚房弄東西：她不起來，我就自己做。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我不是每天都做。但如果我先醒，就弄一下。不是什麼大事，就是習慣了。藏鏡人：這個畫面好暖...我也想要...</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：他做的不一定好吃，但他做，比好不好吃更重要。</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你跟另一半的早晨是什麼樣子？</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
 </div>
 </article>
-<!-- #18 -->
-<article class="sc" data-id="18">
+<!-- #18b -->
+<article class="sc" data-id="18b">
 <div class="sh" onclick="s(this)">
   <div class="tp">
     <span class="nm">No.18</span>
     <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
   </div>
   <div class="tg">
-<span class="tag">直球情侶版（純雞湯）</span><span class="tag pe">純雞湯（無硬 CTA）</span><span class="tag">IG Reels</span><span class="tag">Threads</span>
+<span class="tag">直球情侶版</span><span class="tag pe">純雞湯（無硬 CTA）</span><span class="tag">IG Reels</span><span class="tag">Threads</span>
   </div>
   <h2 class="ti">開瓶蓋那件小事</h2>
   <p class="vi">廚房或餐桌，簡單日常</p>
@@ -1419,15 +1666,277 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：我知道他愛我，是因為一個瓶蓋。</p><p class="sc-sub">一個瓶蓋</p></div>
-<div class="sl"><span class="st">12-25秒 核心</span><p class="sd">小C：他每次倒飲料，都先幫我開瓶蓋，再開他自己的。他不知道我注意到了。我問過他，為什麼先幫我開？他說，就這樣，你的先。叭噗補一句：你的先開比較快涼。小C：我後來查過，根本沒差。藏鏡人：哈哈哈他找了一個理由但理由是假的！！</p><p class="sc-sub">根本沒差，但他說你的先</p></div>
-<div class="sl"><span class="st">40-52秒 收束（純雞湯語錄）</span><p class="sd">小C 輕聲：愛不是說的，就是你先開我的那個瓶蓋。是那個先，不是為了表現，是習慣了把你放在前面。</p><p class="sc-sub">把你放在前面，就是愛</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：我知道他愛我，是因為一個瓶蓋。</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：他每次倒飲料，都先幫我開瓶蓋，再開他自己的。他說，就這樣，你的先。叭噗補一句：你的先開比較快涼。小C：我後來查過，根本沒差。藏鏡人：哈哈哈他找了一個理由但理由是假的！！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C 輕聲：愛不是說的，就是你先開我的那個瓶蓋。是那個先，是習慣了把你放在前面。</p></div>
 <div class="sl"><span class="st">52-60秒</span><p class="sd">（無硬 CTA）你也有那個瓶蓋嗎</p></div>
   </div>
-  <div class="batch-tag">第 02 批 · 2026-05-12</div>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+<!-- #112 -->
+<article class="sc" data-id="112" data-caption="陪伴不是每秒在一起。是你最煩惱的時候，有個人在。不用說話，不用給答案——就是在。19 年，幾次他以為撐不住，回頭看，我都在。" data-hashtags="#情侶日常 #長情 #台灣情侶 #陪伴 #感情 #純雞湯">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.112</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">直球情侶版</span><span class="tag pe">純雞湯（無硬 CTA）</span><span class="tag">IG Reels</span><span class="tag">Threads</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / Threads</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">某一年我突然明白，陪伴的意思</h2>
+  <p class="vi">兩人同框，底片相機質感畫面或家中，氣氛溫暖</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C（輕聲，對鏡頭）：某一年，我才明白陪伴的意思。字幕：那一年我才懂什麼是陪伴。藏鏡人：說下去⋯⋯</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：不是每秒在一起。是你煩惱時，有個人可以講。字幕：陪伴就是有人聽你</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我們不是天天聊。各自忙，各自靜。但我知道她在。字幕：她在，就夠了</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：陪伴不是熱鬧。是最安靜的時候，他還在。字幕：陪伴就是這個。藏鏡人：最溫柔的⋯⋯</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：19 年，幾次我以為撐不住——回頭看，她都在。字幕：他最撐不住的時候，她都在</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C（輕聲）：你呢？字幕：你的陪伴呢</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#長情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#陪伴</span><span class="hashtag">#感情</span><span class="hashtag">#純雞湯</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
+</div>
+</article>
+<!-- #113 -->
+<article class="sc" data-id="113" data-caption="19 年，我沒為他改變。還是內向。還是喜歡一個人。還是話少。但有一件事不一樣了——我學會說「我現在不好」。不是為了他。為了自己。好感情讓你更像自己。不是讓你消失。" data-hashtags="#情侶日常 #長情 #台灣情侶 #感情 #長期感情 #真實情侶">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.113</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">直球情侶版</span><span class="tag pe">個人化諮詢</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / FB Reels</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">19 年，我沒有為他改變，但我有這個</h2>
+  <p class="vi">兩人同框，家中或旅遊底片質感畫面，小C 說話為主</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我沒為他改變。字幕：我還是我。藏鏡人：沒改變？！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：沒變成另一個人。但有一件事不一樣了。字幕：一個地方有了變化</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：我以前不知道怎麼說難過。悶著。他問我還好嗎，我說還好，他說我知道你不好。字幕：他看穿我的「還好」</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：後來她會講了。小C：對。不是為了他——說出來我自己比較好。字幕：為了我自己。藏鏡人：好感情讓你更像自己，不是讓你消失——這個很重要。</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">小C：好感情讓你更像自己。不是讓你消失。字幕：更像自己</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你有一個讓你更像自己的另一半嗎？</p></div>
+  </div>
+<div class="hashtag-pool"><span class="hashtag">#情侶日常</span><span class="hashtag">#長情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#感情</span><span class="hashtag">#長期感情</span><span class="hashtag">#真實情侶</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
 </div>
 </article>
 
+</div>
+</div>
+
+<!-- 圖卡部 -->
+<div class="gp collapsed" data-g="H">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
+  <div class="gt">
+    <span class="gc">H</span>
+    <span class="gn">圖卡部</span>
+    <span class="gx">2 部</span>
+  </div>
+  <span class="gy">▼</span>
+</div>
+<div class="gb">
+
+<!-- #06b -->
+<article class="sc" data-id="06b">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.06</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">圖卡部</span><span class="tag pe">圖卡部（留言和好取圖卡）</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <h2 class="ti">吵架後你說的第一句話，決定了你們【圖卡部】</h2>
+  <p class="vi">兩人面對面，事後回憶狀態</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C 直視鏡頭：你們吵架後說的第一句話，是什麼？</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C：不是道歉，不是算了算了，也不是沉默讓對方先說。是有一種說法，讓對方軟下來。叭噗：我們試過很多次，有用的只有幾種。答案在私訊。藏鏡人：我需要知道！我跟我男友每次都卡在這邊！</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">留言「和好」，私訊給你 3 個和好開場白</p></div>
+  </div>
+<div class="sc-img"><img src="../bappu-batch03-fishing-card.png" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>
+<a class="download-btn" href="../bappu-batch03-fishing-card.png" download="bappu-batch03-fishing-card.png">下載圖卡</a>
+  <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
+<div class="batch-tag">第 02 批 · 2026-05-12</div>
+</div>
+</article>
+<!-- #104 -->
+<article class="sc" data-id="104" data-caption="19 年，常有人問：不會越來越陌生嗎？老實說，我們中間也有那段時間。但我們做了幾件事——讓「各自的世界」不變成陌生。留言「不陌生」，我私訊給你" data-hashtags="#長期感情 #情侶日常 #長情 #台灣情侶 #19年 #感情維持">
+<div class="sh" onclick="s(this)">
+  <div class="tp">
+    <span class="nm">No.104</span>
+    <div class="ac"><button class="db" onclick="d(event,this)">已拍</button></div>
+  </div>
+  <div class="tg">
+<span class="tag">圖卡部</span><span class="tag pe">圖卡部（留言不陌生取圖卡）</span><span class="tag">IG Reels</span><span class="tag">FB Reels</span>
+  </div>
+  <div class="card-meta-extra"><span class="platform">▶ IG Reels / FB Reels</span> <span class="po-time">⏰ IG 週六 10PM</span></div>
+  <h2 class="ti">【圖卡部】19 年了，你們怎麼不越來越陌生？</h2>
+  <p class="vi">兩人同框，室內，叭噗和小C 對鏡頭說話，認真表情</p>
+  <p class="ht">&#9660; Open</p>
+</div>
+<div class="sb-body">
+  <div class="sg">
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗（對鏡頭）：19 年，常有人問——你們不會越來越陌生嗎？字幕：19 年，不怕陌生？藏鏡人：19 年耶——真的不會嗎？！</p></div>
+<div class="sl"><span class="st">3-12秒</span><p class="sd">小C：老實說，這是長期感情裡最真實的問題。字幕：這是長期感情最真實的問題</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我們也沒有答案說我們「從來不陌生」——我們中間有段時間，兩個人都像在自己的世界裡。字幕：中間也有那段時間</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：但我們做了幾件事，讓那個「各自在自己世界」不變成陌生。叭噗：想知道是什麼嗎？字幕：讓各自世界不變陌生的方法。藏鏡人：我要知道！！</p></div>
+<div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：不過，這件事我不適合在這裡全講。因為每對的狀況都不一樣。字幕：每對的狀況都不同</p></div>
+<div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：底下留言「不陌生」，我把我們做的幾件事私訊給你。不用怕，問問不用錢。</p></div>
+  </div>
+<div class="sc-img"><img src="../bappu-batch03-fishing-card.png" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>
+<a class="download-btn" href="../bappu-batch03-fishing-card.png" download="bappu-batch03-fishing-card.png">下載圖卡</a>
+<div class="hashtag-pool"><span class="hashtag">#長期感情</span><span class="hashtag">#情侶日常</span><span class="hashtag">#長情</span><span class="hashtag">#台灣情侶</span><span class="hashtag">#19年</span><span class="hashtag">#感情維持</span></div>
+  <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+<div class="batch-tag">第 03 批 · 2026-05-18</div>
+</div>
+</article>
+
+</div>
+</div>
+
+<!-- 脆文 Threads -->
+<div class="gp collapsed" data-g="threads">
+<div class="gh" onclick="toggleGroup(this.parentElement)">
+  <div class="gt">
+    <span class="gc">T</span>
+    <span class="gn">脆文 Threads</span>
+    <span class="gx">第 03 批 · 7 篇</span>
+  </div>
+  <span class="gy">▼</span>
+</div>
+<div class="gb">
+<div class="threads-grid">
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T01</span><span class="thread-label">叭噗語氣</span></div>
+<div class="thread-text">帶看帶了一整天。
+六組，全說要考慮。
+進門的時候她沒說加油也沒說辛苦。
+就說，我有留飯，先去換衣服。
+
+19 年了。
+她知道我那時候要的不是加油。
+是飯。
+
+你另一半讀得懂你的累嗎？</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T02</span><span class="thread-label">小C 語氣</span></div>
+<div class="thread-text">有人說感情要有不過夜規定才穩。
+我沒覺得這說得通。
+
+我不是反對規定。
+我是覺得，如果你需要規定保護你，
+那你在保護的其實是焦慮，不是感情。
+
+我跟他 19 年沒有規定。
+因為有底氣，就不需要規定守著。
+
+你是規定派還是底氣派？</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T03</span><span class="thread-label">小C 語氣</span></div>
+<div class="thread-text">我跟他冷戰，通常是我先開口。
+
+不是認錯。
+就問——你吃飯了嗎。
+
+就這樣。
+沒有跪地認錯，沒有長篇大論。
+回到正常，就是和好。
+
+19 年，這最實用。
+冷戰從不超過兩天。</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T04</span><span class="thread-label">兩人語氣</span></div>
+<div class="thread-text">很多人問我們——
+19 年，不怕越來越陌生嗎？
+
+老實說，我們有過那段時間。
+各自在自己的世界，
+對方有點遠。
+
+但我們做了幾件事，
+讓「各自世界」沒變成陌生。
+
+想知道是什麼？
+IG DM 我，跟你說。</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T05</span><span class="thread-label">小C 語氣</span></div>
+<div class="thread-text">我去北海道。
+他拍照兩小時。
+我在民宿看書兩小時。
+晚餐一起吃。
+
+朋友說，不膩？
+
+我說，各自玩，再聚一起，
+比全黏著更好玩。
+
+不是每對都適合。
+但你是這種人的話，你懂。</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T06</span><span class="thread-label">小C 語氣</span></div>
+<div class="thread-text">19 年。
+他不常說「我愛你」。
+
+上週水管漏水，
+他去換了。
+
+燈泡壞，他換。
+我說出門，他說等一下。
+
+如果要選——
+天天說愛你但水管漏三個月，
+或不說但當天換，
+我選哪個？
+
+我選換水管的那個。</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T07</span><span class="thread-label">小C 語氣</span></div>
+<div class="thread-text">19 年，我沒為他改變。
+
+還是內向。
+還是喜歡一個人。
+還是話少。
+
+但有一件事不一樣了——
+我學會說「我現在不好」。
+
+不是為了他。
+為了自己。
+說出來，我自己比較好。
+
+好感情讓你更像自己。
+不是讓你消失。</div>
+<button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+</div>
 </div>
 </div>
 
@@ -1497,6 +2006,57 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+// ===== V2 JS: toggleGroup + copyScript + copyThread + lightbox (build_bappu.py v2) =====
+function toggleGroup(grp){grp.classList.toggle('collapsed');}
+function copyScript(btn){
+  var art=btn.closest('article.sc');if(!art) return;
+  var cap=art.dataset.caption;var hRaw=art.dataset.hashtags||'';var h=hRaw.trim()?hRaw.trim():'';
+  var text;
+  if(cap){text=cap;if(h) text=text+'\n\n'+h;}
+  else{
+    var title=art.querySelector('.ti');var rows=art.querySelectorAll('.sl');
+    var lines=[];
+    if(title) lines.push('【'+title.textContent.trim()+'】\n');
+    rows.forEach(function(r){var d=r.querySelector('.sd');if(d) lines.push(d.textContent.trim());});
+    text=lines.join('\n');if(h) text=text+'\n\n'+h;
+  }
+  var orig=btn.textContent;
+  function doCopy(t){
+    if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);return Promise.resolve();
+  }
+  doCopy(text).then(function(){btn.textContent='已複製 ✓';btn.classList.add('copied');setTimeout(function(){btn.textContent=orig;btn.classList.remove('copied');},2000);}).catch(function(){btn.textContent='複製失敗';setTimeout(function(){btn.textContent=orig;},2000);});
+}
+function copyThread(btn){
+  var card=btn.closest('.thread-card');if(!card) return;
+  var tEl=card.querySelector('.thread-text');var hEl=card.querySelector('.thread-hash');
+  var text=(tEl?tEl.textContent.trim():'')+(hEl?'\n\n'+hEl.textContent.trim():'');
+  var orig=btn.textContent;
+  function doCopyThread(t){
+    if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);return Promise.resolve();
+  }
+  doCopyThread(text).then(function(){btn.textContent='已複製 ✓';btn.classList.add('copied');setTimeout(function(){btn.textContent='複製脆文';btn.classList.remove('copied');},2000);}).catch(function(){btn.textContent='複製失敗';setTimeout(function(){btn.textContent='複製脆文';},2000);});
+}
+function openLightbox(img){
+  var ov=document.getElementById('lightboxOverlay'),lbI=document.getElementById('lightboxImg');
+  if(!ov||!lbI) return;lbI.src=img.src;ov.classList.add('active');
+}
+// init: all groups collapsed
+(function(){
+  document.querySelectorAll('.gp').forEach(function(g){g.classList.add('collapsed');});
+})();
+// lightbox close
+(function(){
+  var ov=document.getElementById('lightboxOverlay');var cls=document.getElementById('lightboxClose');
+  if(!ov) return;
+  if(cls) cls.addEventListener('click',function(){ov.classList.remove('active');document.getElementById('lightboxImg').src='';});
+  ov.addEventListener('click',function(e){if(e.target===ov){ov.classList.remove('active');document.getElementById('lightboxImg').src='';}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ov.classList.contains('active')){ov.classList.remove('active');document.getElementById('lightboxImg').src='';}});
+})();
+window.toggleGroup=toggleGroup;window.copyScript=copyScript;window.copyThread=copyThread;window.openLightbox=openLightbox;
 </script>
 </body>
 </html>

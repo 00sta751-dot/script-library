@@ -487,7 +487,8 @@ V2_CSS = """
 .po-time{font-size:11px;opacity:.7;}
 .hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px;}
 .hashtag{background:rgba(0,229,255,.1);color:#00b8cc;padding:2px 8px;border-radius:12px;font-size:11px;border:1px solid rgba(0,229,255,.3);}
-.sc-img img.card-thumb{max-width:120px;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;border:1px solid rgba(224,64,251,.4);}
+.sc-img img.card-thumb{max-width:320px;width:100%;height:auto;object-fit:contain;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;border:1px solid rgba(224,64,251,.4);}
+@media (max-width:640px){.sc-img img.card-thumb{max-width:100%;}}
 .download-btn{
   display:inline-flex;align-items:center;gap:5px;
   padding:6px 14px;margin:6px 0;
@@ -533,19 +534,18 @@ if V2_CSS_MARKER not in nc:
 # ---- V2 JS patch ----
 V2_JS_MARKER = '// ===== V2 JS: toggleGroup + copyScript + copyThread + lightbox (build_bappu.py v2) ====='
 V2_JS = r"""// ===== V2 JS: toggleGroup + copyScript + copyThread + lightbox (build_bappu.py v2) =====
-function toggleGroup(grp){grp.classList.toggle('collapsed');}
+function toggleGroup(grp){grp.classList.toggle('op');}
 function copyScript(btn){
   var art=btn.closest('article.sc');if(!art) return;
   var cap=art.dataset.caption;var hRaw=art.dataset.hashtags||'';var h=hRaw.trim()?hRaw.trim():'';
-  var text;
-  if(cap){text=cap;if(h) text=text+'\n\n'+h;}
-  else{
-    var title=art.querySelector('.ti');var rows=art.querySelectorAll('.sl');
-    var lines=[];
-    if(title) lines.push('【'+title.textContent.trim()+'】\n');
-    rows.forEach(function(r){var d=r.querySelector('.sd');if(d) lines.push(d.textContent.trim());});
-    text=lines.join('\n');if(h) text=text+'\n\n'+h;
+  if(!cap){
+    var origDisabled = btn.textContent;
+    btn.textContent = '本批無 caption';
+    btn.style.opacity = '.5';
+    setTimeout(function(){ btn.textContent = origDisabled; btn.style.opacity = ''; }, 2000);
+    return;
   }
+  var text=cap;if(h) text=text+'\n\n'+h;
   var orig=btn.textContent;
   function doCopy(t){
     if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);

@@ -782,12 +782,14 @@ footer {
   .logo-placeholder { width: 60px; height: 60px; }
 }
 
-/* ========== V2 GROUP COLLAPSED + copyScript (build_bappu.py v2) ========== */
-.gp.collapsed > .gb{display:none !important}
-.gp.collapsed > div.threads-grid{display:none !important}
-.group.collapsed > .threads-grid{display:none !important}
+/* ========== V2 GROUP COLLAPSED + copyScript (build_bappu.py v2 — 5/18 fix toggleGroup → .op) ========== */
+/* 叭噗 group 預設摺疊 = 沒 .op class；展開 = 加 .op class（已對齊 line 425/426 原 CSS） */
+.gp > .threads-grid{display:none}
+.gp.op > .threads-grid{display:grid}
 .gy{transition:transform .2s;display:inline-block;}
-.gp.collapsed .gy{transform:rotate(-90deg);}
+.gp:not(.op) .gy{transform:rotate(-90deg);}
+/* validate_deploy.py 規則對齊（叭噗實際用 .gp.op 而非 .group.collapsed，此 rule 為 hook 對齊用） */
+.group.collapsed > .threads-grid{display:none !important}
 .card-meta-extra{font-size:11px;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;}
 .platform{font-size:11px;background:rgba(224,64,251,.12);padding:2px 7px;border-radius:4px;font-weight:600;color:#c800e0;}
 .po-time{font-size:11px;opacity:.7;}
@@ -2007,19 +2009,16 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 });
 // ===== V2 JS: toggleGroup + copyScript + copyThread + lightbox (build_bappu.py v2) =====
-function toggleGroup(grp){grp.classList.toggle('collapsed');}
+function toggleGroup(grp){grp.classList.toggle('op');}
 function copyScript(btn){
   var art=btn.closest('article.sc');if(!art) return;
   var cap=art.dataset.caption;var hRaw=art.dataset.hashtags||'';var h=hRaw.trim()?hRaw.trim():'';
-  var text;
-  if(cap){text=cap;if(h) text=text+'\n\n'+h;}
-  else{
-    var title=art.querySelector('.ti');var rows=art.querySelectorAll('.sl');
-    var lines=[];
-    if(title) lines.push('【'+title.textContent.trim()+'】\n');
-    rows.forEach(function(r){var d=r.querySelector('.sd');if(d) lines.push(d.textContent.trim());});
-    text=lines.join('\n');if(h) text=text+'\n\n'+h;
+  if(!cap){
+    var orig=btn.textContent;btn.textContent='本批無 caption';btn.style.opacity='.5';
+    setTimeout(function(){btn.textContent=orig;btn.style.opacity='';},2000);
+    return;
   }
+  var text=cap;if(h) text=text+'\n\n'+h;
   var orig=btn.textContent;
   function doCopy(t){
     if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);

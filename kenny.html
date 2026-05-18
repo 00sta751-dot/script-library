@@ -374,8 +374,9 @@
 .po-time{font-size:11px;color:var(--muted);}
 .hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px;}
 .hashtag{background:var(--border-soft);color:var(--accent-soft);padding:2px 8px;border-radius:12px;font-size:11px;}
-.card-thumb{max-width:120px;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;}
+.card-thumb{max-width:320px;width:100%;height:auto;object-fit:contain;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;}
 .card-thumb:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.18);}
+@media (max-width:640px){.card-thumb{max-width:100%;}}
 .download-btn{
   display:inline-flex;align-items:center;gap:5px;
   padding:6px 14px;margin:6px 0;
@@ -1458,16 +1459,14 @@ function copyScript(btn){
   var card=btn.closest('.script-card');if(!card) return;
   var cap=card.dataset.caption;var hRaw=card.dataset.hashtags||'';
   var h=hRaw.trim()?hRaw.trim():'';
-  var text;
-  if(cap){text=cap;if(h) text=text+'\n\n'+h;}
-  else{
-    var title=card.querySelector('.card-title');
-    var rows=card.querySelectorAll('.ts-row');
-    var lines=[];
-    if(title) lines.push('【'+title.textContent.trim()+'】\n');
-    rows.forEach(function(r){var d=r.querySelector('.ts-desc');if(d) lines.push(d.textContent.trim());});
-    text=lines.join('\n');if(h) text=text+'\n\n'+h;
+  if(!cap){
+    var origDisabled = btn.textContent;
+    btn.textContent = '本批無 caption';
+    btn.style.opacity = '.5';
+    setTimeout(function(){ btn.textContent = origDisabled; btn.style.opacity = ''; }, 2000);
+    return;
   }
+  var text=cap;if(h) text=text+'\n\n'+h;
   var orig=btn.textContent;
   function doCopy(t){
     if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);

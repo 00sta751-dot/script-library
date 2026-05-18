@@ -714,6 +714,27 @@ footer .bagao-sig{
   color:var(--ink-4);
   text-transform:uppercase;
 }
+
+/* ========== PLATFORM / PO-TIME META (build_index.py patch) ========== */
+.card-meta-extra{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:8px;flex-wrap:wrap;
+}
+.platform{
+  font-family:var(--sans);font-size:11px;font-weight:600;
+  letter-spacing:.06em;color:var(--ink-3);
+  background:var(--paper-2);border:1px solid var(--line);
+  border-radius:4px;padding:2px 7px;
+}
+.po-time{
+  font-family:var(--sans);font-size:11px;font-weight:500;
+  letter-spacing:.04em;color:var(--ink-4);
+  background:transparent;
+}
+.batch{
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.12em;
+  color:var(--ink-4);text-transform:uppercase;
+}
 </style>
 </head>
 <body>
@@ -758,6 +779,10 @@ footer .bagao-sig{
       <span class="pie">直球派</span>
       <span class="num">No. 12</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:20–20:30</span>
     </div>
     <h3 class="title">議價這件事，我從來只做一件事</h3>
     <div class="insight">感覺不能議價，數字才能。實價登錄是你最便宜的籌碼。進入數字對話，不是情緒拉鋸，這才是能談的開始。</div>
@@ -880,6 +905,10 @@ footer .bagao-sig{
       <span class="num">No. 02</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:20–21:00</span>
+    </div>
     <h3 class="title">做房仲 10 年，我最討厭一種謊言</h3>
     <div class="insight">做業務最難不是說服客戶，是你敢不敢對自己誠實。跟自己說「他還在考慮」——那叫說謊，不叫等待。</div>
   </div>
@@ -908,6 +937,10 @@ footer .bagao-sig{
       <span class="num">No. 04</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok / FB Reels</span>
+      <span class="po-time">⏰ 平日 20:10–21:30</span>
+    </div>
     <h3 class="title">說了三年要買房的人，後來怎樣了</h3>
     <div class="insight">不是等房價，是在等一個不存在的安全感。那個點永遠在後面——房價不會為你準備，你準備好了，房子才來。</div>
   </div>
@@ -935,6 +968,10 @@ footer .bagao-sig{
       <span class="pie">嗆辣派</span>
       <span class="num">No. 11</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok / FB Reels</span>
+      <span class="po-time">⏰ 平日 20:00–21:30</span>
     </div>
     <h3 class="title">高雄人買房，卡在這件事上最多</h3>
     <div class="insight">不是錢，不是房價，是臉皮。問了沒成多知道一件事；沒問少知道一件事，這已經輸。輸的不是開口的人，是一直等的人。</div>
@@ -1029,6 +1066,10 @@ footer .bagao-sig{
       <span class="num">No. 01</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:10–20:30</span>
+    </div>
     <h3 class="title">高雄人在早餐店，我看見一件事</h3>
     <div class="insight">30 年的默契——不用解釋，不用確認，不用講第二次。買再貴的房，都不如買到默契好的另一半。</div>
   </div>
@@ -1057,6 +1098,10 @@ footer .bagao-sig{
       <span class="num">No. 03</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:10–20:00</span>
+    </div>
     <h3 class="title">三民區，我發現一個奇怪現象</h3>
     <div class="insight">同一條路差幾十萬，不是地段，是管委會。站在社區門口看停車場，5 分鐘就知道了。公設費，你是在買管理。</div>
   </div>
@@ -1084,6 +1129,10 @@ footer .bagao-sig{
       <span class="pie">人間觀察派</span>
       <span class="num">No. 13</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels / TikTok</span>
+      <span class="po-time">⏰ 週四–五 19:30–21:00</span>
     </div>
     <h3 class="title">等客戶的那段空白，我想到一件事</h3>
     <div class="insight">房子不只資產，是讓誰的生命放在裡面的地方。最後承載的不是預算，是你的心。</div>
@@ -1234,6 +1283,10 @@ footer .bagao-sig{
       <span class="num">No. 05</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:20–20:30</span>
+    </div>
     <h3 class="title">帶看路上，我問了客戶一個問題</h3>
     <div class="insight">超過一半的人要換屋，真正動機不是自己需要。買房最難的不是錢，是你到底為誰買。</div>
   </div>
@@ -1261,6 +1314,10 @@ footer .bagao-sig{
       <span class="pie">故事戲劇派</span>
       <span class="num">No. 08</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:10–20:30</span>
     </div>
     <h3 class="title">簽約那天，屋主說了一句話</h3>
     <div class="insight">賣房不是在賣房，是在做交代。賣給好的人，好好用下去，對他們比價格重要。房子住過很多人，每間都有它的故事。</div>
@@ -1298,6 +1355,10 @@ footer .bagao-sig{
       <span class="pie">結構分析派</span>
       <span class="num">No. 07</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:30–21:00</span>
     </div>
     <h3 class="title">買房前，這 3 件事你先確認清楚</h3>
     <div class="insight">土地用途、主建物面積、有沒有抵押。查清楚再買，每步踩實。少查一件，簽完才後悔。</div>
@@ -1420,6 +1481,10 @@ footer .bagao-sig{
       <span class="num">No. 10</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
     </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / FB Reels</span>
+      <span class="po-time">⏰ 平日 19:30–21:00</span>
+    </div>
     <h3 class="title">鼓山這幾年，我觀察到一個大變化</h3>
     <div class="insight">不是房價變了，是買房的人變了。區在變，不是房價說話，是買的人在說話。</div>
   </div>
@@ -1512,6 +1577,10 @@ footer .bagao-sig{
       <span class="pie">自嘲反差派</span>
       <span class="num">No. 09</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok / IG Reels</span>
+      <span class="po-time">⏰ 平日 19:30–21:30</span>
     </div>
     <h3 class="title">我帶客戶看過一間很奇怪的房子</h3>
     <div class="insight">每人對自己空間有自己邏輯。住起來順就好，旁人覺得奇不奇怪不重要。做房仲最好玩的，永遠猜不到客戶要什麼。</div>
@@ -1623,6 +1692,10 @@ footer .bagao-sig{
       <span class="pie">圖卡部</span>
       <span class="num">No. 06</span>
       <span class="batch">第 33 批 · 2026-05-18</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels / TikTok</span>
+      <span class="po-time">⏰ 平日 19:30–21:00</span>
     </div>
     <h3 class="title">屋主急不急賣？3 個訊號你要看</h3>
     <div class="insight">急賣的屋主降價空間不同。3 個訊號加起來，80% 能判斷。完整判斷 SOP 在私訊圖卡——留言「急賣」，私訊給你。</div>

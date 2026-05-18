@@ -1,6 +1,7 @@
 import os, sys, io, re
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+# v2026-05-18: added platform/po_time params + CSS idempotent patch
 
 BATCH    = '第 33 批 · 2026-05-18'
 BATCH_32 = '第 32 批 · 2026-05-12'

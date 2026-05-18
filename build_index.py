@@ -746,6 +746,19 @@ PLATFORM_CSS = """
   padding:3px 9px;border-radius:12px;
   font-size:12px;font-family:var(--sans-en);
 }
+/* ========== MOBILE RWD (build_index.py patch v2) ========== */
+@media(max-width:768px){
+  .card-meta-extra{gap:6px}
+  .hashtag-pool{gap:4px}
+  .hashtag{font-size:11px;padding:2px 7px}
+  .platform{font-size:10px;padding:2px 6px}
+  .po-time{font-size:10px}
+}
+@media(max-width:640px){
+  .card-meta-extra{gap:4px}
+  .hashtag{font-size:10px;padding:2px 6px}
+  .platform,.po-time,.batch{font-size:9px}
+}
 """
 CSS_MARKER = '/* ========== PLATFORM / PO-TIME META (build_index.py patch) ========== */'
 if CSS_MARKER not in nc:
@@ -759,9 +772,9 @@ if CSS_MARKER not in nc:
 else:
     print('CSS patch already present, skipped')
 
-# ---- Idempotent JS patch: replace copyScript with hashtag-aware version ----
-JS_MARKER = '// ====== HASHTAG-AWARE copyScript (build_index.py patch) ======'
-NEW_COPY_SCRIPT = r"""// ====== HASHTAG-AWARE copyScript (build_index.py patch) ======
+# ---- Idempotent JS patch: replace copyScript with hashtag-aware + iOS fallback version ----
+JS_MARKER = '// ====== HASHTAG-AWARE copyScript v2 (build_index.py patch) ======'
+NEW_COPY_SCRIPT = r"""// ====== HASHTAG-AWARE copyScript v2 (build_index.py patch) ======
 function copyScript(btn){
   var article = btn.closest('article.card');
   if (!article) return;
@@ -788,7 +801,23 @@ function copyScript(btn){
     text = lines.join('\n');
     if (hashtags) text = text + '\n\n' + hashtags;
   }
-  navigator.clipboard.writeText(text).then(function(){
+  // iOS Safari fallback (no navigator.clipboard)
+  function doCopy(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    // execCommand fallback for iOS Safari / older browsers
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopy(text).then(function(){
     btn.textContent = '已複製 ✓';
     btn.classList.add('copied');
     setTimeout(function(){ btn.textContent = originalLabel; btn.classList.remove('copied'); }, 2000);
@@ -800,17 +829,98 @@ function copyScript(btn){
 window.copyScript = copyScript;"""
 
 if JS_MARKER not in nc:
-    # Replace existing copyScript function block (from its comment header to window.copyScript = copyScript;)
-    old_js_start = nc.find('// ====== 9. 複製文案 / 複製腳本 ======')
+    # Replace existing copyScript function block — search multiple possible header variants
+    old_js_start = -1
+    for old_header in [
+        '// ====== HASHTAG-AWARE copyScript (build_index.py patch) ======',  # v1 patch
+        '// ====== 9. 複製文案 / 複製腳本 ======',                              # original
+    ]:
+        idx = nc.find(old_header)
+        if idx >= 0:
+            old_js_start = idx
+            break
     old_js_end = nc.find('window.copyScript = copyScript;')
     if old_js_start >= 0 and old_js_end >= 0:
         old_js_end_full = old_js_end + len('window.copyScript = copyScript;')
         nc = nc[:old_js_start] + NEW_COPY_SCRIPT + nc[old_js_end_full:]
-        print('copyScript JS patch applied')
+        print('copyScript JS v2 patch applied')
     else:
         print('WARNING: old copyScript block not found, JS patch skipped')
 else:
-    print('copyScript JS patch already present, skipped')
+    print('copyScript JS v2 patch already present, skipped')
+
+# ---- Idempotent JS patch: copyThread iOS clipboard fallback ----
+COPY_THREAD_MARKER = '// ====== COPY-THREAD iOS FALLBACK (build_index.py patch) ======'
+NEW_COPY_THREAD = r"""// ====== COPY-THREAD iOS FALLBACK (build_index.py patch) ======
+function copyThread(btn){
+  var card = btn.closest('.thread-card');
+  if (!card) return;
+  var textEl = card.querySelector('.thread-text');
+  var hashEl = card.querySelector('.thread-hash');
+  var text = (textEl ? textEl.textContent.trim() : '') +
+             (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+  function doCopyThread(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopyThread(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = '複製脆文'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = '複製脆文'; }, 2000);
+  });
+}
+window.copyThread = copyThread;"""
+
+if COPY_THREAD_MARKER not in nc:
+    old_ct_start = nc.find('// ====== 10. 複製脆文 ======')
+    old_ct_end = nc.find('window.copyThread = copyThread;')
+    if old_ct_start >= 0 and old_ct_end >= 0:
+        old_ct_end_full = old_ct_end + len('window.copyThread = copyThread;')
+        nc = nc[:old_ct_start] + NEW_COPY_THREAD + nc[old_ct_end_full:]
+        print('copyThread iOS fallback patch applied')
+    else:
+        print('WARNING: old copyThread block not found, copyThread patch skipped')
+else:
+    print('copyThread iOS fallback patch already present, skipped')
+
+# ---- Idempotent CSS patch: mobile RWD 768/640 ----
+MOBILE_RWD_MARKER = '/* ========== MOBILE RWD (build_index.py patch v2) ========== */'
+MOBILE_RWD_CSS = """/* ========== MOBILE RWD (build_index.py patch v2) ========== */
+@media(max-width:768px){
+  .card-meta-extra{gap:6px}
+  .hashtag-pool{gap:4px}
+  .hashtag{font-size:11px;padding:2px 7px}
+  .platform{font-size:10px;padding:2px 6px}
+  .po-time{font-size:10px}
+}
+@media(max-width:640px){
+  .card-meta-extra{gap:4px}
+  .hashtag{font-size:10px;padding:2px 6px}
+  .platform,.po-time,.batch{font-size:9px}
+}
+"""
+if MOBILE_RWD_MARKER not in nc:
+    style_end = nc.find('</style>')
+    if style_end >= 0:
+        nc = nc[:style_end] + MOBILE_RWD_CSS + nc[style_end:]
+        print('MOBILE RWD CSS patch injected')
+    else:
+        print('WARNING: </style> not found, MOBILE RWD CSS patch skipped')
+else:
+    print('MOBILE RWD CSS patch already present, skipped')
 
 with open(os.path.join(LIB, 'index.html'), 'w', encoding='utf-8') as f:
     f.write(nc)

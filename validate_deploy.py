@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_deploy.py — 短影音腳本上線前驗證腳本 (MVP 5 件檢查)
+validate_deploy.py — 短影音腳本上線前驗證腳本 (v2: 10 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-5 件檢查：
+10 件檢查（v1 5 件 + v2 新增 5 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
 4. git status --porcelain 攔未追蹤
 5. Schema Validation（所有 json/yaml 配置檔）
+--- v2 新增（SOP v2 9 件功能邏輯驗證）---
+6. threads-grid collapsed CSS rule 存在
+7. build_*.py v2 keyword 命中（若已 migrate）
+8. article data-caption attribute（若 build script 已加 caption=）
+9. 圖卡部 group 不與「釣魚部」字串並存（命名混淆防呆）
+10. caption 禁用詞清零（應該/大概/可能/差不多/基本上/我猜）
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
 
 建檔：2026-05-16 / 3 輪 cross-check 後 Codex+Gemini 雙 GO 定稿
+v2 升級：2026-05-18 SOP v2 9 件功能邏輯對齊
 """
 
 import os
@@ -244,6 +251,164 @@ def check_5_schema_validation():
     return fails
 
 
+# === v2 新增 5 件 ===
+
+def check_6_threads_grid_css():
+    """檢查 6：每個 html 若含 .threads-grid 則必有 collapsed CSS rule
+    SOP v2 §2.4：.group.collapsed > .threads-grid { display: none }
+    """
+    log('=== Check 6：threads-grid collapsed CSS rule ===')
+    fails = []
+    REQUIRED_RULE = '.group.collapsed > .threads-grid'
+
+    for html_rel in OWNER_MAP.keys():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            continue
+
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+
+        # 只驗有 threads-grid 的 html
+        if 'threads-grid' not in content:
+            log(f'  ℹ {html_rel}: 無 threads-grid，跳過')
+            continue
+
+        if REQUIRED_RULE in content:
+            log(f'  ✅ {html_rel}: threads-grid CSS rule 存在')
+        else:
+            msg = f'❌ {html_rel}: 有 threads-grid 但缺 .group.collapsed > .threads-grid CSS rule'
+            log(f'  {msg}')
+            fails.append(msg)
+
+    return fails
+
+
+def check_7_build_v2_keywords():
+    """檢查 7：build_*.py 含 v2 keyword（若已 migrate 到 v2 標竿）
+    僅驗 build_index.py（瑞祥 = v2 標竿）
+    其他業主尚未 migrate，跳過
+    """
+    log('=== Check 7：build_*.py v2 keyword 命中 ===')
+    fails = []
+    V2_KEYWORDS = ['hashtag-pool', 'platform=', 'po_time=', 'caption=',
+                   'threads-grid', 'copyScript']
+
+    # 只驗 build_index.py（v2 標竿）
+    build_path = LIB / 'build_index.py'
+    if not build_path.exists():
+        log('  ℹ build_index.py 不存在，跳過')
+        return fails
+
+    content = build_path.read_text(encoding='utf-8', errors='replace')
+    found = [kw for kw in V2_KEYWORDS if kw in content]
+    if len(found) >= 3:
+        log(f'  ✅ build_index.py v2 keywords 命中 {len(found)}/{len(V2_KEYWORDS)}: {found}')
+    else:
+        msg = f'❌ build_index.py v2 keywords 命中不足（{len(found)}/{len(V2_KEYWORDS)}）: 找到 {found}'
+        log(f'  {msg}')
+        fails.append(msg)
+
+    return fails
+
+
+def check_8_article_data_caption():
+    """檢查 8：index.html article 含 data-caption attribute（若 build 已加 caption=）
+    SOP v2 §2.6：複製文案按鈕讀 article.dataset.caption
+    """
+    log('=== Check 8：article data-caption attribute ===')
+    fails = []
+
+    # 只驗 index.html（瑞祥 v2 標竿，其他業主尚未 migrate）
+    html_path = LIB / 'index.html'
+    if not html_path.exists():
+        log('  ℹ index.html 不存在，跳過')
+        return fails
+
+    content = html_path.read_text(encoding='utf-8', errors='replace')
+
+    # 計算有 data-caption 的 article
+    cap_count = len(re.findall(r'<article[^>]*data-caption="[^"]+', content))
+    total_count = len(re.findall(r'<article class="card"', content))
+
+    if cap_count == 0:
+        msg = f'❌ index.html: 0/{total_count} article 有 data-caption（build 未加 caption=？）'
+        log(f'  {msg}')
+        fails.append(msg)
+    else:
+        log(f'  ✅ index.html: {cap_count}/{total_count} article 有 data-caption')
+
+    return fails
+
+
+def check_9_no_mixed_fishing_card():
+    """檢查 9：圖卡部 group 不與「釣魚部」字串並存（命名混淆防呆）
+    SOP v2 §2.3：命名為「圖卡部 Card Library」，舊名「釣魚部」不能殘留在 group head
+    """
+    log('=== Check 9：圖卡部/釣魚部 命名混淆防呆 ===')
+    fails = []
+
+    for html_rel in OWNER_MAP.keys():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            continue
+
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+
+        has_card_lib = '圖卡部' in content
+        has_fishing = '釣魚部' in content
+
+        if has_card_lib and has_fishing:
+            msg = f'❌ {html_rel}: 同時含「圖卡部」和「釣魚部」— 命名混淆（group head 需統一）'
+            log(f'  {msg}')
+            fails.append(msg)
+        elif has_fishing and not has_card_lib:
+            log(f'  ℹ {html_rel}: 只有釣魚部（尚未 migrate 到圖卡部），跳過')
+        elif has_card_lib:
+            log(f'  ✅ {html_rel}: 圖卡部命名正確，無殘留釣魚部')
+        else:
+            log(f'  ℹ {html_rel}: 無圖卡部/釣魚部 group，跳過')
+
+    return fails
+
+
+def check_10_caption_no_forbidden_words():
+    """檢查 10：html 中 data-caption 值不含禁用詞（誠實協議第 9 條）
+    禁用詞：應該 / 大概 / 可能 / 差不多 / 基本上 / 我猜
+    """
+    log('=== Check 10：caption 禁用詞清零 ===')
+    fails = []
+    FORBIDDEN = ['應該', '大概', '可能', '差不多', '基本上', '我猜']
+
+    for html_rel in OWNER_MAP.keys():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            continue
+
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+
+        # 抓所有 data-caption 值
+        captions = re.findall(r'data-caption="([^"]*)"', content)
+        if not captions:
+            log(f'  ℹ {html_rel}: 無 data-caption，跳過')
+            continue
+
+        file_fails = []
+        for i, cap in enumerate(captions):
+            hits = [w for w in FORBIDDEN if w in cap]
+            if hits:
+                file_fails.append(f'article #{i+1} caption 含禁用詞 {hits}: {cap[:60]}...')
+
+        if file_fails:
+            for ff in file_fails:
+                msg = f'❌ {html_rel}: {ff}'
+                log(f'  {msg}')
+                fails.append(msg)
+        else:
+            log(f'  ✅ {html_rel}: {len(captions)} 篇 caption 禁用詞清零')
+
+    return fails
+
+
 # === main ===
 
 def main():
@@ -269,6 +434,17 @@ def main():
     log('')
     all_fails += check_5_schema_validation()
     log('')
+    # v2 新增 5 件
+    all_fails += check_6_threads_grid_css()
+    log('')
+    all_fails += check_7_build_v2_keywords()
+    log('')
+    all_fails += check_8_article_data_caption()
+    log('')
+    all_fails += check_9_no_mixed_fishing_card()
+    log('')
+    all_fails += check_10_caption_no_forbidden_words()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -276,11 +452,11 @@ def main():
         for i, f in enumerate(all_fails, 1):
             log(f'  {i}. {f}')
         log('')
-        log('修法見：SOP_腳本上線_統一版.md §3 報錯怎麼辦')
+        log('修法見：SOP_腳本上線_統一版_v2.md §7 報錯怎麼辦')
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 5 件齊')
+        log('✅ 全部通過 — 10 件齊')
         sys.exit(0)
 
 

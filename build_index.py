@@ -21,7 +21,7 @@ PIE_COLORS = {
     '故事戲劇派': '#2A2A6B',
 }
 
-def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=None, caption=None):
+def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=None, caption=None, platform=None, po_time=None):
     if batch is None:
         batch = BATCH
     pid = 'c' + str(num) + ('b' if batch == BATCH_32 else '')
@@ -51,6 +51,12 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
         cap_escaped = caption.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
     cap_attr = ' data-caption="' + cap_escaped + '"' if cap_escaped else ''
     copy_label = '複製文案' if cap_escaped else '複製腳本'
+    # platform / po_time meta row (only shown when provided)
+    meta_extra = ''
+    if platform:
+        meta_extra += '      <span class="platform">▶ ' + platform + '</span>\n'
+    if po_time:
+        meta_extra += '      <span class="po-time">⏰ ' + po_time + '</span>\n'
     return (
         '<article class="card" data-cat="' + pie + '" id="' + pid + '"' + cap_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
@@ -59,7 +65,8 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
         '      <span class="pie">' + pie + '</span>\n'
         '      <span class="num">No. ' + str(num).zfill(2) + '</span>\n'
         '      <span class="batch">' + batch + '</span>\n'
-        '    </div>\n'
+        '    </div>\n' +
+        (('    <div class="card-meta-extra">\n' + meta_extra + '    </div>\n') if meta_extra else '') +
         '    <h3 class="title">' + title + '</h3>\n'
         '    <div class="insight">' + insight + '</div>\n'
         '  </div>\n'
@@ -115,7 +122,8 @@ sect_direct = section('I.', '直球派', 'The Direct Voice', 0, [
          ('40-52秒', '感覺不能議價，數字才能。實價登錄是你最便宜的籌碼。', '數字是最便宜的籌碼', ''),
          ('52-60秒', '不知道怎麼查實價或怎麼開口的，留言「實價」，我幫你看個人狀況。不用怕，問問不用錢。', '留言「實價」不用怕問問不用錢', '')],
         '留言「實價」，問問不用錢',
-        caption='議價最重要不是你說什麼，是你有沒有數字。花十分鐘查實價登錄，把同棟成交印出來，進去談跟沒查完全不一樣。'),
+        caption='議價最重要不是你說什麼，是你有沒有數字。花十分鐘查實價登錄，把同棟成交印出來，進去談跟沒查完全不一樣。',
+             platform='IG Reels / FB Reels', po_time='平日 19:20–20:30'),
     # --- 第 32 批 ---
     rux_article(1, '帶看 10 年 我見過最奇怪的拒絕理由',
         '直球派',
@@ -173,7 +181,8 @@ sect_spicy = section('II.', '嗆辣派', 'The Spicy Edge', 1, [
          ('40-52秒', '做業務，最難不是說服客戶，是你敢不敢對自己誠實。', '最難是對自己誠實', ''),
          ('52-60秒', '有什麼買房問題想直接問，留言「諮詢」，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='做房仲帶看沒成，回車上就跟自己說他還在考慮。做了十年才敢說真話：那叫說謊，不叫等待。'),
+        caption='做房仲帶看沒成，回車上就跟自己說他還在考慮。做了十年才敢說真話：那叫說謊，不叫等待。',
+             platform='TikTok / FB Reels', po_time='平日 19:20–21:00'),
     rux_article(4, '說了三年要買房的人，後來怎樣了',
         '嗆辣派',
         '不是等房價，是在等一個不存在的安全感。那個點永遠在後面——房價不會為你準備，你準備好了，房子才來。',
@@ -185,7 +194,8 @@ sect_spicy = section('II.', '嗆辣派', 'The Spicy Edge', 1, [
          ('40-52秒', '房價不會為你準備。你準備好了，房子才來。', '你準備好了房子才來', ''),
          ('52-60秒', '你現在哪個階段？想聊的留言「諮詢」，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='認識一個說了五年要買房的人，每年說等房價跌。去年終於買了，說早知道早點買。他知道，只是在等一個不存在的安全感。'),
+        caption='認識一個說了五年要買房的人，每年說等房價跌。去年終於買了，說早知道早點買。他知道，只是在等一個不存在的安全感。',
+             platform='TikTok / FB Reels', po_time='平日 20:10–21:30'),
     rux_article(11, '高雄人買房，卡在這件事上最多',
         '嗆辣派',
         '不是錢，不是房價，是臉皮。問了沒成多知道一件事；沒問少知道一件事，這已經輸。輸的不是開口的人，是一直等的人。',
@@ -197,7 +207,8 @@ sect_spicy = section('II.', '嗆辣派', 'The Spicy Edge', 1, [
          ('40-52秒', '想問就問，想了解就了解。輸的不是開口的人，是一直等的人。', '輸的是一直等的人', ''),
          ('52-60秒', '你現在有什麼問題一直沒開口問，留言「諮詢」，我這裡沒有蠢問題，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='高雄人買房最多人卡在臉皮這件事，不是錢不夠，是怕問沒成很丟臉，怕問題蠢。你買一兩次，我一年帶看幾百次，沒有蠢問題這回事。'),
+        caption='高雄人買房最多人卡在臉皮這件事，不是錢不夠，是怕問沒成很丟臉，怕問題蠢。你買一兩次，我一年帶看幾百次，沒有蠢問題這回事。',
+             platform='TikTok / FB Reels', po_time='平日 20:00–21:30'),
     # --- 第 32 批 ---
     rux_article(8, '房地合一稅這件事 你再不搞清楚 要哭的是你',
         '嗆辣派',
@@ -243,7 +254,8 @@ sect_human = section('III.', '人間觀察派', 'Human Observations', 2, [
          ('40-52秒', '買房不是兩人拿著計算機對數字。是兩人能不能走到最後，一起說好。', '一起說好才算買房', ''),
          ('52-60秒', '想聊你家買房的狀況，留言「諮詢」，不用怕，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='左營早餐店坐到一對老夫妻，老先生去結帳，老太太說去拿包，老先生沒回頭就說好。三十年不需要解釋，就是那種感覺。'),
+        caption='左營早餐店坐到一對老夫妻，老先生去結帳，老太太說去拿包，老先生沒回頭就說好。三十年不需要解釋，就是那種感覺。',
+             platform='IG Reels / FB Reels', po_time='平日 19:10–20:30'),
     rux_article(3, '三民區，我發現一個奇怪現象',
         '人間觀察派',
         '同一條路差幾十萬，不是地段，是管委會。站在社區門口看停車場，5 分鐘就知道了。公設費，你是在買管理。',
@@ -255,7 +267,8 @@ sect_human = section('III.', '人間觀察派', 'Human Observations', 2, [
          ('40-52秒', '公設費，你是在買管理。', '公設費是在買管理', ''),
          ('52-60秒', '三民區有問題要問，留言「諮詢」，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='三民區同一條路隔壁棟，一棟好賣一棟沒人問，行情差幾十萬。差別不是地段，是進去看停車場就知道了。'),
+        caption='三民區同一條路隔壁棟，一棟好賣一棟沒人問，行情差幾十萬。差別不是地段，是進去看停車場就知道了。',
+             platform='IG Reels / FB Reels', po_time='平日 19:10–20:00'),
     rux_article(13, '等客戶的那段空白，我想到一件事',
         '人間觀察派',
         '房子不只資產，是讓誰的生命放在裡面的地方。最後承載的不是預算，是你的心。',
@@ -267,7 +280,8 @@ sect_human = section('III.', '人間觀察派', 'Human Observations', 2, [
          ('40-52秒', '後來客戶來了，我沒跟他說這件事。但帶看那天，比平常更認真。', '帶看比平常更認真', ''),
          ('52-60秒', '你買的那間，最後誰住進去？', '你買的那間，最後誰住進去？', '')],
         '純雞湯位——無 CTA',
-        caption='車裡等客戶，想到一個客戶買左營小套房給媽媽。媽媽過世後他傳來一句話：她住那裡很喜歡，慶幸讓她住到那裡。'),
+        caption='車裡等客戶，想到一個客戶買左營小套房給媽媽。媽媽過世後他傳來一句話：她住那裡很喜歡，慶幸讓她住到那裡。',
+             platform='IG Reels / FB Reels / TikTok', po_time='週四–五 19:30–21:00'),
     # --- 第 32 批 ---
     rux_article(7, '做房仲 10 年 有一種客戶我現在還是接不住',
         '人間觀察派',
@@ -336,7 +350,8 @@ sect_story = section('IV.', '故事戲劇派', 'Story Drama', 3, [
          ('40-52秒', '買房最難的不是錢。是你到底為誰買。', '你到底為誰買', ''),
          ('52-60秒', '你是哪一種？想聊留言「諮詢」，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='帶看路上問客戶：要換大一點是真的需要，還是鄰居換了你也要換？他沉默了快十秒。最後他說不換了。'),
+        caption='帶看路上問客戶：要換大一點是真的需要，還是鄰居換了你也要換？他沉默了快十秒。最後他說不換了。',
+             platform='IG Reels / FB Reels', po_time='平日 19:20–20:30'),
     rux_article(8, '簽約那天，屋主說了一句話',
         '故事戲劇派',
         '賣房不是在賣房，是在做交代。賣給好的人，好好用下去，對他們比價格重要。房子住過很多人，每間都有它的故事。',
@@ -348,7 +363,8 @@ sect_story = section('IV.', '故事戲劇派', 'Story Drama', 3, [
          ('40-52秒', '房子住過很多人，每間都有它的故事。', '每間房子都有故事', ''),
          ('52-60秒', '你有沒有遇過這樣的房子？留言「諮詢」，我們聊聊。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='簽約那天老屋主說：我爸說要留著讓我自己決定。他走三年，我想三年。房子賣的不是坪數，是一個人做了決定。'),
+        caption='簽約那天老屋主說：我爸說要留著讓我自己決定。他走三年，我想三年。房子賣的不是坪數，是一個人做了決定。',
+             platform='IG Reels / FB Reels', po_time='平日 19:10–20:30'),
 ], 2)
 
 print('Section 故事戲劇派 built OK')
@@ -369,7 +385,8 @@ sect_struct = section('V.', '結構分析 / 拆解派', 'Structural Analysis & B
          ('40-52秒', '土地用途、主建物面積、有沒有抵押。查清楚再買，每步踩實。', '三件事查清楚再買', ''),
          ('52-60秒', '哪步驟不清楚，留言「看屋」，我幫你看個人狀況。不用怕，問問不用錢。', '留言「看屋」不用怕問問不用錢', '')],
         '留言「看屋」，問問不用錢',
-        caption='買房前三件事很多人跳過，不是頭期款貸款，是土地用途、主建物面積、有沒有抵押。少查一件，簽完才後悔。'),
+        caption='買房前三件事很多人跳過，不是頭期款貸款，是土地用途、主建物面積、有沒有抵押。少查一件，簽完才後悔。',
+             platform='IG Reels / FB Reels', po_time='平日 19:30–21:00'),
     # --- 第 32 批 ---
     rux_article(3, '月薪多少才能買北高雄的房？我幫你算清楚',
         '結構分析派',
@@ -427,7 +444,8 @@ sect_market = section('VI.', '市場觀察派', 'Market Insight', 5, [
          ('40-52秒', '區在變，不是房價說話。是買的人在說話。', '是買的人在說話', ''),
          ('52-60秒', '你想了解鼓山這邊的行情，留言「諮詢」，我聊給你聽。不用怕，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='鼓山這幾年買房的人變了，不再只問捷運時間，開始問巷子安不安靜、管理好不好。是生活方式在找地方，不是地方在找人。'),
+        caption='鼓山這幾年買房的人變了，不再只問捷運時間，開始問巷子安不安靜、管理好不好。是生活方式在找地方，不是地方在找人。',
+             platform='IG Reels / FB Reels', po_time='平日 19:30–21:00'),
     # --- 第 32 批 ---
     rux_article(6, '我爸退休後問我：現在高雄的房還能買嗎？',
         '故事戲劇派',
@@ -472,7 +490,8 @@ sect_self = section('VII.', '自嘲反差派', 'Self-Deprecating Contrast', 6, [
          ('40-52秒', '做房仲最好玩的，永遠猜不到客戶要什麼。', '永遠猜不到客戶要什麼', ''),
          ('52-60秒', '你有什麼奇怪的看屋需求，留言「諮詢」說說看，問問不用錢。', '留言「諮詢」不用怕問問不用錢', '')],
         '留言「諮詢」，問問不用錢',
-        caption='帶看鼓山一間，客廳放小椅子，廚房放健身機，廁所外有鳥籠。我介紹到一半不知道說什麼，只說了三個字：很有個性。'),
+        caption='帶看鼓山一間，客廳放小椅子，廚房放健身機，廁所外有鳥籠。我介紹到一半不知道說什麼，只說了三個字：很有個性。',
+             platform='TikTok / IG Reels', po_time='平日 19:30–21:30'),
 ], 1)
 
 print('Section 自嘲反差派 built OK')
@@ -531,7 +550,8 @@ sect_fish = section('X.', '圖卡部', 'Card Library', 9, [
          ('52-60秒', '留言「急賣」，我私訊圖卡給你。不用怕，問問不用錢。', '留言「急賣」→ 私訊解答圖卡 | 不用怕問問不用錢', '')],
         '留言「急賣」→ 私訊解答圖卡',
         img='rui-batch33-fishing-card.png',
-        caption='買房談價格前有一件事要先搞清楚：這個屋主急不急賣。急賣跟不急賣，談出來的結果差很多。3 個訊號判斷圖卡留言「急賣」給你。'),
+        caption='買房談價格前有一件事要先搞清楚：這個屋主急不急賣。急賣跟不急賣，談出來的結果差很多。3 個訊號判斷圖卡留言「急賣」給你。',
+             platform='IG Reels / TikTok', po_time='平日 19:30–21:00'),
 ], 1)
 
 print('Section 釣魚部 built OK')
@@ -668,6 +688,43 @@ print(f'Before section_start: {repr(c[section_start-30:section_start])}')
 print(f'At section_end: {repr(c[lightbox:lightbox+50])}')
 
 nc = c[:section_start] + all_sections + '\n\n' + c[lightbox:]
+
+# ---- Idempotent CSS patch ----
+# Inject .card-meta-extra / .platform / .po-time / .batch CSS if missing
+PLATFORM_CSS = """
+/* ========== PLATFORM / PO-TIME META (build_index.py patch) ========== */
+.card-meta-extra{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:8px;flex-wrap:wrap;
+}
+.platform{
+  font-family:var(--sans);font-size:11px;font-weight:600;
+  letter-spacing:.06em;color:var(--ink-3);
+  background:var(--paper-2);border:1px solid var(--line);
+  border-radius:4px;padding:2px 7px;
+}
+.po-time{
+  font-family:var(--sans);font-size:11px;font-weight:500;
+  letter-spacing:.04em;color:var(--ink-4);
+  background:transparent;
+}
+.batch{
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.12em;
+  color:var(--ink-4);text-transform:uppercase;
+}
+"""
+CSS_MARKER = '/* ========== PLATFORM / PO-TIME META (build_index.py patch) ========== */'
+if CSS_MARKER not in nc:
+    # Inject before </style>
+    style_end = nc.find('</style>')
+    if style_end >= 0:
+        nc = nc[:style_end] + PLATFORM_CSS + nc[style_end:]
+        print('CSS patch injected')
+    else:
+        print('WARNING: </style> not found, CSS patch skipped')
+else:
+    print('CSS patch already present, skipped')
+
 with open(os.path.join(LIB, 'index.html'), 'w', encoding='utf-8') as f:
     f.write(nc)
 print('index.html DONE:', len(nc), 'chars')
@@ -677,3 +734,10 @@ arts = re.findall(r'<article class="card"', nc)
 print('Total articles:', len(arts))
 print('Batch 32 marker check:', BATCH_32 in nc)
 print('Batch 33 marker check:', BATCH in nc)
+# Verify platform/po-time present in 33 batch articles
+plat_count = len(re.findall(r'class="platform"', nc))
+potime_count = len(re.findall(r'class="po-time"', nc))
+print(f'platform chips: {plat_count}, po-time chips: {potime_count}')
+assert plat_count == 13, f'Expected 13 platform chips, got {plat_count}'
+assert potime_count == 13, f'Expected 13 po-time chips, got {potime_count}'
+print('Platform/po-time assertion PASS')

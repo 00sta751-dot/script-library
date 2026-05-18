@@ -38,7 +38,13 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
         tl_html += '</div>\n'
     img_html = ''
     if img:
-        img_html = '    <div class="ref-link">釣魚部 · 圖卡附件：<a href="' + img + '">' + img + '</a></div>\n'
+        img_html = (
+            '    <div class="ref-link">釣魚部 · 圖卡附件：'
+            '<a href="' + img + '" target="_blank">'
+            '<img src="' + img + '" class="card-thumb" alt="圖卡預覽" '
+            'onclick="openLightbox(this); return false;">'
+            '</a></div>\n'
+        )
     return (
         '<article class="card" data-cat="' + pie + '" id="' + pid + '">\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
@@ -61,6 +67,7 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
         '      <span class="cta-arrow">→</span>\n'
         '      <span>' + cta + '</span>\n'
         '    </div>\n'
+        '    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>\n'
         '  </div>\n'
         '</article>'
     )
@@ -568,11 +575,63 @@ sect_soul = section('XI.', '綜合派', 'Soul Food', 10, [
 
 print('Section 綜合派 built OK')
 
+# ----- 脆文 Threads 區塊（第 33 批 7 篇）-----
+THREADS = [
+    ('T01', '嗆辣觀點型',
+     '你說房價還會跌。\n\n我問你，這句話說多久了？\n\n去年說、前年說、大前年也說。\n\n房價跌的時候你買嗎？還是又說「陷阱，不能買」？\n\n等的人最後沒買到低點，只是錯過很多時間點。\n\n不用怕，問問不用錢。',
+     '#高雄房仲 #買房心態'),
+    ('T02', '人間觀察型',
+     '帶看時我觀察人。\n\n夫妻誰先往前走。\n\n誰先打開廚房櫃子。\n\n誰低著頭在算。\n\n誰站窗邊看很久。\n\n看完就知道買不買、誰說算。\n\n通常不是男生也不是女生，是比較不說話的那個。',
+     '#房仲日常 #高雄'),
+    ('T03', '直球教學型（短）',
+     '看屋別只看客廳。\n\n先看廁所。\n\n廁所通風、排水、牆縫，房子藏不住問題的地方。\n\n看完廁所再看主臥天花板角落。\n\n才看客廳。\n\n客廳是裝飾，廁所是真相。',
+     '#看屋眉角 #高雄買房'),
+    ('T04', '毒舌正能量型',
+     '我看過太多人，找房兩年，最後買的是第三週看的那間。\n\n為什麼？\n\n花兩年把那間翻出來對比，最後認了，當初那間就最好。\n\n不是不懂，需要時間確認直覺。\n\n問題是時間不等人，那間後來漲了。\n\n你直覺通常沒錯，只需有人幫確認它。',
+     '#買房 #人生觀察'),
+    ('T05', '在地觀察型',
+     '左營和鼓山常被放一起比。\n\n但住過才知道，氣質完全不同。\n\n左營：捷運、補習班、便當店、新建案多。生活機能型。\n\n鼓山：老房子、倉庫咖啡廳、漁港味。生活風格型。\n\n選哪個，不是看貴不貴，看你想過哪種日子。',
+     '#高雄 #左營 #鼓山'),
+    ('T06', '嗆辣觀點型',
+     '「朋友也做房仲，找他就好。」\n\n可以。\n\n但問你：朋友專精哪個區？\n\n最近成交在哪個案？\n\n有沒法給你同區行情對照？\n\n朋友幫你是情，不是專業。\n\n買幾百萬的東西，情和專業不能只選一個。',
+     '#高雄房仲 #買房'),
+    ('T07', '雞湯收尾型',
+     '客戶買完房，隔半年傳訊息給我。\n\n說他媽媽住那裡很習慣，每天買菜路上跟鄰居打招呼。\n\n謝謝你幫我找這間。\n\n我說沒什麼。\n\n但放在心裡很久。\n\n做這行，不是賣房。是幫人安頓一段生命在某個地方。',
+     '#房仲日常 #高雄 #家'),
+]
+
+def thread_card(tid, label, body, hashtag):
+    safe_body = body.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    return (
+        '<div class="thread-card">\n'
+        '  <div class="thread-meta"><span class="thread-id">' + tid + '</span>'
+        '<span class="thread-label">' + label + '</span></div>\n'
+        '  <div class="thread-text">' + safe_body + '</div>\n'
+        '  <div class="thread-hash">' + hashtag + '</div>\n'
+        '  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>\n'
+        '</div>'
+    )
+
+sect_threads = (
+    '<header class="section-head" id="sect-threads">\n'
+    '  <span class="roman">✦</span>\n'
+    '  <span class="label">脆文 Threads<span class="en">第 33 批 · 7 篇</span></span>\n'
+    '  <span class="rule"></span>\n'
+    '  <span class="count">7 posts</span>\n'
+    '</header>\n'
+    '<div class="threads-grid">\n' +
+    '\n'.join(thread_card(t[0], t[1], t[2], t[3]) for t in THREADS) +
+    '\n</div>'
+)
+
+print('Section 脆文 Threads built OK')
+
 # Assemble all sections and replace in index.html
 all_sections = '\n\n'.join([
     sect_direct, sect_spicy, sect_human, sect_story,
     sect_struct, sect_market, sect_self, sect_senior,
-    sect_trend, sect_fish, sect_soul
+    sect_trend, sect_fish, sect_soul,
+    sect_threads
 ])
 
 # Replace in index.html

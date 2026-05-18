@@ -625,6 +625,86 @@ footer .lines span{display:inline-block;margin:0 8px}
   pointer-events:none;
 }
 
+/* ========== COPY BUTTON ========== */
+.copy-btn{
+  margin-top:14px;align-self:flex-start;
+  padding:6px 14px;
+  background:var(--gold);color:#fff;
+  border:none;border-radius:4px;
+  cursor:pointer;font-size:13px;
+  font-family:var(--sans);font-weight:500;
+  letter-spacing:.04em;
+  transition:background .15s,opacity .15s;
+}
+.copy-btn:hover{background:var(--bronze)}
+.copy-btn.copied{background:#5a8a50;pointer-events:none}
+
+/* ========== CARD THUMBNAIL (圖卡 lightbox 縮圖) ========== */
+.card-thumb{
+  max-width:200px;cursor:zoom-in;
+  border:1px solid var(--line);border-radius:4px;
+  display:block;margin-top:6px;
+  transition:opacity .2s;
+}
+.card-thumb:hover{opacity:.82}
+
+/* ========== THREADS SECTION ========== */
+.threads-grid{
+  max-width:1080px;margin:0 auto;
+  padding:0 24px 12px;
+  display:grid;grid-template-columns:1fr;gap:16px;
+}
+@media(min-width:780px){
+  .threads-grid{grid-template-columns:1fr 1fr}
+}
+.thread-card{
+  background:var(--paper-2);
+  border-left:4px solid var(--gold);
+  padding:16px 20px;
+  border:1px solid var(--line);
+  border-left:4px solid var(--gold);
+  position:relative;
+}
+.thread-meta{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:10px;
+}
+.thread-id{
+  font-family:var(--serif-en);font-style:italic;font-weight:700;
+  font-size:14px;color:var(--gold-deep);
+}
+.thread-label{
+  font-family:var(--sans);font-size:11px;font-weight:600;
+  letter-spacing:.08em;color:var(--ink-3);
+  padding:2px 8px;background:var(--paper);
+  border:1px solid var(--line);
+}
+.thread-text{
+  font-family:var(--sans);font-size:14.5px;line-height:1.85;
+  color:var(--ink);white-space:pre-wrap;
+  margin-bottom:10px;
+}
+.thread-hash{
+  font-family:var(--sans);font-size:12px;
+  color:var(--gold-deep);letter-spacing:.04em;
+  margin-bottom:10px;
+}
+
+/* ========== SECTION HEAD 派系名稱強化 ========== */
+.section-head .label{
+  font-family:var(--serif);font-weight:700;
+  font-size:26px;color:var(--ink);line-height:1.2;
+}
+.section-head .label .en{
+  display:block;
+  font-family:var(--sans-en);font-style:italic;font-weight:400;
+  font-size:12px;letter-spacing:.18em;color:var(--ink-3);
+  text-transform:uppercase;margin-top:4px;
+}
+@media(max-width:480px){
+  .section-head .label{font-size:20px}
+}
+
 /* ========== FOOTER 署名 ========== */
 footer .bagao-sig{
   margin-top:14px;
@@ -695,6 +775,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「實價」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="直球派" id="c1b">
@@ -722,6 +803,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動（你的奇怪考量）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="直球派" id="c4b">
@@ -749,6 +831,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動（信任的業務）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="直球派" id="c18b">
@@ -776,6 +859,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢（留言查實登）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -812,6 +896,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="嗆辣派" id="c4">
@@ -839,6 +924,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="嗆辣派" id="c11">
@@ -866,6 +952,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="嗆辣派" id="c8b">
@@ -893,6 +980,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢（留言了解稅務）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="嗆辣派" id="c10b">
@@ -920,6 +1008,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢（毒舌正能量位）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -956,6 +1045,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="人間觀察派" id="c3">
@@ -983,6 +1073,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="人間觀察派" id="c13">
@@ -1010,6 +1101,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>純雞湯位——無 CTA</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="人間觀察派" id="c7b">
@@ -1037,6 +1129,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="人間觀察派" id="c9b">
@@ -1064,6 +1157,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="家人朋友模擬派" id="c17b">
@@ -1091,6 +1185,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="自嘲反差派" id="c19b">
@@ -1118,6 +1213,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1154,6 +1250,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="故事戲劇派" id="c8">
@@ -1181,6 +1278,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1217,6 +1315,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「看屋」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="結構分析派" id="c3b">
@@ -1244,6 +1343,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="拆解派" id="c12b">
@@ -1271,6 +1371,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="拆解派" id="c15b">
@@ -1298,6 +1399,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1334,6 +1436,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="故事戲劇派" id="c6b">
@@ -1361,6 +1464,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="市場觀察派" id="c13b">
@@ -1388,6 +1492,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1424,6 +1529,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「諮詢」，問問不用錢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1460,6 +1566,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>Erika 專業位（留言互動）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1496,6 +1603,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢（留言判斷時機）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1520,7 +1628,7 @@ footer .bagao-sig{
   </div>
   <div class="card-body">
     <div class="scene"><b>場景</b>　辦公桌前，手拿計算機或文件夾，正視鏡頭，語氣直接</div>
-    <div class="ref-link">釣魚部 · 圖卡附件：<a href="rui-batch33-fishing-card.png">rui-batch33-fishing-card.png</a></div>
+    <div class="ref-link">釣魚部 · 圖卡附件：<a href="rui-batch33-fishing-card.png" target="_blank"><img src="rui-batch33-fishing-card.png" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></a></div>
     <div class="timeline">
         <div class="row"><div class="time">0-3秒</div><div class="say">買房談價格前，你要先知道一件事——這個屋主急不急賣。</div><div class="sub">屋主急不急賣？先看這個</div></div>
         <div class="row"><div class="time">3-12秒</div><div class="say">為什麼？急賣的屋主降價空間不同。但他不會直接說急，你得看訊號。</div><div class="mirror">藏鏡人　'什麼訊號？說來聽聽'</div><div class="sub">—</div></div>
@@ -1533,6 +1641,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言「急賣」→ 私訊解答圖卡</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="釣魚部" id="c5b">
@@ -1548,7 +1657,7 @@ footer .bagao-sig{
   </div>
   <div class="card-body">
     <div class="scene"><b>場景</b>　帶看現場側拍，若有所思</div>
-    <div class="ref-link">釣魚部 · 圖卡附件：<a href="card-05.png">card-05.png</a></div>
+    <div class="ref-link">釣魚部 · 圖卡附件：<a href="card-05.png" target="_blank"><img src="card-05.png" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></a></div>
     <div class="timeline">
         <div class="row"><div class="time">0-3秒</div><div class="say">有些房子，我一進門就知道屋主有多急著賣。</div><div class="sub">一進門就看出來</div></div>
         <div class="row"><div class="time">3-12秒</div><div class="say">不用問，光看就知道。做久了你會看到，屋主急不急的人現場都看得出來。</div><div class="mirror">藏鏡人　'什麼訊號？說來聽聽'</div><div class="sub">現場看得出來</div></div>
@@ -1561,6 +1670,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>釣魚部（私訊端解答圖卡）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 </div>
@@ -1597,6 +1707,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>純雞湯（無強 CTA）</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="直球派" id="c2b">
@@ -1624,6 +1735,7 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>個人化諮詢</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
 <article class="card" data-cat="家人朋友模擬派" id="c20b">
@@ -1651,8 +1763,132 @@ footer .bagao-sig{
       <span class="cta-arrow">→</span>
       <span>留言互動</span>
     </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製腳本</button>
   </div>
 </article>
+</div>
+
+<header class="section-head" id="sect-threads">
+  <span class="roman">✦</span>
+  <span class="label">脆文 Threads<span class="en">第 33 批 · 7 篇</span></span>
+  <span class="rule"></span>
+  <span class="count">7 posts</span>
+</header>
+<div class="threads-grid">
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T01</span><span class="thread-label">嗆辣觀點型</span></div>
+  <div class="thread-text">你說房價還會跌。
+
+我問你，這句話說多久了？
+
+去年說、前年說、大前年也說。
+
+房價跌的時候你買嗎？還是又說「陷阱，不能買」？
+
+等的人最後沒買到低點，只是錯過很多時間點。
+
+不用怕，問問不用錢。</div>
+  <div class="thread-hash">#高雄房仲 #買房心態</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T02</span><span class="thread-label">人間觀察型</span></div>
+  <div class="thread-text">帶看時我觀察人。
+
+夫妻誰先往前走。
+
+誰先打開廚房櫃子。
+
+誰低著頭在算。
+
+誰站窗邊看很久。
+
+看完就知道買不買、誰說算。
+
+通常不是男生也不是女生，是比較不說話的那個。</div>
+  <div class="thread-hash">#房仲日常 #高雄</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T03</span><span class="thread-label">直球教學型（短）</span></div>
+  <div class="thread-text">看屋別只看客廳。
+
+先看廁所。
+
+廁所通風、排水、牆縫，房子藏不住問題的地方。
+
+看完廁所再看主臥天花板角落。
+
+才看客廳。
+
+客廳是裝飾，廁所是真相。</div>
+  <div class="thread-hash">#看屋眉角 #高雄買房</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T04</span><span class="thread-label">毒舌正能量型</span></div>
+  <div class="thread-text">我看過太多人，找房兩年，最後買的是第三週看的那間。
+
+為什麼？
+
+花兩年把那間翻出來對比，最後認了，當初那間就最好。
+
+不是不懂，需要時間確認直覺。
+
+問題是時間不等人，那間後來漲了。
+
+你直覺通常沒錯，只需有人幫確認它。</div>
+  <div class="thread-hash">#買房 #人生觀察</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T05</span><span class="thread-label">在地觀察型</span></div>
+  <div class="thread-text">左營和鼓山常被放一起比。
+
+但住過才知道，氣質完全不同。
+
+左營：捷運、補習班、便當店、新建案多。生活機能型。
+
+鼓山：老房子、倉庫咖啡廳、漁港味。生活風格型。
+
+選哪個，不是看貴不貴，看你想過哪種日子。</div>
+  <div class="thread-hash">#高雄 #左營 #鼓山</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T06</span><span class="thread-label">嗆辣觀點型</span></div>
+  <div class="thread-text">「朋友也做房仲，找他就好。」
+
+可以。
+
+但問你：朋友專精哪個區？
+
+最近成交在哪個案？
+
+有沒法給你同區行情對照？
+
+朋友幫你是情，不是專業。
+
+買幾百萬的東西，情和專業不能只選一個。</div>
+  <div class="thread-hash">#高雄房仲 #買房</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T07</span><span class="thread-label">雞湯收尾型</span></div>
+  <div class="thread-text">客戶買完房，隔半年傳訊息給我。
+
+說他媽媽住那裡很習慣，每天買菜路上跟鄰居打招呼。
+
+謝謝你幫我找這間。
+
+我說沒什麼。
+
+但放在心裡很久。
+
+做這行，不是賣房。是幫人安頓一段生命在某個地方。</div>
+  <div class="thread-hash">#房仲日常 #高雄 #家</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
 </div>
 
 
@@ -1879,6 +2115,54 @@ if (overlay){
 
 // 暴露 openLightbox 到全域（img onclick= 呼叫用）
 window.openLightbox = openLightbox;
+
+// ====== 9. 複製腳本 ======
+function copyScript(btn){
+  var article = btn.closest('article.card');
+  if (!article) return;
+  var title = article.querySelector('.title');
+  var rows = article.querySelectorAll('.timeline .row');
+  var cta = article.querySelector('.cta span:last-child');
+  var lines = [];
+  if (title) lines.push('【' + title.textContent.trim() + '】\n');
+  rows.forEach(function(row){
+    var time = row.querySelector('.time');
+    var say = row.querySelector('.say');
+    if (time && say){
+      lines.push('[' + time.textContent.trim() + '] ' + say.textContent.trim());
+    }
+  });
+  if (cta) lines.push('\nCTA：' + cta.textContent.trim());
+  var text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = '複製腳本'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = '複製腳本'; }, 2000);
+  });
+}
+window.copyScript = copyScript;
+
+// ====== 10. 複製脆文 ======
+function copyThread(btn){
+  var card = btn.closest('.thread-card');
+  if (!card) return;
+  var textEl = card.querySelector('.thread-text');
+  var hashEl = card.querySelector('.thread-hash');
+  var text = (textEl ? textEl.textContent.trim() : '') +
+             (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+  navigator.clipboard.writeText(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = '複製脆文'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = '複製脆文'; }, 2000);
+  });
+}
+window.copyThread = copyThread;
 
 // ====== 8. Service Worker ======
 if ('serviceWorker' in navigator){

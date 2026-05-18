@@ -58,7 +58,7 @@ def kenny_article(num, title, pie, platforms, cta, summary, timeline,
     img_html = ''
     dl_btn = ''
     if img:
-        img_html = '<div class="card-image-section"><img src="' + img + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;" style="max-width:140px;cursor:zoom-in;"></div>\n'
+        img_html = '<div class="card-image-section"><img src="' + img + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>\n'
         dl_name = os.path.basename(img)
         dl_btn = '<a class="download-btn" href="' + img + '" download="' + dl_name + '">下載圖卡</a>\n'
 

@@ -728,6 +728,10 @@ V2_CSS = """
 .card-thumb{max-width:320px;width:100%;height:auto;object-fit:contain;border-radius:8px;border:1px solid var(--gold-deep);cursor:zoom-in;display:block;margin-top:8px;}
 .card-thumb:hover{transform:scale(1.03);box-shadow:0 4px 12px rgba(0,0,0,.15);}
 @media (max-width:640px){.card-thumb{max-width:100%;}}
+.caption-preview{margin:10px 0 6px;padding:10px 14px;background:var(--rose,var(--cream));border-left:3px solid var(--gold-deep);border-radius:6px;font-size:13px;line-height:1.6;}
+.caption-preview-label{font-size:11px;color:var(--gold-deep);font-weight:600;margin-bottom:4px;letter-spacing:.03em;}
+.caption-preview-text{color:var(--ink-soft);white-space:pre-wrap;}
+.caption-preview-hash{margin-top:6px;font-size:12px;color:var(--gold-deep);}
 """
 
 if V2_CSS_MARKER not in nc:
@@ -814,7 +818,24 @@ function openLightbox(img){
 window.toggleGroup=toggleGroup;
 window.copyScript=copyScript;
 window.copyThread=copyThread;
-window.openLightbox=openLightbox;"""
+window.openLightbox=openLightbox;
+// v2.1: migrate 舊 threads-section + inject caption preview
+(function v21Fixes(){
+  var oldSection=document.querySelector('section.threads-section');
+  var newGrid=document.querySelector('.threads-grid');
+  if(oldSection&&newGrid){oldSection.querySelectorAll('.thread-card').forEach(function(c){newGrid.appendChild(c);});oldSection.remove();}
+  document.querySelectorAll('article.card[data-caption], article.sc[data-caption], .script-card[data-caption]').forEach(function(a){
+    if(a.querySelector('.caption-preview'))return;
+    var cap=a.dataset.caption||'';var hashtags=a.dataset.hashtags||'';
+    var btn=a.querySelector('.copy-btn');if(!btn||!cap)return;
+    var p=document.createElement('div');p.className='caption-preview';
+    p.innerHTML='<div class="caption-preview-label">📋 將複製到剪貼簿（影片 PO 文案 + hashtag）：</div>'+
+                '<div class="caption-preview-text">'+cap.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'+
+                (hashtags?'<div class="caption-preview-hash">'+hashtags.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>':'');
+    btn.parentNode.insertBefore(p,btn);
+  });
+})();
+"""
 
 if V2_JS_MARKER not in nc:
     # Remove old JS blocks (GROUPS hardcode) to avoid conflicts

@@ -524,6 +524,10 @@ V2_CSS = """
 .hashtag{background:var(--border-soft);color:var(--accent-soft);padding:2px 8px;border-radius:12px;font-size:11px;}
 .card-thumb{max-width:320px;width:100%;height:auto;object-fit:contain;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;}
 @media (max-width:640px){.card-thumb{max-width:100%;}}
+.caption-preview{margin:10px 0 6px;padding:10px 14px;background:var(--chiik-bg,var(--surface));border-left:3px solid var(--chiik-yellow,#f0d060);border-radius:4px;font-size:13px;line-height:1.6;}
+.caption-preview-label{font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;}
+.caption-preview-text{color:var(--text);white-space:pre-wrap;}
+.caption-preview-hash{margin-top:6px;font-size:12px;color:var(--tag-blue,var(--accent-soft));}
 .card-thumb:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.18);}
 .download-btn{
   display:inline-flex;align-items:center;gap:5px;
@@ -633,7 +637,21 @@ function openLightbox(img){
   ov.addEventListener('click',function(e){if(e.target===ov){ov.classList.remove('active');document.getElementById('lightboxImg').src='';}});
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ov.classList.contains('active')){ov.classList.remove('active');document.getElementById('lightboxImg').src='';}});
 })();
-window.toggleGroup=toggleGroup;window.copyScript=copyScript;window.copyThread=copyThread;window.openLightbox=openLightbox;"""
+window.toggleGroup=toggleGroup;window.copyScript=copyScript;window.copyThread=copyThread;window.openLightbox=openLightbox;
+// v2.1: caption preview
+(function v21CaptionPreview(){
+  document.querySelectorAll('.script-card[data-caption]').forEach(function(a){
+    if(a.querySelector('.caption-preview'))return;
+    var cap=a.dataset.caption||'';var hashtags=a.dataset.hashtags||'';
+    var btn=a.querySelector('.copy-btn');if(!btn||!cap)return;
+    var p=document.createElement('div');p.className='caption-preview';
+    p.innerHTML='<div class="caption-preview-label">📋 將複製到剪貼簿（影片 PO 文案 + hashtag）：</div>'+
+                '<div class="caption-preview-text">'+cap.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'+
+                (hashtags?'<div class="caption-preview-hash">'+hashtags.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>':'');
+    btn.parentNode.insertBefore(p,btn);
+  });
+})();
+"""
 
 if V2_JS_MARKER not in nc:
     script_end = nc.rfind('</script>')

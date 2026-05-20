@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_deploy.py — 短影音腳本上線前驗證腳本 (v2: 10 件檢查)
+validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-10 件檢查（v1 5 件 + v2 新增 5 件）：
+11 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
@@ -17,12 +17,17 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v2: 10 件檢查)
 8. article data-caption attribute（若 build script 已加 caption=）
 9. 圖卡部 group 不與「釣魚部」字串並存（命名混淆防呆）
 10. caption 禁用詞清零（應該/大概/可能/差不多/基本上/我猜）
+--- v3 新增（2026-05-20 藏鏡人獨立泡泡）---
+11. 藏鏡人獨立泡泡 <div class="mirror"> 計數 HARD BLOCK
+    — 每個 html 的 mirror count 必須 >= 該 html 的 article/card 數量
+    — 確保 mirror 渲染邏輯正確，不混入台詞字串
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
 
 建檔：2026-05-16 / 3 輪 cross-check 後 Codex+Gemini 雙 GO 定稿
 v2 升級：2026-05-18 SOP v2 9 件功能邏輯對齊
+v3 升級：2026-05-20 加第 11 件藏鏡人獨立泡泡 HARD BLOCK
 """
 
 import os
@@ -409,6 +414,128 @@ def check_10_caption_no_forbidden_words():
     return fails
 
 
+def check_11_mirror_dom_count():
+    """檢查 11：藏鏡人獨立泡泡 <div class="mirror"> 計數 + 內容品質 HARD BLOCK (v4 升級)
+
+    各業主 article 標籤格式不同，動態偵測 article 數量：
+    - beauty.html / index.html：<article （含 article 標籤）
+    - kenny.html：class="script-card"
+    - bappu-cc/index.html：<article class="sc"
+    HARD BLOCK 條件：
+      (A) mirror_count == 0（build script 沒渲染藏鏡人）
+      (B) 任一 mirror div 內文為空
+      (C) 任一 mirror div 內文長度 <= 5 字（排除 placeholder）
+      (D) 任一 mirror div 內文命中 placeholder 黑名單
+    WARN 條件：mirror_count > 0 但 < article_count（部分 article 缺藏鏡人，通常因該批腳本未填藏鏡人欄）
+
+    內容品質驗證使用 html.parser（stdlib），不依賴瀏覽器。
+    """
+    from html.parser import HTMLParser
+
+    class MirrorExtractor(HTMLParser):
+        """從 HTML 中抽取所有 <div class="mirror"> 的內文。"""
+        def __init__(self):
+            super().__init__()
+            self._in_mirror = False
+            self._depth = 0
+            self.mirror_texts = []
+            self._buf = ''
+
+        def handle_starttag(self, tag, attrs):
+            attr_dict = dict(attrs)
+            if tag == 'div' and 'mirror' in attr_dict.get('class', '').split():
+                self._in_mirror = True
+                self._depth = 1
+                self._buf = ''
+            elif self._in_mirror:
+                self._depth += 1
+
+        def handle_endtag(self, tag):
+            if self._in_mirror:
+                if tag == 'div':
+                    self._depth -= 1
+                    if self._depth <= 0:
+                        self.mirror_texts.append(self._buf.strip())
+                        self._in_mirror = False
+                        self._buf = ''
+
+        def handle_data(self, data):
+            if self._in_mirror:
+                self._buf += data
+
+        def handle_entityref(self, name):
+            if self._in_mirror:
+                import html as _html
+                self._buf += _html.unescape('&' + name + ';')
+
+        def handle_charref(self, name):
+            if self._in_mirror:
+                if name.startswith('x'):
+                    self._buf += chr(int(name[1:], 16))
+                else:
+                    self._buf += chr(int(name))
+
+    PLACEHOLDER_BLACKLIST = {'待補', 'TBD', '？', '?', '...', '⋯', '⋯⋯'}
+    MIRROR_TAG = '<div class="mirror">'
+
+    log('=== Check 11：藏鏡人獨立泡泡 mirror count + 內容品質 HARD BLOCK ===')
+    fails = []
+
+    for html_rel in OWNER_MAP.keys():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            continue
+
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+        mirror_count = content.count(MIRROR_TAG)
+
+        # 動態偵測 article 數量（兼容 4 業主不同 HTML 結構）
+        article_count = len(re.findall(r'<article ', content))
+        if article_count == 0:
+            article_count = len(re.findall(r'class="script-card"', content))
+        if article_count == 0:
+            log(f'  ℹ {html_rel}: 偵測不到 article 元素，跳過')
+            continue
+
+        # (A) 計數 HARD BLOCK
+        if mirror_count == 0:
+            msg = (f'❌ {html_rel}: mirror count = 0 / article = {article_count}'
+                   f' — build script 沒渲染藏鏡人 HARD BLOCK')
+            log(f'  {msg}')
+            fails.append(msg)
+            continue  # 無 mirror 就不必跑品質驗
+
+        # WARN（部分缺藏鏡人）
+        if mirror_count < article_count:
+            log(f'  ⚠ {html_rel}: mirror={mirror_count} < article={article_count}'
+                f' — 部分 article 缺藏鏡人（WARN，未填藏鏡人欄的舊批次正常）')
+
+        # (B/C/D) 內容品質驗證 — 用 html.parser 解析實際內文
+        extractor = MirrorExtractor()
+        extractor.feed(content)
+        mirror_texts = extractor.mirror_texts
+
+        quality_fails = []
+        for i, text in enumerate(mirror_texts):
+            if not text:
+                quality_fails.append(f'mirror[{i}] 空字串')
+            elif len(text) <= 5:
+                quality_fails.append(f'mirror[{i}] 長度 {len(text)} <= 5 字：{repr(text)}')
+            elif text in PLACEHOLDER_BLACKLIST:
+                quality_fails.append(f'mirror[{i}] 命中 placeholder 黑名單：{repr(text)}')
+
+        if quality_fails:
+            for qf in quality_fails:
+                msg = f'❌ {html_rel}: mirror 內容品質 HARD BLOCK — {qf}'
+                log(f'  {msg}')
+                fails.append(msg)
+        else:
+            log(f'  ✅ {html_rel}: mirror={mirror_count} / article={article_count}'
+                f' / 內容品質 {len(mirror_texts)} 筆全 PASS')
+
+    return fails
+
+
 # === main ===
 
 def main():
@@ -445,6 +572,9 @@ def main():
     log('')
     all_fails += check_10_caption_no_forbidden_words()
     log('')
+    # v3 新增
+    all_fails += check_11_mirror_dom_count()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -456,7 +586,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 10 件齊')
+        log('✅ 全部通過 — 11 件齊')
         sys.exit(0)
 
 

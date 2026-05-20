@@ -835,6 +835,67 @@ footer {
 .lightbox-overlay.active{display:flex}
 .lightbox-overlay img{max-width:min(90vw,900px);max-height:90vh;border-radius:4px;}
 .lightbox-close{position:absolute;top:20px;right:24px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;}
+
+/* ========== V2 GROUP COLLAPSED + copyScript (build_bappu.py v2) ========== */
+.gp.collapsed > .gb{display:none !important}
+.gp.collapsed > div.threads-grid{display:none !important}
+.group.collapsed > .threads-grid{display:none !important}
+.gy{transition:transform .2s;display:inline-block;}
+.gp.collapsed .gy{transform:rotate(-90deg);}
+.card-meta-extra{font-size:11px;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;}
+.platform{font-size:11px;background:rgba(224,64,251,.12);padding:2px 7px;border-radius:4px;font-weight:600;color:#c800e0;}
+.po-time{font-size:11px;opacity:.7;}
+.hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px;}
+.hashtag{background:rgba(0,229,255,.1);color:#00b8cc;padding:2px 8px;border-radius:12px;font-size:11px;border:1px solid rgba(0,229,255,.3);}
+.sc-img img.card-thumb{max-width:320px;width:100%;height:auto;object-fit:contain;border-radius:6px;cursor:zoom-in;display:block;margin:8px 0;border:1px solid rgba(224,64,251,.4);}
+@media (max-width:640px){.sc-img img.card-thumb{max-width:100%;}}
+.caption-preview{margin:10px 0 6px;padding:10px 14px;background:rgba(10,0,18,0.6);border-left:3px solid var(--magenta);border-radius:4px;font-size:13px;line-height:1.6;color:var(--text);}
+.caption-preview-label{font-size:11px;color:var(--magenta);font-weight:600;margin-bottom:4px;letter-spacing:.04em;}
+.caption-preview-text{color:var(--text);white-space:pre-wrap;}
+.caption-preview-hash{margin-top:6px;font-size:12px;color:var(--cyan);}
+.download-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 14px;margin:6px 0;
+  font-size:12px;font-weight:500;color:white;
+  background:linear-gradient(135deg,#E040FB,#00E5FF);
+  border:none;border-radius:999px;text-decoration:none;cursor:pointer;
+  transition:opacity .2s;
+}
+.download-btn:hover{opacity:.85;}
+.copy-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 14px;margin:8px 0;
+  font-size:12px;font-weight:500;color:white;
+  background:linear-gradient(135deg,#E040FB,#00E5FF);
+  border:none;border-radius:999px;cursor:pointer;
+  transition:opacity .2s;
+}
+.copy-btn:hover{opacity:.85;}
+.copy-btn.copied{background:#5c8a5c;}
+.threads-grid{display:grid;grid-template-columns:1fr;gap:14px;padding:8px 0;}
+@media(min-width:720px){.threads-grid{grid-template-columns:1fr 1fr}}
+.thread-card{background:rgba(255,255,255,.06);border:1px solid rgba(224,64,251,.3);border-radius:10px;padding:16px;}
+.thread-meta{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+.thread-id{font-weight:700;color:#E040FB;font-size:14px;}
+.thread-label{font-size:11px;opacity:.6;background:rgba(255,255,255,.08);padding:2px 7px;border-radius:4px;}
+.thread-text{font-size:13px;line-height:1.85;opacity:.85;white-space:pre-wrap;word-break:break-word;}
+.thread-hash{margin-top:6px;font-size:11px;color:#00E5FF;font-weight:500;}
+.lightbox-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;
+  align-items:center;justify-content:center;z-index:9999;padding:24px;cursor:zoom-out;
+}
+.lightbox-overlay.active{display:flex}
+.lightbox-overlay img{max-width:min(90vw,900px);max-height:90vh;border-radius:4px;}
+.lightbox-close{position:absolute;top:20px;right:24px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;}
+
+/* ========== .mirror 藏鏡人泡泡 (build_bappu.py v2.1) ========== */
+.mirror{
+  margin-top:6px;display:inline-block;
+  font-size:11.5px;
+  background:rgba(224,64,251,.12);color:#e040fb;
+  padding:3px 10px;border-radius:6px;
+  border:1px dashed rgba(224,64,251,.4);
+}
 </style>
 </head>
 <body>
@@ -915,6 +976,12 @@ footer {
 
 
 <!-- 19 年日常 -->
+
+<!-- 故事戲劇派 -->
+
+<!-- 故事戲劇派 -->
+
+<!-- 故事戲劇派 -->
 
 <!-- 故事戲劇派 -->
 
@@ -1050,7 +1117,7 @@ footer {
   <div class="sg">
 <div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗（推門進來，扶著門）：累死了。字幕：他帶看一整天，進門第一句</p></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">叭噗：今天帶六組，全部說要考慮。字幕：六組，全考慮</p></div>
-<div class="sl"><span class="st">12-25秒</span><p class="sd">小C（從廚房探頭）：我有留飯。先去換衣服。字幕：留了飯，催他洗。藏鏡人：19 年，她看懂了他的累⋯⋯</p></div>
+<div class="sl"><span class="st">12-25秒</span><p class="sd">小C（從廚房探頭）：我有留飯。先去換衣服。字幕：留了飯，催他洗。</p><div class="mirror">藏鏡人　'19 年，她看懂了他的累⋯⋯'</div></div>
 <div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：你怎麼知道我想先吃飯？小C：你每次累到不行才說累。字幕：每次累到不行才說</p></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">（小C 把飯推過去，兩人沒再說話）字幕：一眼看出他累到什麼程度</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗（對鏡頭）：你記住另一半的哪個習慣？底下說說。</p></div>
@@ -1077,10 +1144,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他說不在乎。記了 4 年。字幕：嘴上不在乎，心裡記著。藏鏡人：什麼事？！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：他說不在乎。記了 4 年。字幕：嘴上不在乎，心裡記著。</p><div class="mirror">藏鏡人　'什麼事？！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：我說想去沖繩，他說現在沒辦法。我說沒關係。就結束了。字幕：沒在一起時說的話</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">小C：4 年後他說，你不是想去沖繩？我說對。他說那規劃一下。就去了。字幕：4 年後才提起，還真的去</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：只是記在腦袋裡。沒什麼大事。小C：你說不在乎。記了 4 年。字幕：說不在乎，真的記著。藏鏡人：這就是長情⋯⋯他的愛在行動裡⋯⋯</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：只是記在腦袋裡。沒什麼大事。小C：你說不在乎。記了 4 年。字幕：說不在乎，真的記著。</p><div class="mirror">藏鏡人　'這就是長情⋯⋯他的愛在行動裡⋯⋯'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：他常這樣。說不在乎，記著，哪天就做。字幕：他的愛，在行動裡</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你另一半有這樣的事嗎？存起來傳給他看。</p></div>
   </div>
@@ -1106,10 +1173,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：嫁給他之前，有件事我不知道。字幕：婚前沒發現的事。藏鏡人：什麼事？！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：嫁給他之前，有件事我不知道。字幕：婚前沒發現的事。</p><div class="mirror">藏鏡人　'什麼事？！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：他吃得很慢。叭噗：我在享受。小C：吃飯他吃第三口，我快吃完。字幕：他超級慢，我卡著</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">字幕：不會吵？小C：一開始會等急。後來我帶書，他吃完我們再走。字幕：學著等，現在沒問題</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：她也有我不知道的。小C：什麼？叭噗：妳睡前一定要聊天。小C：對啦。字幕：她睡前必聊天。藏鏡人：互相揭露⋯⋯婚前不知道，婚後接受⋯⋯這才是生活！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：她也有我不知道的。小C：什麼？叭噗：妳睡前一定要聊天。小C：對啦。字幕：她睡前必聊天。</p><div class="mirror">藏鏡人　'互相揭露⋯⋯婚前不知道，婚後接受⋯⋯這才是生活！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：婚前不知道，婚後就接受。字幕：發現怪癖，學著包容</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你嫁給他（或娶了她）之後，發現什麼你之前不知道的？底下說說。</p></div>
   </div>
@@ -1298,7 +1365,7 @@ footer {
 <div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C（直視鏡頭）：我跟他在一起的時候沒有不過夜規定這件事。字幕：沒有不過夜規定</p></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：對，一開始就這樣，從來沒訂過。字幕：從來沒訂過規定</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：有人非常需要不過夜規定。有人根本不需要。小C：對，我是那種，訂了規定更焦慮的人。字幕：訂了規定反而焦慮</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：差在哪？我覺得差在你對那個人有沒有底氣。字幕：差在有沒有底氣。藏鏡人：靠的不是規定，是底氣——這個說法！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：差在哪，差在你對那個人有沒有底氣。字幕：差在有沒有底氣。</p><div class="mirror">藏鏡人　'靠的不是規定，是底氣——這個說法！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：有底氣，就不需要規定。字幕：有底氣就夠了</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你是規定派還是自然派？轉給另一半，看他怎麼回答。</p></div>
   </div>
@@ -1324,10 +1391,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我們好像很少說「我愛你」。字幕：19 年沒說過幾次。藏鏡人：不浪漫欸——</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我們好像很少說「我愛你」。字幕：19 年沒說過幾次。</p><div class="mirror">藏鏡人　'不浪漫欸——'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：上週他幫我換水管。漏水很久。字幕：他去換了漏了很久的水管</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我愛你三個字讓我覺得假。做不就好。小C：他邏輯這樣。我一開始也覺得少了什麼。字幕：他覺得三個字作假，說還不如做</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：後來我想，如果天天說愛你，水管漏三個月不理——我選哪種？字幕：說愛你 vs 換水管，我要哪種。藏鏡人：毒但真！！！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：後來我想，如果天天說愛你，水管漏三個月不理——我選哪種？字幕：說愛你 vs 換水管，我要哪種。</p><div class="mirror">藏鏡人　'毒但真！！！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：沒說幾次，但水管換了，燈泡換了，我出門他說等一下。夠了。字幕：他的愛在細節裡</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：你另一半是話多派還是動作派？底下說說。</p></div>
   </div>
@@ -1419,10 +1486,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年不分的原因，你猜不到。字幕：他為什麼一直都在。藏鏡人：什麼原因？！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年不分的原因，你猜不到。字幕：他為什麼一直都在。</p><div class="mirror">藏鏡人　'什麼原因？！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：不是相似，是相反。字幕：其實是互補，不是匹配</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我出去她在家。我安靜她說話。各做各的。小C：晚餐一定一起吃。字幕：各自的世界，晚餐聚</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：有人說要非常契合——其實是互補。你一方，他另一方，加起來才完整。字幕：互補，不是完全合拍。藏鏡人：互補才完整——這個說法我沒想過！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：有人說要非常契合——其實是互補。你一方，他另一方，加起來才完整。字幕：互補，不是完全合拍。</p><div class="mirror">藏鏡人　'互補才完整——這個說法我沒想過！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：我們也是試了很久才知道的。字幕：試了很久才知道</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半是哪種搭法？底下說說。</p></div>
   </div>
@@ -1514,10 +1581,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：我們旅遊，19 年沒有一次完全一致過。字幕：旅遊計畫從來沒全一致。藏鏡人：哈哈哈哈哈這不就是我們！！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗：我們旅遊，19 年沒有一次完全一致過。字幕：旅遊計畫從來沒全一致。</p><div class="mirror">藏鏡人　'哈哈哈哈哈這不就是我們！！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：我要曬太陽，他要走路。叭噗：我要走路，她要待在旁邊的咖啡廳。小C：對。字幕：他走路，她進咖啡廳</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：去北海道，我拍兩小時，她在民宿看書。晚餐一起吃。小C：完美。字幕：各玩各的，晚餐聚</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：各自玩，再一起吃飯，比全黏在一起更好玩。字幕：各自玩，聚一起，更有趣。藏鏡人：這個模式聽起來很解放⋯⋯我要跟我另一半講！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：各自玩，再一起吃飯，比全黏在一起更好玩。字幕：各自玩，聚一起，更有趣。</p><div class="mirror">藏鏡人　'這個模式聽起來很解放⋯⋯我要跟我另一半講！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：19 年了，我試過帶他去咖啡廳三次。三次他都出去繞一圈再回來找我。叭噗（聳肩）：確實。字幕：帶他去咖啡廳三次，三次都跑掉</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你跟另一半旅遊也是各玩各的嗎？底下說說。</p></div>
   </div>
@@ -1699,10 +1766,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C（輕聲，對鏡頭）：某一年，我才明白陪伴的意思。字幕：那一年我才懂什麼是陪伴。藏鏡人：說下去⋯⋯</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C（輕聲，對鏡頭）：某一年，我才明白陪伴的意思。字幕：那一年我才懂什麼是陪伴。</p><div class="mirror">藏鏡人　'說下去⋯⋯'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：不是每秒在一起。是你煩惱時，有個人可以講。字幕：陪伴就是有人聽你</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我們不是天天聊。各自忙，各自靜。但我知道她在。字幕：她在，就夠了</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：陪伴不是熱鬧。是最安靜的時候，他還在。字幕：陪伴就是這個。藏鏡人：最溫柔的⋯⋯</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：陪伴不是熱鬧。是最安靜的時候，他還在。字幕：陪伴就是這個。</p><div class="mirror">藏鏡人　'最溫柔的⋯⋯'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：19 年，幾次我以為撐不住——回頭看，她都在。字幕：他最撐不住的時候，她都在</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C（輕聲）：你呢？字幕：你的陪伴呢</p></div>
   </div>
@@ -1728,10 +1795,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我沒為他改變。字幕：我還是我。藏鏡人：沒改變？！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">小C：19 年，我沒為他改變。字幕：我還是我。</p><div class="mirror">藏鏡人　'沒改變？！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：沒變成另一個人。但有一件事不一樣了。字幕：一個地方有了變化</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">小C：我以前不知道怎麼說難過。悶著。他問我還好嗎，我說還好，他說我知道你不好。字幕：他看穿我的「還好」</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：後來她會講了。小C：對。不是為了他——說出來我自己比較好。字幕：為了我自己。藏鏡人：好感情讓你更像自己，不是讓你消失——這個很重要。</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">叭噗：後來她會講了。小C：對。不是為了他——說出來我自己比較好。字幕：為了我自己。</p><div class="mirror">藏鏡人　'好感情讓你更像自己，不是讓你消失——這個很重要。'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">小C：好感情讓你更像自己。不是讓你消失。字幕：更像自己</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">小C：你有一個讓你更像自己的另一半嗎？</p></div>
   </div>
@@ -1799,10 +1866,10 @@ footer {
 </div>
 <div class="sb-body">
   <div class="sg">
-<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗（對鏡頭）：19 年，常有人問——你們不會越來越陌生嗎？字幕：19 年，不怕陌生？藏鏡人：19 年耶——真的不會嗎？！</p></div>
+<div class="sl"><span class="st">0-3秒 Hook</span><p class="sd">叭噗（對鏡頭）：19 年，常有人問——你們不會越來越陌生嗎？字幕：19 年，不怕陌生？</p><div class="mirror">藏鏡人　'19 年耶——真的不會嗎？！'</div></div>
 <div class="sl"><span class="st">3-12秒</span><p class="sd">小C：老實說，這是長期感情裡最真實的問題。字幕：這是長期感情最真實的問題</p></div>
 <div class="sl"><span class="st">12-25秒</span><p class="sd">叭噗：我們也沒有答案說我們「從來不陌生」——我們中間有段時間，兩個人都像在自己的世界裡。字幕：中間也有那段時間</p></div>
-<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：但我們做了幾件事，讓那個「各自在自己世界」不變成陌生。叭噗：想知道是什麼嗎？字幕：讓各自世界不變陌生的方法。藏鏡人：我要知道！！</p></div>
+<div class="sl"><span class="st">25-40秒</span><p class="sd">小C：但我們做了幾件事，讓那個「各自在自己世界」不變成陌生。叭噗：想知道是什麼嗎？字幕：讓各自世界不變陌生的方法。</p><div class="mirror">藏鏡人　'我要知道！！'</div></div>
 <div class="sl"><span class="st">40-52秒</span><p class="sd">叭噗：不過，這件事我不適合在這裡全講。因為每對的狀況都不一樣。字幕：每對的狀況都不同</p></div>
 <div class="sl"><span class="st">52-60秒 CTA</span><p class="sd">叭噗：底下留言「不陌生」，我把我們做的幾件事私訊給你。不用怕，問問不用錢。</p></div>
   </div>

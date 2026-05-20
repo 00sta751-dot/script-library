@@ -346,10 +346,12 @@ def check_8_article_data_caption():
 
 
 def check_9_no_mixed_fishing_card():
-    """檢查 9：圖卡部 group 不與「釣魚部」字串並存（命名混淆防呆）
-    SOP v2 §2.3：命名為「圖卡部 Card Library」，舊名「釣魚部」不能殘留在 group head
+    """檢查 9：group head 名稱不同時含「圖卡部」和「釣魚部」（命名混淆防呆）
+    SOP v2 §2.3：命名為「圖卡部 Card Library」，舊名「釣魚部」不能殘留在 group head。
+    注意：只查 <span class="gn"> 群組 header 名稱，不查全文（腳本 title/台詞含此字屬正常）。
+    2026-05-21 v3.1 fix：原全文搜尋會被 title 含「釣魚部」誤觸（04_07 釣魚部腳本）。
     """
-    log('=== Check 9：圖卡部/釣魚部 命名混淆防呆 ===')
+    log('=== Check 9：圖卡部/釣魚部 命名混淆防呆（查 group head 名稱）===')
     fails = []
 
     for html_rel in OWNER_MAP.keys():
@@ -359,19 +361,22 @@ def check_9_no_mixed_fishing_card():
 
         content = html_path.read_text(encoding='utf-8', errors='replace')
 
-        has_card_lib = '圖卡部' in content
-        has_fishing = '釣魚部' in content
+        # 只抓 <span class="gn">...</span> 群組名稱，不查全文
+        group_names = re.findall(r'<span class="gn">([^<]+)</span>', content)
+
+        has_card_lib = any('圖卡部' in gn for gn in group_names)
+        has_fishing = any('釣魚部' in gn for gn in group_names)
 
         if has_card_lib and has_fishing:
-            msg = f'❌ {html_rel}: 同時含「圖卡部」和「釣魚部」— 命名混淆（group head 需統一）'
+            msg = f'❌ {html_rel}: group head 同時含「圖卡部」和「釣魚部」— 命名混淆（group head 需統一）'
             log(f'  {msg}')
             fails.append(msg)
         elif has_fishing and not has_card_lib:
-            log(f'  ℹ {html_rel}: 只有釣魚部（尚未 migrate 到圖卡部），跳過')
+            log(f'  ℹ {html_rel}: group head 只有釣魚部（尚未 migrate 到圖卡部），跳過')
         elif has_card_lib:
-            log(f'  ✅ {html_rel}: 圖卡部命名正確，無殘留釣魚部')
+            log(f'  ✅ {html_rel}: group head 圖卡部命名正確，無殘留釣魚部')
         else:
-            log(f'  ℹ {html_rel}: 無圖卡部/釣魚部 group，跳過')
+            log(f'  ℹ {html_rel}: 無圖卡部/釣魚部 group head，跳過')
 
     return fails
 

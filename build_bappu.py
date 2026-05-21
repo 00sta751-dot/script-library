@@ -497,8 +497,10 @@ gG = gp_group_v2('G', '直球情侶版 / 直球派',
     [b02_16, b02_17, b02_18, b03_12, b03_13]
     + _b04_by_pie.get('直球派', []))
 
-# 圖卡部（02批 1部 + 03批 1部）— 04批 04_07 待澤君拍風格，暫不進圖卡部
-gH = gp_group_v2('H', '圖卡部', [b02_06, b03_04_card])
+# 圖卡部（02批 1部 + 03批 1部 + 04批 04_07 釣魚部圖卡）
+gH = gp_group_v2('H', '圖卡部',
+    [b02_06, b03_04_card]
+    + _b04_by_pie.get('圖卡部', []))
 
 # 模板L_知識反差（04批新增 — 6部）
 # 02/03批無此派系，04批獨立新建 group
@@ -512,13 +514,13 @@ print(f'gD 拆解派: 3 部')
 print(f'gF 自嘲反差派: {len([b02_10, b02_11, b03_07] + _b04_by_pie.get("自嘲反差派", []))} 部')
 print(f'gC 家人朋友模擬派: 2 部')
 print(f'gG 直球情侶版/直球派: {len([b02_16, b02_17, b02_18, b03_12, b03_13] + _b04_by_pie.get("直球派", []))} 部')
-print(f'gH 圖卡部: 2 部')
+print(f'gH 圖卡部: {len([b02_06, b03_04_card] + _b04_by_pie.get("圖卡部", []))} 部')
 print(f'gL 模板L_知識反差: {len(_b04_by_pie.get("模板L_知識反差", []))} 部')
-_b04_total_merged = sum(len(_b04_by_pie.get(p, [])) for p in ['故事戲劇派','人間觀察派','自嘲反差派','直球派','模板L_知識反差'])
+_b04_total_merged = sum(len(_b04_by_pie.get(p, [])) for p in ['故事戲劇派','人間觀察派','自嘲反差派','直球派','模板L_知識反差','圖卡部'])
 print(f'04批已合入 {_b04_total_merged}/13 部')
 
 # 04 批未消費派系防護（Codex×3 P0 corrective action 5/21 PM）
-B04_ALLOWED_PIES = {'故事戲劇派', '人間觀察派', '自嘲反差派', '直球派', '模板L_知識反差'}
+B04_ALLOWED_PIES = {'故事戲劇派', '人間觀察派', '自嘲反差派', '直球派', '模板L_知識反差', '圖卡部'}
 _b04_actual_pies = set(_b04_by_pie.keys())
 _b04_unused = _b04_actual_pies - B04_ALLOWED_PIES
 _b04_guard_total = sum(len(_b04_by_pie.get(p, [])) for p in B04_ALLOWED_PIES)
@@ -533,7 +535,8 @@ assert _b04_guard_total == EXPECTED_COUNT_04, (
     f'   - 派系分布: {{{", ".join(f"{p}: {len(v)}" for p, v in _b04_by_pie.items())}}}\n'
     f'   - 檢查 yaml 派系欄位 + B04_ALLOWED_PIES 對齊'
 )
-print(f'✅ 04 批防護 PASS: 5 派系 / {EXPECTED_COUNT_04} 部 / 0 silent drop')
+_b04_actual_pie_count = len(_b04_actual_pies)
+print(f'✅ 04 批防護 PASS: {_b04_actual_pie_count} 派系 / {EXPECTED_COUNT_04} 部 / 0 silent drop')
 
 all_groups = '\n'.join([gA, gB, gD, gF, gC, gG, gH, gL, threads_section])
 

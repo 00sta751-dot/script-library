@@ -158,7 +158,7 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
         'platform_chip': platform_chip,
         'po_time': po_time,
         'hashtag': hashtag,
-        'img': None,  # 第04批試水批無圖卡
+        'img': yaml_data.get('img') or None,  # top-level img 欄位（如 ../bappu-batch04-fishing-card-007.png）
     }
 
 

@@ -41,6 +41,18 @@ def _ts_convert(timestamp: str, scene_type: str = '') -> str:
     return ts
 
 
+def _get_dialogue_parts(sc: dict) -> list:
+    """從 scene dict 收集所有 '台詞_*' key 的值，保留原始欄位順序。
+    相容 叭噗/小C/阿奇/任意 業主台詞欄位名稱。
+    """
+    parts = []
+    for k, v in sc.items():
+        if k.startswith('台詞_') and v:
+            speaker = k[len('台詞_'):]  # e.g. '阿奇', '叭噗', '小C'
+            parts.append(f'{speaker}：{v}')
+    return parts
+
+
 def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     """單個 yaml dict → sc_article() kwargs
 
@@ -85,13 +97,14 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     cta = '個人化諮詢'
     for sc in scenes:
         if sc.get('type', '').upper() == 'CTA':
-            parts = []
-            if sc.get('台詞_叭噗'):
-                parts.append(sc['台詞_叭噗'])
-            if sc.get('台詞_小C'):
-                parts.append(sc['台詞_小C'])
+            parts = _get_dialogue_parts(sc)
             if parts:
-                cta = parts[0]  # 取第一句 CTA 台詞
+                # 取第一句台詞（去掉 "說話者：" 前綴，直接取台詞文字）
+                first_raw = list(sc.items())
+                for k, v in sc.items():
+                    if k.startswith('台詞_') and v:
+                        cta = str(v)
+                        break
             break
 
     # --- scene（hook 場景描述）：取第一個 scene 的畫面 ---
@@ -100,12 +113,8 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     if first_scene.get('畫面'):
         scene_desc = first_scene['畫面']
     else:
-        # fallback：合併第一場台詞
-        parts = []
-        if first_scene.get('台詞_叭噗'):
-            parts.append(f"叭噗：{first_scene['台詞_叭噗']}")
-        if first_scene.get('台詞_小C'):
-            parts.append(f"小C：{first_scene['台詞_小C']}")
+        # fallback：合併第一場台詞（通用 台詞_* 欄位）
+        parts = _get_dialogue_parts(first_scene)
         scene_desc = ' '.join(parts)
 
     # --- timeline ---
@@ -113,11 +122,7 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     for sc in scenes:
         ts = _ts_convert(sc['timestamp'], sc.get('type', ''))
 
-        desc_parts = []
-        if sc.get('台詞_叭噗'):
-            desc_parts.append(f"叭噗：{sc['台詞_叭噗']}")
-        if sc.get('台詞_小C'):
-            desc_parts.append(f"小C：{sc['台詞_小C']}")
+        desc_parts = _get_dialogue_parts(sc)
         if sc.get('畫面'):
             desc_parts.append(f"（{sc['畫面']}）")
         desc = ' '.join(desc_parts)

@@ -1,10 +1,31 @@
-import os, sys, io, re
+import os, sys, io, re, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
+from _html_escape_utils import esc_text, esc_attr, safe_img_src
 
 # v2 2026-05-18: align SOP v2 9-feature logic
 # v3 2026-05-21: replace 第04批(虛構故事 archived) with 第05批(生活向)
 # v4 2026-05-21: remove 第03批(archived) — kenny.html now shows 第05批 only (13 支)
+# v5 2026-05-22: yaml-driven mode (--mode yaml) + kenny_article_adapter
+
+# ============================================================
+# CLI mode 解析
+# ============================================================
+_parser = argparse.ArgumentParser(description='build_all.py — 仲豪 kenny 腳本庫 build script')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
+                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
+                     help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
+_parser.add_argument('--batch-label', dest='batch_label', default='',
+                     help='批次顯示名稱，如「第 06 批 · 2026-06-01」')
+_parser.add_argument('--num-start', dest='num_start', type=int, default=1,
+                     help='article 編號起點')
+_parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
+                     help='預期 yaml 數量（驗證用）')
+_args, _unknown = _parser.parse_known_args()
+MODE = _args.mode
 
 BATCH_05 = '第 05 批 · 2026-05-21'
 
@@ -31,57 +52,69 @@ def kenny_article(num, title, pie, platforms, cta, summary, timeline,
     if batch is None:
         batch = BATCH_05
     cid = 'k' + str(num).zfill(2)
+    # P1#3: escape platform names in ptag spans
     pl_tags = ''.join('<span class="ptag ptag-{0}">{1}</span>'.format(
-        'ig' if 'IG' in p else 'tk' if 'TikTok' in p else 'fb' if 'FB' in p else 'th' if 'Threads' in p else 'xh', p)
+        'ig' if 'IG' in p else 'tk' if 'TikTok' in p else 'fb' if 'FB' in p else 'th' if 'Threads' in p else 'xh',
+        esc_text(p))
         for p in platforms)
+    # P1#3: escape text fields
+    title_e = esc_text(title)
+    pie_e = esc_text(pie)
+    cta_e = esc_text(cta)
+    summary_e = esc_text(summary)
+    batch_e = esc_text(batch)
     tl_html = ''
     for t, d, *rest in timeline:
         sub    = rest[0] if len(rest) > 0 else ''
         mirror = rest[1] if len(rest) > 1 else ''
-        tl_html += '<div class="ts-row"><div class="ts-time">' + t + '</div><div class="ts-desc">' + d + '</div>'
+        tl_html += '<div class="ts-row"><div class="ts-time">' + esc_text(t) + '</div><div class="ts-desc">' + esc_text(d) + '</div>'
         if sub:
-            tl_html += '<div class="ts-sub">' + sub + '</div>'
+            tl_html += '<div class="ts-sub">' + esc_text(sub) + '</div>'
         if mirror:
-            tl_html += '<div class="mirror">藏鏡人　' + Q + mirror + Q + '</div>'
+            tl_html += '<div class="mirror">藏鏡人　' + Q + esc_text(mirror) + Q + '</div>'
         tl_html += '</div>\n'
 
-    cap_escaped = ''
-    if caption:
-        cap_escaped = caption.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+    # caption escape via esc_attr
+    cap_escaped = esc_attr(caption) if caption else ''
     cap_attr = ' data-caption="' + cap_escaped + '"' if cap_escaped else ''
 
     hashtag_attr = ''
     hashtag_html = ''
     if hashtag:
-        hashtag_attr = ' data-hashtags="' + ' '.join(hashtag) + '"'
-        hashtag_html = '<div class="hashtag-pool">' + ''.join('<span class="hashtag">' + t + '</span>' for t in hashtag) + '</div>\n'
+        hashtag_attr = ' data-hashtags="' + esc_attr(' '.join(hashtag)) + '"'
+        hashtag_html = '<div class="hashtag-pool">' + ''.join('<span class="hashtag">' + esc_text(t) + '</span>' for t in hashtag) + '</div>\n'
 
     meta_extra = ''
     if platform_chip:
-        meta_extra += '<span class="platform">▶ ' + platform_chip + '</span> '
+        meta_extra += '<span class="platform">▶ ' + esc_text(platform_chip) + '</span> '
     if po_time:
-        meta_extra += '<span class="po-time">⏰ ' + po_time + '</span>'
+        meta_extra += '<span class="po-time">⏰ ' + esc_text(po_time) + '</span>'
 
     img_html = ''
     dl_btn = ''
     if img:
-        img_html = '<div class="card-image-section"><img src="' + img + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>\n'
-        dl_name = os.path.basename(img)
-        dl_btn = '<a class="download-btn" href="' + img + '" download="' + dl_name + '">下載圖卡</a>\n'
+        try:
+            img_safe = safe_img_src(img)
+        except ValueError:
+            img_safe = ''
+        if img_safe:
+            dl_name = esc_attr(os.path.basename(img))
+            img_html = '<div class="card-image-section"><img src="' + img_safe + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>\n'
+            dl_btn = '<a class="download-btn" href="' + img_safe + '" download="' + dl_name + '">下載圖卡</a>\n'
 
     copy_label = '複製文案' if cap_escaped else '複製腳本'
 
     return (
-        '<div class="script-card" data-tags="' + pie + ' ' + cta + '" data-id="' + cid + '"' + cap_attr + hashtag_attr + '>\n'
+        '<div class="script-card" data-tags="' + esc_attr(pie + ' ' + cta) + '" data-id="' + cid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-top">\n'
         '    <div class="card-num">#' + str(num).zfill(2) + '</div>\n'
         '    <div class="card-title-block">\n'
-        '      <div class="card-title">' + title + '</div>\n'
-        '      <div class="card-meta"><span>60 秒</span><span>' + batch + '</span><span>' + pie + '</span></div>\n' +
+        '      <div class="card-title">' + title_e + '</div>\n'
+        '      <div class="card-meta"><span>60 秒</span><span>' + batch_e + '</span><span>' + pie_e + '</span></div>\n' +
         (('      <div class="card-meta-extra">' + meta_extra + '</div>\n') if meta_extra else '') +
         '    </div>\n'
         '  </div>\n'
-        '  <div class="card-summary">' + summary + '</div>\n'
+        '  <div class="card-summary">' + summary_e + '</div>\n'
         '  <div class="card-footer">'
         '<div class="platform-tags">' + pl_tags + '</div>'
         '<div class="card-actions">'
@@ -330,7 +363,128 @@ g_card = group_v2('圖卡部', 'Card Library', 4,
 g_soul = group_v2('純雞湯', 'Soul Food', 5,
     [k05_03])
 
-all_main = '\n\n'.join([g_direct, g_human, g_pain, g_story, g_card, g_soul, threads_section])
+# ============================================================
+# yaml-driven adapter（仲豪 kenny_article）
+# ============================================================
+
+def kenny_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
+    """yaml dict → kenny_article() HTML
+    kenny_article 需要 summary，yaml_to_sc 通用版只生 scene。
+    adapter 策略：從 yaml 取 summary 欄位，fallback 到 scene（第一場景描述）。
+    platforms 從 main_platform 解析，platform_chip = main_platform。
+    """
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import yaml_to_sc_kwargs
+    kw = yaml_to_sc_kwargs(yaml_data, num=num)
+
+    # kenny_article 專屬欄位 mapping
+    summary = yaml_data.get('summary') or yaml_data.get('核心洞察') or kw['scene']
+    # kenny_article(num, title, pie, platforms, cta, summary, timeline, batch, caption, platform_chip, po_time, hashtag, img)
+    return kenny_article(
+        num=kw['num'],
+        title=kw['title'],
+        pie=kw['pie'],
+        platforms=kw['platforms'],
+        cta=kw['cta'],
+        summary=summary,
+        timeline=kw['timeline'],
+        batch=batch_label,
+        caption=kw.get('caption'),
+        platform_chip=kw.get('platform_chip'),
+        po_time=kw.get('po_time'),
+        hashtag=kw.get('hashtag'),
+        img=kw.get('img'),
+    )
+
+
+# ============================================================
+# yaml-driven 主路由（--mode yaml 時執行，否則用 legacy 路徑）
+# ============================================================
+
+if MODE == 'yaml':
+    print(f'\n=== yaml-driven mode (仲豪 kenny) ===')
+    if not _args.yaml_dir:
+        print('ERROR: --mode yaml 必須指定 --yaml-dir', file=sys.stderr)
+        sys.exit(1)
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import load_yaml_articles
+
+    batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml_dir)}'
+    yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
+    num_start = _args.num_start
+
+    # 依派系分流
+    _yaml_by_pie = {}
+    for _idx, _ydata in enumerate(yaml_articles, start=0):
+        _pie = _ydata.get('派系', '未分類')
+        _art = kenny_article_adapter(_ydata, num=num_start + _idx, batch_label=batch_label)
+        _yaml_by_pie.setdefault(_pie, []).append(_art)
+
+    _yaml_total = sum(len(v) for v in _yaml_by_pie.values())
+    print(f'yaml articles built OK ({_yaml_total} 部):')
+    for _pie, _arts in sorted(_yaml_by_pie.items()):
+        print(f'  {_pie}: {len(_arts)} 部')
+
+    # 既有 group 對應派系（kenny 用中文標籤）
+    KENNY_PIE_TO_GROUP = {
+        '直球揭秘': g_direct, '拆解': g_direct,
+        '人間觀察': g_human,
+        '嗆辣': g_pain, '嗆辣派': g_pain,
+        '自嘲反差': g_story,
+        '圖卡部': g_card,
+        '純雞湯': g_soul, '家人朋友模擬派': g_soul,
+    }
+
+    def _inject_into_group(group_html: str, new_arts: list) -> str:
+        inject_html = '\n'.join(new_arts)
+        # group_v2 結構：<div class="group-body">...\n</div>\n</div>
+        # 在最後 </div>\n</div> 前插入
+        close_seq = '\n</div>\n</div>'
+        last_close = group_html.rfind(close_seq)
+        if last_close < 0:
+            return group_html + '\n' + inject_html
+        return group_html[:last_close] + '\n' + inject_html + group_html[last_close:]
+
+    for _pie, _arts in _yaml_by_pie.items():
+        _matched = False
+        for _key, _grp_var in [
+            ('直球揭秘', 'g_direct'), ('拆解', 'g_direct'),
+            ('人間觀察', 'g_human'),
+            ('嗆辣', 'g_pain'), ('嗆辣派', 'g_pain'),
+            ('自嘲反差', 'g_story'),
+            ('圖卡部', 'g_card'),
+            ('純雞湯', 'g_soul'), ('家人朋友模擬派', 'g_soul'),
+        ]:
+            if _pie == _key or _pie.startswith(_key):
+                globals()[_grp_var] = _inject_into_group(globals()[_grp_var], _arts)
+                print(f'  {_pie} → 注入 {_grp_var} ({len(_arts)} 部)')
+                _matched = True
+                break
+        if not _matched:
+            # 新派系 → 獨立 group
+            _new_grp = group_v2(_pie, _pie, 99, _arts)
+            globals()['g_extra_' + _pie] = _new_grp
+            print(f'  {_pie} → 新建 group ({len(_arts)} 部)')
+
+    # 重建 all_main（含 yaml 注入後）
+    _all_groups = [
+        globals()['g_direct'], globals()['g_human'], globals()['g_pain'],
+        globals()['g_story'], globals()['g_card'], globals()['g_soul'],
+        threads_section
+    ]
+    # 補新派系 group
+    for _gkey in [k for k in globals() if k.startswith('g_extra_')]:
+        _all_groups.append(globals()[_gkey])
+
+    all_main = '\n\n'.join(_all_groups)
+    print('yaml-driven all_main assembled')
+else:
+    # legacy mode（預設）
+    all_main = '\n\n'.join([g_direct, g_human, g_pain, g_story, g_card, g_soul, threads_section])
 
 ok, nc = rp_main(os.path.join(LIB, 'kenny.html'), all_main)
 

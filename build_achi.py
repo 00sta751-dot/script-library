@@ -11,6 +11,7 @@ build_achi.py — 阿奇 腳本庫 build script
 
 更新日誌：
   2026-05-22：yaml_to_sc.py sub_desc 改從 '畫面' 欄位取值，修 .sub 字幕渲染（75 個）
+  2026-05-22：加 Threads 脆文段（build_threads_section），每次 rebuild 自動帶入 7 篇
 """
 
 import os
@@ -180,6 +181,84 @@ def section(roman, label, en, sect_id, cards, count):
 
 
 # ============================================================
+# Threads 脆文段（2026-05-22）
+# ============================================================
+def build_threads_section(threads_md_path: str) -> str:
+    """解析 threads_achi_*.md → HTML 段落（section-head + threads-grid）"""
+    import re as _re
+    import html as _html
+
+    if not os.path.exists(threads_md_path):
+        print(f'[threads] 找不到 {threads_md_path}，跳過 Threads 段', file=sys.stderr)
+        return ''
+
+    with open(threads_md_path, 'r', encoding='utf-8') as _f:
+        _content = _f.read()
+
+    _chunks = _content.split('\n---\n')
+    _thread_chunks = [_c.strip() for _c in _chunks[1:]]
+
+    _parsed = []
+    for _ch in _thread_chunks:
+        _lines = _ch.split('\n')
+        _m_head = _re.match(r'## Threads (\d+)（衍生自 ([^）]+)）', _lines[0].strip())
+        _m_title = _re.match(r'主題：(.+)', _lines[1].strip()) if len(_lines) > 1 else None
+        _num = int(_m_head.group(1)) if _m_head else 0
+        _title = _m_title.group(1) if _m_title else ''
+        _body_lines = _lines[3:] if len(_lines) > 3 else []
+        _hashtag = ''
+        _text_lines = []
+        for _ln in _body_lines:
+            if _ln.strip().startswith('#') and not _ln.strip().startswith('##'):
+                _hashtag = _ln.strip()
+            else:
+                _text_lines.append(_ln)
+        _text = '\n'.join(_text_lines).strip()
+        # strip markdown bold **...**
+        _text = _re.sub(r'\*\*(.+?)\*\*', r'\1', _text)
+        _parsed.append({'num': _num, 'title': _title, 'text': _text, 'hashtag': _hashtag})
+
+    if not _parsed:
+        print('[threads] 解析結果為空，跳過 Threads 段', file=sys.stderr)
+        return ''
+
+    _cards_html = ''
+    for _t in _parsed:
+        _num_str = f'T{_t["num"]:02d}'
+        _title_e = _html.escape(_t['title'])
+        _text_e = _html.escape(_t['text'])
+        _hashtag_e = _html.escape(_t['hashtag'])
+        _cards_html += (
+            '<div class="thread-card">\n'
+            '  <div class="thread-meta">\n'
+            '    <span class="thread-id">' + _num_str + '</span>\n'
+            '    <span class="thread-label">' + _title_e + '</span>\n'
+            '  </div>\n'
+            '  <div class="thread-text">' + _text_e + '</div>\n'
+            '  <div class="thread-hash">' + _hashtag_e + '</div>\n'
+            '  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>\n'
+            '</div>\n'
+        )
+
+    _count = len(_parsed)
+    _result = (
+        '\n<!-- THREADS_SECTION_START — build_achi.py 管理 -->\n'
+        '<header class="section-head" id="sect-threads">\n'
+        '  <span class="roman">VIII.</span>\n'
+        '  <span class="label">Threads 脆文<span class="en">Copy &amp; Post</span></span>\n'
+        '  <span class="rule"></span>\n'
+        '  <span class="count">' + str(_count) + ' posts</span>\n'
+        '</header>\n'
+        '<div class="threads-grid">\n' +
+        _cards_html +
+        '</div>\n'
+        '<!-- THREADS_SECTION_END -->\n'
+    )
+    print(f'[threads] 解析完成：{_count} 篇')
+    return _result
+
+
+# ============================================================
 # 阿奇 article adapter（yaml_to_sc_kwargs → owner_article）
 # ============================================================
 def owner_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
@@ -289,14 +368,42 @@ if placeholder_pos < 0:
     # 嘗試通用 placeholder
     placeholder_pos = c.find(PLACEHOLDER_ALT)
     if placeholder_pos < 0:
-        print('ERROR: 找不到 SECTIONS_PLACEHOLDER 標記', file=sys.stderr)
-        sys.exit(1)
-    # 找到行尾
-    placeholder_end = c.find('\n', placeholder_pos) + 1
+        # fallback：找第一個 section-head 作為 sections 起點
+        _sh_fallback = c.find('<header class="section-head"')
+        if _sh_fallback > 0:
+            placeholder_pos = _sh_fallback
+            placeholder_end = placeholder_pos  # 不跳過任何前綴文字
+            print('[sections] 找不到 SECTIONS_PLACEHOLDER，使用 section-head fallback', file=sys.stderr)
+        else:
+            print('ERROR: 找不到 SECTIONS_PLACEHOLDER 標記，也找不到 section-head fallback', file=sys.stderr)
+            sys.exit(1)
+    else:
+        # 找到行尾
+        placeholder_end = c.find('\n', placeholder_pos) + 1
 else:
     placeholder_end = placeholder_pos + len(PLACEHOLDER) + 1
 
-nc = c[:placeholder_pos] + all_sections + '\n\n' + c[placeholder_end:]
+# 找 <footer（舊 sections 結束標誌，含舊 threads section）
+footer_pos = c.find('<footer', max(placeholder_end, placeholder_pos))
+if footer_pos > placeholder_pos:
+    # 跳過舊 sections（含舊 threads section），直接接 <footer
+    tail = c[footer_pos:]
+else:
+    # 沒有 footer 或 footer 在前面，用原邏輯
+    tail = c[placeholder_end:]
+
+# Threads 脆文段（每次 rebuild 帶入）
+# script-library 位於 Claude/Projects/短影音系統/L4_工具腳本/_部署系統/script-library
+# 往上 5 層到達 Claude root → Claude/Projects/...
+_claude_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..'))
+_threads_md = os.path.normpath(os.path.join(
+    _claude_root, 'Projects',
+    '短影音系統', 'L2_業主層', '餐飲_阿奇',
+    '01_腳本生產', '第01批_2026-05-22', 'threads_achi_01.md'
+))
+threads_html = build_threads_section(_threads_md)
+
+nc = c[:placeholder_pos] + all_sections + '\n\n' + threads_html + '\n' + tail
 
 with open(HTML_FILE, 'w', encoding='utf-8') as f:
     f.write(nc)

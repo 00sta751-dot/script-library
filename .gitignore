@@ -1,1 +1,5 @@
 ps_test.py
+.gstack/
+__pycache__/
+*.bak
+*.bak_*

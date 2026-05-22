@@ -1,9 +1,30 @@
-import os, sys, io, re
+import os, sys, io, re, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
+from _html_escape_utils import esc_text, esc_attr, safe_img_src
 
 # v2 2026-05-18: align SOP v2 9-feature logic
 # Accumulative: 第03批(new) + 第02批(existing)
+# v3 2026-05-22: yaml-driven mode (--mode yaml) + bappu_article_adapter（對齊 4 業主標準接口）
+
+# ============================================================
+# CLI mode 解析
+# ============================================================
+_parser = argparse.ArgumentParser(description='build_bappu.py — 叭噗_小C 腳本庫 build script')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
+                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
+                     help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
+_parser.add_argument('--batch-label', dest='batch_label', default='',
+                     help='批次顯示名稱，如「第 05 批 · 2026-06-01」')
+_parser.add_argument('--num-start', dest='num_start', type=int, default=1,
+                     help='article 編號起點')
+_parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
+                     help='預期 yaml 數量（驗證用）')
+_args, _unknown = _parser.parse_known_args()
+MODE = _args.mode
 
 BATCH_04 = '第 04 批 · 2026-05-21'
 EXPECTED_COUNT_04 = 13  # 第 04 批應產出腳本數，未來批次另設 EXPECTED_COUNT_05 等
@@ -17,49 +38,59 @@ def sc_article(num, title, pie, platforms, cta, scene, timeline, batch=None,
     if batch is None:
         batch = BATCH_03
     aid = str(num).zfill(2) + ('b' if batch == BATCH_02 else '')
-    pl_tags = ''.join('<span class="tag">' + p + '</span>' for p in platforms)
-    派系_tags = '<span class="tag">' + pie + '</span>'
-    cta_tag = '<span class="tag pe">' + cta + '</span>'
+    # P1#3: escape text fields
+    title_e = esc_text(title)
+    pie_e = esc_text(pie)
+    cta_e = esc_text(cta)
+    scene_e = esc_text(scene)
+    batch_e = esc_text(batch)
+    pl_tags = ''.join('<span class="tag">' + esc_text(p) + '</span>' for p in platforms)
+    派系_tags = '<span class="tag">' + pie_e + '</span>'
+    cta_tag = '<span class="tag pe">' + cta_e + '</span>'
     tl_html = ''
     for ts, desc, *rest in timeline:
         sub    = rest[0] if len(rest) > 0 else ''
         mirror = rest[1] if len(rest) > 1 else ''
         tl_html += (
-            '<div class="sl"><span class="st">' + ts + '</span>'
-            '<p class="sd">' + desc + '</p>'
+            '<div class="sl"><span class="st">' + esc_text(ts) + '</span>'
+            '<p class="sd">' + esc_text(desc) + '</p>'
         )
         if sub:
-            tl_html += '<p class="sc-sub">' + sub + '</p>'
+            tl_html += '<p class="sc-sub">' + esc_text(sub) + '</p>'
         if mirror:
-            tl_html += '<div class="mirror">藏鏡人　' + Q + mirror + Q + '</div>'
+            tl_html += '<div class="mirror">藏鏡人　' + Q + esc_text(mirror) + Q + '</div>'
         tl_html += '</div>\n'
 
-    cap_escaped = ''
-    if caption:
-        cap_escaped = caption.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+    # caption escape via esc_attr
+    cap_escaped = esc_attr(caption) if caption else ''
     cap_attr = ' data-caption="' + cap_escaped + '"' if cap_escaped else ''
 
     hashtag_attr = ''
     hashtag_html = ''
     if hashtag:
-        hashtag_attr = ' data-hashtags="' + ' '.join(hashtag) + '"'
-        hashtag_html = '<div class="hashtag-pool">' + ''.join('<span class="hashtag">' + t + '</span>' for t in hashtag) + '</div>\n'
+        hashtag_attr = ' data-hashtags="' + esc_attr(' '.join(hashtag)) + '"'
+        hashtag_html = '<div class="hashtag-pool">' + ''.join('<span class="hashtag">' + esc_text(t) + '</span>' for t in hashtag) + '</div>\n'
 
     meta_extra = ''
     if platform_chip:
-        meta_extra += '<span class="platform">▶ ' + platform_chip + '</span> '
+        meta_extra += '<span class="platform">▶ ' + esc_text(platform_chip) + '</span> '
     if po_time:
-        meta_extra += '<span class="po-time">⏰ ' + po_time + '</span>'
+        meta_extra += '<span class="po-time">⏰ ' + esc_text(po_time) + '</span>'
 
     img_html = ''
     dl_btn = ''
     if img:
-        img_html = '<div class="sc-img"><img src="' + img + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>\n'
-        dl_name = os.path.basename(img)
-        dl_btn = '<a class="download-btn" href="' + img + '" download="' + dl_name + '">下載圖卡</a>\n'
+        try:
+            img_safe = safe_img_src(img)
+        except ValueError:
+            img_safe = ''
+        if img_safe:
+            dl_name = esc_attr(os.path.basename(img))
+            img_html = '<div class="sc-img"><img src="' + img_safe + '" class="card-thumb" alt="圖卡預覽" onclick="openLightbox(this); return false;"></div>\n'
+            dl_btn = '<a class="download-btn" href="' + img_safe + '" download="' + dl_name + '">下載圖卡</a>\n'
 
     copy_label = '複製文案' if cap_escaped else '複製腳本'
-    batch_tag = '<div class="batch-tag">' + batch + '</div>\n'
+    batch_tag = '<div class="batch-tag">' + batch_e + '</div>\n'
 
     return (
         '<!-- #' + aid + ' -->\n'
@@ -73,8 +104,8 @@ def sc_article(num, title, pie, platforms, cta, scene, timeline, batch=None,
         + 派系_tags + cta_tag + pl_tags +
         '\n  </div>\n' +
         (('  <div class="card-meta-extra">' + meta_extra + '</div>\n') if meta_extra else '') +
-        '  <h2 class="ti">' + title + '</h2>\n'
-        '  <p class="vi">' + scene + '</p>\n'
+        '  <h2 class="ti">' + title_e + '</h2>\n'
+        '  <p class="vi">' + scene_e + '</p>\n'
         '  <p class="ht">&#9660; Open</p>\n'
         '</div>\n'
         '<div class="sb-body">\n'
@@ -741,6 +772,129 @@ print('bappu-cc/index.html DONE:', len(nc), 'chars')
 
 arts = re.findall(r'<article class="sc"', nc)
 print('Total articles:', len(arts))
+
+# ============================================================
+# bappu_article_adapter（yaml_to_sc_kwargs → sc_article）
+# 對齊 4 業主標準接口（SOP §6.5 yaml-driven 鐵律）
+# ============================================================
+
+def bappu_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
+    """yaml dict → sc_article() HTML（叭噗_小C 標準接口）
+    sc_article 需要 platforms list，yaml_to_sc 通用版從 main_platform 解析。
+    """
+    from yaml_to_sc import yaml_to_sc_kwargs
+    kw = yaml_to_sc_kwargs(yaml_data, num=num)
+    return sc_article(
+        num=kw['num'],
+        title=kw['title'],
+        pie=kw['pie'],
+        platforms=kw['platforms'],
+        cta=kw['cta'],
+        scene=kw['scene'],
+        timeline=kw['timeline'],
+        batch=batch_label,
+        caption=kw.get('caption'),
+        platform_chip=kw.get('platform_chip'),
+        po_time=kw.get('po_time'),
+        hashtag=kw.get('hashtag'),
+        img=kw.get('img'),
+    )
+
+
+# ============================================================
+# yaml-driven 主路由（--mode yaml 時執行）
+# 用途：第05批及以後新批次，inject 到既有 group
+# 第04批 yaml-driven 仍在 load time 直接執行（相容不動）
+# ============================================================
+
+if MODE == 'yaml':
+    print(f'\n=== yaml-driven mode (叭噗_小C) ===')
+    if not _args.yaml_dir:
+        print('ERROR: --mode yaml 必須指定 --yaml-dir', file=sys.stderr)
+        import sys as _sys2; _sys2.exit(1)
+    if not os.path.isdir(_args.yaml_dir):
+        print(f'ERROR: yaml-dir 不存在：{_args.yaml_dir}', file=sys.stderr)
+        import sys as _sys2; _sys2.exit(1)
+
+    from yaml_to_sc import load_yaml_articles
+
+    _new_batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml_dir)}'
+    _new_yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
+    _new_num_start = _args.num_start
+
+    # 依派系分流
+    _new_by_pie = {}
+    for _idx, _ydata in enumerate(_new_yaml_articles, start=0):
+        _pie = _ydata.get('派系', '未分類')
+        _art = bappu_article_adapter(_ydata, num=_new_num_start + _idx,
+                                     batch_label=_new_batch_label)
+        _new_by_pie.setdefault(_pie, []).append(_art)
+
+    _new_total = sum(len(v) for v in _new_by_pie.items().__class__.__mro__) if False else \
+                 sum(len(v) for v in _new_by_pie.values())
+    print(f'yaml articles built OK ({_new_total} 部):')
+    for _pie, _arts in sorted(_new_by_pie.items()):
+        print(f'  {_pie}: {len(_arts)} 部')
+
+    # 派系 → group 對應表（對齊現有叭噗 group 結構）
+    BAPPU_PIE_TO_GROUP = {
+        '故事戲劇派': 'gA',
+        '人間觀察派': 'gB',
+        '拆解派':     'gD',
+        '自嘲反差派': 'gF',
+        '家人朋友模擬派': 'gC',
+        '直球派':     'gG', '直球情侶版': 'gG',
+        '圖卡部':     'gH',
+        '模板L_知識反差': 'gL',
+    }
+
+    def _inject_bappu_group(group_html: str, new_arts: list) -> str:
+        """在 group <div class="gb">...\n\n</div>\n</div> 前插入新 articles"""
+        inject_html = '\n'.join(new_arts)
+        close_seq = '\n\n</div>\n</div>'
+        last_close = group_html.rfind(close_seq)
+        if last_close < 0:
+            return group_html + '\n' + inject_html
+        return group_html[:last_close] + '\n' + inject_html + group_html[last_close:]
+
+    _extra_bappu_groups = []
+    for _pie, _arts in _new_by_pie.items():
+        _gvar = BAPPU_PIE_TO_GROUP.get(_pie, '')
+        if _gvar and _gvar in globals():
+            globals()[_gvar] = _inject_bappu_group(globals()[_gvar], _arts)
+            print(f'  {_pie} → 注入 {_gvar} ({len(_arts)} 部)')
+        else:
+            # 未知派系 → 獨立新 group
+            _new_grp = gp_group_v2(str(len(_extra_bappu_groups) + 90), _pie, _arts)
+            _extra_bappu_groups.append(_new_grp)
+            print(f'  {_pie} → 新建 group ({len(_arts)} 部)')
+
+    # 重組 all_groups（含 inject 後）並重寫 HTML
+    all_groups_new = '\n'.join([
+        globals()['gA'], globals()['gB'], globals()['gD'],
+        globals()['gF'], globals()['gC'], globals()['gG'],
+        globals()['gH'], globals()['gL'],
+        threads_section
+    ] + _extra_bappu_groups)
+
+    # 重新替換 HTML（讀最新已寫入的 bappu-cc/index.html）
+    with open(bappu_path, 'r', encoding='utf-8') as _f:
+        _nc2 = _f.read()
+
+    _first_gp2 = _nc2.find('<div class="gp"')
+    if _first_gp2 < 0:
+        _first_gp2 = _nc2.find('<div class="gp ')
+    _main_wrap2 = _nc2.find('</div><!-- .main-wrap -->')
+    if _first_gp2 >= 0 and _main_wrap2 >= 0:
+        _nc2 = _nc2[:_first_gp2] + all_groups_new + '\n\n' + _nc2[_main_wrap2:]
+        with open(bappu_path, 'w', encoding='utf-8') as _f:
+            _f.write(_nc2)
+        _arts2 = len(re.findall(r'<article class="sc"', _nc2))
+        print(f'yaml-driven 重寫完成 bappu-cc/index.html ({_arts2} articles, {len(_nc2)} chars)')
+    else:
+        print('WARNING: 找不到 gp div 或 main-wrap，yaml inject 跳過', file=sys.stderr)
+
+print('build_bappu.py DONE')
 dl_count = len(re.findall(r'<a class="download-btn"', nc))
 print(f'download-btn count: {dl_count}')
 assert len(arts) >= 20, f'Expected >= 20 articles, got {len(arts)}'

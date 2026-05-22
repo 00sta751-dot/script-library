@@ -1,7 +1,29 @@
-import os, sys, io, re
+import os, sys, io, re, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
+from _html_escape_utils import esc_text, esc_attr, safe_img_src
 # v2026-05-18: added platform/po_time params + CSS idempotent patch
+# v2026-05-22: yaml-driven mode (--mode yaml) + rux_article_adapter
+# v2026-05-22: P1#3 html escape via _html_escape_utils
+
+# ============================================================
+# CLI mode 解析
+# ============================================================
+_parser = argparse.ArgumentParser(description='build_index.py — 瑞祥腳本庫 build script')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
+                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
+                     help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
+_parser.add_argument('--batch-label', dest='batch_label', default='',
+                     help='批次顯示名稱，如「第 34 批 · 2026-06-01」')
+_parser.add_argument('--num-start', dest='num_start', type=int, default=1,
+                     help='article 編號起點（第 N 批 → 通常 (N-30)*13+1）')
+_parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
+                     help='預期 yaml 數量（驗證用）')
+_args, _unknown = _parser.parse_known_args()
+MODE = _args.mode
 
 BATCH    = '第 33 批 · 2026-05-18'
 BATCH_32 = '第 32 批 · 2026-05-12'
@@ -28,28 +50,38 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
     pid = 'c' + str(num) + ('b' if batch == BATCH_32 else '')
     color = PIE_COLORS.get(pie, '#444')
     Q = chr(39)
+    # P1#3: escape text fields
+    title_e = esc_text(title)
+    pie_e = esc_text(pie)
+    insight_e = esc_text(insight)
+    scene_e = esc_text(scene)
+    cta_e = esc_text(cta)
+    batch_e = esc_text(batch)
     tl_html = ''
     for ts, say, sub, *rest in timeline:
         mirror = rest[0] if rest else ''
-        tl_html += '        <div class="row"><div class="time">' + ts + '</div><div class="say">' + say + '</div>'
+        tl_html += '        <div class="row"><div class="time">' + esc_text(ts) + '</div><div class="say">' + esc_text(say) + '</div>'
         if mirror:
-            tl_html += '<div class="mirror">藏鏡人　' + Q + mirror + Q + '</div>'
+            tl_html += '<div class="mirror">藏鏡人　' + Q + esc_text(mirror) + Q + '</div>'
         if sub:
-            tl_html += '<div class="sub">' + sub + '</div>'
+            tl_html += '<div class="sub">' + esc_text(sub) + '</div>'
         tl_html += '</div>\n'
     img_html = ''
     if img:
-        img_html = (
-            '    <div class="ref-link">圖卡部 · 圖卡附件：'
-            '<a href="' + img + '" target="_blank">'
-            '<img src="' + img + '" class="card-thumb" alt="圖卡預覽" '
-            'onclick="openLightbox(this); return false;">'
-            '</a></div>\n'
-        )
-    # caption HTML escape
-    cap_escaped = ''
-    if caption:
-        cap_escaped = caption.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+        try:
+            img_safe = safe_img_src(img)
+        except ValueError:
+            img_safe = ''
+        if img_safe:
+            img_html = (
+                '    <div class="ref-link">圖卡部 · 圖卡附件：'
+                '<a href="' + img_safe + '" target="_blank">'
+                '<img src="' + img_safe + '" class="card-thumb" alt="圖卡預覽" '
+                'onclick="openLightbox(this); return false;">'
+                '</a></div>\n'
+            )
+    # caption escape via esc_attr（取代手動 replace 4 次）
+    cap_escaped = esc_attr(caption) if caption else ''
     cap_attr = ' data-caption="' + cap_escaped + '"' if cap_escaped else ''
     copy_label = '複製文案' if cap_escaped else '複製腳本'
     # hashtag data attribute (space-separated list for JS to read)
@@ -57,40 +89,40 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
     hashtag_html = ''
     if hashtag:
         # data-hashtags stores space-separated tags for copyScript JS
-        hashtag_attr = ' data-hashtags="' + ' '.join(hashtag) + '"'
+        hashtag_attr = ' data-hashtags="' + esc_attr(' '.join(hashtag)) + '"'
         hashtag_html = (
             '    <div class="hashtag-pool">\n' +
-            ''.join('      <span class="hashtag">' + t + '</span>\n' for t in hashtag) +
+            ''.join('      <span class="hashtag">' + esc_text(t) + '</span>\n' for t in hashtag) +
             '    </div>\n'
         )
     # platform / po_time meta row (only shown when provided)
     meta_extra = ''
     if platform:
-        meta_extra += '      <span class="platform">▶ ' + platform + '</span>\n'
+        meta_extra += '      <span class="platform">▶ ' + esc_text(platform) + '</span>\n'
     if po_time:
-        meta_extra += '      <span class="po-time">⏰ ' + po_time + '</span>\n'
+        meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
     return (
-        '<article class="card" data-cat="' + pie + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="' + esc_attr(pie) + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
-        '      <span class="pie">' + pie + '</span>\n'
+        '      <span class="pie">' + pie_e + '</span>\n'
         '      <span class="num">No. ' + str(num).zfill(2) + '</span>\n'
-        '      <span class="batch">' + batch + '</span>\n'
+        '      <span class="batch">' + batch_e + '</span>\n'
         '    </div>\n' +
         (('    <div class="card-meta-extra">\n' + meta_extra + '    </div>\n') if meta_extra else '') +
-        '    <h3 class="title">' + title + '</h3>\n'
-        '    <div class="insight">' + insight + '</div>\n'
+        '    <h3 class="title">' + title_e + '</h3>\n'
+        '    <div class="insight">' + insight_e + '</div>\n'
         '  </div>\n'
         '  <div class="card-body">\n'
-        '    <div class="scene"><b>場景</b>　' + scene + '</div>\n' +
+        '    <div class="scene"><b>場景</b>　' + scene_e + '</div>\n' +
         img_html +
         '    <div class="timeline">\n' +
         tl_html +
         '    </div>\n'
         '    <div class="cta">\n'
         '      <span class="cta-arrow">→</span>\n'
-        '      <span>' + cta + '</span>\n'
+        '      <span>' + cta_e + '</span>\n'
         '    </div>\n' +
         hashtag_html +
         '    <button class="copy-btn" onclick="copyScript(this)">' + copy_label + '</button>\n'
@@ -688,14 +720,143 @@ sect_threads = (
 
 print('Section 脆文 Threads built OK')
 
-# Assemble all sections and replace in index.html
-# 脆文 sect_threads 排在最後，預設 collapsed 邏輯由 JS 統一處理
-all_sections = '\n\n'.join([
-    sect_direct, sect_spicy, sect_human, sect_story,
-    sect_struct, sect_market, sect_self, sect_senior,
-    sect_trend, sect_fish, sect_soul,
-    sect_threads
-])
+# ============================================================
+# yaml-driven adapter（瑞祥 rux_article）
+# ============================================================
+
+def rux_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
+    """yaml dict → rux_article() HTML
+    rux_article 需要 insight + scene，yaml_to_sc 通用版只生 scene。
+    adapter 策略：從 yaml 取 insight 欄位，fallback 到 scene。
+    """
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import yaml_to_sc_kwargs
+    kw = yaml_to_sc_kwargs(yaml_data, num=num)
+
+    # rux_article 專屬欄位 mapping
+    insight = yaml_data.get('insight') or yaml_data.get('核心洞察') or kw['scene']
+    scene = kw['scene']
+    # rux_article(num, title, pie, insight, scene, timeline, cta, img, batch, caption, platform, po_time, hashtag)
+    return rux_article(
+        num=kw['num'],
+        title=kw['title'],
+        pie=kw['pie'],
+        insight=insight,
+        scene=scene,
+        timeline=kw['timeline'],
+        cta=kw['cta'],
+        img=kw.get('img'),
+        batch=batch_label,
+        caption=kw.get('caption'),
+        platform=kw.get('platform_chip') or (kw['platforms'][0] if kw.get('platforms') else None),
+        po_time=kw.get('po_time'),
+        hashtag=kw.get('hashtag'),
+    )
+
+
+# ============================================================
+# yaml-driven 主路由（--mode yaml 時執行，否則跳過）
+# ============================================================
+
+if MODE == 'yaml':
+    print(f'\n=== yaml-driven mode ===')
+    if not _args.yaml_dir:
+        print('ERROR: --mode yaml 必須指定 --yaml-dir', file=sys.stderr)
+        sys.exit(1)
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import load_yaml_articles
+
+    batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml_dir)}'
+    yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
+    num_start = _args.num_start
+
+    # 依派系分流（同 build_bappu.py 邏輯）
+    _yaml_by_pie = {}
+    for _idx, _ydata in enumerate(yaml_articles, start=0):
+        _pie = _ydata.get('派系', '未分類')
+        _art = rux_article_adapter(_ydata, num=num_start + _idx, batch_label=batch_label)
+        _yaml_by_pie.setdefault(_pie, []).append(_art)
+
+    _yaml_total = sum(len(v) for v in _yaml_by_pie.values())
+    print(f'yaml articles built OK ({_yaml_total} 部):')
+    for _pie, _arts in sorted(_yaml_by_pie.items()):
+        print(f'  {_pie}: {len(_arts)} 部')
+
+    # 各派系注入到既有 section（同派系合併，新派系獨立新 section）
+    KNOWN_PIES = {
+        '直球派': sect_direct,
+        '嗆辣派': sect_spicy,
+        '人間觀察派': sect_human,
+        '故事戲劇派': sect_story,
+        '結構分析派': sect_struct,
+        '拆解派': sect_struct,
+        '市場觀察派': sect_market,
+        '自嘲反差派': sect_self,
+        '老前輩權威派': sect_senior,
+        '時事追擊派': sect_trend,
+        '圖卡部': sect_fish,
+        '綜合派': sect_soul,
+    }
+    # 未知派系 → 新建獨立 section
+    _extra_sections = []
+    for _pie, _arts in sorted(_yaml_by_pie.items()):
+        if _pie not in KNOWN_PIES:
+            _extra_sec = section(
+                str(len(KNOWN_PIES) + len(_extra_sections) + 1) + '.',
+                _pie, _pie, 99 + len(_extra_sections), _arts, len(_arts)
+            )
+            _extra_sections.append(_extra_sec)
+            print(f'  新派系 {_pie} 建立獨立 section')
+
+    # 把 yaml articles 加進既有 section（修改 section HTML 字串，append before </div>）
+    def _inject_into_section(sect_html: str, new_arts: list) -> str:
+        inject_html = '\n'.join(new_arts)
+        # 在最後 </div> 前插入（section 結構：<div class="cards">...</div>）
+        close_tag = '</div>'
+        last_close = sect_html.rfind(close_tag)
+        if last_close < 0:
+            return sect_html + '\n' + inject_html
+        return sect_html[:last_close] + '\n' + inject_html + '\n' + sect_html[last_close:]
+
+    for _pie, _arts in _yaml_by_pie.items():
+        if _pie in KNOWN_PIES:
+            # 找對應 section 變數並注入
+            _sect_varname = {
+                '直球派': 'sect_direct', '嗆辣派': 'sect_spicy',
+                '人間觀察派': 'sect_human', '故事戲劇派': 'sect_story',
+                '結構分析派': 'sect_struct', '拆解派': 'sect_struct',
+                '市場觀察派': 'sect_market', '自嘲反差派': 'sect_self',
+                '老前輩權威派': 'sect_senior', '時事追擊派': 'sect_trend',
+                '圖卡部': 'sect_fish', '綜合派': 'sect_soul',
+            }.get(_pie, '')
+            if _sect_varname:
+                _cur = globals()[_sect_varname]
+                globals()[_sect_varname] = _inject_into_section(_cur, _arts)
+                print(f'  {_pie} → 注入 {_sect_varname} ({len(_arts)} 部)')
+
+    # 重建 all_sections（含 yaml 注入後）
+    all_sections = '\n\n'.join([
+        globals()['sect_direct'], globals()['sect_spicy'], globals()['sect_human'],
+        globals()['sect_story'], globals()['sect_struct'], globals()['sect_market'],
+        globals()['sect_self'], globals()['sect_senior'], globals()['sect_trend'],
+        globals()['sect_fish'], globals()['sect_soul'],
+        sect_threads
+    ] + _extra_sections)
+    print('yaml-driven all_sections assembled')
+else:
+    # legacy mode（預設）
+    # Assemble all sections and replace in index.html
+    # 脆文 sect_threads 排在最後，預設 collapsed 邏輯由 JS 統一處理
+    all_sections = '\n\n'.join([
+        sect_direct, sect_spicy, sect_human, sect_story,
+        sect_struct, sect_market, sect_self, sect_senior,
+        sect_trend, sect_fish, sect_soul,
+        sect_threads
+    ])
 
 # Replace in index.html
 with open(os.path.join(LIB, 'index.html'), 'r', encoding='utf-8') as f:

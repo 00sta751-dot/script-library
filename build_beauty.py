@@ -1,8 +1,29 @@
-import os, sys, io, re
+import os, sys, io, re, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
+from _html_escape_utils import esc_text, esc_attr, safe_img_src
 
 # v2 2026-05-18: align SOP v2 9-feature logic (sections + groups + collapsed + caption + platform + po_time + hashtag + lightbox)
+# v3 2026-05-22: yaml-driven mode (--mode yaml) + beauty_article_adapter
+
+# ============================================================
+# CLI mode 解析
+# ============================================================
+_parser = argparse.ArgumentParser(description='build_beauty.py — 昀臻美容腳本庫 build script')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
+                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
+                     help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
+_parser.add_argument('--batch-label', dest='batch_label', default='',
+                     help='批次顯示名稱，如「第 10 批 · 2026-06-01」')
+_parser.add_argument('--num-start', dest='num_start', type=int, default=1,
+                     help='article 編號起點')
+_parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
+                     help='預期 yaml 數量（驗證用）')
+_args, _unknown = _parser.parse_known_args()
+MODE = _args.mode
 
 BATCH_09 = '第 09 批 · 2026-05-18'
 BATCH_07 = '第 07 批 · 2026-05-13'
@@ -31,43 +52,53 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
         batch = BATCH_09
     pid = 'b' + str(num) + ('_07' if batch == BATCH_07 else '_06' if batch == BATCH_06 else '')
     color = PIE_COLORS.get(pie, '#C9A84C')
+    # P1#3: escape text fields
+    title_e = esc_text(title)
+    pie_e = esc_text(pie)
+    insight_e = esc_text(insight)
+    scene_e = esc_text(scene)
+    cta_e = esc_text(cta)
+    batch_e = esc_text(batch)
 
     tl_html = ''
     for ts, say, sub, *rest in timeline:
         mirror = rest[0] if rest else ''
-        tl_html += '        <div class="row"><div class="time">' + ts + '</div><div class="line">' + say + '</div>'
+        tl_html += '        <div class="row"><div class="time">' + esc_text(ts) + '</div><div class="line">' + esc_text(say) + '</div>'
         if sub:
-            tl_html += '<div class="sub">' + sub + '</div>'
+            tl_html += '<div class="sub">' + esc_text(sub) + '</div>'
         if mirror:
-            tl_html += '<div class="mirror">藏鏡人　' + Q + mirror + Q + '</div>'
+            tl_html += '<div class="mirror">藏鏡人　' + Q + esc_text(mirror) + Q + '</div>'
         tl_html += '</div>\n'
 
     img_html = ''
     if img:
-        # dl_name: derive from img path
-        dl_name_base = os.path.basename(img).replace('./', '')
-        img_html = (
-            '    <div class="ref-link">圖卡部 · 圖卡附件：<br>\n'
-            '    <img src="' + img + '" class="card-thumb" alt="圖卡預覽" '
-            'onclick="openLightbox(this); return false;">\n'
-            '    </div>\n'
-            '    <div class="card-image-actions">\n'
-            '      <a class="download-btn" href="' + img + '" download="' + dl_name_base + '">下載圖卡</a>\n'
-            '    </div>\n'
-        )
+        try:
+            img_safe = safe_img_src(img)
+        except ValueError:
+            img_safe = ''
+        if img_safe:
+            dl_name_base = esc_attr(os.path.basename(img).replace('./', ''))
+            img_html = (
+                '    <div class="ref-link">圖卡部 · 圖卡附件：<br>\n'
+                '    <img src="' + img_safe + '" class="card-thumb" alt="圖卡預覽" '
+                'onclick="openLightbox(this); return false;">\n'
+                '    </div>\n'
+                '    <div class="card-image-actions">\n'
+                '      <a class="download-btn" href="' + img_safe + '" download="' + dl_name_base + '">下載圖卡</a>\n'
+                '    </div>\n'
+            )
 
-    cap_escaped = ''
-    if caption:
-        cap_escaped = caption.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+    # caption escape via esc_attr
+    cap_escaped = esc_attr(caption) if caption else ''
     cap_attr = ' data-caption="' + cap_escaped + '"' if cap_escaped else ''
 
     hashtag_attr = ''
     hashtag_html = ''
     if hashtag:
-        hashtag_attr = ' data-hashtags="' + ' '.join(hashtag) + '"'
+        hashtag_attr = ' data-hashtags="' + esc_attr(' '.join(hashtag)) + '"'
         hashtag_html = (
             '    <div class="hashtag-pool">\n' +
-            ''.join('      <span class="hashtag">' + t + '</span>\n' for t in hashtag) +
+            ''.join('      <span class="hashtag">' + esc_text(t) + '</span>\n' for t in hashtag) +
             '    </div>\n'
         )
 
@@ -75,32 +106,32 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
 
     meta_extra = ''
     if platform:
-        meta_extra += '      <span class="platform">▶ ' + platform + '</span>\n'
+        meta_extra += '      <span class="platform">▶ ' + esc_text(platform) + '</span>\n'
     if po_time:
-        meta_extra += '      <span class="po-time">⏰ ' + po_time + '</span>\n'
+        meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
 
     return (
-        '<article class="card" data-cat="' + pie + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="' + esc_attr(pie) + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
-        '      <span class="pie">' + pie + '</span>\n'
+        '      <span class="pie">' + pie_e + '</span>\n'
         '      <span class="num">No. ' + str(num).zfill(2) + '</span>\n'
-        '      <span class="batch">' + batch + '</span>\n'
+        '      <span class="batch">' + batch_e + '</span>\n'
         '    </div>\n' +
         (('    <div class="card-meta-extra">\n' + meta_extra + '    </div>\n') if meta_extra else '') +
-        '    <h3 class="title">' + title + '</h3>\n'
-        '    <div class="insight">' + insight + '</div>\n'
+        '    <h3 class="title">' + title_e + '</h3>\n'
+        '    <div class="insight">' + insight_e + '</div>\n'
         '  </div>\n'
         '  <div class="card-body">\n'
-        '    <div class="scene"><b>場景</b>　' + scene + '</div>\n' +
+        '    <div class="scene"><b>場景</b>　' + scene_e + '</div>\n' +
         img_html +
         '    <div class="timeline">\n' +
         tl_html +
         '    </div>\n'
         '    <div class="cta">\n'
         '      <span class="cta-arrow">→</span>\n'
-        '      <span>' + cta + '</span>\n'
+        '      <span>' + cta_e + '</span>\n'
         '    </div>\n' +
         hashtag_html +
         '    <button class="copy-btn" onclick="copyScript(this)">' + copy_label + '</button>\n'
@@ -565,6 +596,71 @@ sect_threads = (
 print('脆文 Threads built OK')
 
 # ============================================================
+# yaml-driven adapter（昀臻 beauty_article）
+# ============================================================
+
+def beauty_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
+    """yaml dict → beauty_article() HTML
+    beauty_article 需要 insight + scene，yaml_to_sc 通用版只生 scene。
+    adapter 策略：從 yaml 取 insight 欄位，fallback 到 scene。
+    """
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import yaml_to_sc_kwargs
+    kw = yaml_to_sc_kwargs(yaml_data, num=num)
+
+    # beauty_article 專屬欄位 mapping
+    insight = yaml_data.get('insight') or yaml_data.get('核心洞察') or kw['scene']
+    scene = kw['scene']
+    # beauty_article(num, title, pie, insight, scene, timeline, cta, img, batch, caption, platform, po_time, hashtag)
+    return beauty_article(
+        num=kw['num'],
+        title=kw['title'],
+        pie=kw['pie'],
+        insight=insight,
+        scene=scene,
+        timeline=kw['timeline'],
+        cta=kw['cta'],
+        img=kw.get('img'),
+        batch=batch_label,
+        caption=kw.get('caption'),
+        platform=kw.get('platform_chip') or (kw['platforms'][0] if kw.get('platforms') else None),
+        po_time=kw.get('po_time'),
+        hashtag=kw.get('hashtag'),
+    )
+
+
+# ============================================================
+# yaml-driven 主路由（--mode yaml 時執行，否則用 legacy 路徑）
+# ============================================================
+_yaml_by_pie = {}  # 供 yaml mode 使用，legacy mode 空 dict
+
+if MODE == 'yaml':
+    print(f'\n=== yaml-driven mode (昀臻 beauty) ===')
+    if not _args.yaml_dir:
+        print('ERROR: --mode yaml 必須指定 --yaml-dir', file=sys.stderr)
+        sys.exit(1)
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    if _this_dir not in sys.path:
+        sys.path.insert(0, _this_dir)
+    from yaml_to_sc import load_yaml_articles
+
+    batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml_dir)}'
+    yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
+    num_start = _args.num_start
+
+    for _idx, _ydata in enumerate(yaml_articles, start=0):
+        _pie = _ydata.get('派系', '未分類')
+        _art = beauty_article_adapter(_ydata, num=num_start + _idx, batch_label=batch_label)
+        _yaml_by_pie.setdefault(_pie, []).append(_art)
+
+    _yaml_total = sum(len(v) for v in _yaml_by_pie.values())
+    print(f'yaml articles built OK ({_yaml_total} 部):')
+    for _pie, _arts in sorted(_yaml_by_pie.items()):
+        print(f'  {_pie}: {len(_arts)} 部')
+
+# ============================================================
 # Assemble section groups (v2:派系合併跨批)
 # ============================================================
 
@@ -600,11 +696,54 @@ sect_card = section_group('VI.', '圖卡部', 'Card Library', 5, card_cards, len
 b2b_cards = [a06_04, a09_12]
 sect_b2b = section_group('VII.', '美業心法 / 招生', 'B2B Academy', 6, b2b_cards, len(b2b_cards))
 
-all_sections = '\n\n'.join([
-    sect_direct, sect_story, sect_human, sect_market,
-    sect_struct, sect_card, sect_b2b,
-    sect_threads
-])
+# yaml mode：把 yaml articles 注入對應 section
+if MODE == 'yaml' and _yaml_by_pie:
+    BEAUTY_PIE_TO_SECT = {
+        '直球派': 'sect_direct', '毒舌正能量': 'sect_direct',
+        '故事戲劇派': 'sect_story', '家人朋友模擬派': 'sect_story',
+        '人間觀察派': 'sect_human',
+        '市場觀察派': 'sect_market',
+        '拆解派': 'sect_struct', '結構分析派': 'sect_struct',
+        '圖卡部': 'sect_card',
+        '純雞湯': 'sect_b2b',  # 無雞湯 section，暫放 b2b
+    }
+
+    def _inject_beauty_section(sect_html: str, new_arts: list) -> str:
+        inject_html = '\n'.join(new_arts)
+        # section_group 結構：<div class="cards">...\n</div>\n</div>
+        close_seq = '\n</div>\n</div>'
+        last_close = sect_html.rfind(close_seq)
+        if last_close < 0:
+            return sect_html + '\n' + inject_html
+        return sect_html[:last_close] + '\n' + inject_html + sect_html[last_close:]
+
+    _extra_beauty_sects = []
+    for _pie, _arts in _yaml_by_pie.items():
+        _sv = BEAUTY_PIE_TO_SECT.get(_pie, '')
+        if _sv:
+            globals()[_sv] = _inject_beauty_section(globals()[_sv], _arts)
+            print(f'  beauty yaml {_pie} → 注入 {_sv} ({len(_arts)} 部)')
+        else:
+            _new_sect = section_group(
+                str(len(BEAUTY_PIE_TO_SECT) + len(_extra_beauty_sects) + 1) + '.',
+                _pie, _pie, 99 + len(_extra_beauty_sects), _arts, len(_arts)
+            )
+            _extra_beauty_sects.append(_new_sect)
+            print(f'  beauty yaml {_pie} → 新建 section ({len(_arts)} 部)')
+
+    all_sections = '\n\n'.join([
+        globals()['sect_direct'], globals()['sect_story'],
+        globals()['sect_human'], globals()['sect_market'],
+        globals()['sect_struct'], globals()['sect_card'],
+        globals()['sect_b2b'],
+        sect_threads
+    ] + _extra_beauty_sects)
+else:
+    all_sections = '\n\n'.join([
+        sect_direct, sect_story, sect_human, sect_market,
+        sect_struct, sect_card, sect_b2b,
+        sect_threads
+    ])
 
 # ============================================================
 # Replace in beauty.html

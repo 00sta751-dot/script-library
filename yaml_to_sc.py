@@ -127,7 +127,7 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
             desc_parts.append(f"（{sc['畫面']}）")
         desc = ' '.join(desc_parts)
 
-        sub_desc = ''  # yaml 目前無對應欄位
+        sub_desc = sc.get('畫面', '')  # 場景畫面描述作字幕（.sub 欄位）
 
         # 藏鏡人：去掉「「」」包覆符
         mirror_raw = sc.get('藏鏡人', '') or ''

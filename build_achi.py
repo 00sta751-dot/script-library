@@ -8,6 +8,9 @@ build_achi.py — 阿奇 腳本庫 build script
 
 用法：
   python build_achi.py --mode yaml --yaml-dir <yaml資料夾路徑> --batch-label "第 01 批 · 2026-XX-XX"
+
+更新日誌：
+  2026-05-22：yaml_to_sc.py sub_desc 改從 '畫面' 欄位取值，修 .sub 字幕渲染（75 個）
 """
 
 import os

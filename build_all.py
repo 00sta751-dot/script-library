@@ -372,17 +372,18 @@ def kenny_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
     kenny_article 需要 summary，yaml_to_sc 通用版只生 scene。
     adapter 策略：從 yaml 取 summary 欄位，fallback 到 scene（第一場景描述）。
     platforms 從 main_platform 解析，platform_chip = main_platform。
+    v2 2026-05-23：注入 v2 新欄位 data-* meta（voice_lock/publish_mode/dist_mode/trial_reels）
     """
     _this_dir = os.path.dirname(os.path.abspath(__file__))
     if _this_dir not in sys.path:
         sys.path.insert(0, _this_dir)
-    from yaml_to_sc import yaml_to_sc_kwargs
+    from yaml_to_sc import yaml_to_sc_kwargs, inject_v2_meta_attrs
     kw = yaml_to_sc_kwargs(yaml_data, num=num)
 
     # kenny_article 專屬欄位 mapping
     summary = yaml_data.get('summary') or yaml_data.get('核心洞察') or kw['scene']
     # kenny_article(num, title, pie, platforms, cta, summary, timeline, batch, caption, platform_chip, po_time, hashtag, img)
-    return kenny_article(
+    html = kenny_article(
         num=kw['num'],
         title=kw['title'],
         pie=kw['pie'],
@@ -397,6 +398,7 @@ def kenny_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         hashtag=kw.get('hashtag'),
         img=kw.get('img'),
     )
+    return inject_v2_meta_attrs(html, kw)
 
 
 # ============================================================

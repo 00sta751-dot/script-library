@@ -34,7 +34,8 @@ BATCH_02 = '第 02 批 · 2026-05-12'
 Q = chr(39)
 
 def sc_article(num, title, pie, platforms, cta, scene, timeline, batch=None,
-               caption=None, platform_chip=None, po_time=None, hashtag=None, img=None):
+               caption=None, platform_chip=None, po_time=None, hashtag=None, img=None,
+               **_extra):  # v2: 吸收 voice_lock/policy_alignment/publish_mode 等新欄位
     if batch is None:
         batch = BATCH_03
     aid = str(num).zfill(2) + ('b' if batch == BATCH_02 else '')
@@ -781,10 +782,11 @@ print('Total articles:', len(arts))
 def bappu_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
     """yaml dict → sc_article() HTML（叭噗_小C 標準接口）
     sc_article 需要 platforms list，yaml_to_sc 通用版從 main_platform 解析。
+    v2 2026-05-23：注入 v2 新欄位 data-* meta（voice_lock/publish_mode/dist_mode/trial_reels）
     """
-    from yaml_to_sc import yaml_to_sc_kwargs
+    from yaml_to_sc import yaml_to_sc_kwargs, inject_v2_meta_attrs
     kw = yaml_to_sc_kwargs(yaml_data, num=num)
-    return sc_article(
+    html = sc_article(
         num=kw['num'],
         title=kw['title'],
         pie=kw['pie'],
@@ -799,6 +801,7 @@ def bappu_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         hashtag=kw.get('hashtag'),
         img=kw.get('img'),
     )
+    return inject_v2_meta_attrs(html, kw)
 
 
 # ============================================================

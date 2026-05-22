@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_script_batch.py — 腳本批次品管員（15 件自動擋）
-對齊 SOP _腳本生產SOP_v3.0.yaml §11 9 件 + §14 §15 + guardian 補 6 件
+validate_script_batch.py — 腳本批次品管員（20 件自動擋 / v2 — 階段 3 升級）
+對齊 SOP _腳本生產SOP_v3.0.yaml §11 9 件 + §14 §15 + guardian 補 6 件 C-010 ~ C-015
+v2 新增 5 件 V2-001 ~ V2-005（yaml schema 新欄位驗 + migration plan）
 
 用法：
   python validate_script_batch.py --owner 阿奇 --batch-dir <絕對路徑>
@@ -12,6 +13,17 @@ validate_script_batch.py — 腳本批次品管員（15 件自動擋）
 PASS → exit 0 / FAIL → exit 1（--strict 模式 / 任一 FAIL）
 
 建檔：2026-05-22 / 對齊 SOP §11 L1-001 ~ L1-009 + guardian 補 6 件 C-010 ~ C-015
+v2 升級：2026-05-23 / 階段 3 新欄位驗 V2-001 ~ V2-005
+
+=== Migration Plan（Codex R2 P0）===
+  - 既有 65 部腳本 yaml：legacy_allowed_until: 2026-06-01 → V2 check 在過渡期 WARN 不 FAIL
+  - 新批次（2026-06-01 後 / 或 yaml 缺 legacy_allowed_until）→ V2 check 硬 FAIL
+  - 5 組 validator fixtures（見底部 __main__ 段）：
+    F1 pass — 含全新欄位
+    F2 missing_field — 缺 distribution_mode
+    F3 legacy — 含 legacy_allowed_until: 2026-06-01 → WARN 不 FAIL
+    F4 platform_variants — 含 platform_variants 驗格式
+    F5 beauty_violation — 美容業 policy_alignment 缺 Meta D-2
 """
 
 import sys
@@ -520,12 +532,136 @@ def chk_c015_hashtag_caption(data: dict, fname: str) -> tuple[str, str]:
 
 
 # ────────────────────────────────────────────
+# v2 新欄位 check 函式（V2-001 ~ V2-005）
+# Migration Plan：
+#   - yaml 有 legacy_allowed_until 欄位且日期 >= today → WARN（過渡期）
+#   - yaml 無 legacy_allowed_until 或日期已過 → FAIL（新批次強制）
+# ────────────────────────────────────────────
+
+import datetime as _dt
+
+def _is_legacy_yaml(data: dict) -> bool:
+    """判斷是否為過渡期 legacy yaml（legacy_allowed_until >= today）"""
+    val = data.get('legacy_allowed_until', '')
+    if not val:
+        return False
+    try:
+        cutoff = _dt.date.fromisoformat(str(val).strip())
+        return _dt.date.today() <= cutoff
+    except Exception:
+        return False
+
+
+def chk_v2_001_voice_lock(data: dict, fname: str) -> tuple[str, str]:
+    """V2-001：voice_lock 欄位存在（明確聲明是否強制語料）"""
+    has_field = 'voice_lock' in data
+    if has_field:
+        val = data['voice_lock']
+        return "PASS", f"voice_lock = {val}（明確聲明）"
+    if _is_legacy_yaml(data):
+        return "WARN", f"缺 voice_lock（legacy yaml 過渡期，legacy_allowed_until: {data.get('legacy_allowed_until')}）"
+    return "FAIL", "缺 voice_lock 欄位（新批次必須聲明 true/false）"
+
+
+def chk_v2_002_policy_alignment(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
+    """V2-002：policy_alignment 非空 + 各平台 >= 1 條政策
+    美容業（昀臻）額外驗 Meta D-2 合規標記存在。
+    """
+    pa = data.get('policy_alignment')
+    if not pa:
+        if _is_legacy_yaml(data):
+            return "WARN", f"缺 policy_alignment（legacy 過渡期允許）"
+        return "FAIL", "缺 policy_alignment 欄位（應標記每平台融入的 2026 演算法政策）"
+    if not isinstance(pa, dict):
+        return "FAIL", f"policy_alignment 格式錯誤（應是 dict，實際：{type(pa).__name__}）"
+    # 至少一個平台有填
+    filled = {k: v for k, v in pa.items() if v}
+    if not filled:
+        return "FAIL", "policy_alignment 所有平台欄位空白（至少填 1 個平台的政策）"
+    # 美容業額外驗 Meta D-2
+    if owner == '昀臻':
+        ig_policies = pa.get('ig') or pa.get('fb') or []
+        if isinstance(ig_policies, list):
+            has_d2 = any('D-2' in str(p) or '合規' in str(p) or '美容效果' in str(p) for p in ig_policies)
+            if not has_d2:
+                return "WARN", "昀臻（美容業）policy_alignment 建議包含 Meta D-2 合規標記（防美容效果宣稱違規）"
+    return "PASS", f"policy_alignment 已填 {len(filled)} 個平台（{list(filled.keys())}）"
+
+
+def chk_v2_003_publish_distribution_mode(data: dict, fname: str) -> tuple[str, str]:
+    """V2-003：publish_mode + distribution_mode 存在且 enum 合法"""
+    VALID_PUBLISH = {'manual_today', 'platform_scheduled', 'draft_only'}
+    VALID_DIST    = {'organic_only', 'boost_candidate', 'paid_ad'}
+    fails = []
+
+    pm = data.get('publish_mode', '')
+    dm = data.get('distribution_mode', '')
+
+    if not pm:
+        if _is_legacy_yaml(data):
+            return "WARN", "缺 publish_mode + distribution_mode（legacy 過渡期允許）"
+        fails.append("缺 publish_mode")
+    elif pm not in VALID_PUBLISH:
+        fails.append(f"publish_mode '{pm}' 不合法（合法值：{sorted(VALID_PUBLISH)}）")
+
+    if not dm:
+        if not fails:  # 只在 pm OK 時才 WARN
+            if _is_legacy_yaml(data):
+                return "WARN", "缺 distribution_mode（legacy 過渡期允許）"
+        fails.append("缺 distribution_mode")
+    elif dm not in VALID_DIST:
+        fails.append(f"distribution_mode '{dm}' 不合法（合法值：{sorted(VALID_DIST)}）")
+
+    if fails:
+        return "FAIL", "；".join(fails)
+    return "PASS", f"publish_mode={pm}，distribution_mode={dm}"
+
+
+def chk_v2_004_platform_variants(data: dict, fname: str) -> tuple[str, str]:
+    """V2-004：platform_variants 存在 + 至少 1 個平台有 cta 或 caption_keywords"""
+    pv = data.get('platform_variants')
+    if not pv:
+        if _is_legacy_yaml(data):
+            return "WARN", "缺 platform_variants（legacy 過渡期允許）"
+        return "FAIL", "缺 platform_variants（應設定各平台特化 CTA / caption_keywords）"
+    if not isinstance(pv, dict):
+        return "FAIL", f"platform_variants 格式錯誤（應是 dict，實際：{type(pv).__name__}）"
+    # 至少 1 個平台有 cta 或 caption_keywords 或 reply_prompt
+    valid_platforms = []
+    for plat, cfg in pv.items():
+        if not isinstance(cfg, dict):
+            continue
+        if cfg.get('cta') or cfg.get('caption_keywords') or cfg.get('reply_prompt'):
+            valid_platforms.append(plat)
+    if not valid_platforms:
+        return "FAIL", "platform_variants 每個平台都空白（至少 1 個平台需填 cta / caption_keywords）"
+    return "PASS", f"platform_variants 已填 {len(valid_platforms)} 個平台（{valid_platforms}）"
+
+
+def chk_v2_005_trial_reels_consistency(data: dict, fname: str) -> tuple[str, str]:
+    """V2-005：若 main_platform 含 IG，trial_reels 欄位應存在（一致性）"""
+    mp = str(data.get('main_platform', ''))
+    has_ig = 'IG' in mp or 'ig' in mp.lower()
+    has_field = 'trial_reels' in data
+    if not has_ig:
+        return "PASS", "非 IG 主平台，trial_reels 非必要"
+    if has_field:
+        return "PASS", f"IG 主平台，trial_reels = {data['trial_reels']}"
+    if _is_legacy_yaml(data):
+        return "WARN", "IG 主平台建議補 trial_reels（legacy 過渡期允許缺）"
+    return "WARN", "IG 主平台建議補 trial_reels（true=送 Trial Reels 測試流量 / false=直接推）"
+
+
+# ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
 def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str, str, str]]:
-    """回傳 [(check_id, status, desc, detail), ...]"""
+    """回傳 [(check_id, status, desc, detail), ...]
+    v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
+    """
     results = []
     checks = [
+        # 原 15 件
         ("L1-001", chk_l1_001_schema(data, f.name)),
         ("L1-002", chk_l1_002_banned(data, f.name)),
         ("L1-003", chk_l1_003_mirror(data, f.name)),
@@ -536,6 +672,12 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
         ("C-013",  chk_c013_dm_card(data, f.name, owner)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
+        # v2 新增 5 件（V2-001 ~ V2-005）
+        ("V2-001", chk_v2_001_voice_lock(data, f.name)),
+        ("V2-002", chk_v2_002_policy_alignment(data, f.name, owner)),
+        ("V2-003", chk_v2_003_publish_distribution_mode(data, f.name)),
+        ("V2-004", chk_v2_004_platform_variants(data, f.name)),
+        ("V2-005", chk_v2_005_trial_reels_consistency(data, f.name)),
     ]
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -557,7 +699,7 @@ def main():
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"  腳本批次品管員 v1.0")
+    print(f"  腳本批次品管員 v2.0（20 件自動擋 — 含 V2 schema 升級）")
     print(f"  批次資料夾：{batch_dir}")
     print(f"{'='*60}\n")
 
@@ -652,4 +794,98 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # 如果帶 --fixtures 參數跑 5 組 migration fixtures test（不需要 batch-dir）
+    if "--fixtures" in sys.argv:
+        # ── 5 組 fixtures test（Migration Plan 驗）──
+        print("\n=== validate_script_batch.py V2 Fixtures Test（5 組）===\n")
+
+        PASS_COUNT = 0
+        FAIL_COUNT = 0
+
+        def fcheck(label: str, condition: bool, detail: str = ''):
+            global PASS_COUNT, FAIL_COUNT
+            if condition:
+                print(f"  [PASS] {label}")
+                PASS_COUNT += 1
+            else:
+                print(f"  [FAIL] {label}{(' — ' + detail) if detail else ''}")
+                FAIL_COUNT += 1
+
+        # ── F1 pass：含全新欄位 → 全 PASS ──
+        print("[F1] 含全新欄位 → V2 checks 全 PASS")
+        f1 = {
+            'title': 'F1測試',
+            '派系': '直球派',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_阿奇': '測試', '畫面': '測試'}],
+            'caption': '測試 caption',
+            'hashtag': ['#test'],
+            'main_platform': 'IG Reels',
+            'voice_lock': True,
+            'policy_alignment': {'ig': ['DM Sends 優先', 'Trial Reels 開啟'], 'fb': ['當日上傳 +50%']},
+            'trial_reels': True,
+            'publish_mode': 'manual_today',
+            'distribution_mode': 'organic_only',
+            'platform_variants': {'ig': {'cta': '留言諮詢', 'caption_keywords': ['高雄']}, 'threads': {'reply_prompt': '你覺得呢？'}},
+        }
+        _f1_path = Path('/fake/f1.yaml')
+        r1 = chk_v2_001_voice_lock(f1, 'f1.yaml')
+        fcheck('F1 V2-001 PASS', r1[0] == 'PASS', r1[1])
+        r2 = chk_v2_002_policy_alignment(f1, 'f1.yaml', '阿奇')
+        fcheck('F1 V2-002 PASS', r2[0] == 'PASS', r2[1])
+        r3 = chk_v2_003_publish_distribution_mode(f1, 'f1.yaml')
+        fcheck('F1 V2-003 PASS', r3[0] == 'PASS', r3[1])
+        r4 = chk_v2_004_platform_variants(f1, 'f1.yaml')
+        fcheck('F1 V2-004 PASS', r4[0] == 'PASS', r4[1])
+        r5 = chk_v2_005_trial_reels_consistency(f1, 'f1.yaml')
+        fcheck('F1 V2-005 PASS', r5[0] == 'PASS', r5[1])
+
+        # ── F2 missing_field：缺 distribution_mode → FAIL ──
+        print("\n[F2] 缺 distribution_mode → V2-003 FAIL")
+        f2 = dict(f1)
+        del f2['distribution_mode']
+        r = chk_v2_003_publish_distribution_mode(f2, 'f2.yaml')
+        fcheck('F2 V2-003 FAIL', r[0] == 'FAIL', r[1])
+
+        # ── F3 legacy：含 legacy_allowed_until → WARN 不 FAIL ──
+        print("\n[F3] legacy yaml（legacy_allowed_until: 2026-06-01）→ V2 checks WARN 不 FAIL")
+        f3 = {
+            'title': 'F3 legacy',
+            '派系': '直球派',
+            'main_platform': 'IG Reels',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試', '畫面': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            'legacy_allowed_until': '2026-06-01',  # 過渡期
+        }
+        r1 = chk_v2_001_voice_lock(f3, 'f3.yaml')
+        fcheck('F3 V2-001 WARN（不 FAIL）', r1[0] == 'WARN', r1[1])
+        r3 = chk_v2_003_publish_distribution_mode(f3, 'f3.yaml')
+        fcheck('F3 V2-003 WARN（不 FAIL）', r3[0] == 'WARN', r3[1])
+        r4 = chk_v2_004_platform_variants(f3, 'f3.yaml')
+        fcheck('F3 V2-004 WARN（不 FAIL）', r4[0] == 'WARN', r4[1])
+
+        # ── F4 platform_variants：含 platform_variants 驗格式 ──
+        print("\n[F4] platform_variants 全空 dict → FAIL（不含任何 cta/keywords）")
+        f4 = dict(f1)
+        f4['platform_variants'] = {'ig': {}, 'fb': {}}  # 空 config
+        r = chk_v2_004_platform_variants(f4, 'f4.yaml')
+        fcheck('F4 V2-004 FAIL（全空）', r[0] == 'FAIL', r[1])
+
+        # ── F5 beauty_violation：昀臻 policy_alignment 缺 Meta D-2 → WARN ──
+        print("\n[F5] 昀臻 policy_alignment 缺 Meta D-2 → V2-002 WARN")
+        f5 = dict(f1)
+        f5['policy_alignment'] = {'ig': ['DM Sends 優先']}  # 缺 D-2
+        r = chk_v2_002_policy_alignment(f5, 'f5.yaml', '昀臻')
+        fcheck('F5 V2-002 WARN（美容業缺 D-2）', r[0] == 'WARN', r[1])
+
+        # 總結
+        total = PASS_COUNT + FAIL_COUNT
+        print(f"\n=== Fixtures 結果：{PASS_COUNT}/{total} PASS ===")
+        if FAIL_COUNT > 0:
+            print(f"FAIL {FAIL_COUNT} 件")
+            sys.exit(1)
+        else:
+            print("全部 PASS — V2 migration fixtures 通過")
+            sys.exit(0)
+    else:
+        main()

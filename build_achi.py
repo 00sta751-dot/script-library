@@ -262,14 +262,16 @@ def build_threads_section(threads_md_path: str) -> str:
 # 阿奇 article adapter（yaml_to_sc_kwargs → owner_article）
 # ============================================================
 def owner_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
-    """yaml dict → owner_article() HTML"""
-    from yaml_to_sc import yaml_to_sc_kwargs
+    """yaml dict → owner_article() HTML
+    v2 2026-05-23：注入 v2 新欄位 data-* meta（voice_lock/publish_mode/dist_mode/trial_reels）
+    """
+    from yaml_to_sc import yaml_to_sc_kwargs, inject_v2_meta_attrs
     kw = yaml_to_sc_kwargs(yaml_data, num=num)
 
     insight = yaml_data.get('insight') or yaml_data.get('核心洞察') or kw['scene']
     scene = kw['scene']
 
-    return owner_article(
+    html = owner_article(
         num=kw['num'],
         title=kw['title'],
         pie=kw['pie'],
@@ -284,6 +286,7 @@ def owner_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         po_time=kw.get('po_time'),
         hashtag=kw.get('hashtag'),
     )
+    return inject_v2_meta_attrs(html, kw)
 
 
 # ============================================================

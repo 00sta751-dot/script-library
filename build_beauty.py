@@ -603,18 +603,19 @@ def beauty_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
     """yaml dict → beauty_article() HTML
     beauty_article 需要 insight + scene，yaml_to_sc 通用版只生 scene。
     adapter 策略：從 yaml 取 insight 欄位，fallback 到 scene。
+    v2 2026-05-23：注入 v2 新欄位 data-* meta（voice_lock/publish_mode/dist_mode/trial_reels）
     """
     _this_dir = os.path.dirname(os.path.abspath(__file__))
     if _this_dir not in sys.path:
         sys.path.insert(0, _this_dir)
-    from yaml_to_sc import yaml_to_sc_kwargs
+    from yaml_to_sc import yaml_to_sc_kwargs, inject_v2_meta_attrs
     kw = yaml_to_sc_kwargs(yaml_data, num=num)
 
     # beauty_article 專屬欄位 mapping
     insight = yaml_data.get('insight') or yaml_data.get('核心洞察') or kw['scene']
     scene = kw['scene']
     # beauty_article(num, title, pie, insight, scene, timeline, cta, img, batch, caption, platform, po_time, hashtag)
-    return beauty_article(
+    html = beauty_article(
         num=kw['num'],
         title=kw['title'],
         pie=kw['pie'],
@@ -629,6 +630,7 @@ def beauty_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         po_time=kw.get('po_time'),
         hashtag=kw.get('hashtag'),
     )
+    return inject_v2_meta_attrs(html, kw)
 
 
 # ============================================================

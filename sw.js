@@ -1,31 +1,28 @@
-// v2 2026-05-23: network-first strategy / 解決 cache 永久綁定首次訪問版本問題
-var CACHE = 'script-lib-v2';
-var ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+// v3 2026-05-23 自殺版 — unregister 自己 + 清所有 cache + 強制 reload
+// 解決 v1/v2 service worker 鎖死舊 cache 問題
+// 用戶 1 次訪問後永遠不再受 sw cache 影響
 
 self.addEventListener('install', function(e) {
-  e.waitUntil(caches.open(CACHE).then(function(c) { return c.addAll(ASSETS); }));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(names) {
-      return Promise.all(names.filter(function(n) { return n !== CACHE; }).map(function(n) { return caches.delete(n); }));
+      return Promise.all(names.map(function(n) { return caches.delete(n); }));
+    }).then(function() {
+      return self.registration.unregister();
+    }).then(function() {
+      return self.clients.matchAll({ type: 'window' });
+    }).then(function(clients) {
+      clients.forEach(function(c) {
+        if (c.navigate) c.navigate(c.url);
+      });
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', function(e) {
-  e.respondWith(
-    fetch(e.request).then(function(r) {
-      // 成功從網路拿到 → 更新 cache + 返回
-      var clone = r.clone();
-      caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
-      return r;
-    }).catch(function() {
-      // 網路失敗 → 回退 cache
-      return caches.match(e.request);
-    })
-  );
+  // 不攔截 — 直接走網路
+  return;
 });

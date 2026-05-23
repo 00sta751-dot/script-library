@@ -1085,12 +1085,59 @@ if MOBILE_RWD_MARKER not in nc:
 else:
     print('MOBILE RWD CSS patch already present, skipped')
 
+# ---- Dynamic stats patch ----
+# 從實際產出的 nc 動態計算 stats 數字，取代 index.html 裡的 hardcode 值
+_total_scripts = len(re.findall(r'<article\b', nc))  # 含 inject_v2_meta_attrs 後的 data-* 開頭格式
+_sections_count = len(re.findall(r'<header class="section-head" id="sect-\d+">', nc))
+# 從最新批次取日期：yaml 模式優先用 --batch-label，否則用 BATCH hardcode
+# 格式「第 XX 批 · YYYY-MM-DD」→ 「YYYY・MM・DD」
+import re as _re
+_batch_source = (getattr(_args, 'batch_label', '') or '').strip() or BATCH
+_batch_date_m = _re.search(r'(\d{4})-(\d{2})-(\d{2})', _batch_source)
+if _batch_date_m:
+    _date_str = f'{_batch_date_m.group(1)}・{_batch_date_m.group(2)}・{_batch_date_m.group(3)}'
+else:
+    _date_str = None
+
+# 替換 meta-row：共 X 部 / X 主題 / 日期更新
+nc = re.sub(
+    r'共 <b>\d+</b> 部',
+    f'共 <b>{_total_scripts}</b> 部',
+    nc
+)
+nc = re.sub(
+    r'<span>\d+ 主題</span>',
+    f'<span>{_sections_count} 主題</span>',
+    nc
+)
+if _date_str:
+    # 字元類含三種中點：・(U+30FB) / ‧(U+2027) / ·(U+00B7)
+    nc = re.sub(
+        r'<b>\d{4}[・‧·]\d{2}[・‧·]\d{2}</b> 更新',
+        f'<b>{_date_str}</b> 更新',
+        nc
+    )
+
+# 替換 stats section 卡的 Total scripts 數字
+nc = re.sub(
+    r'(<div class="stat"><div class="n">)\d+(</div><div class="l">Total scripts</div></div>)',
+    rf'\g<1>{_total_scripts}\g<2>',
+    nc
+)
+# 替換 Sections 數字
+nc = re.sub(
+    r'(<div class="stat"><div class="n">)\d+(</div><div class="l">Sections</div></div>)',
+    rf'\g<1>{_sections_count}\g<2>',
+    nc
+)
+print(f'Stats patch: total={_total_scripts}, sections={_sections_count}, date={_date_str}')
+
 with open(os.path.join(LIB, 'index.html'), 'w', encoding='utf-8') as f:
     f.write(nc)
 print('index.html DONE:', len(nc), 'chars')
 
-# Count articles and verify
-arts = re.findall(r'<article class="card"', nc)
+# Count articles and verify（含 inject_v2_meta_attrs 後 data-* 開頭格式）
+arts = re.findall(r'<article\b', nc)
 print('Total articles:', len(arts))
 print('Batch 32 marker check:', BATCH_32 in nc)
 print('Batch 33 marker check:', BATCH in nc)

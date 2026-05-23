@@ -71,8 +71,12 @@ def load_yamls(batch_dir: Path) -> list[tuple[Path, dict]]:
             continue
         try:
             text = f.read_text(encoding="utf-8")
-            # 移掉 --- frontmatter markers
+            # 移掉開頭 --- frontmatter marker
             text = re.sub(r"^---\s*\n", "", text, count=1)
+            # 切第二個 --- 後的 markdown body（yaml-with-frontmatter 格式）
+            parts = re.split(r"\n---\s*\n", text, maxsplit=1)
+            text = parts[0]
+            # 再 strip 結尾 ---
             text = re.sub(r"\n---\s*$", "", text)
             data = yaml.safe_load(text)
             # 修 3（P1）：空 YAML / None / list / scalar → 標 __schema_error__，嚴禁靜默 skip
@@ -652,6 +656,260 @@ def chk_v2_005_trial_reels_consistency(data: dict, fname: str) -> tuple[str, str
     return "WARN", "IG 主平台建議補 trial_reels（true=送 Trial Reels 測試流量 / false=直接推）"
 
 
+# ════════════════════════════════════════════
+# v3 新增 11 件 check（V2-006 ~ V2-016 + V2-007B）
+# 對齊：2026-05-23 三審 16 盲點 + 業務員 9 批反向工程 + Codex×3 R3 Pareto 95% fallback
+# ════════════════════════════════════════════
+
+import difflib
+
+# 4 強制位 keyword 對應表（V2-006）
+REQUIRED_SLOTS = {
+    "釣魚部":      ["釣魚", "fishing"],
+    "毒舌正能量":  ["毒舌正能量", "毒舌"],
+    "純雞湯":      ["純雞湯"],
+    "Erika 拆解派": ["Erika", "拆解派", "教育型"],
+}
+
+# 昀臻醫療效能禁用詞（V2-012 — 對齊第 09 批算盤報告 20 條）
+BEAUTY_MED_WORDS = [
+    "發炎", "抗發炎", "修復", "治療", "根治", "痊癒", "處方",
+    "屏障修復", "痘疤修復", "一定壞", "至少三年", "眼尾平了",
+    "活化", "再生", "醫美等級", "醫療級", "藥用", "復原", "癒合", "炎症"
+]
+
+# 虛構故事信號詞（V2-011 — 仲豪/阿奇）
+FICTION_SIGNAL_WORDS = ["有個客戶說", "曾經有個案例", "我朋友的客戶", "聽說有個", "傳說中的"]
+
+
+def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
+    """V2-006：4 強制位覆蓋驗（釣魚/毒舌/雞湯/Erika）— batch-level
+    Codex R1 盲點 4 修法：用 required_slot 欄位 / faction 含嗆辣派 ≠ 毒舌
+    """
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    found = {slot: [] for slot in REQUIRED_SLOTS}
+    for f, data in valid:
+        slot_field = str(data.get('required_slot', ''))
+        type_field = str(data.get('type', ''))
+        for slot, keywords in REQUIRED_SLOTS.items():
+            if slot_field == slot:
+                found[slot].append(f.name)
+                continue
+            for kw in keywords:
+                if kw in type_field:
+                    if f.name not in found[slot]:
+                        found[slot].append(f.name)
+                    break
+        if data.get('is_fishing') and f.name not in found["釣魚部"]:
+            found["釣魚部"].append(f.name)
+        if data.get('is_chicken_soup') and f.name not in found["純雞湯"]:
+            found["純雞湯"].append(f.name)
+    missing = [s for s, files in found.items() if not files]
+    if missing:
+        return "FAIL", f"4 強制位缺 {len(missing)} 件：{missing}（建議 yaml 加 required_slot 欄位）"
+    counts = {s: len(files) for s, files in found.items()}
+    return "PASS", f"4 強制位齊備：{counts}"
+
+
+def chk_v2_007_threads_seven(batch_dir: Path) -> tuple[str, str]:
+    """V2-007：Threads 脆文 7 篇存在驗 — batch-level
+    Glob *Threads*.md / *脆文*.md / threads_*.md，v2 優先
+    """
+    candidates = []
+    for pattern in ['*Threads*.md', '*脆文*.md', 'threads_*.md']:
+        candidates.extend(batch_dir.glob(pattern))
+    candidates = sorted(set(candidates))
+    if not candidates:
+        return "FAIL", "批次目錄找不到 Threads 脆文檔（Glob: *Threads*.md / *脆文*.md / threads_*.md）"
+    target = sorted(candidates, key=lambda p: ('v2' in p.name, p.stat().st_mtime), reverse=True)[0]
+    try:
+        text = target.read_text(encoding='utf-8')
+    except Exception as e:
+        return "FAIL", f"讀 {target.name} 失敗：{e}"
+    threads_sections = re.findall(r'^## (?:Threads|脆文)\s*\d+', text, re.MULTILINE)
+    count = len(threads_sections)
+    if count < 7:
+        return "FAIL", f"{target.name} 只找到 {count} 篇脆文（要 ≥ 7）"
+    return "PASS", f"{target.name} 找到 {count} 篇脆文（≥ 7）"
+
+
+def chk_v2_007b_standalone_threads(data: dict, fname: str) -> tuple[str, str]:
+    """V2-007B：platform_variants.threads 衝突驗 — per-file
+    standalone_threads_derivative=true 但 platform_variants.threads=false → WARN
+    """
+    pv = data.get('platform_variants', {})
+    if not isinstance(pv, dict):
+        return "PASS", "(no platform_variants)"
+    threads_enabled = pv.get('threads')
+    standalone = data.get('standalone_threads_derivative')
+    if standalone and not threads_enabled:
+        return "WARN", "standalone_threads_derivative=true 但 platform_variants.threads=false（建議改 threads=true）"
+    return "PASS", f"threads={threads_enabled} / standalone={standalone}"
+
+
+def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
+    """V2-008：已用題目去重驗 — batch-level
+    fuzzy match ratio >= 0.65（Codex R1 surface 從 80% 降到 65% — 撞題實證）
+    """
+    pref_path = OWNER_PREF_PATHS.get(owner)
+    if not pref_path:
+        return "WARN", f"找不到 owner={owner} 的偏好路徑"
+    used_titles_path = pref_path.parent / f"_{owner}已用題目.md"
+    if not used_titles_path.exists():
+        return "WARN", f"找不到 {used_titles_path.name}"
+    used_text = used_titles_path.read_text(encoding='utf-8')
+    used_titles = []
+    for line in used_text.split('\n'):
+        m = re.match(r'^-\s*#?\d*\s*\[[^\]]+\]\s*(.+?)$', line.strip())
+        if m:
+            used_titles.append(m.group(1).strip())
+    if not used_titles:
+        return "WARN", f"{used_titles_path.name} 沒抽到任何已用題目（解析錯）"
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    hits = []
+    THRESHOLD = 0.65
+    for f, data in valid:
+        title = str(data.get('title', '')).strip()
+        if not title:
+            continue
+        for used in used_titles:
+            ratio = difflib.SequenceMatcher(None, title, used).ratio()
+            if ratio >= THRESHOLD:
+                hits.append((f.name, title, used, round(ratio, 2)))
+                break
+    if hits:
+        first = hits[0]
+        return "FAIL", f"{len(hits)} 件撞題（fuzzy ≥ {THRESHOLD}）：{first[0]} '{first[1][:30]}' vs 已用 '{first[2][:30]}' ratio={first[3]}"
+    return "PASS", f"已用題目 {len(used_titles)} 條，全 yaml 0 撞題（threshold={THRESHOLD}）"
+
+
+def chk_v2_009_auditor_report(batch_dir: Path, owner: str) -> tuple[str, str]:
+    """V2-009：算盤覆核報告存在驗 — batch-level
+    WARN 若找不到 / owner=昀臻 升 FAIL（醫療詞強制算盤覆核）
+    """
+    candidates = []
+    for pattern in ['*算盤*.md', '*覆核*.md', '*audit*.md']:
+        candidates.extend(batch_dir.glob(pattern))
+    if candidates:
+        return "PASS", f"找到 {len(candidates)} 個算盤覆核報告"
+    if owner == '昀臻':
+        return "FAIL", "昀臻（美容業）無算盤覆核報告（醫療詞強制覆核）"
+    return "WARN", "找不到算盤覆核報告（建議補 _算盤覆核報告.md）"
+
+
+def chk_v2_010_batch_summary(batch_dir: Path) -> tuple[str, str]:
+    """V2-010：批次摘要文件存在驗 — batch-level WARN"""
+    candidates = []
+    for pattern in ['*摘要*.md', '*README*.md', '*overview*.md', '_批次摘要*.md', '_總覽*.md']:
+        candidates.extend(batch_dir.glob(pattern))
+    if candidates:
+        return "PASS", f"找到 {len(candidates)} 個摘要文件"
+    return "WARN", "找不到批次摘要（建議補 _批次摘要.md）"
+
+
+def chk_v2_011_no_fiction(data: dict, fname: str, owner: str) -> tuple[str, str]:
+    """V2-011：禁虛構故事驗 — per-file（仲豪/阿奇 特化）"""
+    if owner not in ('仲豪', '阿奇'):
+        return "PASS", "(非仲豪/阿奇，跳過)"
+    sc = data.get('schema_check', {})
+    if isinstance(sc, dict):
+        no_fiction = sc.get('禁虛構')
+        if no_fiction is False:
+            return "FAIL", f"{owner} schema_check.禁虛構=false（仲豪 §11.4 / 阿奇 強制 true）"
+    all_text = get_all_text(data)
+    hits = [w for w in FICTION_SIGNAL_WORDS if w in all_text]
+    if hits:
+        return "FAIL", f"{owner} 台詞含虛構信號詞：{hits}"
+    return "PASS", f"{owner} 禁虛構驗 PASS"
+
+
+def chk_v2_012_beauty_med_words(data: dict, fname: str, owner: str) -> tuple[str, str]:
+    """V2-012：昀臻醫療效能禁用詞驗 — per-file（昀臻 特化）"""
+    if owner != '昀臻':
+        return "PASS", "(非昀臻，跳過)"
+    all_text = get_all_text(data)
+    hits = [w for w in BEAUTY_MED_WORDS if w in all_text]
+    if hits:
+        return "FAIL", f"昀臻台詞含醫療效能禁用詞：{hits[:5]}（對齊第 09 批算盤 20 條）"
+    return "PASS", "昀臻醫療詞驗 PASS"
+
+
+def chk_v2_013_zhonghao_life_ratio(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
+    """V2-013：仲豪生活/房仲字數比驗 — batch-level（仲豪 特化）
+    生活字數 / 房仲字數 >= 3.0 (76%+)
+    """
+    if owner != '仲豪':
+        return "PASS", "(非仲豪，跳過)"
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    life_chars = 0
+    realty_chars = 0
+    for f, data in valid:
+        type_field = str(data.get('type', ''))
+        all_text = get_all_text(data)
+        char_count = len(all_text)
+        if '生活' in type_field:
+            life_chars += char_count
+        elif '房仲' in type_field:
+            realty_chars += char_count
+    if realty_chars == 0:
+        return "PASS", f"仲豪批次無房仲類腳本（生活字數 {life_chars}）"
+    ratio = life_chars / realty_chars
+    if ratio < 3.0:
+        return "FAIL", f"仲豪生活/房仲字數比 {ratio:.2f} < 3.0（生活 {life_chars} / 房仲 {realty_chars}）"
+    return "PASS", f"仲豪生活/房仲字數比 {ratio:.2f} >= 3.0"
+
+
+def chk_v2_014_bappu_taboo(data: dict, fname: str, owner: str) -> tuple[str, str]:
+    """V2-014：叭噗禁忌題材驗 — per-file（叭噗 特化）
+    Codex R1 盲點 11 修法：用 schema_check 欄位（不 grep 上下文避誤殺）
+    """
+    if owner != '叭噗_小C':
+        return "PASS", "(非叭噗，跳過)"
+    sc = data.get('schema_check', {})
+    if not isinstance(sc, dict):
+        if _is_legacy_yaml(data):
+            return "WARN", "叭噗 缺 schema_check（legacy 過渡期）"
+        return "FAIL", "叭噗 缺 schema_check 欄位"
+    fails = []
+    for key in ['禁業配', '禁引流房仲', '禁媽媽題材']:
+        if sc.get(key) is False:
+            fails.append(f"{key}=false")
+    if fails:
+        return "FAIL", f"叭噗 schema_check 違規：{fails}"
+    return "PASS", "叭噗禁忌題材 schema_check 驗 PASS"
+
+
+def chk_v2_015_bappu_q1q2q3(data: dict, fname: str, owner: str) -> tuple[str, str]:
+    """V2-015：叭噗知識反差三標準驗 — per-file（叭噗 特化）"""
+    if owner != '叭噗_小C':
+        return "PASS", "(非叭噗，跳過)"
+    faction = str(data.get('faction', ''))
+    if '知識反差' not in faction:
+        return "PASS", "(非知識反差派系，跳過)"
+    l2_check = data.get('L2_判斷標準') or data.get('l2_judgment')
+    if not l2_check or not isinstance(l2_check, dict):
+        return "FAIL", "叭噗知識反差派缺 L2_判斷標準"
+    missing = [q for q in ['q1', 'q2', 'q3'] if not l2_check.get(q)]
+    if missing:
+        return "FAIL", f"叭噗知識反差 L2_判斷標準缺 {missing}"
+    return "PASS", "叭噗知識反差 q1/q2/q3 全填"
+
+
+def chk_v2_016_trial_observe_until(data: dict, fname: str, owner: str) -> tuple[str, str]:
+    """V2-016：試水批 observe_until 存在驗 — per-file
+    Codex R1 盲點 5 修法：owner=叭噗_小C AND batch_tag含試水 強制 / 其他業主 WARN
+    """
+    batch_tag = str(data.get('batch_tag', '') or data.get('batch_label', ''))
+    if '試水' not in batch_tag:
+        return "PASS", "(非試水批，跳過)"
+    fails = [k for k in ['observe_until', 'review_kpi', 'override_reason'] if not data.get(k)]
+    if not fails:
+        return "PASS", "試水批 3 欄齊"
+    if owner == '叭噗_小C':
+        return "FAIL", f"叭噗試水批缺：{fails}"
+    return "WARN", f"{owner} 試水批建議補：{fails}（限叭噗強制）"
+
+
 # ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
@@ -678,6 +936,13 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("V2-003", chk_v2_003_publish_distribution_mode(data, f.name)),
         ("V2-004", chk_v2_004_platform_variants(data, f.name)),
         ("V2-005", chk_v2_005_trial_reels_consistency(data, f.name)),
+        # v3 新增 6 件（2026-05-23 三審修補）
+        ("V2-007B", chk_v2_007b_standalone_threads(data, f.name)),
+        ("V2-011",  chk_v2_011_no_fiction(data, f.name, owner)),
+        ("V2-012",  chk_v2_012_beauty_med_words(data, f.name, owner)),
+        ("V2-014",  chk_v2_014_bappu_taboo(data, f.name, owner)),
+        ("V2-015",  chk_v2_015_bappu_q1q2q3(data, f.name, owner)),
+        ("V2-016",  chk_v2_016_trial_observe_until(data, f.name, owner)),
     ]
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -739,15 +1004,22 @@ def main():
 
     all_results: list[tuple[str, str, str, str]] = []
 
-    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014）──
+    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014 + v3 新 6 件）──
     batch_checks = [
         ("L1-008", chk_l1_008_batch_count(yamls, batch_dir)),
         ("L1-009", chk_l1_009_派系_coverage(valid_yamls)),
         ("C-011",  chk_c011_派系_ratio(valid_yamls, owner, pref_text)),
         ("C-012",  chk_c012_identity_ratio(valid_yamls, owner, pref_text)),
         ("C-014",  chk_c014_card_style(batch_dir, owner, batch_tag)),
+        # v3 新增 6 件 batch checks（2026-05-23 三審修補）
+        ("V2-006", chk_v2_006_required_slot(valid_yamls)),
+        ("V2-007", chk_v2_007_threads_seven(batch_dir)),
+        ("V2-008", chk_v2_008_used_titles_dedup(valid_yamls, owner)),
+        ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
+        ("V2-010", chk_v2_010_batch_summary(batch_dir)),
+        ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
     ]
-    print("── 批次級 check（5 件）──")
+    print("── 批次級 check（11 件）──")
     for cid, (status, detail) in batch_checks:
         icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
         print(f"  {icon} [{cid}] {status}: {detail}")

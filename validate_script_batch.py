@@ -34,6 +34,19 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+# ── normalize_script_to_canonical（yaml_to_sc.py v3）──
+# 接 canonical 讀腳本，供 V2-025/V2-026 使用
+# 若 import 失敗（例如路徑問題），check 會自動 WARN 不 FAIL
+try:
+    _YAML_TO_SC_DIR = Path(__file__).parent
+    if str(_YAML_TO_SC_DIR) not in sys.path:
+        sys.path.insert(0, str(_YAML_TO_SC_DIR))
+    from yaml_to_sc import normalize_script_to_canonical as _normalize_canonical
+    _CANONICAL_AVAILABLE = True
+except Exception as _e:
+    _CANONICAL_AVAILABLE = False
+    _normalize_canonical = None  # type: ignore
+
 # UTF-8 輸出防亂碼（Windows cp950）
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -75,16 +88,21 @@ def load_yamls(batch_dir: Path) -> list[tuple[Path, dict]]:
             text = re.sub(r"^---\s*\n", "", text, count=1)
             # 切第二個 --- 後的 markdown body（yaml-with-frontmatter 格式）
             parts = re.split(r"\n---\s*\n", text, maxsplit=1)
-            text = parts[0]
+            frontmatter_text = parts[0]
+            # 保留 markdown body（供 normalize_script_to_canonical 使用）
+            md_body = parts[1].strip() if len(parts) > 1 else ""
             # 再 strip 結尾 ---
-            text = re.sub(r"\n---\s*$", "", text)
-            data = yaml.safe_load(text)
+            frontmatter_text = re.sub(r"\n---\s*$", "", frontmatter_text)
+            data = yaml.safe_load(frontmatter_text)
             # 修 3（P1）：空 YAML / None / list / scalar → 標 __schema_error__，嚴禁靜默 skip
             if data is None or data == "" or data == {}:
                 results.append((f, {"__schema_error__": f"YAML 為空（None/empty）：{f.name}"}))
             elif not isinstance(data, dict):
                 results.append((f, {"__schema_error__": f"YAML top-level 不是 dict（實際型別：{type(data).__name__}）：{f.name}"}))
             else:
+                # 把 markdown body 存入 data（加法，不破壞現有欄位），供 canonical 層使用
+                if md_body and '_markdown_body' not in data:
+                    data['_markdown_body'] = md_body
                 results.append((f, data))
         except Exception as e:
             results.append((f, {"__parse_error__": str(e)}))
@@ -190,12 +208,56 @@ def get_all_text(data: dict) -> str:
 # 15 件 check 函式（逐一回傳 (PASS/FAIL/WARN, detail)）
 # ────────────────────────────────────────────
 
+def _ts_normalize(ts: str) -> str:
+    """把 canonical 格式 timestamp 正規化為 '0-3s' 標準格式，供 L1-001 比對用。
+    支援：'0-3s'（已是標準）/ '0-3秒'（markdown body 解析結果）。
+    """
+    # 移除空格，統一全形破折號
+    ts = ts.strip().replace('–', '-').replace(' ', '')
+    # '0-3秒' → '0-3s'
+    ts = re.sub(r'秒.*$', 's', ts)
+    return ts
+
+
+def _get_canonical_scenes(data: dict) -> Optional[list]:
+    """若 canonical 可用且能解析出 scenes，回傳 canonical scenes；否則 None。
+    canonical scenes 每個元素有 timestamp / role / dialogue / subtitle /
+    offscreen_interaction 等欄位。
+    """
+    if not _CANONICAL_AVAILABLE or _normalize_canonical is None:
+        return None
+    try:
+        canonical = _normalize_canonical(data)
+        scenes = canonical.get('scenes', [])
+        if scenes:
+            return scenes
+    except Exception:
+        pass
+    return None
+
+
 def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
-    """L1-001：schema 對齊 — 6 段時間軸完整且順序正確"""
+    """L1-001：schema 對齊 — 6 段時間軸完整且順序正確
+    有 canonical 用 canonical（支援 markdown body 格式），沒有 fallback 舊邏輯。
+    """
+    expected_order = ["0-3s", "3-12s", "12-25s", "25-40s", "40-52s", "52-60s"]
+
+    # 嘗試用 canonical
+    canonical_scenes = _get_canonical_scenes(data)
+    if canonical_scenes is not None:
+        if len(canonical_scenes) != 6:
+            ts_list = [s.get('timestamp', '?') for s in canonical_scenes]
+            return "FAIL", f"scenes 段數 = {len(canonical_scenes)}，需要 6 段（實際：{ts_list}）"
+        actual = [_ts_normalize(s.get('timestamp', '')) for s in canonical_scenes]
+        for i, (exp, got) in enumerate(zip(expected_order, actual)):
+            if got != exp:
+                return "FAIL", f"scenes[{i}] timestamp = '{got}'，期望 '{exp}'（原始：{canonical_scenes[i].get('timestamp','')}）"
+        return "PASS", "6 段時間軸齊全且順序正確（canonical 層驗）"
+
+    # fallback：舊邏輯（structured frontmatter）
     scenes = get_scenes(data)
     if len(scenes) != 6:
         return "FAIL", f"scenes 段數 = {len(scenes)}，需要 6 段（實際：{[s.get('timestamp','?') for s in scenes]}）"
-    expected_order = ["0-3s", "3-12s", "12-25s", "25-40s", "40-52s", "52-60s"]
     actual = [s.get("timestamp", "") for s in scenes]
     for i, (exp, got) in enumerate(zip(expected_order, actual)):
         if got != exp:
@@ -221,7 +283,19 @@ def chk_l1_002_banned(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", "無禁用詞"
 
 def chk_l1_003_mirror(data: dict, fname: str) -> tuple[str, str]:
-    """L1-003：藏鏡人互動點 >= 2"""
+    """L1-003：藏鏡人互動點 >= 2
+    有 canonical 用 canonical（offscreen_interaction 欄位），沒有 fallback 舊邏輯。
+    §14 P0：mirror 要吃 canonical，不是舊貪婪 regex。
+    """
+    # 嘗試用 canonical
+    canonical_scenes = _get_canonical_scenes(data)
+    if canonical_scenes is not None:
+        count = sum(1 for s in canonical_scenes if s.get('offscreen_interaction'))
+        if count < 2:
+            return "FAIL", f"藏鏡人互動點 = {count}，需要 >= 2（canonical 層驗）"
+        return "PASS", f"藏鏡人互動點 = {count}（canonical 層驗）"
+
+    # fallback：舊邏輯
     count = 0
     scenes = get_scenes(data)
     for scene in scenes:
@@ -237,11 +311,27 @@ def chk_l1_003_mirror(data: dict, fname: str) -> tuple[str, str]:
         return "FAIL", f"藏鏡人互動點 = {count}，需要 >= 2"
     return "PASS", f"藏鏡人互動點 = {count}"
 
+def _canonical_all_text(canonical_scenes: list, caption: str = '') -> str:
+    """從 canonical scenes 取全文（dialogue + subtitle + offscreen）供關鍵詞搜尋。"""
+    parts = []
+    for s in canonical_scenes:
+        for d in s.get('dialogue', []):
+            parts.append(d.get('line', ''))
+        if s.get('subtitle'):
+            parts.append(s['subtitle'])
+        if s.get('offscreen_interaction'):
+            parts.append(s['offscreen_interaction'])
+    if caption:
+        parts.append(caption)
+    return ' '.join(parts)
+
+
 def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
-    """L1-004：流量密碼 >= 3（以 schema_check 欄位 or 台詞關鍵詞代理）"""
+    """L1-004：流量密碼 >= 3（以 schema_check 欄位 or 台詞關鍵詞代理）
+    有 canonical 用 canonical（dialogue + subtitle + offscreen 全文），沒有 fallback 舊邏輯。
+    """
     sc = data.get("schema_check", {})
     if isinstance(sc, dict):
-        # 如果 schema_check 有明確的 流量密碼 欄位
         fd = sc.get("流量密碼數量") or sc.get("流量密碼")
         if fd:
             try:
@@ -252,12 +342,32 @@ def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
                     return "FAIL", f"schema_check 流量密碼數量 = {n}，需 >= 3"
             except Exception:
                 pass
-    # 代理：用反問句 / 懸念語句 / 情緒觸發詞統計
+
     TRAFFIC_SIGNALS = ["？", "你也", "你有", "你曾", "你試", "為什麼", "你知道", "留言", "轉發",
                        "嗎", "嚇到", "沒想到", "顛覆", "原來", "不是", "竟然", "居然"]
+
+    # 嘗試用 canonical
+    canonical_scenes = _get_canonical_scenes(data)
+    if canonical_scenes is not None:
+        cap = ''
+        try:
+            cap = _normalize_canonical(data).get('caption', '') if _normalize_canonical else ''
+        except Exception:
+            pass
+        text = _canonical_all_text(canonical_scenes, cap)
+        hits = sum(1 for s in TRAFFIC_SIGNALS if s in text)
+        # 有藏鏡人 = +1
+        if any(s.get('offscreen_interaction') for s in canonical_scenes):
+            hits += 1
+        if cap and ("？" in cap or "留言" in cap):
+            hits += 1
+        if hits >= 3:
+            return "PASS", f"流量密碼信號 >= 3（偵測到 {hits} 個，含懸念+互動+反問，canonical 層驗）"
+        return "FAIL", f"流量密碼信號偵測 = {hits}，低於 3（canonical 層驗，請確認台詞有反問/懸念/互動引導）"
+
+    # fallback：舊邏輯
     text = get_all_text(data)
     hits = sum(1 for s in TRAFFIC_SIGNALS if s in text)
-    # 寬鬆：有懸念型藏鏡人 = +1 / 有 CTA 互動 = +1
     if data.get("藏鏡人"):
         hits += 1
     cap = data.get("caption", "")
@@ -290,11 +400,39 @@ def chk_l1_005_number_source(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", f"業務數字 {hits[:5]}{'...' if len(hits)>5 else ''}，已有來源標記或為個人經歷數字"
 
 def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
-    """L1-006：52-60s 段落有 CTA 引導語（純雞湯除外）"""
+    """L1-006：52-60s 段落有 CTA 引導語（純雞湯除外）
+    有 canonical 用 canonical（timestamp 正規化 + dialogue），沒有 fallback 舊邏輯。
+    """
     sc = data.get("schema_check", {})
     # 純雞湯豁免
     if data.get("純雞湯標記") or (isinstance(sc, dict) and (sc.get("純雞湯") or sc.get("無CTA"))):
         return "PASS", "純雞湯標記 = true，豁免 CTA 要求"
+
+    cta_keywords = ["留言", "私訊", "追蹤", "訂閱", "IG", "FB", "TikTok", "電話", "LINE", "連結", "點",
+                    "分享", "收藏", "告訴我", "找我", "我訊你",
+                    "底下", "說說", "聊聊", "來問", "tag", "按讚", "一起", "你呢", "你是", "你有",
+                    "評論", "互動", "問我", "歡迎", "歡迎來"]
+
+    # 嘗試用 canonical
+    canonical_scenes = _get_canonical_scenes(data)
+    if canonical_scenes is not None:
+        if not canonical_scenes:
+            return "FAIL", "canonical scenes 為空，找不到 CTA 段"
+        last = canonical_scenes[-1]
+        ts_norm = _ts_normalize(last.get('timestamp', ''))
+        if ts_norm != '52-60s':
+            return "FAIL", f"最後一段 timestamp = '{last.get('timestamp','')}' (正規化: '{ts_norm}')，不是 '52-60s'"
+        role = last.get('role', '')
+        if 'CTA' not in role and 'cta' not in role.lower():
+            return "FAIL", f"最後一段 role = '{role}'，應含 CTA（canonical 層驗）"
+        text = ' '.join(d.get('line', '') for d in last.get('dialogue', []))
+        # 也從 subtitle 找
+        text += ' ' + last.get('subtitle', '')
+        if any(k in text for k in cta_keywords):
+            return "PASS", f"52-60s CTA 段存在，含引導語（canonical 層驗，{text[:40]}…）"
+        return "FAIL", f"52-60s CTA 段文字無引導語關鍵詞（canonical 層驗，{text[:60]}）"
+
+    # fallback：舊邏輯
     scenes = get_scenes(data)
     last = scenes[-1] if scenes else {}
     ts = last.get("timestamp", "")
@@ -303,13 +441,8 @@ def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
     seg_type = last.get("type", "")
     if "CTA" not in seg_type and "cta" not in seg_type.lower():
         return "FAIL", f"最後一段 type = '{seg_type}'，應含 CTA"
-    # 修 2（P1）：用 _get_all_dialogue 涵蓋 5 業主所有台詞欄位
     dialogue_parts = _get_all_dialogue(last)
     text = " ".join(dialogue_parts) if dialogue_parts else ""
-    cta_keywords = ["留言", "私訊", "追蹤", "訂閱", "IG", "FB", "TikTok", "電話", "LINE", "連結", "點",
-                    "分享", "收藏", "告訴我", "找我", "我訊你",
-                    "底下", "說說", "聊聊", "來問", "tag", "按讚", "一起", "你呢", "你是", "你有",
-                    "評論", "互動", "問我", "歡迎", "歡迎來"]
     if any(k in text for k in cta_keywords):
         return "PASS", f"52-60s CTA 段存在，含引導語（{text[:40]}…）"
     return "FAIL", f"52-60s CTA 段文字無引導語關鍵詞（{text[:60]}）"
@@ -335,14 +468,16 @@ def chk_l1_008_batch_count(yamls: list[tuple[Path, dict]], batch_dir: Path) -> t
     return "FAIL", f"主腳本 yaml 數量 = {n}，SOP 要求 13-14 支"
 
 def chk_l1_009_派系_coverage(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
-    """L1-009：派系覆蓋度 >= 3 種"""
+    """L1-009：派系覆蓋度 >= 3 種
+    支援 '派系' key（阿奇/叭噗格式）及 'faction' key（瑞祥 markdown 格式）。
+    """
     types = set()
     for _, d in yamls:
         if "__parse_error__" in d:
             continue
-        派系 = d.get("派系", "") or d.get("template", "")
+        # 同時讀 派系 / faction / template（按優先序）
+        派系 = d.get("派系", "") or d.get("faction", "") or d.get("template", "")
         if 派系:
-            # 抓「（派N）」前的派系名
             m = re.match(r"([^\(（]+)", str(派系))
             if m:
                 types.add(m.group(1).strip())
@@ -515,18 +650,41 @@ def chk_c014_card_style(batch_dir: Path, owner: str, batch_tag: str) -> tuple[st
     return "WARN", f"圖卡風格選擇檔存在（{candidates[0].name}）但未偵測到 style-N- 格式的風格 id"
 
 def chk_c015_hashtag_caption(data: dict, fname: str) -> tuple[str, str]:
-    """C-015：hashtag 8-12 個 + caption 60-80 字"""
+    """C-015：hashtag 8-12 個 + caption 60-80 字
+    有 canonical 用 canonical（markdown body 的 ## Caption / ## Hashtag），
+    沒有 fallback 直讀 frontmatter（叭噗/阿奇結構化格式）。
+    """
+    # 嘗試從 canonical 讀（含 markdown body 解析）
+    hashtag = None
+    caption = None
+    if _CANONICAL_AVAILABLE and _normalize_canonical is not None:
+        try:
+            canonical = _normalize_canonical(data)
+            ht_c = canonical.get('hashtag', [])
+            cap_c = canonical.get('caption', '')
+            if ht_c:  # canonical 讀到 hashtag 就用
+                hashtag = ht_c
+            if cap_c:  # canonical 讀到 caption 就用
+                caption = cap_c
+        except Exception:
+            pass
+
+    # fallback：直讀 frontmatter
+    if hashtag is None:
+        hashtag = data.get("hashtag", [])
+    if caption is None:
+        caption = str(data.get("caption", "") or "")
+
     fails = []
-    hashtag = data.get("hashtag", [])
     if isinstance(hashtag, list):
         ht_count = len(hashtag)
     else:
         ht_count = len(str(hashtag).split())
     if not (8 <= ht_count <= 12):
         fails.append(f"hashtag 數量 = {ht_count}，需 8-12 個")
-    caption = str(data.get("caption", "") or "")
-    # caption 字數：純正文（排除 hashtag）
-    cap_clean = re.sub(r"#[\S]+", "", caption).strip()
+
+    caption_str = str(caption or "")
+    cap_clean = re.sub(r"#[\S]+", "", caption_str).strip()
     cap_len = len(cap_clean)
     if not (60 <= cap_len <= 80):
         fails.append(f"caption 字數 = {cap_len}，需 60-80 字（純文 = '{cap_clean[:50]}…'）")
@@ -570,18 +728,22 @@ def chk_v2_001_voice_lock(data: dict, fname: str) -> tuple[str, str]:
 def chk_v2_002_policy_alignment(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
     """V2-002：policy_alignment 非空 + 各平台 >= 1 條政策
     美容業（昀臻）額外驗 Meta D-2 合規標記存在。
+    試點腳本無此欄位 → WARN（同 legacy 過渡期邏輯）。
     """
     pa = data.get('policy_alignment')
     if not pa:
         if _is_legacy_yaml(data):
             return "WARN", f"缺 policy_alignment（legacy 過渡期允許）"
-        return "FAIL", "缺 policy_alignment 欄位（應標記每平台融入的 2026 演算法政策）"
+        # policy_alignment 空：對非強制業主（非昀臻）降 WARN，不硬 FAIL
+        if owner == '昀臻':
+            return "FAIL", "缺 policy_alignment 欄位（昀臻美容業強制，應標記每平台 2026 演算法政策）"
+        return "WARN", "缺 policy_alignment 欄位（建議標記每平台融入的 2026 演算法政策；試點/初版腳本允許空）"
     if not isinstance(pa, dict):
         return "FAIL", f"policy_alignment 格式錯誤（應是 dict，實際：{type(pa).__name__}）"
     # 至少一個平台有填
     filled = {k: v for k, v in pa.items() if v}
     if not filled:
-        return "FAIL", "policy_alignment 所有平台欄位空白（至少填 1 個平台的政策）"
+        return "WARN", "policy_alignment 所有平台欄位空白（至少填 1 個平台的政策）"
     # 美容業額外驗 Meta D-2
     if owner == '昀臻':
         ig_policies = pa.get('ig') or pa.get('fb') or []
@@ -593,9 +755,17 @@ def chk_v2_002_policy_alignment(data: dict, fname: str, owner: str = '') -> tupl
 
 
 def chk_v2_003_publish_distribution_mode(data: dict, fname: str) -> tuple[str, str]:
-    """V2-003：publish_mode + distribution_mode 存在且 enum 合法"""
+    """V2-003：publish_mode + distribution_mode 存在且 enum 合法
+    別名（§14 P1）：'manual' → 'manual_today'、'organic' → 'organic_only' 接受（降 WARN）。
+    既有瑞祥第34批使用 manual/organic，不應 FAIL。
+    """
     VALID_PUBLISH = {'manual_today', 'platform_scheduled', 'draft_only'}
     VALID_DIST    = {'organic_only', 'boost_candidate', 'paid_ad'}
+    # 別名映射（接受舊格式，降 WARN）
+    ALIAS_PUBLISH = {'manual': 'manual_today'}
+    ALIAS_DIST    = {'organic': 'organic_only'}
+
+    warns = []
     fails = []
 
     pm = data.get('publish_mode', '')
@@ -605,31 +775,47 @@ def chk_v2_003_publish_distribution_mode(data: dict, fname: str) -> tuple[str, s
         if _is_legacy_yaml(data):
             return "WARN", "缺 publish_mode + distribution_mode（legacy 過渡期允許）"
         fails.append("缺 publish_mode")
+    elif pm in ALIAS_PUBLISH:
+        warns.append(f"publish_mode '{pm}' 是別名，建議改為 '{ALIAS_PUBLISH[pm]}'")
     elif pm not in VALID_PUBLISH:
         fails.append(f"publish_mode '{pm}' 不合法（合法值：{sorted(VALID_PUBLISH)}）")
 
     if not dm:
-        if not fails:  # 只在 pm OK 時才 WARN
+        if not fails:
             if _is_legacy_yaml(data):
                 return "WARN", "缺 distribution_mode（legacy 過渡期允許）"
         fails.append("缺 distribution_mode")
+    elif dm in ALIAS_DIST:
+        warns.append(f"distribution_mode '{dm}' 是別名，建議改為 '{ALIAS_DIST[dm]}'")
     elif dm not in VALID_DIST:
         fails.append(f"distribution_mode '{dm}' 不合法（合法值：{sorted(VALID_DIST)}）")
 
     if fails:
         return "FAIL", "；".join(fails)
+    if warns:
+        return "WARN", "；".join(warns)
     return "PASS", f"publish_mode={pm}，distribution_mode={dm}"
 
 
 def chk_v2_004_platform_variants(data: dict, fname: str) -> tuple[str, str]:
-    """V2-004：platform_variants 存在 + 至少 1 個平台有 cta 或 caption_keywords"""
+    """V2-004：platform_variants 存在 + 至少 1 個平台有 cta 或 caption_keywords
+    既有瑞祥格式 {ig_reels: true, fb_reels: true} 為 bool 格式 → 降 WARN（§14 P1）。
+    """
     pv = data.get('platform_variants')
     if not pv:
         if _is_legacy_yaml(data):
             return "WARN", "缺 platform_variants（legacy 過渡期允許）"
-        return "FAIL", "缺 platform_variants（應設定各平台特化 CTA / caption_keywords）"
+        return "WARN", "缺 platform_variants（建議設定各平台特化 CTA / caption_keywords；試點/舊格式腳本允許空）"
     if not isinstance(pv, dict):
         return "FAIL", f"platform_variants 格式錯誤（應是 dict，實際：{type(pv).__name__}）"
+    # 若全部 value 是 bool → 舊格式（瑞祥 {ig_reels: true}）→ WARN
+    all_bool = all(isinstance(v, bool) for v in pv.values())
+    if all_bool:
+        enabled = [k for k, v in pv.items() if v]
+        return "WARN", (
+            f"platform_variants 是 bool 格式（啟用平台：{enabled}），"
+            f"建議升級為 {{platform: {{cta, caption_keywords}}}} 格式"
+        )
     # 至少 1 個平台有 cta 或 caption_keywords 或 reply_prompt
     valid_platforms = []
     for plat, cfg in pv.items():
@@ -910,6 +1096,297 @@ def chk_v2_016_trial_observe_until(data: dict, fname: str, owner: str) -> tuple[
     return "WARN", f"{owner} 試水批建議補：{fails}（限叭噗強制）"
 
 
+# ════════════════════════════════════════════
+# V2-025 / V2-026 — 爆款範本引用驗（§12.3 強制餵範本系統）
+# V2-025：template_source_ids 必須存在且存在於 template_index.jsonl（FAIL）
+# V2-026：template_adaptation 完整驗（WARN→2批後FAIL）
+# ════════════════════════════════════════════
+
+# template_index.jsonl 路徑（singleton 快取，避免每筆 yaml 都重複讀檔）
+_TEMPLATE_INDEX_PATH = Path(__file__).parent / "template_index.jsonl"
+_TEMPLATE_INDEX_CACHE: Optional[set] = None  # set of template_id
+
+# 2026-06-01 新批強制日（V2-025 legacy 過渡截止）
+_V2_025_CUTOFF = _dt.date(2026, 6, 1)
+
+# P1-3：strict 模式旗標（由 main() 設定，讓 check fn 讀取）
+_STRICT_MODE: bool = False
+
+
+def _extract_batch_date(data: dict, fname: str = '') -> Optional[_dt.date]:
+    """從 yaml 欄位或批次目錄名抓批次日期，供 V2-025 legacy 判斷。
+
+    收集**所有**日期候選，取最大（最新）日期，防止複製舊 yaml 到新批目錄時
+    舊 yaml 欄位日期繞過新批強制（P1 繞過洞修復）。
+
+    支援多格式：YYYY-MM-DD、YYYY/MM/DD、YYYYMMDD、YYYY_MM_DD（P2 多格式修復）
+
+    目錄名日期 >= 2026-06-01 時強制視為新批（雙重保護）：
+    即使 yaml 欄位含舊日期，只要目錄名是新批，仍走強制路徑。
+    """
+    # P2：支援多格式 regex
+    # 先嘗試 YYYY-MM-DD / YYYY/MM/DD / YYYY_MM_DD（分隔符版本）
+    DATE_RE_SEP = re.compile(r'(\d{4})[-/_ ](\d{2})[-/_ ](\d{2})')
+    # 再嘗試 YYYYMMDD（無分隔，需邊界避免誤吃流水號）
+    DATE_RE_COMPACT = re.compile(r'(?<!\d)(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)')
+
+    def _try_parse(text: str) -> Optional[_dt.date]:
+        s = str(text)
+        # 分隔符版本優先
+        m = DATE_RE_SEP.search(s)
+        if m:
+            try:
+                return _dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                pass
+        # 緊湊版本（YYYYMMDD）
+        m2 = DATE_RE_COMPACT.search(s)
+        if m2:
+            try:
+                return _dt.date(int(m2.group(1)), int(m2.group(2)), int(m2.group(3)))
+            except ValueError:
+                pass
+        return None
+
+    # P1 修復：收集所有候選，取最大值
+    candidates: list[_dt.date] = []
+
+    # yaml 欄位候選
+    for key in ('batch_date', 'batch_tag', 'batch_label', 'generated_at', 'batch'):
+        val = data.get(key)
+        if val:
+            d = _try_parse(val)
+            if d:
+                candidates.append(d)
+
+    # fname 候選（run_per_file_checks 傳入 "批次目錄名/檔名"，目錄名含日期）
+    if fname:
+        d = _try_parse(fname)
+        if d:
+            candidates.append(d)
+
+    if not candidates:
+        return None
+
+    # P1 修復核心：取最大（最新）日期，防止舊欄位日期蓋過新批目錄日期
+    return max(candidates)
+
+
+def _is_v2025_legacy(data: dict, fname: str = '') -> bool:
+    """判斷是否為 V2-025 legacy 批次（批次日期 < 2026-06-01）。
+
+    True  → 既有批次，V2-025 缺 template_source_ids 只 WARN（過渡期）
+    False → 新批次或無法判斷，V2-025 缺 template_source_ids → FAIL（強制）
+    """
+    batch_date = _extract_batch_date(data, fname)
+    if batch_date is None:
+        return False  # 無法判斷 → 保守當新批 FAIL
+    return batch_date < _V2_025_CUTOFF
+
+
+def _load_template_index_ids() -> Optional[set]:
+    """讀 template_index.jsonl 回傳 template_id set（快取）"""
+    global _TEMPLATE_INDEX_CACHE
+    if _TEMPLATE_INDEX_CACHE is not None:
+        return _TEMPLATE_INDEX_CACHE
+    if not _TEMPLATE_INDEX_PATH.exists():
+        return None  # index 不存在 → WARN 不 FAIL
+    ids = set()
+    try:
+        import json as _json
+        with _TEMPLATE_INDEX_PATH.open(encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    card = _json.loads(line)
+                    if 'template_id' in card:
+                        ids.add(card['template_id'])
+    except Exception:
+        return None
+    _TEMPLATE_INDEX_CACHE = ids
+    return ids
+
+
+def chk_v2_025_template_source_required(data: dict, fname: str) -> tuple[str, str]:
+    """V2-025：template_source_ids 必填，且每個 id 存在於 template_index.jsonl（FAIL）
+
+    腳本 yaml 必填 template_source_ids（list of template_id），
+    且每個 id 必須對得到 template_index.jsonl 中的卡。
+    template_index.jsonl 不存在 → WARN（建置期容忍）。
+
+    例外：腳本 yaml 含 control_group: true → 豁免本檢查（對照組不套範本，無需 template_source_ids）。
+
+    接 canonical：用 normalize_script_to_canonical 讀 template_sources（若已有），
+    否則直接讀 data['template_source_ids']（未來格式）。
+    """
+    # 對照組豁免：control_group: true → 直接放行
+    if data.get('control_group') is True:
+        return "PASS", "[CONTROL] 對照組腳本，豁免範本來源檢查"
+
+    # 嘗試從 canonical 層讀（§12.3 canonical 加 template_sources 欄位，當前尚未部署時 fallback 直讀）
+    source_ids = None
+    if _CANONICAL_AVAILABLE and _normalize_canonical is not None:
+        try:
+            canonical = _normalize_canonical(data)
+            # canonical 目前版本還沒有 template_sources（§14 P2，待下批加），
+            # 但保留此路徑供未來擴展；現在直接讀 data 層
+            ts_from_canonical = canonical.get('template_sources')
+            if ts_from_canonical and isinstance(ts_from_canonical, list):
+                source_ids = ts_from_canonical
+        except Exception:
+            pass
+
+    if source_ids is None:
+        # 直讀 raw data（現在的欄位名）
+        source_ids = data.get('template_source_ids')
+
+    if not source_ids:
+        # V2-025 legacy 過渡：批次日期 < 2026-06-01 → WARN；新批 → FAIL
+        if _is_v2025_legacy(data, fname):
+            return "WARN", (
+                "[LEGACY] 既有批次過渡期豁免，2026-06-01 後新批強制填 template_source_ids"
+            )
+        return "FAIL", "缺 template_source_ids（必須填入 3-5 張範本卡 id，照 §12.3 強制餵範本系統）"
+
+    if not isinstance(source_ids, list):
+        return "FAIL", f"template_source_ids 格式錯誤（應是 list，實際：{type(source_ids).__name__}）"
+
+    # P1-2：數量限制（非對照組必須 3-5 張，且無重複 id）
+    # legacy 批次（batch_date < 2026-06-01）→ 數量/重複問題一律 WARN（過渡期不擋死既有業主）
+    # 新批（>= 2026-06-01）→ FAIL（強制）
+    unique_ids = list(dict.fromkeys(source_ids))  # 保序去重
+    if len(unique_ids) != len(source_ids):
+        dup = [tid for tid in source_ids if source_ids.count(tid) > 1]
+        if _is_v2025_legacy(data, fname):
+            return "WARN", (
+                f"[LEGACY] template_source_ids 有重複 id（{list(set(dup))}）— "
+                f"既有批次過渡期豁免，2026-06-01 後新批強制不得重複"
+            )
+        return "FAIL", (
+            f"template_source_ids 有重複 id（{list(set(dup))}）— 每張範本只能引用一次"
+        )
+    if not (3 <= len(unique_ids) <= 5):
+        if _is_v2025_legacy(data, fname):
+            return "WARN", (
+                f"[LEGACY] template_source_ids 需填 3-5 張（目前 {len(unique_ids)} 張）— "
+                f"既有批次過渡期豁免，2026-06-01 後新批強制 3-5 張"
+            )
+        return "FAIL", (
+            f"template_source_ids 需填 3-5 張（目前 {len(unique_ids)} 張）— "
+            f"照 §12.3 強制餵 3-5 張範本卡"
+        )
+
+    # 驗每個 id 是否存在於 template_index.jsonl
+    known_ids = _load_template_index_ids()
+    if known_ids is None:
+        # P1-3：strict 模式 + 新批（>= 2026-06-01）→ FAIL；其餘 WARN
+        if _STRICT_MODE and not _is_v2025_legacy(data, fname):
+            return "FAIL", (
+                f"template_source_ids 已填（{source_ids}），但 template_index.jsonl 缺失或損壞 — "
+                f"strict 模式新批必須先跑 build_template_index.py 建索引才能通過"
+            )
+        return "WARN", (
+            f"template_source_ids 已填（{source_ids}），但 template_index.jsonl 不存在 — "
+            f"請先跑 build_template_index.py 建索引（建立前暫 WARN）"
+        )
+
+    missing_ids = [tid for tid in source_ids if tid not in known_ids]
+    if missing_ids:
+        return "FAIL", (
+            f"template_source_ids 有 {len(missing_ids)} 個 id 不存在於 template_index.jsonl："
+            f"{missing_ids}（請確認 id 正確，或重跑 build_template_index.py 更新索引）"
+        )
+
+    return "PASS", f"template_source_ids 已填 {len(source_ids)} 張，全在索引中"
+
+
+def _is_placeholder(val) -> bool:
+    """判斷一個值是否為 skeleton 產生的 placeholder（未實際填寫）。
+
+    placeholder 清單：'[編劇填]' / 'pending' / 'todo' / '待填' / 空字串 / 純空白。
+    比對前先 strip + lower。
+    另外：skeleton 產出的值常帶行內 comment（e.g. '[編劇填]  # 說明'），
+    只要字串以 placeholder 關鍵字為「前半段」（空白/# 之前）即視為 placeholder。
+    """
+    if val is None:
+        return True
+    s = str(val).strip()
+    if not s:
+        return True
+    # 取 comment 前的有效部份（以 '#' 或空白分割取第一段）
+    token = re.split(r'[\s#]', s)[0].lower()
+    return token in ('[編劇填]', 'pending', 'todo', '待填')
+
+
+def chk_v2_026_template_adaptation_required(data: dict, fname: str) -> tuple[str, str]:
+    """V2-026：template_adaptation 完整驗
+
+    對齊 V2-025 cutoff 邏輯（_V2_025_CUTOFF = 2026-06-01）：
+    - legacy 批次（批次日期 < 2026-06-01）：缺欄位 / placeholder / forbidden_copy_check 未過 → WARN
+    - 非 legacy（新批次或無法判斷）：缺欄位 / placeholder / forbidden_copy_check 未過 → FAIL
+
+    template_adaptation 欄位應包含：
+      learned_structure：從範本學到的骨架邏輯（必填，不可為 placeholder）
+      changed_context：換成業主情境的說明（必填，不可為 placeholder）
+      forbidden_copy_check：需為 PASS / passed / true（不分大小寫）
+    """
+    is_legacy = _is_v2025_legacy(data, fname)
+
+    def _make_result(has_issues: bool, issues: list[str]) -> tuple[str, str]:
+        """根據 legacy 狀態決定 WARN 或 FAIL"""
+        if not has_issues:
+            return "PASS", "template_adaptation 已填 learned_structure + changed_context（forbidden_copy_check OK）"
+        msg_base = "template_adaptation 未完整：" + "；".join(issues)
+        if is_legacy:
+            return "WARN", msg_base + "（legacy 批次過渡期）"
+        return "FAIL", msg_base + "（新批次強制 — 2026-06-01 起必須完整填寫）"
+
+    adapt = data.get('template_adaptation')
+
+    if not adapt:
+        issues = [
+            "缺 template_adaptation（建議填 learned_structure + changed_context，"
+            "說明從範本學到什麼 / 如何改成業主情境）"
+        ]
+        return _make_result(True, issues)
+
+    if not isinstance(adapt, dict):
+        issues = [f"template_adaptation 格式錯誤（應是 dict，實際：{type(adapt).__name__}）"]
+        return _make_result(True, issues)
+
+    # 檢查 learned_structure / changed_context：缺欄位 或 值為 placeholder → 視為 missing
+    placeholder_fields = []
+    missing_fields = []
+    for k in ('learned_structure', 'changed_context'):
+        v = adapt.get(k)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            missing_fields.append(k)
+        elif _is_placeholder(v):
+            placeholder_fields.append(k)
+
+    issues = []
+    if missing_fields:
+        issues.append(
+            f"缺欄位 {missing_fields}（learned_structure=從範本學到的結構邏輯 / "
+            f"changed_context=換成業主情境的說明）"
+        )
+    if placeholder_fields:
+        issues.append(
+            f"{placeholder_fields} 仍為 skeleton placeholder（'[編劇填]'/'pending' 等），請實際填寫"
+        )
+
+    # 檢查 forbidden_copy_check：需為 PASS / passed / true
+    fcc = adapt.get('forbidden_copy_check')
+    if fcc is not None:
+        fcc_ok = str(fcc).strip().lower() in ('pass', 'passed', 'true')
+        if not fcc_ok:
+            issues.append(
+                f"forbidden_copy_check='{fcc}' 未過（需改為 PASS 後才算確認無直接複製）"
+            )
+
+    return _make_result(bool(issues), issues)
+
+
 # ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
@@ -917,6 +1394,8 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
     """
+    # P1-1：傳入「批次目錄名/檔名」讓 _extract_batch_date 能從目錄名（如第34批_試水批_2026-05-23）抓日期
+    _fname_with_dir = f"{f.parent.name}/{f.name}"
     results = []
     checks = [
         # 原 15 件
@@ -943,6 +1422,10 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("V2-014",  chk_v2_014_bappu_taboo(data, f.name, owner)),
         ("V2-015",  chk_v2_015_bappu_q1q2q3(data, f.name, owner)),
         ("V2-016",  chk_v2_016_trial_observe_until(data, f.name, owner)),
+        # v4 新增 2 件（2026-05-31 爆款範本引用系統）
+        # P1-1：V2-025 改傳 _fname_with_dir 讓日期解析能吃批次目錄名
+        ("V2-025",  chk_v2_025_template_source_required(data, _fname_with_dir)),
+        ("V2-026",  chk_v2_026_template_adaptation_required(data, _fname_with_dir)),
     ]
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -957,6 +1440,10 @@ def main():
     parser.add_argument("--batch-dir", required=True, help="第 N 批 yaml 資料夾絕對路徑")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
     args = parser.parse_args()
+
+    # P1-3：設模組旗標讓 check fn 知道是否 strict
+    global _STRICT_MODE
+    _STRICT_MODE = args.strict
 
     batch_dir = Path(args.batch_dir)
     if not batch_dir.exists():
@@ -1149,6 +1636,462 @@ if __name__ == "__main__":
         f5['policy_alignment'] = {'ig': ['DM Sends 優先']}  # 缺 D-2
         r = chk_v2_002_policy_alignment(f5, 'f5.yaml', '昀臻')
         fcheck('F5 V2-002 WARN（美容業缺 D-2）', r[0] == 'WARN', r[1])
+
+        # ── F6 V2-025：缺 template_source_ids → FAIL ──
+        print("\n[F6] 缺 template_source_ids → V2-025 FAIL")
+        f6_no_ids = {
+            'title': 'F6 缺 template_source_ids',
+            '派系': '直球派',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_阿奇': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+        }
+        r = chk_v2_025_template_source_required(f6_no_ids, 'f6.yaml')
+        fcheck('F6 V2-025 FAIL（缺 template_source_ids）', r[0] == 'FAIL', r[1])
+
+        # ── F7 V2-025：template_source_ids 填了但 index 不存在 → WARN ──
+        print("\n[F7] template_source_ids 已填、index 不存在 → V2-025 WARN")
+        # 暫時清除快取（測試隔離）
+        import validate_script_batch as _self_mod
+        _saved_cache = _self_mod._TEMPLATE_INDEX_CACHE
+        _saved_path = _self_mod._TEMPLATE_INDEX_PATH
+        # 指向不存在的路徑
+        _self_mod._TEMPLATE_INDEX_PATH = Path('/nonexistent/template_index.jsonl')
+        _self_mod._TEMPLATE_INDEX_CACHE = None
+
+        f7_with_ids = {
+            'title': 'F7 有 template_source_ids',
+            '派系': '直球派',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_阿奇': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # P1-2 修：補到 3 張（數量 OK）才能進到 index 不存在判斷
+            'template_source_ids': ['tmpl_abc123', 'tmpl_def456', 'tmpl_ghi789'],
+        }
+        r = _self_mod.chk_v2_025_template_source_required(f7_with_ids, 'f7.yaml')
+        fcheck('F7 V2-025 WARN（index 不存在）', r[0] == 'WARN', r[1])
+
+        # 還原快取路徑
+        _self_mod._TEMPLATE_INDEX_PATH = _saved_path
+        _self_mod._TEMPLATE_INDEX_CACHE = _saved_cache
+
+        # ── F8 V2-025：template_source_ids 有 id 不在 index → FAIL ──
+        print("\n[F8] template_source_ids 有 id 不在 index → V2-025 FAIL")
+        import json as _json_mod
+        import tempfile, os as _os
+        _tmp_dir = tempfile.mkdtemp()
+        _tmp_index = Path(_tmp_dir) / "template_index.jsonl"
+        # P1-2 修：index 建 3 張已知 id，F8/F9 data 補到 3 張以上才能進 index 驗
+        _tmp_index.write_text(
+            _json_mod.dumps({"template_id": "tmpl_known_001", "platform": "IG"}, ensure_ascii=False) + '\n' +
+            _json_mod.dumps({"template_id": "tmpl_known_002", "platform": "IG"}, ensure_ascii=False) + '\n' +
+            _json_mod.dumps({"template_id": "tmpl_known_003", "platform": "IG"}, ensure_ascii=False) + '\n',
+            encoding='utf-8'
+        )
+        _self_mod._TEMPLATE_INDEX_PATH = _tmp_index
+        _self_mod._TEMPLATE_INDEX_CACHE = None
+
+        f8_bad_ids = {
+            'title': 'F8 有無效 id',
+            '派系': '直球派',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_阿奇': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # P1-2 修：3 張（數量 OK），其中 1 張不在 index → FAIL
+            'template_source_ids': ['tmpl_known_001', 'tmpl_known_002', 'tmpl_NOT_EXIST'],
+        }
+        r = _self_mod.chk_v2_025_template_source_required(f8_bad_ids, 'f8.yaml')
+        fcheck('F8 V2-025 FAIL（有 id 不在 index）', r[0] == 'FAIL', r[1])
+
+        # ── F9 V2-025：全部 id 都在 index → PASS ──
+        print("\n[F9] template_source_ids 全在 index → V2-025 PASS")
+        f9_good_ids = dict(f8_bad_ids)
+        # P1-2 修：3 張全在 index → PASS
+        f9_good_ids['template_source_ids'] = ['tmpl_known_001', 'tmpl_known_002', 'tmpl_known_003']
+        r = _self_mod.chk_v2_025_template_source_required(f9_good_ids, 'f9.yaml')
+        fcheck('F9 V2-025 PASS（全在 index）', r[0] == 'PASS', r[1])
+
+        # 還原路徑 + 清理暫存
+        _self_mod._TEMPLATE_INDEX_PATH = _saved_path
+        _self_mod._TEMPLATE_INDEX_CACHE = _saved_cache
+        try:
+            _tmp_index.unlink()
+            _os.rmdir(_tmp_dir)
+        except Exception:
+            pass
+
+        # ── F10 V2-026：缺 template_adaptation，無日期 → 新批保守 FAIL ──
+        print("\n[F10] 缺 template_adaptation，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
+        f10_no_adapt = {
+            'title': 'F10 缺 adaptation',
+            'template_source_ids': ['tmpl_abc'],
+        }
+        r = chk_v2_026_template_adaptation_required(f10_no_adapt, 'f10.yaml')
+        fcheck('F10 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
+
+        # ── F10L V2-026 legacy：缺 template_adaptation，fname 含 < 6/1 日期 → WARN ──
+        print("\n[F10L] 缺 template_adaptation，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
+        r = chk_v2_026_template_adaptation_required(f10_no_adapt, '第30批_2026-05-20/f10L.yaml')
+        fcheck('F10L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
+
+        # ── F11 V2-026：template_adaptation 缺 changed_context，無日期 → 新批保守 FAIL ──
+        print("\n[F11] template_adaptation 缺 changed_context，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
+        f11_partial_adapt = {
+            'title': 'F11 adaptation 不完整',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': {
+                'learned_structure': '反差 hook + 案例收束',
+                # 缺 changed_context
+            },
+        }
+        r = chk_v2_026_template_adaptation_required(f11_partial_adapt, 'f11.yaml')
+        fcheck('F11 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
+
+        # ── F11L V2-026 legacy：缺 changed_context，fname 含 < 6/1 日期 → WARN ──
+        print("\n[F11L] template_adaptation 缺 changed_context，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
+        r = chk_v2_026_template_adaptation_required(f11_partial_adapt, '第30批_2026-05-20/f11L.yaml')
+        fcheck('F11L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
+
+        # ── F12 V2-026：template_adaptation 完整 → PASS ──
+        print("\n[F12] template_adaptation 完整 → V2-026 PASS")
+        f12_full_adapt = {
+            'title': 'F12 adaptation 完整',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': {
+                'learned_structure': '反差 hook：先說反常觀點，用案例說明',
+                'changed_context': '把「帶看」換成「瑞祥帶看豐原日出段的故事」',
+            },
+        }
+        r = chk_v2_026_template_adaptation_required(f12_full_adapt, 'f12.yaml')
+        fcheck('F12 V2-026 PASS（完整 adaptation）', r[0] == 'PASS', r[1])
+
+        # ── F13 V2-025：template_source_ids 是空 list → FAIL ──
+        print("\n[F13] template_source_ids 空 list → V2-025 FAIL")
+        f13_empty_ids = {
+            'title': 'F13 空 list',
+            'template_source_ids': [],
+        }
+        r = chk_v2_025_template_source_required(f13_empty_ids, 'f13.yaml')
+        fcheck('F13 V2-025 FAIL（空 list）', r[0] == 'FAIL', r[1])
+
+        # ── F14 V2-026：template_adaptation 是 str，無日期 → 新批保守 FAIL ──
+        print("\n[F14] template_adaptation 是 str，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
+        f14_str_adapt = {
+            'title': 'F14 adaptation str',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': '隨便說一下',
+        }
+        r = chk_v2_026_template_adaptation_required(f14_str_adapt, 'f14.yaml')
+        fcheck('F14 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
+
+        # ── F14L V2-026 legacy：adaptation 是 str，fname 含 < 6/1 日期 → WARN ──
+        print("\n[F14L] template_adaptation 是 str，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
+        r = chk_v2_026_template_adaptation_required(f14_str_adapt, '第30批_2026-05-20/f14L.yaml')
+        fcheck('F14L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
+
+        # ── F14b V2-026：learned_structure 是 placeholder '[編劇填]'，無日期 → FAIL ──
+        print("\n[F14b] learned_structure=[編劇填]（skeleton placeholder），fname 無日期 → V2-026 FAIL（無日期=新批強制）")
+        f14b_placeholder = {
+            'title': 'F14b adaptation placeholder',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': {
+                'learned_structure': '[編劇填]  # 從範本學到的結構，e.g. 反差 hook + 案例收束',
+                'changed_context': '[編劇填]  # 把範本情境換成本批，e.g. 把帶看換成瑞祥帶看日出段',
+                'forbidden_copy_check': 'pending',
+            },
+        }
+        r = chk_v2_026_template_adaptation_required(f14b_placeholder, 'f14b.yaml')
+        fcheck('F14b V2-026 FAIL（無日期=新批強制）且 placeholder 在訊息中',
+               r[0] == 'FAIL' and 'placeholder' in r[1], r[1])
+
+        # ── F14bL V2-026 legacy：placeholder，fname 含 < 6/1 日期 → WARN + placeholder 在訊息 ──
+        print("\n[F14bL] learned_structure=[編劇填]（placeholder），fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
+        r = chk_v2_026_template_adaptation_required(f14b_placeholder, '第30批_2026-05-20/f14bL.yaml')
+        fcheck('F14bL V2-026 WARN（legacy 過渡）且 placeholder 在訊息中',
+               r[0] == 'WARN' and 'placeholder' in r[1], r[1])
+
+        # ── F14c V2-026：forbidden_copy_check=pending，無日期 → FAIL ──
+        print("\n[F14c] forbidden_copy_check=pending，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
+        f14c_fcc_pending = {
+            'title': 'F14c fcc pending',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': {
+                'learned_structure': '反差 hook：先說反常觀點，用案例說明',
+                'changed_context': '把「帶看」換成「瑞祥帶看豐原日出段的故事」',
+                'forbidden_copy_check': 'pending',
+            },
+        }
+        r = chk_v2_026_template_adaptation_required(f14c_fcc_pending, 'f14c.yaml')
+        fcheck('F14c V2-026 FAIL（無日期=新批強制）且 forbidden_copy_check 在訊息中',
+               r[0] == 'FAIL' and 'forbidden_copy_check' in r[1], r[1])
+
+        # ── F14cL V2-026 legacy：fcc=pending，fname 含 < 6/1 日期 → WARN + forbidden_copy_check 在訊息 ──
+        print("\n[F14cL] forbidden_copy_check=pending，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
+        r = chk_v2_026_template_adaptation_required(f14c_fcc_pending, '第30批_2026-05-20/f14cL.yaml')
+        fcheck('F14cL V2-026 WARN（legacy 過渡）且 forbidden_copy_check 在訊息中',
+               r[0] == 'WARN' and 'forbidden_copy_check' in r[1], r[1])
+
+        # ── F14d V2-026：真填 + forbidden_copy_check=PASS → PASS ──
+        print("\n[F14d] 真填 + forbidden_copy_check=PASS → V2-026 PASS")
+        f14d_full_with_fcc = {
+            'title': 'F14d 完整含 fcc PASS',
+            'template_source_ids': ['tmpl_abc'],
+            'template_adaptation': {
+                'learned_structure': '反差 hook：先說反常觀點，用案例說明',
+                'changed_context': '把「帶看」換成「瑞祥帶看豐原日出段的故事」',
+                'forbidden_copy_check': 'PASS',
+            },
+        }
+        r = chk_v2_026_template_adaptation_required(f14d_full_with_fcc, 'f14d.yaml')
+        fcheck('F14d V2-026 PASS（真填 + fcc=PASS）', r[0] == 'PASS', r[1])
+
+        # ── F15 V2-025：control_group:true → 豁免 template_source_ids → PASS ──
+        print("\n[F15] control_group:true（對照組）→ V2-025 豁免 PASS")
+        f15_control = {
+            'title': 'F15 對照組腳本',
+            '派系': '直球派',
+            'control_group': True,
+            # 刻意不填 template_source_ids，驗豁免邏輯
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_阿奇': '測試對照組'}],
+            'caption': '對照組測試',
+            'hashtag': ['#test'],
+        }
+        r = chk_v2_025_template_source_required(f15_control, 'f15.yaml')
+        fcheck('F15 V2-025 PASS（control_group:true 豁免）', r[0] == 'PASS' and '[CONTROL]' in r[1], r[1])
+
+        # ── F16 V2-025 legacy：批次日期 < 2026-06-01 無 template_source_ids → WARN ──
+        print("\n[F16] batch_label 含 2026-05-23（< 6/1）且無 template_source_ids → V2-025 WARN（legacy 過渡）")
+        f16_legacy = {
+            'title': 'F16 既有批次過渡',
+            '派系': '直球派',
+            'batch_label': '試水批_2026-05-23',  # < 2026-06-01
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # 刻意不填 template_source_ids，模擬既有批次
+        }
+        r = chk_v2_025_template_source_required(f16_legacy, 'f16.yaml')
+        fcheck(
+            'F16 V2-025 WARN（legacy 批次過渡期豁免）',
+            r[0] == 'WARN' and '[LEGACY]' in r[1],
+            r[1]
+        )
+
+        # ── F17 V2-025 新批：批次日期 >= 2026-06-01 無 template_source_ids → FAIL ──
+        print("\n[F17] batch_date 含 2026-06-01（新批強制）且無 template_source_ids → V2-025 FAIL")
+        f17_new_batch = {
+            'title': 'F17 新批強制',
+            '派系': '直球派',
+            'batch_date': '2026-06-01',  # >= 2026-06-01 → 強制
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # 刻意不填 template_source_ids，驗新批強制 FAIL
+        }
+        r = chk_v2_025_template_source_required(f17_new_batch, 'f17.yaml')
+        fcheck(
+            'F17 V2-025 FAIL（新批 >= 2026-06-01 強制填 template_source_ids）',
+            r[0] == 'FAIL',
+            r[1]
+        )
+
+        # ── F18 P1-1：batch 欄位含日期（< 6/1）且無 template_source_ids → WARN（legacy） ──
+        print("\n[F18] P1-1：yaml['batch'] 含日期 2026-05-31（< 6/1），無 template_source_ids → WARN（legacy）")
+        f18_batch_field = {
+            'title': 'F18 batch 欄位日期',
+            '派系': '直球派',
+            'batch': 'pilot_範本試點_2026-05-31',  # P1-1 新欄位
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # 刻意不填 template_source_ids，驗 batch 欄位日期被抓到 → legacy WARN
+        }
+        r = chk_v2_025_template_source_required(f18_batch_field, 'f18.yaml')
+        fcheck(
+            'F18 V2-025 WARN（batch 欄位日期 < 6/1 → legacy 過渡）',
+            r[0] == 'WARN' and '[LEGACY]' in r[1],
+            r[1]
+        )
+
+        # ── F19 P1-1：批次目錄名含日期（< 6/1）無 yaml 日期欄位 → WARN（legacy） ──
+        print("\n[F19] P1-1：fname 含批次目錄 第34批_試水批_2026-05-23（< 6/1），無 template_source_ids → WARN（legacy）")
+        f19_dir_date = {
+            'title': 'F19 批次目錄日期',
+            '派系': '直球派',
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # 無任何日期欄位，日期從 fname 的目錄段抓
+        }
+        # 模擬 run_per_file_checks 傳入的 "批次目錄名/檔名"
+        r = chk_v2_025_template_source_required(f19_dir_date, '第34批_試水批_2026-05-23/script_rux_34_01.yaml')
+        fcheck(
+            'F19 V2-025 WARN（目錄名日期 < 6/1 → legacy 過渡）',
+            r[0] == 'WARN' and '[LEGACY]' in r[1],
+            r[1]
+        )
+
+        # ── F20 P1-2：template_source_ids 只有 1 張 → FAIL（數量不足） ──
+        print("\n[F20] P1-2：template_source_ids 只有 1 張 → V2-025 FAIL（需 3-5 張）")
+        f20_one_id = {
+            'title': 'F20 一張',
+            'template_source_ids': ['tmpl_x'],
+        }
+        r = chk_v2_025_template_source_required(f20_one_id, 'f20.yaml')
+        fcheck('F20 V2-025 FAIL（只有 1 張）', r[0] == 'FAIL', r[1])
+
+        # ── F21 P1-2：template_source_ids 有重複 id → FAIL ──
+        print("\n[F21] P1-2：template_source_ids 重複 id → V2-025 FAIL")
+        f21_dup_ids = {
+            'title': 'F21 重複 id',
+            'template_source_ids': ['tmpl_x', 'tmpl_x', 'tmpl_x'],
+        }
+        r = chk_v2_025_template_source_required(f21_dup_ids, 'f21.yaml')
+        fcheck('F21 V2-025 FAIL（重複 id）', r[0] == 'FAIL', r[1])
+
+        # ── F22 P1-2：template_source_ids 剛好 5 張不重複（需 index 不擋）→ 數量 PASS ──
+        print("\n[F22] P1-2：template_source_ids 5 張不重複（index 不存在 → 數量過驗後 WARN）")
+        import validate_script_batch as _self_mod22
+        _saved_cache22 = _self_mod22._TEMPLATE_INDEX_CACHE
+        _saved_path22 = _self_mod22._TEMPLATE_INDEX_PATH
+        _self_mod22._TEMPLATE_INDEX_PATH = Path('/nonexistent/template_index.jsonl')
+        _self_mod22._TEMPLATE_INDEX_CACHE = None
+        f22_five_ids = {
+            'title': 'F22 5 張不重複',
+            'template_source_ids': ['tmpl_a', 'tmpl_b', 'tmpl_c', 'tmpl_d', 'tmpl_e'],
+        }
+        r = _self_mod22.chk_v2_025_template_source_required(f22_five_ids, 'f22.yaml')
+        # 數量/重複驗過，index 不存在 → WARN（不因數量 FAIL）
+        fcheck('F22 V2-025 WARN（5 張 OK，index 缺 → WARN 非 FAIL）', r[0] == 'WARN', r[1])
+        _self_mod22._TEMPLATE_INDEX_PATH = _saved_path22
+        _self_mod22._TEMPLATE_INDEX_CACHE = _saved_cache22
+
+        # ── F23 P1-3：strict 模式 + 新批 + index 缺失 → FAIL ──
+        print("\n[F23] P1-3：strict 模式 + 新批（>= 6/1）+ index 缺失 → V2-025 FAIL")
+        import validate_script_batch as _self_mod23
+        _saved_cache23 = _self_mod23._TEMPLATE_INDEX_CACHE
+        _saved_path23 = _self_mod23._TEMPLATE_INDEX_PATH
+        _saved_strict23 = _self_mod23._STRICT_MODE
+        _self_mod23._TEMPLATE_INDEX_PATH = Path('/nonexistent/template_index.jsonl')
+        _self_mod23._TEMPLATE_INDEX_CACHE = None
+        _self_mod23._STRICT_MODE = True  # 模擬 --strict
+        f23_strict_new = {
+            'title': 'F23 strict 新批 index 缺',
+            'batch_date': '2026-06-01',  # 新批
+            'template_source_ids': ['tmpl_a', 'tmpl_b', 'tmpl_c'],  # 3 張數量 OK
+        }
+        r = _self_mod23.chk_v2_025_template_source_required(f23_strict_new, 'f23.yaml')
+        fcheck('F23 V2-025 FAIL（strict + 新批 + index 缺）', r[0] == 'FAIL', r[1])
+        _self_mod23._TEMPLATE_INDEX_PATH = _saved_path23
+        _self_mod23._TEMPLATE_INDEX_CACHE = _saved_cache23
+        _self_mod23._STRICT_MODE = _saved_strict23
+
+        # ── F24 P1-2 legacy：legacy 批（< 6/1）+ 只 2 張 → WARN（不 FAIL） ──
+        print("\n[F24] P1-2 legacy：batch_label 含 2026-05-31（< 6/1）+ 只 2 張 template_source_ids → V2-025 WARN（legacy 過渡，不 FAIL）")
+        f24_legacy_two = {
+            'title': 'F24 legacy 批 2 張',
+            '派系': '直球派',
+            'batch_label': '試點批_2026-05-31',  # < 2026-06-01
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            'template_source_ids': ['tmpl_pilot_01', 'tmpl_pilot_02'],  # 只 2 張（< 3）
+        }
+        r = chk_v2_025_template_source_required(f24_legacy_two, 'f24.yaml')
+        fcheck(
+            'F24 V2-025 WARN（legacy 批 2 張，不 FAIL）',
+            r[0] == 'WARN' and '[LEGACY]' in r[1],
+            r[1]
+        )
+
+        # ── F25 P1-2 legacy：legacy 批（< 6/1）+ 重複 id → WARN（不 FAIL） ──
+        print("\n[F25] P1-2 legacy：batch_label 含 2026-05-31（< 6/1）+ 重複 id → V2-025 WARN（legacy 過渡，不 FAIL）")
+        f25_legacy_dup = {
+            'title': 'F25 legacy 批重複 id',
+            '派系': '直球派',
+            'batch_label': '試點批_2026-05-31',  # < 2026-06-01
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            'template_source_ids': ['tmpl_x', 'tmpl_x', 'tmpl_x'],  # 重複
+        }
+        r = chk_v2_025_template_source_required(f25_legacy_dup, 'f25.yaml')
+        fcheck(
+            'F25 V2-025 WARN（legacy 批重複 id，不 FAIL）',
+            r[0] == 'WARN' and '[LEGACY]' in r[1],
+            r[1]
+        )
+
+        # ── F26 P1 繞過洞：舊 yaml 日期（5/31）複製到 6/2 目錄 → 應 FAIL（取最大日期）──
+        print("\n[F26] P1 繞過洞：yaml batch_label=2026-05-31 但目錄名含 2026-06-02 → V2-025 FAIL（不允許繞過）")
+        f26_bypass = {
+            'title': 'F26 舊 yaml 放新目錄',
+            '派系': '直球派',
+            'batch_label': '試水批_2026-05-31',  # 舊 yaml 欄位日期（< 6/1）
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+            # 刻意不填 template_source_ids，驗繞過洞是否堵住
+        }
+        # fname 帶新批目錄（6/2），取最大日期應為 2026-06-02 → 新批 FAIL
+        r = chk_v2_025_template_source_required(f26_bypass, '第35批_2026-06-02/script_rux_35_01.yaml')
+        fcheck(
+            'F26 V2-025 FAIL（繞過洞堵住：目錄日期 6/2 > yaml 日期 5/31 → 新批強制）',
+            r[0] == 'FAIL',
+            r[1]
+        )
+
+        # ── F27 多格式：YYYY/MM/DD → 抓到 legacy 日期 → WARN ──
+        print("\n[F27] P2 多格式 YYYY/MM/DD：batch_label 含 2026/05/31 → 抓到日期 → legacy WARN")
+        f27_slash = {
+            'title': 'F27 slash format',
+            '派系': '直球派',
+            'batch_label': '試水批_2026/05/31',  # YYYY/MM/DD 格式
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+        }
+        # 驗 _extract_batch_date 能抓到日期
+        d27 = _extract_batch_date(f27_slash, 'f27.yaml')
+        fcheck(
+            'F27 _extract_batch_date 抓到 2026/05/31（slash 格式）',
+            d27 == _dt.date(2026, 5, 31),
+            f"抓到：{d27}"
+        )
+
+        # ── F28 多格式：YYYYMMDD → 抓到 legacy 日期 → WARN ──
+        print("\n[F28] P2 多格式 YYYYMMDD：batch_label 含 20260531 → 抓到日期 → legacy WARN")
+        f28_compact = {
+            'title': 'F28 compact format',
+            '派系': '直球派',
+            'batch_label': '試水批_20260531',  # YYYYMMDD 格式
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+        }
+        d28 = _extract_batch_date(f28_compact, 'f28.yaml')
+        fcheck(
+            'F28 _extract_batch_date 抓到 20260531（compact 格式）',
+            d28 == _dt.date(2026, 5, 31),
+            f"抓到：{d28}"
+        )
+
+        # ── F29 多格式：YYYY_MM_DD → 抓到 legacy 日期 → WARN ──
+        print("\n[F29] P2 多格式 YYYY_MM_DD：batch_label 含 2026_05_31 → 抓到日期 → legacy WARN")
+        f29_underscore = {
+            'title': 'F29 underscore format',
+            '派系': '直球派',
+            'batch_label': '試水批_2026_05_31',  # YYYY_MM_DD 格式
+            'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試'}],
+            'caption': '測試',
+            'hashtag': ['#test'],
+        }
+        d29 = _extract_batch_date(f29_underscore, 'f29.yaml')
+        fcheck(
+            'F29 _extract_batch_date 抓到 2026_05_31（underscore 格式）',
+            d29 == _dt.date(2026, 5, 31),
+            f"抓到：{d29}"
+        )
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

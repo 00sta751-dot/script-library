@@ -194,17 +194,20 @@ def check_3_build_html_dual_change():
 
 def check_4_untracked_files():
     """檢查 4：git status --porcelain 攔未追蹤
-    .py / .html / .png 新增檔沒 git add = 漏 commit
+    .py / .html / .png / .jsonl 新增檔沒 git add = 漏 commit
+    修正（2026-05-31）：
+    - git -c core.quotepath=false 讓中文檔名不被 octal 編碼遮掉
+    - --untracked-files=all 展開未追蹤目錄，防止整個目錄被 ?? dir/ 略過
     """
     log('=== Check 4：git status --porcelain 攔未追蹤 ===')
     fails = []
 
-    status = git_run(['status', '--porcelain']).split('\n')
+    status = git_run(['-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all']).split('\n')
     untracked = []
     for line in status:
         if line.startswith('??'):
             f = line[3:].strip()
-            if f.endswith(('.py', '.html', '.png', '.jpg', '.json', '.yaml')):
+            if f.endswith(('.py', '.html', '.png', '.jpg', '.json', '.yaml', '.jsonl')):
                 untracked.append(f)
 
     if untracked:
@@ -252,6 +255,46 @@ def check_5_schema_validation():
                 fails.append(msg)
     except ImportError:
         log('  ℹ 沒裝 pyyaml，跳過 YAML 檢查')
+
+    # 掃 jsonl — line-by-line（禁整文 json.loads，JSONL 多行不合法 JSON）
+    # 必填 key：template_id / source_path / transferability_score
+    # 注意：只驗範本索引 JSONL（template_index.jsonl），其他工具的 audit/log JSONL 跳過
+    JSONL_REQUIRED_KEYS = ('template_id', 'source_path', 'transferability_score')
+    for jp in LIB.rglob('*.jsonl'):
+        if '.git' in jp.parts or '_archive' in jp.parts or '.gstack' in jp.parts:
+            continue
+        # 只驗範本系統的 jsonl（檔名含 template_ 或 template 前綴）
+        if 'template' not in jp.name:
+            log(f'  ℹ {jp.relative_to(LIB)} — 非範本系統 JSONL，跳過必填 key 驗證')
+            continue
+        rel = jp.relative_to(LIB)
+        line_errors = []
+        try:
+            with jp.open(encoding='utf-8', errors='replace') as jf:
+                for lineno, raw in enumerate(jf, 1):
+                    raw = raw.strip()
+                    if not raw:
+                        continue  # 空行跳過
+                    try:
+                        obj = json.loads(raw)
+                    except Exception as e:
+                        line_errors.append(f'  line {lineno}: JSON parse 失敗 — {e}')
+                        continue
+                    missing = [k for k in JSONL_REQUIRED_KEYS if k not in obj]
+                    if missing:
+                        line_errors.append(f'  line {lineno}: 缺必填 key {missing}')
+        except Exception as e:
+            msg = f'❌ {rel} 讀取失敗: {e}'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+
+        if line_errors:
+            for le in line_errors:
+                log(f'  ❌ {rel}{le}')
+            fails.append(f'❌ {rel} JSONL 驗證失敗（{len(line_errors)} 行有問題）')
+        else:
+            log(f'  ✅ {rel} JSONL OK')
 
     return fails
 

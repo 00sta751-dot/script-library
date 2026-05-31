@@ -11,7 +11,9 @@ yaml_to_sc.py — yaml 腳本檔 → sc_article() kwargs 通用翻譯機
 
 主要函數：
   load_yaml_articles(yaml_dir, expected_count) -> list[dict]
-  yaml_to_sc_kwargs(yaml_data, num) -> dict
+  yaml_to_sc_kwargs(yaml_data, num) -> dict          ← 對外 API，輸出不變
+  normalize_script_to_canonical(source_dict) -> dict ← v3 新增：canonical 格式層
+  canonical_to_sc_kwargs(canonical, original_yaml, num) -> dict  ← v3 內部用
   parse_markdown_body(md_text) -> dict
 
 timestamp 轉換規則：
@@ -34,6 +36,16 @@ v2.1 2026-05-23：加 markdown body parser（新格式支援）
   auto-detect：frontmatter 無 scenes key → 自動走 markdown parser
   backward compatible：既有 structured frontmatter yaml 不受影響
   faction 別名：frontmatter 的 faction key 自動映射為 派系
+
+v3 2026-05-31：canonical 格式層（3 業主中性格式）
+  新功能：normalize_script_to_canonical(source_dict) -> dict
+  canonical schema：
+    faction: {primary, alternatives, alias_raw}
+    platforms: {primary, secondary, variants}
+    scenes: [{slot, role, dialogue:[{speaker,line}], subtitle, visual,
+              offscreen_interaction, raw_text}]
+  字幕分流：字幕卡/翠文 → subtitle；畫面 → visual；藏鏡人 → offscreen_interaction
+  對外 API（yaml_to_sc_kwargs）輸出不變，舊 build script 零影響。
 """
 
 import os
@@ -246,6 +258,332 @@ def _normalize_yaml_data(yaml_data: dict) -> dict:
 
     return data
 
+
+# ============================================================
+# normalize_script_to_canonical — v3 中性 canonical 格式層
+# ============================================================
+# 3 業主格式差異：
+#   瑞祥  : faction / platform_primary / markdown body 時間軸（台詞行/字幕卡行）
+#   叭噗  : 派系 / main_platform / 結構化 scenes（台詞_叭噗/台詞_小C）
+#   阿奇  : 派系 / main_platform / 結構化 scenes（台詞_阿奇/翠文）
+#
+# 字幕分流鐵律：
+#   字幕卡（瑞祥）/ 翠文（阿奇）→ subtitle
+#   畫面 → visual
+#   藏鏡人 → offscreen_interaction
+#   台詞_X → dialogue:[{speaker,line}]（保留順序；雙人對話不壓成一段）
+#
+# 本函式不改變 yaml_to_sc_kwargs() 的輸出，供 validator 使用。
+
+# inline 藏鏡人格式（markdown body 內）：【藏鏡人 1 共鳴型：「文字」】
+_INLINE_MIRROR_RE = re.compile(
+    r'【藏鏡人\s*\d*[^：:]*[：:][^「」]*「([^」]+)」[^】]*】',
+    re.MULTILINE
+)
+
+# markdown body 台詞行：「台詞：文字」
+_MD_DIALOGUE_LINE_RE = re.compile(r'^台詞：\s*(.+)$', re.MULTILINE)
+# markdown body 字幕卡行
+_MD_SUBTITLE_LINE_RE = re.compile(r'^字幕卡：\s*(.+)$', re.MULTILINE)
+# markdown body 畫面行
+_MD_VISUAL_LINE_RE = re.compile(r'^畫面：\s*(.+)$', re.MULTILINE)
+
+
+def _canonical_faction(yaml_data: dict) -> dict:
+    """從 yaml 抽出 canonical faction dict（支援 派系/faction 兩個 key）。"""
+    raw = yaml_data.get('派系') or yaml_data.get('faction') or ''
+    parts = [p.strip() for p in str(raw).split('/') if p.strip()]
+    _BRACKET_RE = re.compile(r'（[^）]*）')
+    clean_parts = [_BRACKET_RE.sub('', p).strip() for p in parts]
+    primary = clean_parts[0] if clean_parts else ''
+    alternatives = clean_parts[1:] if len(clean_parts) > 1 else []
+    return {'primary': primary, 'alternatives': alternatives, 'alias_raw': str(raw)}
+
+
+def _canonical_platforms(yaml_data: dict) -> dict:
+    """從 yaml 抽出 canonical platforms dict。
+    優先 main_platform；瑞祥用 platform_primary / platform_secondary。
+    """
+    primary_raw = yaml_data.get('main_platform') or yaml_data.get('platform_primary') or ''
+    secondary_raw = yaml_data.get('platform_secondary') or ''
+    variants_raw = yaml_data.get('platform_variants') or {}
+    if not isinstance(variants_raw, dict):
+        variants_raw = {}
+    return {
+        'primary': str(primary_raw).strip(),
+        'secondary': str(secondary_raw).strip(),
+        'variants': variants_raw,
+    }
+
+
+def _canonical_scenes_structured(scenes: list) -> list:
+    """結構化 scenes（叭噗/阿奇格式）→ canonical scenes。"""
+    canonical = []
+    for slot_idx, sc in enumerate(scenes, start=1):
+        dialogue = []
+        for k, v in sc.items():
+            if k.startswith('台詞_') and v:
+                speaker = k[len('台詞_'):]
+                dialogue.append({'speaker': speaker, 'line': str(v).strip()})
+
+        subtitle = ''
+        if sc.get('字幕卡'):
+            subtitle = str(sc['字幕卡']).strip()
+        elif sc.get('翠文'):
+            subtitle = str(sc['翠文']).strip()
+
+        visual = str(sc.get('畫面', '') or '').strip()
+
+        mirror_raw = str(sc.get('藏鏡人', '') or '').strip()
+        if mirror_raw.startswith('「') and mirror_raw.endswith('」'):
+            mirror_raw = mirror_raw[1:-1]
+
+        raw_parts = [
+            f'{k}:{v}' for k, v in sc.items()
+            if k not in ('timestamp', 'type') and v
+        ]
+
+        canonical.append({
+            'slot': slot_idx,
+            'role': str(sc.get('type', '') or '').strip(),
+            'dialogue': dialogue,
+            'subtitle': subtitle,
+            'visual': visual,
+            'offscreen_interaction': mirror_raw,
+            'raw_text': ' | '.join(raw_parts),
+            'timestamp': str(sc.get('timestamp', '') or '').strip(),
+        })
+    return canonical
+
+
+def _canonical_scenes_markdown(md_body: str) -> list:
+    """markdown body（瑞祥格式）→ canonical scenes。
+    呼叫既有 parse_markdown_body，再對每個 scene 做欄位分流。
+    """
+    if not md_body or not md_body.strip():
+        return []
+    parsed = parse_markdown_body(md_body)
+    if not parsed['scenes']:
+        return []
+
+    canonical = []
+    for slot_idx, sc in enumerate(parsed['scenes'], start=1):
+        raw_body = sc.get('_raw', '')
+
+        # dialogue：台詞行（去掉 inline 藏鏡人後）
+        dialogue = []
+        raw_d = sc.get('台詞_旁白', '')
+        if raw_d:
+            clean = _INLINE_MIRROR_RE.sub('', raw_d).strip()
+            clean = re.sub(r'\s+', ' ', clean).strip()
+            if clean:
+                dialogue.append({'speaker': '旁白', 'line': clean})
+        elif raw_body:
+            for d_text in _MD_DIALOGUE_LINE_RE.findall(raw_body):
+                clean = _INLINE_MIRROR_RE.sub('', d_text).strip()
+                clean = re.sub(r'\s+', ' ', clean).strip()
+                if clean:
+                    dialogue.append({'speaker': '旁白', 'line': clean})
+
+        # subtitle：字幕卡
+        subtitle = str(sc.get('字幕卡', '') or '').strip()
+        if not subtitle and raw_body:
+            m = _MD_SUBTITLE_LINE_RE.search(raw_body)
+            if m:
+                subtitle = m.group(1).strip()
+
+        # visual：畫面（瑞祥 markdown 格式通常無畫面行，預設空）
+        visual = ''
+        if raw_body:
+            m = _MD_VISUAL_LINE_RE.search(raw_body)
+            if m:
+                visual = m.group(1).strip()
+
+        # offscreen_interaction：從 _raw 中的 inline 【藏鏡人...：「...」】 抓（精確）
+        # 不用 sc['藏鏡人']（parse_markdown_body 的 _MIRROR_RE 貪婪匹配行尾會抓多）
+        mirror = ''
+        if raw_body:
+            inline_hits = _INLINE_MIRROR_RE.findall(raw_body)
+            if inline_hits:
+                mirror = ' / '.join(inline_hits)
+
+        canonical.append({
+            'slot': slot_idx,
+            'role': str(sc.get('type', '') or '').strip(),
+            'dialogue': dialogue,
+            'subtitle': subtitle,
+            'visual': visual,
+            'offscreen_interaction': mirror,
+            'raw_text': raw_body[:200] if raw_body else '',
+            'timestamp': str(sc.get('timestamp', '') or '').strip(),
+        })
+    return canonical
+
+
+def normalize_script_to_canonical(source_dict: dict) -> dict:
+    """任意業主 raw yaml dict → 中性 canonical dict（v3）。
+
+    Args:
+        source_dict: yaml.safe_load() 後的 dict（含 _markdown_body）
+
+    Returns:
+        canonical dict：
+          script_id, owner, title
+          faction: {primary, alternatives, alias_raw}
+          platforms: {primary, secondary, variants}
+          scenes: [{slot, role, dialogue:[{speaker,line}], subtitle,
+                    visual, offscreen_interaction, raw_text, timestamp}]
+          caption, hashtag, suggested_po_time
+          _owner_format: 'structured' | 'markdown'
+    """
+    data = dict(source_dict)
+    if '派系' not in data and 'faction' in data:
+        data['派系'] = data['faction']
+
+    faction = _canonical_faction(data)
+    platforms = _canonical_platforms(data)
+
+    owner_format = 'structured'
+    if 'scenes' in data and data['scenes']:
+        canonical_scenes = _canonical_scenes_structured(data['scenes'])
+    else:
+        md_body = data.get('_markdown_body', '')
+        canonical_scenes = _canonical_scenes_markdown(md_body)
+        owner_format = 'markdown'
+
+    caption = str(data.get('caption', '') or '').strip()
+    if not caption and owner_format == 'markdown' and data.get('_markdown_body'):
+        parsed = parse_markdown_body(data['_markdown_body'])
+        caption = parsed.get('caption', '')
+
+    hashtag = data.get('hashtag', [])
+    if not hashtag and owner_format == 'markdown' and data.get('_markdown_body'):
+        parsed = parse_markdown_body(data['_markdown_body'])
+        hashtag = parsed.get('hashtag', [])
+    if not isinstance(hashtag, list):
+        hashtag = [str(hashtag)] if hashtag else []
+
+    return {
+        'script_id': str(data.get('script_id', '') or ''),
+        'owner': str(data.get('owner', '') or ''),
+        'title': str(data.get('title', '') or ''),
+        'faction': faction,
+        'platforms': platforms,
+        'scenes': canonical_scenes,
+        'caption': caption,
+        'hashtag': hashtag,
+        'suggested_po_time': str(data.get('suggested_po_time', '') or ''),
+        '_owner_format': owner_format,
+    }
+
+
+# ============================================================
+# canonical_to_sc_kwargs — canonical + original_yaml → sc_article() kwargs
+# （內部用；對外仍走 yaml_to_sc_kwargs 確保舊 API byte 不變）
+# ============================================================
+
+def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> dict:
+    """canonical dict + original_yaml → sc_article() kwargs。
+
+    platforms / platform_chip 仍使用 original_yaml 的 main_platform（保留舊行為）。
+    canonical 的 platforms 供 validator 使用，不改 build 端輸出。
+    """
+    # platforms（保留舊行為：讀 original_yaml.main_platform）
+    main_platform = original_yaml.get('main_platform', '')
+    if '/' in main_platform:
+        platforms = [p.strip() for p in main_platform.split('/') if p.strip()]
+    else:
+        platforms = [main_platform] if main_platform else ['IG Reels']
+
+    # cta：從 canonical scenes 的 CTA slot dialogue[0].line
+    cta = '個人化諮詢'
+    for csc in canonical['scenes']:
+        if csc.get('role', '').upper() == 'CTA' and csc.get('dialogue'):
+            cta = csc['dialogue'][0]['line']
+            break
+
+    # scene desc（hook 視覺場景）
+    scene_desc = ''
+    if canonical['scenes']:
+        first_csc = canonical['scenes'][0]
+        if first_csc.get('visual'):
+            scene_desc = first_csc['visual']
+        else:
+            scene_desc = ' '.join(
+                f'{d["speaker"]}：{d["line"]}' for d in first_csc.get('dialogue', [])
+            )
+
+    # timeline（從 original_yaml scenes，保留舊邏輯確保 byte 一致）
+    original_scenes = original_yaml.get('scenes', [])
+    timeline = []
+    for sc in original_scenes:
+        ts = _ts_convert(sc['timestamp'], sc.get('type', ''))
+        desc_parts = _get_dialogue_parts(sc)
+        if sc.get('畫面'):
+            desc_parts.append(f"（{sc['畫面']}）")
+        desc = ' '.join(desc_parts)
+        sub_desc = sc.get('畫面', '')
+        mirror_raw = sc.get('藏鏡人', '') or ''
+        mirror = mirror_raw.strip()
+        if mirror.startswith('「') and mirror.endswith('」'):
+            mirror = mirror[1:-1]
+        timeline.append((ts, desc, sub_desc, mirror))
+
+    caption = original_yaml.get('caption', '')
+    po_time = original_yaml.get('suggested_po_time', '')
+    hashtag = original_yaml.get('hashtag', [])
+    if not isinstance(hashtag, list):
+        hashtag = [hashtag] if hashtag else []
+    platform_chip = main_platform
+
+    voice_lock = original_yaml.get('voice_lock', False)
+    if isinstance(voice_lock, str):
+        voice_lock = voice_lock.lower() in ('true', 'yes', '1')
+    voice_lock = bool(voice_lock)
+
+    policy_alignment = original_yaml.get('policy_alignment') or {}
+    if not isinstance(policy_alignment, dict):
+        policy_alignment = {}
+
+    trial_reels = original_yaml.get('trial_reels', False)
+    if isinstance(trial_reels, str):
+        trial_reels = trial_reels.lower() in ('true', 'yes', '1')
+    trial_reels = bool(trial_reels)
+
+    publish_mode = str(original_yaml.get('publish_mode') or 'manual_today').strip()
+    if publish_mode not in VALID_PUBLISH_MODES:
+        publish_mode = 'manual_today'
+
+    distribution_mode = str(original_yaml.get('distribution_mode') or 'organic_only').strip()
+    if distribution_mode not in VALID_DISTRIBUTION_MODES:
+        distribution_mode = 'organic_only'
+
+    platform_variants_kw = original_yaml.get('platform_variants') or {}
+    if not isinstance(platform_variants_kw, dict):
+        platform_variants_kw = {}
+
+    return {
+        'num': num,
+        'title': original_yaml['title'],
+        'pie': original_yaml['派系'],
+        'platforms': platforms,
+        'cta': cta,
+        'scene': scene_desc,
+        'timeline': timeline,
+        'caption': caption,
+        'platform_chip': platform_chip,
+        'po_time': po_time,
+        'hashtag': hashtag,
+        'img': original_yaml.get('img') or None,
+        'voice_lock': voice_lock,
+        'policy_alignment': policy_alignment,
+        'trial_reels': trial_reels,
+        'publish_mode': publish_mode,
+        'distribution_mode': distribution_mode,
+        'platform_variants': platform_variants_kw,
+    }
+
+
 # === 新欄位 schema（v2 — 階段 3 升級）===
 # 全部 optional（backward compatible）。
 # legacy_allowed_until=2026-06-01 — 既有 yaml 過渡期允許缺這 6 欄。
@@ -292,9 +630,12 @@ def _get_dialogue_parts(sc: dict) -> list:
 def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     """單個 yaml dict → sc_article() kwargs
 
+    v3 內部走 normalize_script_to_canonical → canonical_to_sc_kwargs，
+    對外輸出 byte 完全不變（舊 build script 零影響）。
+
     Args:
         yaml_data: yaml.safe_load() 後的 dict
-                   （可含 _markdown_body key，由 load_yaml_articles 注入）
+                   （含 _markdown_body key，由 load_yaml_articles 注入）
         num: article 編號（第04批 = 401-413）
 
     Returns:
@@ -306,7 +647,7 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
     # 前處理：新格式正規化（faction→派系 / markdown body parser / caption/hashtag 補填）
     yaml_data = _normalize_yaml_data(yaml_data)
 
-    # 必填欄位驗
+    # 必填欄位驗（在 canonical 之前，確保錯誤訊息與舊版一致）
     for field in REQUIRED_FIELDS:
         if field not in yaml_data:
             raise ValueError(
@@ -319,133 +660,17 @@ def yaml_to_sc_kwargs(yaml_data: dict, num: int) -> dict:
             f'yaml scenes 為空 list：{yaml_data.get("script_id", "unknown")}'
         )
 
-    # 驗每個 scene 有 timestamp
     for i, sc in enumerate(scenes):
         if 'timestamp' not in sc:
             raise ValueError(
                 f'yaml scene[{i}] 缺 timestamp：{yaml_data.get("script_id", "unknown")}'
             )
 
-    # --- platforms ---
-    main_platform = yaml_data.get('main_platform', '')
-    if '/' in main_platform:
-        platforms = [p.strip() for p in main_platform.split('/') if p.strip()]
-    else:
-        platforms = [main_platform] if main_platform else ['IG Reels']
+    # v3：建 canonical（供 validator 使用；不影響下方 kwargs 組裝）
+    canonical = normalize_script_to_canonical(yaml_data)
 
-    # --- cta：從末段 type=CTA 抓，否則固定「個人化諮詢」---
-    cta = '個人化諮詢'
-    for sc in scenes:
-        if sc.get('type', '').upper() == 'CTA':
-            parts = _get_dialogue_parts(sc)
-            if parts:
-                # 取第一句台詞（去掉 "說話者：" 前綴，直接取台詞文字）
-                first_raw = list(sc.items())
-                for k, v in sc.items():
-                    if k.startswith('台詞_') and v:
-                        cta = str(v)
-                        break
-            break
-
-    # --- scene（hook 場景描述）：取第一個 scene 的畫面 ---
-    scene_desc = ''
-    first_scene = scenes[0]
-    if first_scene.get('畫面'):
-        scene_desc = first_scene['畫面']
-    else:
-        # fallback：合併第一場台詞（通用 台詞_* 欄位）
-        parts = _get_dialogue_parts(first_scene)
-        scene_desc = ' '.join(parts)
-
-    # --- timeline ---
-    timeline = []
-    for sc in scenes:
-        ts = _ts_convert(sc['timestamp'], sc.get('type', ''))
-
-        desc_parts = _get_dialogue_parts(sc)
-        if sc.get('畫面'):
-            desc_parts.append(f"（{sc['畫面']}）")
-        desc = ' '.join(desc_parts)
-
-        sub_desc = sc.get('畫面', '')  # 場景畫面描述作字幕（.sub 欄位）
-
-        # 藏鏡人：去掉「「」」包覆符
-        mirror_raw = sc.get('藏鏡人', '') or ''
-        mirror = mirror_raw.strip()
-        if mirror.startswith('「') and mirror.endswith('」'):
-            mirror = mirror[1:-1]
-
-        timeline.append((ts, desc, sub_desc, mirror))
-
-    # --- caption（禁用詞不在 yaml 內容層做替換，保留原文）---
-    caption = yaml_data.get('caption', '')
-
-    # --- platform_chip：直接用 main_platform ---
-    platform_chip = main_platform
-
-    # --- po_time ---
-    po_time = yaml_data.get('suggested_po_time', '')
-
-    # --- hashtag ---
-    hashtag = yaml_data.get('hashtag', [])
-    if not isinstance(hashtag, list):
-        hashtag = [hashtag] if hashtag else []
-
-    # --- 新欄位 v2（階段 3 schema 升級 — 全 optional，backward compatible）---
-
-    # voice_lock: bool
-    voice_lock = yaml_data.get('voice_lock', False)
-    if isinstance(voice_lock, str):
-        voice_lock = voice_lock.lower() in ('true', 'yes', '1')
-    voice_lock = bool(voice_lock)
-
-    # policy_alignment: dict{ig, fb, tiktok, threads}（每平台融入政策清單）
-    policy_alignment = yaml_data.get('policy_alignment') or {}
-    if not isinstance(policy_alignment, dict):
-        policy_alignment = {}
-
-    # trial_reels: bool
-    trial_reels = yaml_data.get('trial_reels', False)
-    if isinstance(trial_reels, str):
-        trial_reels = trial_reels.lower() in ('true', 'yes', '1')
-    trial_reels = bool(trial_reels)
-
-    # publish_mode: str — 驗 enum，不合法 fallback 'manual_today'
-    publish_mode = str(yaml_data.get('publish_mode') or 'manual_today').strip()
-    if publish_mode not in VALID_PUBLISH_MODES:
-        publish_mode = 'manual_today'
-
-    # distribution_mode: str — 驗 enum，不合法 fallback 'organic_only'
-    distribution_mode = str(yaml_data.get('distribution_mode') or 'organic_only').strip()
-    if distribution_mode not in VALID_DISTRIBUTION_MODES:
-        distribution_mode = 'organic_only'
-
-    # platform_variants: dict{ig, fb, tiktok, threads}
-    platform_variants = yaml_data.get('platform_variants') or {}
-    if not isinstance(platform_variants, dict):
-        platform_variants = {}
-
-    return {
-        'num': num,
-        'title': yaml_data['title'],
-        'pie': yaml_data['派系'],
-        'platforms': platforms,
-        'cta': cta,
-        'scene': scene_desc,
-        'timeline': timeline,
-        'caption': caption,
-        'platform_chip': platform_chip,
-        'po_time': po_time,
-        'hashtag': hashtag,
-        'img': yaml_data.get('img') or None,  # top-level img 欄位（如 ../bappu-batch04-fishing-card-007.png）
-        # v2 新欄位（階段 3）
-        'voice_lock': voice_lock,
-        'policy_alignment': policy_alignment,
-        'trial_reels': trial_reels,
-        'publish_mode': publish_mode,
-        'distribution_mode': distribution_mode,
-        'platform_variants': platform_variants,
-    }
+    # 內部走 canonical_to_sc_kwargs，輸出 byte 與舊版一致
+    return canonical_to_sc_kwargs(canonical, yaml_data, num)
 
 
 def inject_v2_meta_attrs(html: str, kw: dict) -> str:
@@ -891,7 +1116,7 @@ if __name__ == '__main__':
         md_body = rux34_01.get('_markdown_body', '')
         parsed = parse_markdown_body(md_body)
 
-        check('scenes 非空（≥ 1）', len(parsed['scenes']) >= 1, f'實際 {len(parsed["scenes"])}')
+        check('scenes 非空（>=1）', len(parsed['scenes']) >= 1, f'實際 {len(parsed["scenes"])}')
         check('scenes 數 = 6', len(parsed['scenes']) == 6, f'實際 {len(parsed["scenes"])}')
         check('caption 非空', bool(parsed['caption'].strip()), f'caption: {parsed["caption"][:30]}')
         check('hashtag 非空', len(parsed['hashtag']) >= 1, f'hashtag 數: {len(parsed["hashtag"])}')

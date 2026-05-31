@@ -167,6 +167,15 @@ def build_yaml_skeleton(item: dict) -> str:
         lines.append(f'  - "[編劇填{i}]"  # 8-12 個')
     lines.append("")
 
+    # ── 範本引用（§12.3 強制餵範本系統，2026-06-01 後新批必填）──
+    lines.append("# 範本引用：請跑 template_retriever.py 查詢後填入（新批 2026-06-01 後強制，缺失 → FAIL）")
+    lines.append("template_source_ids: []  # [編劇填] 3-5 張範本 id，e.g. [\"style-1-bw-fact_001\", ...]")
+    lines.append("template_adaptation:")
+    lines.append("  learned_structure: \"[編劇填]  # 從範本學到的結構，e.g. 反差 hook + 案例收束\"")
+    lines.append("  changed_context: \"[編劇填]  # 把範本情境換成本批，e.g. 把帶看換成瑞祥帶看日出段\"")
+    lines.append("  forbidden_copy_check: pending  # 編劇確認無直接複製範本 → 改為 PASS")
+    lines.append("")
+
     # ── schema_check ──
     lines.append("schema_check:")
     lines.append("  禁虛構: true")

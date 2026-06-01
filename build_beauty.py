@@ -168,7 +168,7 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
         meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
 
     return (
-        '<article class="card" data-cat="" id="' + pid + '' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
@@ -794,13 +794,18 @@ if MODE == 'yaml' and _yaml_by_pie:
     # 新批所有 articles 合併建成單一「新批整批 section」放最上
     _all_yaml_arts_beauty = [art for _pie in sorted(_yaml_by_pie.keys()) for art in _yaml_by_pie[_pie]]
     _new_batch_label_beauty = batch_label
-    _new_batch_section_beauty = section_group(
-        '0.',
-        _new_batch_label_beauty,
-        _new_batch_label_beauty,
-        -1,
-        _all_yaml_arts_beauty,
-        len(_all_yaml_arts_beauty)
+    _new_batch_section_beauty = (
+        '<div class="group collapsed" id="grp-new">\n'
+        '<header class="section-head" onclick="toggleGroup(this.parentElement)">\n'
+        '  <span class="roman">★</span>\n'
+        '  <span class="label">' + _new_batch_label_beauty + ' 更新<span class="en">最新批次</span></span>\n'
+        '  <span class="rule"></span>\n'
+        '  <span class="count">' + str(len(_all_yaml_arts_beauty)) + ' scripts</span>\n'
+        '</header>\n'
+        '<div class="cards">\n' +
+        '\n'.join(_all_yaml_arts_beauty) + '\n'
+        '</div>\n'
+        '</div>'
     )
     # 脆文 section：若有 --threads-md 則用新批脆文取代舊批
     if _args.threads_md and os.path.isfile(_args.threads_md):
@@ -878,6 +883,14 @@ _after_section = _re_clean.sub(
     flags=_re_clean.DOTALL
 )
 nc = c[:sec_start] + new_section + '\n</section>' + _after_section
+
+# 修復殘留 hero 統計：配套圖卡數對齊實際 download-btn（否則 validate Check 1 header≠btn FAIL）
+_dl_count = nc.count('class="download-btn"')
+nc = _re_clean.sub(
+    r'共\s*\d+\s*部\s*·\s*配套圖卡\s*\d+\s*張',
+    '共 ' + str(_beauty_total_count) + ' 部 · 配套圖卡 ' + str(_dl_count) + ' 張',
+    nc
+)
 
 # ---- CSS patch: v2 section-head + group collapsed + hashtag-pool + platform/po-time ----
 V2_CSS_MARKER = '/* ========== V2 SECTION-HEAD + GROUP COLLAPSED (build_beauty.py v2) ========== */'

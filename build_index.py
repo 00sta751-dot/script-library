@@ -169,7 +169,7 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
     if po_time:
         meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
     return (
-        '<article class="card" data-cat="" id="' + pid + '' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
@@ -945,13 +945,16 @@ if MODE == 'yaml':
     # 新批所有 articles 合併建成單一「新批整批 section」放最上
     _all_yaml_arts = [art for _pie in sorted(_yaml_by_pie.keys()) for art in _yaml_by_pie[_pie]]
     _new_batch_label = batch_label  # e.g. "第 35 批 · 2026-06-01"
-    _new_batch_section = section(
-        '0.',
-        _new_batch_label,
-        _new_batch_label,
-        -1,
-        _all_yaml_arts,
-        len(_all_yaml_arts)
+    _new_batch_section = (
+        '<header class="section-head" id="sect-new">\n'
+        '  <span class="roman">★</span>\n'
+        '  <span class="label">' + _new_batch_label + ' 更新<span class="en">最新批次</span></span>\n'
+        '  <span class="rule"></span>\n'
+        '  <span class="count">' + str(len(_all_yaml_arts)) + ' scripts</span>\n'
+        '</header>\n'
+        '<div class="cards">\n' +
+        '\n'.join(_all_yaml_arts) + '\n'
+        '</div>'
     )
     # 脆文 section：若有 --threads-md 則用新批脆文取代舊批，否則沿用舊 sect_threads
     if _args.threads_md and os.path.isfile(_args.threads_md):
@@ -994,8 +997,8 @@ else:
 with open(os.path.join(LIB, 'index.html'), 'r', encoding='utf-8') as f:
     c = f.read()
 
-# Find start: first section-head (sect-0)
-section_start = c.find('<header class="section-head" id="sect-0">')
+# Find start: first section-head of ANY id（含前批殘留 sect-new/sect--1，避免累積重複）
+section_start = c.find('<header class="section-head"')
 # Find end: lightbox overlay
 lightbox = c.find('\n\n<div class="lightbox-overlay"')
 if lightbox < 0:

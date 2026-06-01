@@ -49,12 +49,13 @@ except Exception:
 LIB = Path(__file__).parent.resolve()
 LOG_FILE = LIB / '.validate_deploy.log'
 
-# 4 業主 html 對應 build script + 圖卡 prefix
+# 5 業主 html 對應 build script + 圖卡 prefix
 OWNER_MAP = {
-    'beauty.html':           {'build': 'build_beauty.py', 'prefix': 'yunzhen-'},
-    'index.html':            {'build': 'build_index.py',  'prefix': 'rui-'},
-    'kenny.html':            {'build': 'build_all.py',    'prefix': 'kenny-'},
-    'bappu-cc/index.html':   {'build': 'build_bappu.py',  'prefix': 'bappu-'},
+    'beauty.html':           {'build': 'build_beauty.py',    'prefix': 'yunzhen-'},
+    'index.html':            {'build': 'build_index.py',     'prefix': 'rui-'},
+    'kenny.html':            {'build': 'build_all.py',       'prefix': 'kenny-'},
+    'bappu-cc/index.html':   {'build': 'build_bappu.py',     'prefix': 'bappu-'},
+    'shihting.html':         {'build': 'build_shihting.py',  'prefix': 'shihting-'},
 }
 
 
@@ -308,6 +309,8 @@ def check_6_threads_grid_css():
     log('=== Check 6：threads-grid collapsed CSS rule ===')
     fails = []
     REQUIRED_RULE = '.group.collapsed > .threads-grid'
+    # shihting.html 用獨立 threads-section 結構（非 group 巢狀），允許等效 CSS rule
+    SHIHTING_REQUIRED_RULE = '.threads-section.collapsed .threads-grid'
 
     for html_rel in OWNER_MAP.keys():
         html_path = LIB / html_rel
@@ -321,10 +324,16 @@ def check_6_threads_grid_css():
             log(f'  ℹ {html_rel}: 無 threads-grid，跳過')
             continue
 
-        if REQUIRED_RULE in content:
+        # shihting.html 用獨立 threads-section 結構，檢查等效 rule
+        if html_rel == 'shihting.html':
+            rule = SHIHTING_REQUIRED_RULE
+        else:
+            rule = REQUIRED_RULE
+
+        if rule in content:
             log(f'  ✅ {html_rel}: threads-grid CSS rule 存在')
         else:
-            msg = f'❌ {html_rel}: 有 threads-grid 但缺 .group.collapsed > .threads-grid CSS rule'
+            msg = f'❌ {html_rel}: 有 threads-grid 但缺 {rule} CSS rule'
             log(f'  {msg}')
             fails.append(msg)
 
@@ -481,9 +490,12 @@ def check_11_mirror_dom_count():
     from html.parser import HTMLParser
 
     class MirrorExtractor(HTMLParser):
-        """從 HTML 中抽取所有 <div class="mirror"> 的內文。"""
-        def __init__(self):
+        """從 HTML 中抽取藏鏡人 div 的內文。
+        mirror_class: 要比對的 class 名稱（預設 'mirror'；shihting 傳 'shihting-mirror'）
+        """
+        def __init__(self, mirror_class='mirror'):
             super().__init__()
+            self._mirror_class = mirror_class
             self._in_mirror = False
             self._depth = 0
             self.mirror_texts = []
@@ -491,7 +503,7 @@ def check_11_mirror_dom_count():
 
         def handle_starttag(self, tag, attrs):
             attr_dict = dict(attrs)
-            if tag == 'div' and 'mirror' in attr_dict.get('class', '').split():
+            if tag == 'div' and self._mirror_class in attr_dict.get('class', '').split():
                 self._in_mirror = True
                 self._depth = 1
                 self._buf = ''
@@ -525,6 +537,8 @@ def check_11_mirror_dom_count():
 
     PLACEHOLDER_BLACKLIST = {'待補', 'TBD', '？', '?', '...', '⋯', '⋯⋯'}
     MIRROR_TAG = '<div class="mirror">'
+    # shihting.html 用獨立 class 名稱 shihting-mirror，避免 propagate 到老業主頁
+    SHIHTING_MIRROR_TAG = '<div class="shihting-mirror">'
 
     log('=== Check 11：藏鏡人獨立泡泡 mirror count + 內容品質 HARD BLOCK ===')
     fails = []
@@ -535,7 +549,11 @@ def check_11_mirror_dom_count():
             continue
 
         content = html_path.read_text(encoding='utf-8', errors='replace')
-        mirror_count = content.count(MIRROR_TAG)
+        # shihting.html 用 shihting-mirror class；其他業主頁用 mirror class
+        if html_rel == 'shihting.html':
+            mirror_count = content.count(SHIHTING_MIRROR_TAG)
+        else:
+            mirror_count = content.count(MIRROR_TAG)
 
         # 動態偵測 article 數量（兼容 4 業主不同 HTML 結構）
         article_count = len(re.findall(r'<article ', content))
@@ -559,7 +577,9 @@ def check_11_mirror_dom_count():
                 f' — 部分 article 缺藏鏡人（WARN，未填藏鏡人欄的舊批次正常）')
 
         # (B/C/D) 內容品質驗證 — 用 html.parser 解析實際內文
-        extractor = MirrorExtractor()
+        # shihting.html 用 shihting-mirror class；其他業主頁用 mirror class
+        mirror_cls = 'shihting-mirror' if html_rel == 'shihting.html' else 'mirror'
+        extractor = MirrorExtractor(mirror_class=mirror_cls)
         extractor.feed(content)
         mirror_texts = extractor.mirror_texts
 

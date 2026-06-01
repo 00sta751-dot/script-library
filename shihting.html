@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F7F2EA">
+<meta property="og:title" content="詩婷的腳本｜好房詩配・幸福到位">
+<meta property="og:image" content="shihting-qver.png">
+<title>詩婷的腳本 ｜ 好房詩配・幸福到位 🍀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Klee+One:wght@600&display=swap" rel="stylesheet">
+<style>
+/* =====================================================
+   詩婷・清新療癒色系（2026-06-01）
+   色票：奶茶米白 / 暖橘 / 薄荷綠 / 暖棕深墨
+   字型：Noto Serif TC（中文標題）+ Noto Sans TC（內文）
+   + Klee One（手寫感裝飾）
+   禁複製：非 Playfair/金棕 系（瑞祥配色）
+   ===================================================== */
+:root {
+  /* 底色系 */
+  --linen:   #F7F2EA;
+  --linen2:  #EFE8D8;
+  --linen3:  #E8DDCA;
+  --white:   #FDFAF5;
+
+  /* 暖橘 accent（詩婷主色） */
+  --orange:  #D97D4A;
+  --orange2: #C06835;
+  --orange-soft: #F5DDC8;
+  --orange-glow: #FBEEE2;
+
+  /* 薄荷綠（點綴色） */
+  --mint:    #5BA88A;
+  --mint2:   #3D8C6F;
+  --mint-soft: #D4EDE4;
+  --mint-glow: #EBF5F0;
+
+  /* 深墨（文字） */
+  --ink:     #3B3028;
+  --ink2:    #6B5C4A;
+  --ink3:    #9C8878;
+  --ink4:    #BCA898;
+
+  /* 邊框 / 分隔 */
+  --line:    #E2D8C6;
+  --line2:   #D4C8B2;
+
+  /* 字型堆疊（詩婷專屬，不使用 Playfair/Cormorant/serif-en） */
+  --serif:   'Noto Serif TC', 'Songti TC', '宋體', Georgia, serif;
+  --sans:    'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --hand:    'Klee One', 'Noto Serif TC', cursive;
+
+  /* 圓角 / 陰影（療癒感） */
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+  --shadow:  0 8px 32px -12px rgba(100,70,40,.18);
+  --shadow2: 0 16px 48px -20px rgba(100,70,40,.24);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--linen);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.8;
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"palt";
+  padding-bottom:72px;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.wrap{width:min(780px,92vw);margin:0 auto}
+
+/* ── Hero ───────────────────────────────────────────── */
+.hero{
+  position:relative;overflow:hidden;
+  text-align:center;padding:52px 0 40px;
+  background:
+    radial-gradient(ellipse 120% 70% at 85% 5%,var(--orange-glow) 0%,transparent 50%),
+    radial-gradient(ellipse 120% 70% at 10% 95%,var(--mint-glow) 0%,transparent 50%),
+    var(--linen);
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(255,255,255,.5) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero .qv{
+  width:120px;height:120px;margin:0 auto 14px;
+  border-radius:50%;overflow:hidden;
+  background:linear-gradient(160deg,var(--white),var(--linen2));
+  box-shadow:var(--shadow2);
+  border:3px solid var(--white);
+  position:relative;z-index:1;
+}
+.hero .qv img{width:100%;height:100%;object-fit:cover;object-position:top}
+.hero .tagline{
+  position:relative;z-index:1;
+  font-family:var(--serif);
+  font-weight:900;
+  font-size:clamp(22px,5.5vw,32px);
+  color:var(--ink);
+  letter-spacing:.04em;
+  margin-bottom:6px;
+}
+.hero .tagline em{font-style:normal;color:var(--orange2)}
+.hero .tagline .cl{color:var(--mint2)}
+.hero .subname{
+  position:relative;z-index:1;
+  font-family:var(--hand);
+  font-size:15px;color:var(--ink2);
+  margin-bottom:18px;letter-spacing:.06em;
+}
+.hero .batch-badge{
+  position:relative;z-index:1;
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:8px 20px;
+  font-size:13px;color:var(--ink2);
+  box-shadow:var(--shadow);
+}
+.hero .batch-badge b{color:var(--orange2);font-family:var(--serif)}
+
+/* ── 篩選列 ─────────────────────────────────────────── */
+.filter-bar{
+  display:flex;flex-wrap:wrap;gap:8px;
+  padding:20px 0 12px;
+}
+.filter-btn{
+  cursor:pointer;border:1px solid var(--line2);
+  background:var(--white);color:var(--ink2);
+  border-radius:999px;padding:5px 14px;
+  font-size:12.5px;font-weight:600;font-family:var(--sans);
+  transition:all .2s;
+}
+.filter-btn:hover{border-color:var(--orange);color:var(--orange2)}
+.filter-btn.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+
+/* ── 腳本卡片 ───────────────────────────────────────── */
+.cards-main{margin-top:10px;display:flex;flex-direction:column;gap:20px}
+.card{
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:var(--radius-lg);
+  padding:24px 24px 20px;
+  box-shadow:var(--shadow);
+  transition:transform .3s,box-shadow .3s;
+}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow2)}
+.card.shot{opacity:.58}
+
+/* card top row */
+.c-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.c-no{
+  font-family:var(--serif);font-weight:900;font-size:14px;
+  color:var(--orange2);background:var(--orange-soft);
+  border-radius:var(--radius-sm);padding:2px 10px;
+}
+.chip{font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 10px;letter-spacing:.02em}
+.chip.ig{background:#FBE3EC;color:#C45B7E}
+.chip.tk{background:#E4E0EE;color:#6A5F9F}
+.chip.th{background:#E6E9EC;color:#5B6B78}
+.chip.fac{background:var(--mint-glow);color:var(--mint2);border:1px solid var(--mint-soft)}
+.c-flag{
+  margin-left:auto;font-size:11px;
+  color:var(--orange2);background:var(--orange-soft);
+  border-radius:var(--radius-sm);padding:2px 8px;font-weight:700;
+}
+
+/* card 標題 */
+.c-title{
+  font-family:var(--serif);font-weight:700;
+  font-size:18.5px;color:var(--ink);
+  line-height:1.45;margin-bottom:14px;
+}
+
+/* hook 區 */
+.hook{
+  background:linear-gradient(180deg,var(--mint-glow),var(--linen2));
+  border-radius:var(--radius-md);
+  padding:13px 16px;margin-bottom:14px;
+}
+.hook .lb{
+  font-size:10px;letter-spacing:.18em;
+  color:var(--mint2);font-weight:700;
+  margin-bottom:4px;text-transform:uppercase;
+}
+.hook .tx{font-size:15px;color:var(--ink);font-weight:500;line-height:1.7}
+
+/* body 展開區 */
+.body{
+  font-size:14px;color:var(--ink2);
+  line-height:1.95;
+  max-height:0;overflow:hidden;
+  transition:max-height .5s ease;
+}
+.body.open{max-height:1600px}
+.body .seg{margin:8px 0}
+.body .seg .lb{
+  font-size:10px;letter-spacing:.14em;
+  color:var(--ink3);font-weight:700;
+  display:block;margin-bottom:2px;text-transform:uppercase;
+}
+
+/* ── 藏鏡人（詩婷專屬）─────────────────────────────── */
+/* 只在 shihting.html 的 .body .seg 範圍內作用，
+   class 名稱 .shihting-mirror 確保不 propagate 到老業主頁 */
+.shihting-mirror{
+  display:flex;align-items:flex-start;gap:8px;
+  background:var(--orange-glow);
+  border:1px solid var(--orange-soft);
+  border-left:3px solid var(--orange);
+  border-radius:var(--radius-sm);
+  padding:9px 13px;
+  margin-top:8px;
+  font-size:13.5px;
+  color:var(--ink2);
+  line-height:1.75;
+}
+.shihting-mirror .mirror-chip{
+  flex-shrink:0;
+  background:var(--orange);
+  color:#fff;
+  border-radius:4px;
+  padding:1px 7px;
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.06em;
+  font-family:var(--sans);
+  white-space:nowrap;
+  margin-top:2px;
+}
+.shihting-mirror .mirror-text{flex:1}
+
+/* ── 批次群組（可收合，預設閉合）── */
+.group{margin-top:28px}
+.group:first-of-type{margin-top:10px}
+.section-head{
+  position:relative;cursor:pointer;user-select:none;-webkit-user-select:none;
+  display:flex;align-items:center;gap:12px;
+  padding:14px 46px 14px 4px;
+}
+.section-head .roman{font-family:var(--hand);font-size:20px;color:var(--orange2);flex-shrink:0}
+.section-head .label{
+  font-family:var(--serif);font-size:17px;font-weight:700;color:var(--ink);
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.section-head .label .en{font-family:var(--sans);font-size:12px;font-weight:400;color:var(--ink3);letter-spacing:.04em}
+.section-head .rule{flex:1;border-top:1px dashed var(--line2)}
+.section-head .count{font-family:var(--sans);font-size:12px;color:var(--ink3);white-space:nowrap;flex-shrink:0}
+.section-head::after{
+  content:'−';position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;line-height:24px;text-align:center;font-size:17px;
+  color:var(--orange2);border:1px solid var(--line2);border-radius:50%;background:var(--orange-glow);
+}
+.group.collapsed .section-head::after{content:'+'}
+.group.collapsed > .cards{display:none}
+
+/* caption 複製區 */
+.cap{
+  background:var(--linen2);
+  border:1px solid var(--line);
+  border-radius:var(--radius-md);
+  padding:13px 15px;margin-top:12px;position:relative;
+}
+.cap .lb{
+  font-size:10px;letter-spacing:.14em;color:var(--orange2);
+  font-weight:700;margin-bottom:6px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.cap .tx{font-size:13.5px;color:var(--ink);line-height:1.85;white-space:pre-wrap}
+.cap .hash{margin-top:7px;font-size:12px;color:var(--mint2)}
+.copy{
+  cursor:pointer;border:none;
+  background:var(--orange2);color:#fff;
+  border-radius:999px;padding:4px 14px;
+  font-size:11.5px;font-weight:600;
+  font-family:var(--sans);transition:background .2s;
+}
+.copy:hover{background:var(--orange)}.copy.done{background:var(--mint2)}
+
+/* 需確認提示 */
+.confirm{
+  margin-top:10px;font-size:12px;
+  color:#8B5E2A;
+  background:#FDF0DC;
+  border-radius:var(--radius-sm);
+  padding:9px 13px;line-height:1.7;
+  border:1px dashed #E8C896;
+}
+
+/* ── card-head 收合（靜態 HTML 卡）───────────────────── */
+/* 靜態卡（<article class="card">）預設收合；點 card-head 才展開 */
+.card-head{
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  position:relative;
+  padding-right:36px; /* 讓箭頭有空間 */
+}
+.card-head::after{
+  content:'▾';
+  position:absolute;
+  top:50%;right:14px;
+  transform:translateY(-50%);
+  font-size:14px;
+  color:var(--ink3);
+  transition:transform .25s ease, color .25s;
+  pointer-events:none;
+}
+.card.open .card-head::after{
+  transform:translateY(-50%) rotate(-180deg);
+  color:var(--orange2);
+}
+.card-body{
+  display:none;
+  padding-top:12px;
+  border-top:1px dashed var(--line2);
+  margin-top:2px;
+}
+.card.open .card-body{
+  display:block;
+}
+
+/* card 動作列 */
+.c-act{
+  display:flex;align-items:center;gap:10px;
+  margin-top:14px;padding-top:13px;
+  border-top:1px dashed var(--line2);
+}
+.btn{
+  cursor:pointer;
+  border:1px solid var(--line2);
+  background:var(--linen);color:var(--ink2);
+  border-radius:999px;padding:6px 16px;
+  font-size:12.5px;font-weight:600;font-family:var(--sans);
+  transition:all .2s;
+}
+.btn:hover{border-color:var(--orange);color:var(--orange2)}
+.btn.shotb.on{background:var(--mint2);color:#fff;border-color:var(--mint2)}
+
+/* ── 脆文 Threads 區塊 ───────────────────────────────── */
+.threads-section{
+  margin-top:32px;
+}
+.threads-section-head{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:16px;
+  cursor:pointer;user-select:none;
+}
+.threads-section-head .ts-label{
+  font-family:var(--serif);font-weight:700;
+  font-size:16px;color:var(--ink);
+}
+.threads-section-head .ts-count{
+  font-size:12px;color:var(--ink3);
+  background:var(--linen2);
+  border-radius:999px;padding:2px 10px;
+}
+.threads-section-head .ts-toggle{
+  margin-left:auto;font-size:12px;color:var(--ink3);
+  transition:transform .25s;
+}
+.threads-section.collapsed .ts-toggle{transform:rotate(-90deg)}
+.threads-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:14px;
+}
+.threads-section.collapsed .threads-grid{display:none}
+@media(min-width:640px){.threads-grid{grid-template-columns:1fr 1fr}}
+
+.thread-card{
+  background:var(--white);
+  border:1px solid var(--line);
+  border-left:3px solid var(--mint2);
+  border-radius:var(--radius-md);
+  padding:16px 18px;
+}
+.thread-meta{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:9px;
+}
+.thread-id{
+  font-family:var(--serif);font-weight:700;
+  font-size:13px;color:var(--mint2);
+}
+.thread-label{
+  font-size:11px;color:var(--ink3);
+  background:var(--mint-glow);
+  border-radius:4px;padding:1px 8px;
+}
+.thread-text{
+  font-size:13.5px;line-height:1.9;
+  color:var(--ink2);white-space:pre-wrap;word-break:break-word;
+}
+.thread-hash{
+  margin-top:7px;font-size:12px;
+  color:var(--mint2);letter-spacing:.04em;
+}
+.copy-thread{
+  margin-top:10px;cursor:pointer;
+  border:1px solid var(--line2);
+  background:var(--linen);color:var(--ink2);
+  border-radius:999px;padding:4px 14px;
+  font-size:11.5px;font-weight:600;font-family:var(--sans);
+  transition:all .2s;
+}
+.copy-thread:hover{border-color:var(--mint2);color:var(--mint2)}
+.copy-thread.done{background:var(--mint2);color:#fff;border-color:var(--mint2)}
+
+/* ── footer ─────────────────────────────────────────── */
+footer{
+  margin-top:52px;
+  background:var(--ink);color:#EADfce;
+  padding:40px 0 34px;text-align:center;
+}
+footer .fn{
+  font-family:var(--serif);font-size:16px;
+  color:#F4E9D7;margin-bottom:14px;
+}
+footer .fm{font-size:12.5px;color:#B6A892;line-height:2}
+footer .fm b{color:#EADfce}
+.mbc{
+  margin:22px auto 0;
+  display:inline-flex;flex-direction:column;
+  align-items:center;gap:8px;opacity:.92;
+}
+.mbc .l{
+  font-size:10px;letter-spacing:.26em;
+  color:#9C8E78;text-transform:uppercase;
+}
+.mbc img{
+  height:52px;width:auto;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.14);
+}
+.fs{margin-top:20px;font-size:10.5px;color:#7E725F;letter-spacing:.14em}
+
+/* ── toast ──────────────────────────────────────────── */
+.toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;
+  padding:10px 22px;border-radius:999px;
+  font-size:13px;opacity:0;
+  transition:all .3s;z-index:99;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:560px){.card{padding:18px 16px 15px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="qv"><img src="shihting-qver.png" alt="詩婷 Q版"></div>
+    <div class="tagline">好房<em>詩配</em>，幸福<span class="cl">到位</span> 🍀</div>
+    <div class="subname">高雄房仲・林詩婷 Erica</div>
+    <div class="batch-badge">📋 腳本工作台　<b id="batch-count">—</b> 支　·　<span id="batch-date">2026.06</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="filter-bar" id="filter-bar"></div>
+  <div class="cards-main" id="cards"></div>
+
+<!-- SECTIONS_PLACEHOLDER — build_shihting.py 負責替換此區塊 -->
+
+<div class="group collapsed" id="grp-new">
+<header class="section-head" id="sect-new" onclick="toggleGroup(this.parentElement)">
+  <span class="roman">★</span>
+  <span class="label">第 01 批 · 2026-06-01 更新<span class="en">最新批次</span></span>
+  <span class="rule"></span>
+  <span class="count">13 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="" id="shi1" data-caption="第一次帶看我真的迷路了，客人還在三樓等我。新人帶著窘境也帶著真心，好房詩配，一直在學著幫你找到最對的家" data-hashtags="#房仲新人 #新人日記 #帶看日常 #好房詩配 #高雄房仲">
+  <div class="card-head" style="--pie:#C06835">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 01</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">我帶看第一天，差點把自己丟在裡面</h3>
+    <div class="insight">詩婷對著鏡頭自嘲表情，略帶害羞</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對著鏡頭自嘲表情，略帶害羞</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：我第一次帶看，房子找到了，但我自己迷路了🥹 （詩婷對著鏡頭自嘲表情，略帶害羞）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">也太可愛了吧</span></div><div class="sub">詩婷對著鏡頭自嘲表情，略帶害羞</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：拿著鑰匙跟客人看完三樓要下來，我走進電梯按一樓，客人說「你不用陪我到大廳嗎」 （詩婷回憶表情，搖頭苦笑）</div><div class="sub">詩婷回憶表情，搖頭苦笑</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：我才發現我一個人在電梯裡、客人還站三樓等我。白目犯傻反應慢半拍就是當時的我。但那個超香的採光我還是喜歡。 （詩婷雙手搓臉，笑著無奈）</div><div class="sub">詩婷雙手搓臉，笑著無奈</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：新人就是這樣，帶著窘境帶著心跳慢慢學著幫你找家。 （詩婷看鏡頭，眼神真誠）</div><div class="sub">詩婷看鏡頭，眼神真誠</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：你有沒有遇過這樣笑到不行的新人？ （詩婷微笑收尾）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你有沒有遇過這樣笑到不行的新人？</span></div><div class="sub">詩婷微笑收尾</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：你也有第一次很窘的故事嗎？留言跟我說，互相🥹 （詩婷舉手示意留言）</div><div class="sub">詩婷舉手示意留言</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也有第一次很窘的故事嗎？留言跟我說，互相🥹</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#房仲新人</span>
+      <span class="hashtag">#新人日記</span>
+      <span class="hashtag">#帶看日常</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄房仲</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi2" data-caption="每天走過中都那條路…找家不只是看坪數，是找一個讓你說「就是這裡」的感覺" data-hashtags="#高雄生活 #中都 #高雄房仲 #好房詩配 #高雄日常">
+  <div class="card-head" style="--pie:#5BA88A">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 02</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週末早 10AM</span>
+    </div>
+    <h3 class="title">高雄中都，我最喜歡的那條路</h3>
+    <div class="insight">詩婷走路的畫面，早晨光線</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷走路的畫面，早晨光線</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：我每天上班都會走過一條路，走了幾個月才發現它超香～～～ （詩婷走路的畫面，早晨光線）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">走過這條路的高雄人舉手～</span></div><div class="sub">詩婷走路的畫面，早晨光線</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：中都那帶早上老闆擺滷肉飯、阿嬤掃地、遠遠有狗曬太陽。 （描述中的街景）</div><div class="sub">描述中的街景</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：以前覺得高雄熱悶車多，住進去才發現有種慢慢的溫度。帶客人看這區我都說：先別看坪數，先感覺這裡的早晨。 （詩婷在街角停下來感受的樣子）</div><div class="sub">詩婷在街角停下來感受的樣子</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：房子條件可以查，但一個地方讓你有「對，就是這裡」的感覺，才是真正的家。 （詩婷回頭看街景）</div><div class="sub">詩婷回頭看街景</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：你的高雄是哪個味道？ （詩婷微笑望向遠方）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你的高雄是哪個味道？</span></div><div class="sub">詩婷微笑望向遠方</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：留言告訴我你心目中的高雄是什麼感覺💓 （詩婷看鏡頭微笑）</div><div class="sub">詩婷看鏡頭微笑</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>留言告訴我你心目中的高雄是什麼感覺💓</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#高雄生活</span>
+      <span class="hashtag">#中都</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄日常</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi3" data-caption="去看物件迷路，一個阿伯帶我走了三個路口…如果有一天幫人找家不只是為了成交，是真心希望他找到對的地方，我就做對了" data-hashtags="#善意 #療癒日常 #房仲日常 #好房詩配 #世界還是很美好">
+  <div class="card-head" style="--pie:#3D8C6F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 03</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ Threads</span>
+      <span class="po-time">⏰ 週間晚 9PM</span>
+    </div>
+    <h3 class="title">那天一個陌生人讓我相信世界還是很美好</h3>
+    <div class="insight">詩婷走在街上，停下來問路</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷走在街上，停下來問路</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：我去看一個物件，迷路問了一位阿伯方向，他帶我走了三個路口。 （詩婷走在街上，停下來問路）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">也太暖了吧</span></div><div class="sub">詩婷走在街上，停下來問路</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：我說謝謝，他說「你看起來很趕，我就送你過去啦」。沒有原因沒有要求。走進大樓時鼻子有點酸。 （詩婷感動表情）</div><div class="sub">詩婷感動表情</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：那天業績沒成、客人沒下訂，但下班一直想起那位阿伯。 （詩婷發呆沉思）</div><div class="sub">詩婷發呆沉思</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：我在想，如果有一天我也這樣——不是因為要成交，是真的希望這個人找到好的家，那我就知道我做對了這份工作。 （詩婷看向窗外，眼神清澈）</div><div class="sub">詩婷看向窗外，眼神清澈</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：世界還是很美好。 （詩婷溫柔微笑）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你最近被陌生人感動過嗎？</span></div><div class="sub">詩婷溫柔微笑</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：你最近被陌生人感動過嗎？留言跟我說💗 （詩婷看鏡頭，表情溫暖）</div><div class="sub">詩婷看鏡頭，表情溫暖</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你最近被陌生人感動過嗎？留言跟我說💗</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#善意</span>
+      <span class="hashtag">#療癒日常</span>
+      <span class="hashtag">#房仲日常</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#世界還是很美好</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi4" data-caption="客人看了十幾間還不知道要哪間…不是比坪數比價格，是先知道自己要住什麼生活" data-hashtags="#買房 #首購 #看房日記 #高雄房仲 #好房詩配">
+  <div class="card-head" style="--pie:#3D8C6F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 04</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">大家說買房要貨比三家，但沒人告訴你比什麼</h3>
+    <div class="insight">詩婷對鏡頭直視，提問表情</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭直視，提問表情</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：每個人都說買房要貨比三家——但比的到底是什麼？我當新人才搞懂。 （詩婷對鏡頭直視，提問表情）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">正在看房的朋友，你先問過自己了嗎？</span></div><div class="sub">詩婷對鏡頭直視，提問表情</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：剛入行有個客人說看了十幾間還不知道要哪間。後來才知道他每間都比坪數價格，但沒先問自己要住的生活是什麼樣子。 （詩婷搖頭，表情若有所思）</div><div class="sub">詩婷搖頭，表情若有所思</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：採光重要但他不知道喜歡午後還早晨的光；格局重要但沒想過週末怎麼用。老實說我當時也沒想通。 （詩婷自省表情）</div><div class="sub">詩婷自省表情</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：後來陪他又走三間，不看規格，聊他的生活。第三間他說「欸，這個感覺對」，那天我真的整個閃閃發亮！ （詩婷興奮開心的表情）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你知道自己想住什麼感覺的家嗎～</span></div><div class="sub">詩婷興奮開心的表情</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：不是比坪數比價格，是先知道自己要住什麼生活。 （詩婷點頭，語氣肯定）</div><div class="sub">詩婷點頭，語氣肯定</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：正在找房不知道從哪開始，私訊詩婷，我們一起聊聊你的生活先💓 （詩婷比愛心手勢）</div><div class="sub">詩婷比愛心手勢</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>正在找房不知道從哪開始，私訊詩婷，我們一起聊聊你的生活先💓</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#看房日記</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#好房詩配</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi5" data-caption="在韓國某條巷子突然站著不走…回高雄用這眼光看房，好房詩配配的就是這個" data-hashtags="#韓國旅遊 #高雄生活 #好房詩配 #旅遊控 #房仲日常">
+  <div class="card-head" style="--pie:#5BA88A">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 05</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週末晚 8PM</span>
+    </div>
+    <h3 class="title">去韓國旅遊的時候，我突然懂了一件事</h3>
+    <div class="insight">詩婷站在巷口，若有所思</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷站在巷口，若有所思</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：我去韓國旅遊，走到一條巷子，我突然就站在那裡不走了。 （詩婷站在巷口，若有所思）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">旅遊控舉手～這感覺你懂嗎</span></div><div class="sub">詩婷站在巷口，若有所思</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：那條巷子什麼都不特別：小咖啡廳、書店、有人遛狗、阿嬤把花盆排整齊。我站著想，如果能住這裡就好了。 （描述中的巷弄氛圍）</div><div class="sub">描述中的巷弄氛圍</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：不是覺得漂亮，是「這裡的生活我好像會很喜歡」。回高雄走在我服務這帶，開始用這眼光看：這條路的早晨什麼樣子？ （詩婷走在高雄街道上，轉換視角）</div><div class="sub">詩婷走在高雄街道上，轉換視角</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：旅遊訓練了我——不是找完美的房子，是找讓你想留下來的生活感。 （詩婷停下腳步，回頭看）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你有在旅遊途中突然想在那裡住下來的地方嗎？</span></div><div class="sub">詩婷停下腳步，回頭看</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：好房詩配，想幫你配的就是這個感覺🍀 （詩婷微笑，手比四葉草）</div><div class="sub">詩婷微笑，手比四葉草</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：有的話留言跟我說，說不定我們對同一種生活感有 fu💓 （詩婷看鏡頭，期待表情）</div><div class="sub">詩婷看鏡頭，期待表情</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有的話留言跟我說，說不定我們對同一種生活感有 fu💓</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#韓國旅遊</span>
+      <span class="hashtag">#高雄生活</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#旅遊控</span>
+      <span class="hashtag">#房仲日常</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi6" data-caption="首購族最常問的三件事：時機、頭期款、看房注意什麼…私訊詩婷給你看整理好的" data-hashtags="#首購族 #買房 #頭期款 #看房注意 #好房詩配">
+  <div class="card-head" style="--pie:#C06835">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 06</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">首購族最常問我的三件事</h3>
+    <div class="insight">詩婷對鏡頭，舉起三根手指</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，舉起三根手指</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：首購族最常問我的三件事，我整理好了，真的很多人有一樣的疑惑。 （詩婷對鏡頭，舉起三根手指）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">這個問題你也有嗎？</span></div><div class="sub">詩婷對鏡頭，舉起三根手指</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：第一件「現在是買房好時機嗎？」——前輩說「最好的時機是你準備好了的時候」，以前覺得虛現在越想越有理。 （詩婷點頭，語氣認同）</div><div class="sub">詩婷點頭，語氣認同</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：第二件「頭期款要多少？」——要看物件跟貸款條件，我沒辦法給一個數字，但整理了基本參考思路，私訊我給你看。 （詩婷搖手，表情誠實）</div><div class="sub">詩婷搖手，表情誠實</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：第三件「看房要注意什麼？」——先感覺，再看格局，採光和方向是你後來最不後悔的決定。 （詩婷比手勢強調）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">私訊詩婷，我整理好給你～</span></div><div class="sub">詩婷比手勢強調</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：今天先記得這三件事，剩下的私訊詩婷。 （詩婷舉三根手指收尾）</div><div class="sub">詩婷舉三根手指收尾</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：想知道完整的，私訊詩婷～我整理好給你💗 （詩婷比愛心，笑著看鏡頭）</div><div class="sub">詩婷比愛心，笑著看鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想知道完整的，私訊詩婷～我整理好給你💗</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#首購族</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#頭期款</span>
+      <span class="hashtag">#看房注意</span>
+      <span class="hashtag">#好房詩配</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi7" data-caption="買房習慣從物件開始，其實應先問自己的生活怎麼用這房子。格局採光是基本盤，住起來對不對才是那個超香的感覺" data-hashtags="#買房觀念 #首購 #看房 #高雄房仲 #好房詩配">
+  <div class="card-head" style="--pie:#C06835">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 07</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">有一個觀念，很多人買房前不知道</h3>
+    <div class="insight">詩婷對鏡頭，表情恍然大悟</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，表情恍然大悟</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：有個買房觀念，我當新人才被前輩點醒，怎麼沒人早點告訴我。 （詩婷對鏡頭，表情恍然大悟）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">有沒有人跟我一樣以前都想反了？</span></div><div class="sub">詩婷對鏡頭，表情恍然大悟</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：很多人買房習慣從物件開始——先看哪間在賣、坪數、價格。但前輩說順序應反過來：先問自己我的生活會怎麼用這房子？ （詩婷搖手指，語氣認真）</div><div class="sub">詩婷搖手指，語氣認真</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：幾點起床？週末在家還出門？有人來住嗎？要停車嗎？想清楚才知道真正需要的格局。不然搞不好買到「條件好看」但「住起來不對」的房子。 （詩婷扳手指列舉，表情認真）</div><div class="sub">詩婷扳手指列舉，表情認真</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：我剛入行也都先看格局方正採光好，後來才知道這只是基本盤，「你的生活適不適合這個家」才是那個超香的感覺。 （詩婷自省表情，點頭）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你有想過你的生活是怎麼用這個家嗎？</span></div><div class="sub">詩婷自省表情，點頭</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：格局採光是基本盤，住起來對不對才是那個超香的感覺。 （詩婷點頭確認，語氣堅定）</div><div class="sub">詩婷點頭確認，語氣堅定</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：想一起聊聊你適合什麼樣的家，私訊詩婷～好房詩配幫你配對🍀 （詩婷微笑，手比四葉草）</div><div class="sub">詩婷微笑，手比四葉草</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想一起聊聊你適合什麼樣的家，私訊詩婷～好房詩配幫你配對🍀</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#買房觀念</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#好房詩配</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi8" data-caption="帶看忘帶資料找不到停車場，客人說謝謝你很真誠…保有真誠比什麼都重要，謝謝讓我閃閃發亮的你們" data-hashtags="#感謝 #房仲新人 #真誠 #好房詩配 #閃閃發亮">
+  <div class="card-head" style="--pie:#D9A05B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 08</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週末晚 9PM</span>
+    </div>
+    <h3 class="title">謝謝那些讓我閃閃發亮的人們</h3>
+    <div class="insight">詩婷對鏡頭，眼睛亮亮的</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，眼睛亮亮的</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：做房仲這幾個月，我遇到好多讓我整個閃閃發亮的瞬間。 （詩婷對鏡頭，眼睛亮亮的）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">新人有時候靠的就是這個</span></div><div class="sub">詩婷對鏡頭，眼睛亮亮的</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：有次帶看結束客人說「謝謝你帶我們看，你雖然是新人，但你很真誠」，我當時整個鼻酸。 （詩婷回憶，捂心口）</div><div class="sub">詩婷回憶，捂心口</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：因為那天我什麼都沒搞定，忘帶資料、找不到停車場，但他還是說了這句。 （詩婷苦笑，搖頭回憶）</div><div class="sub">詩婷苦笑，搖頭回憶</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：我那時想，做這份工作不是要變很厲害很資深說話很有重量，是要一直保有那個真誠。 （詩婷眼神認真，語氣真誠）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">謝謝一直支持我的你，你讓我很有力量</span></div><div class="sub">詩婷眼神認真，語氣真誠</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：成交不一定，但如果你走出去覺得詩婷真的有用心，那對我來說就閃閃發亮了。謝謝你們～～～～💓 （詩婷雙手比愛心，眼裡有光）</div><div class="sub">詩婷雙手比愛心，眼裡有光</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：謝謝那個說了一句話讓我記到現在的人。你最近被誰感動過嗎？ （詩婷微笑看鏡頭）</div><div class="sub">詩婷微笑看鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>謝謝那個說了一句話讓我記到現在的人。你最近被誰感動過嗎？</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#感謝</span>
+      <span class="hashtag">#房仲新人</span>
+      <span class="hashtag">#真誠</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#閃閃發亮</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi9" data-caption="帶客人看五間他問哪間採光好，我愣住說不出話。採光不是規格，是你的生活什麼時候最需要陽光" data-hashtags="#採光 #看房 #房仲新人 #好房詩配 #高雄房仲">
+  <div class="card-head" style="--pie:#C06835">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 09</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">新人教我看採光，是件超難說清楚的事</h3>
+    <div class="insight">詩婷楞住的表情，微微搖頭</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷楞住的表情，微微搖頭</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：帶客人看了五間房，他說「你覺得哪間採光比較好？」我愣在那裡說不出話🥹 （詩婷楞住的表情，微微搖頭）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">你喜歡的採光是哪種？早光還是午後？</span></div><div class="sub">詩婷楞住的表情，微微搖頭</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：那時我才發現「採光好不好」每個人答案不一樣——有人說不曬西曬、有人說下午有光柱、有人說明亮不壓迫就好。 （詩婷扳手指列舉）</div><div class="sub">詩婷扳手指列舉</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：前輩後來跟我說帶看前要先問這個人幾點起床、喜歡早上還傍晚的光。我才開始懂，採光不是規格，是「你的生活什麼時候最需要陽光」。 （詩婷若有所悟的表情）</div><div class="sub">詩婷若有所悟的表情</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：現在帶看我一定先問。 （詩婷點頭，語氣確定）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">以前沒想過這個問題的舉手～</span></div><div class="sub">詩婷點頭，語氣確定</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：採光不是規格，是你的生活什麼時候最需要陽光。 （詩婷微笑，語氣溫柔）</div><div class="sub">詩婷微笑，語氣溫柔</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：有想找一個採光真的超香的家嗎？私訊詩婷，先聊你的生活習慣🍀 （詩婷比四葉草，笑著看鏡頭）</div><div class="sub">詩婷比四葉草，笑著看鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有想找一個採光真的超香的家嗎？私訊詩婷，先聊你的生活習慣🍀</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#採光</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#房仲新人</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄房仲</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi10" data-caption="她租屋七年每次佈置都捨不得，後來站窗邊說這裡待很久。那個瞬間讓我相信做這份工作是對的" data-hashtags="#租屋 #首購 #租轉買 #好房詩配 #房仲日常">
+  <div class="card-head" style="--pie:#3D8C6F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 10</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ Threads</span>
+      <span class="po-time">⏰ 週間晚 9PM</span>
+    </div>
+    <h3 class="title">我陪一個租了七年的人，走進她第一間屬於她的房子</h3>
+    <div class="insight">詩婷看鏡頭，語氣沉穩</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷看鏡頭，語氣沉穩</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：有個客人說「我租屋租了七年，每次佈置都捨不得花太多，因為不是我的。」🥹 （詩婷看鏡頭，語氣沉穩）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">有租屋族的朋友，你佈置過出租的家嗎？</span></div><div class="sub">詩婷看鏡頭，語氣沉穩</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：那句話讓我想了很久。七年，每次搬家裝箱，每次想刷牆又算了反正不是我的。 （詩婷表情若有所思）</div><div class="sub">詩婷表情若有所思</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：她說「不知道什麼時候才能有真的屬於我的角落」。後來帶她走進一間——不大，但她站窗邊說「欸，這個感覺我可以待很久」。 （詩婷描述時，表情越來越溫柔）</div><div class="sub">詩婷描述時，表情越來越溫柔</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：我心裡整個閃閃發亮。不是因為快成交，是七年後她終於站在一個說「待很久」的地方。 （詩婷眼裡有光，感動表情）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">這句話讓我相信做這份工作是對的</span></div><div class="sub">詩婷眼裡有光，感動表情</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：那個瞬間讓我相信做這份工作是對的。 （詩婷輕輕點頭）</div><div class="sub">詩婷輕輕點頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：從租屋轉買房，第一步從哪開始？私訊詩婷💓 （詩婷比愛心，語氣溫柔）</div><div class="sub">詩婷比愛心，語氣溫柔</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>從租屋轉買房，第一步從哪開始？私訊詩婷💓</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#租屋</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#租轉買</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#房仲日常</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi11" data-caption="第一次陪簽約客人問問題我心跳停一下，我說讓我確認。學姐說做對了。走出去高雄下小雨傻站兩分鐘，第一次覺得我真的在做這件事了" data-hashtags="#房仲新人 #第一次 #新人成長 #好房詩配 #高雄房仲">
+  <div class="card-head" style="--pie:#C06835">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 11</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">第一次陪客人簽約，我手心都在出汗</h3>
+    <div class="insight">詩婷對鏡頭，回憶表情</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，回憶表情</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：第一次陪客人簽約，那天是客人興奮還是我比較興奮，真的不知道🥹 （詩婷對鏡頭，回憶表情）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">有沒有人工作第一次做對一件事，站在那裡傻笑的？</span></div><div class="sub">詩婷對鏡頭，回憶表情</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：我帶印好的文件確認三遍，鑰匙放口袋手機靜音。說到第二頁客人問了一個問題，我心跳停了一下——我知道答案但怕說錯。 （詩婷緊張神情，手輕輕壓在心口）</div><div class="sub">詩婷緊張神情，手輕輕壓在心口</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：我說「這個我現在確認一下，確定了馬上回你」。學姐後來說「你做對了，不確定就不要亂答」。 （詩婷鬆了一口氣，微微點頭）</div><div class="sub">詩婷鬆了一口氣，微微點頭</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：簽完走出去高雄下小雨，我在路邊傻站兩分鐘。不是因為多厲害，是第一次覺得「我真的在做這件事了」。 （詩婷望著窗外，眼睛微濕）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">新人的第一次都超珍貴</span></div><div class="sub">詩婷望著窗外，眼睛微濕</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：超香那種感覺✨ （詩婷微笑，眼睛亮亮的）</div><div class="sub">詩婷微笑，眼睛亮亮的</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：你也有第一次做對了傻站在那裡的瞬間嗎？留言跟我說🥹 （詩婷看鏡頭，表情期待）</div><div class="sub">詩婷看鏡頭，表情期待</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也有第一次做對了傻站在那裡的瞬間嗎？留言跟我說🥹</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#房仲新人</span>
+      <span class="hashtag">#第一次</span>
+      <span class="hashtag">#新人成長</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄房仲</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi12" data-caption="前輩問我在哪吃早餐我才懂選社區。帶客人走三家早餐店她說附近的早晨讓她覺得生活會很香。找家要先找你習慣的那個早晨" data-hashtags="#社區選擇 #生活機能 #好房詩配 #高雄房仲 #早餐">
+  <div class="card-head" style="--pie:#5BA88A">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 12</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週末早 10AM</span>
+    </div>
+    <h3 class="title">挑早餐的眼光，讓我第一次會選社區</h3>
+    <div class="insight">詩婷對鏡頭，舉手示意</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，舉手示意</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：我選早餐比選社區認真，直到有天前輩問我「你在哪吃早餐」，我才懂了一件事✨ （詩婷對鏡頭，舉手示意）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">挑早餐比挑房子認真的舉手～</span></div><div class="sub">詩婷對鏡頭，舉手示意</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：以前介紹社區只說交通學區機能。有次帶一個客人，她不在意捷運幾分鐘，她問「附近有沒有豆漿店？早餐種類多嗎？」 （詩婷回憶，略帶驚訝表情）</div><div class="sub">詩婷回憶，略帶驚訝表情</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：我愣一下，問她習慣幾點出門、假日呢。她說早起、喜歡走路去吃早餐回家洗澡再上班。那下午帶她走三家早餐店，她說「欸這家我可以」，然後去看了那棟樓。 （詩婷走路帶看，輕鬆愉快）</div><div class="sub">詩婷走路帶看，輕鬆愉快</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：最後她說「這附近的早晨讓我覺得住這裡生活會很香～～～～」我超喜歡這句話。 （詩婷眼睛亮起來，笑著點頭）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">原來找家要先找你習慣的那個早晨</span></div><div class="sub">詩婷眼睛亮起來，笑著點頭</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：找家要先找你習慣的那個早晨。 （詩婷微笑收尾）</div><div class="sub">詩婷微笑收尾</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：想找一個早晨就超香的社區嗎？私訊詩婷，先聊你的生活習慣🍀 （詩婷比四葉草，笑著看鏡頭）</div><div class="sub">詩婷比四葉草，笑著看鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想找一個早晨就超香的社區嗎？私訊詩婷，先聊你的生活習慣🍀</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#社區選擇</span>
+      <span class="hashtag">#生活機能</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#早餐</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="" id="shi13" data-caption="有人說想換屋我先問哪裡住不下去了。不是預算，是找到那個點才知道真正在找什麼" data-hashtags="#換屋 #買房 #好房詩配 #高雄房仲 #看房日記">
+  <div class="card-head" style="--pie:#3D8C6F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 13</span>
+      <span class="batch">第 01 批 · 2026-06-01</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ TikTok</span>
+      <span class="po-time">⏰ 週間晚 8PM</span>
+    </div>
+    <h3 class="title">聽到「換屋」兩個字，我第一個想問的問題</h3>
+    <div class="insight">詩婷對鏡頭，語氣直接但溫柔</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　詩婷對鏡頭，語氣直接但溫柔</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">詩婷：有人說想換屋，我一定先問他一件事，不是預算，是「現在住的哪裡讓你住不下去了？」 （詩婷對鏡頭，語氣直接但溫柔）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">正在考慮換屋的，你知道你的「住不下去的點」是什麼嗎？</span></div><div class="sub">詩婷對鏡頭，語氣直接但溫柔</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">詩婷：很多人說想換屋但說不出哪裡不好——「就是覺得要換了」「朋友說現在是時機」「住久了就要換」。 （詩婷搖頭，語氣理解）</div><div class="sub">詩婷搖頭，語氣理解</div></div>
+        <div class="row"><div class="time">12-25秒 核心展開</div><div class="say">詩婷：但不知道「不對在哪」很難找到「對的那個」。我遇過有人說要換大一點，聊了半小時發現他要的不是坪數，是一個讀書房間讓他下班關門靜一靜。 （詩婷表情認真，語氣專注）</div><div class="sub">詩婷表情認真，語氣專注</div></div>
+        <div class="row"><div class="time">25-40秒 轉折</div><div class="say">詩婷：後來方向整個不一樣。換屋說難說簡單——得先搞清楚「住不下去的那個點」，那才是你真的在找什麼。 （詩婷點頭，語氣堅定）</div><div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">這問題問自己比問房仲還重要</span></div><div class="sub">詩婷點頭，語氣堅定</div></div>
+        <div class="row"><div class="time">40-52秒 收束</div><div class="say">詩婷：先搞清楚「住不下去的點」，那才是你真的在找什麼。 （詩婷看鏡頭，語氣平靜有力）</div><div class="sub">詩婷看鏡頭，語氣平靜有力</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">詩婷：想一起理清楚你在找什麼，私訊詩婷，我不急著帶你看房，先聊💓 （詩婷比愛心，笑著看鏡頭）</div><div class="sub">詩婷比愛心，笑著看鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想一起理清楚你在找什麼，私訊詩婷，我不急著帶你看房，先聊💓</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#換屋</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#好房詩配</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#看房日記</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+</div>
+</div>
+
+<!-- THREADS_PLACEHOLDER — build_shihting.py 負責替換此區塊 -->
+
+
+<!-- 脆文 Threads —— build_shihting.py 自動生成 -->
+<div class="threads-section collapsed">
+<div class="threads-section-head">
+  <span>🌿</span>
+  <span class="ts-label">脆文 Threads</span>
+  <span class="ts-count">第 01 批 · 2026-06-01・7 篇</span>
+  <span class="ts-toggle">▼</span>
+</div>
+<div class="threads-grid">
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T01</span><span class="thread-label">日常自嘲觀察</span></div>
+<div class="thread-text">有人跟我說「嘉義人最好辨認，因為他們遇到什麼都一副沒在怕的樣子」。我想了一下，有點對。我嘉義出身現在在高雄跑房仲，每天被拒絕、客戶沒消息、案子沒進展。但朋友說我臉上還是笑笑的，問我「你不累嗎？」我說好累，但嘉義人嘛，表情就是這樣。白目犯傻反應慢半拍這件事我已經跟自己和好了🥹 你有沒有一個地方的特質，讓你變得特別能撐？
+
+`#嘉義出身高雄打拼 #房仲新人 #好房詩配`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T02</span><span class="thread-label">幽默自嘲日常</span></div>
+<div class="thread-text">我最近好像得了一個病。每次看完物件，我會評價採光，然後習慣性評價附近有什麼好吃的。一個朋友說「你是在幫客人找家還是找餐廳？」我說都有。有好吃的附近住起來才超香啊٩(˃̶͈̀௰˂̶͈́)و 你也有這樣的選房癖好嗎？告訴我💓
+
+`#yummyeateat #好房詩配 #高雄美食 #房仲日常`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T03</span><span class="thread-label">溫和觀點生活觀察</span></div>
+<div class="thread-text">不知道有沒有人跟我一樣——走進一棟大樓，光看電梯等待的樣子，就能感覺到住戶素質。有人讓你先進，有人會跟你說「幾樓？」，有人直接滑手機不看你。我帶客人看屋，有時候我們不只看房間，會在一樓等一下電梯。我跟客人說：買的不只是房子，是一棟樓的生活方式。
+
+`#看屋眉角 #好房詩配 #高雄房仲 #買房眼光`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T04</span><span class="thread-label">感性生活觀</span></div>
+<div class="thread-text">以前我以為「有安全感」這件事來自人。現在在找家的過程，我發現它也來自空間。一個進去就覺得「對，就是這裡」的地方——採光剛好、格局不複雜、住起來不擠也不空。那種怦然心動，跟遇到一個讓你安心的人，好像是同一種感覺。好房詩配，配的就是這個🍀🥹
+
+`#悸動在日常 #好房詩配 #療癒 #找家`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T05</span><span class="thread-label">觀點共鳴新人</span></div>
+<div class="thread-text">我發現當新人最難的一件事不是被拒絕，是說「這個我不知道，我去查再告訴你」。第一個月我超怕客人問我答不出來的問題，覺得說不知道就輸了。後來前輩說「客人要的不是你什麼都會，是你不亂說話的誠實」。那句話讓我整個閃閃發亮～～～～ 現在遇到不確定的，我都直接說「我確認一下給你」。好像真的比硬撐更讓人信任。你有沒有在哪裡學到一句話，讓你整個想法改變了？
+⚠️[需詩婷確認] 「前輩說不亂說話的誠實」是否真實，否則改「我自己後來想通的」
+
+`#房仲新人 #新人心得 #誠實 #好房詩配`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T06</span><span class="thread-label">在地生活觀察</span></div>
+<div class="thread-text">從嘉義搬來高雄打拼，一開始覺得高雄好熱好大車好多。住了一陣子才發現有種慢慢的溫度。早上有老闆手沖咖啡、下午可以在苓雅不趕路、晚上吃宵夜不用跑太遠。我跟客人說高雄，我不說增值潛力或交通便利，我說「住進去你才會懂」。你覺得高雄最超香的生活是什麼？
+⚠️[需詩婷確認] 「我跟客人說住進去才會懂」是否真實說過，否則改「我都想跟人說」
+
+`#高雄生活 #嘉義人在高雄 #高雄日常 #好房詩配`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+<div class="thread-card">
+<div class="thread-meta"><span class="thread-id">T07</span><span class="thread-label">生活感悟感性</span></div>
+<div class="thread-text">我去看過很多場演唱會，每次結束出來都有種「這個體驗值得」的滿足感。最近在做房仲才發現，找家是同一種感覺。不是在買一個數字，是買一種「每天住在這裡的體驗」。那個採光你早上起來會不會想賴床多十分鐘？那個社區你下樓遛狗會不會覺得超香？體驗型消費我懂，但家是一個長期在住的體驗，選對才值得🥹 你怎麼看「家是一種長期體驗」這件事？
+
+`#演唱會控 #好房詩配 #買房 #找家 #生活感`</div>
+<button class="copy-thread">複製脆文</button>
+</div>
+</div>
+</div>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="fn">好房詩配・幸福到位 🍀</div>
+    <div class="fm"><b>林詩婷 Erica</b>　|　永慶不動產・中都十全<br>0934-022-856　|　高雄市</div>
+    <div class="mbc"><span class="l">Tech Partner</span><img src="maskbago-badge.jpg" alt="MasKBago"></div>
+    <div class="fs">短影音腳本工作台 · 內部預覽</div>
+  </div>
+</footer>
+
+<div class="toast" id="toast">已複製 ✓</div>
+
+<script>
+// =========================================================
+// 暫存卡片資料（build_shihting.py 跑後由 SECTIONS_PLACEHOLDER 取代）
+// 這裡的 DATA 只供「未 build 前預覽」用
+// =========================================================
+var DATA = [];
+
+// 篩選列初始化
+function initFilter() {
+  var cats = {};
+  DATA.forEach(function(d) { cats[d.fac] = (cats[d.fac] || 0) + 1; });
+  var bar = document.getElementById('filter-bar');
+  if (!bar || Object.keys(cats).length === 0) return;
+  var all = document.createElement('button');
+  all.className = 'filter-btn active'; all.textContent = '全部';
+  all.onclick = function() { filterCards(null, this); };
+  bar.appendChild(all);
+  Object.keys(cats).forEach(function(c) {
+    var b = document.createElement('button');
+    b.className = 'filter-btn'; b.textContent = c + '（' + cats[c] + '）';
+    b.onclick = function() { filterCards(c, this); };
+    bar.appendChild(b);
+  });
+}
+
+function filterCards(cat, btn) {
+  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(function(c) {
+    c.style.display = (!cat || c.dataset.cat === cat) ? '' : 'none';
+  });
+}
+
+// 卡片渲染
+function renderCards() {
+  var box = document.getElementById('cards');
+  if (!box || DATA.length === 0) return;
+
+  // 更新 batch badge
+  var bCount = document.getElementById('batch-count');
+  if (bCount) bCount.textContent = DATA.length;
+
+  DATA.forEach(function(d, i) {
+    var chips = (d.pf || []).map(function(p) {
+      return '<span class="chip ' + p[0] + '">' + p[1] + '</span>';
+    }).join('');
+
+    var bodyHtml = (d.body || []).map(function(s) {
+      var label = s[0], text = s[1];
+      if (label === '藏鏡人') {
+        return '<div class="shihting-mirror"><span class="mirror-chip">🎬 藏鏡人</span><span class="mirror-text">' + text + '</span></div>';
+      }
+      return '<div class="seg"><span class="lb">' + label + '</span>' + text + '</div>';
+    }).join('');
+
+    var confirmHtml = d.confirm
+      ? '<div class="confirm">⚠️ 需詩婷確認：' + d.confirm + '</div>'
+      : '';
+    var flag = d.confirm ? '<span class="c-flag">需確認</span>' : '';
+
+    var el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.cat = d.fac;
+    el.innerHTML =
+      '<div class="c-top"><span class="c-no">#' + d.no + '</span>' + chips +
+      '<span class="chip fac">' + d.fac + '</span>' + flag + '</div>' +
+      '<div class="c-title">' + d.t + '</div>' +
+      '<div class="hook"><div class="lb">HOOK · 3 秒</div><div class="tx">' + d.hook + '</div></div>' +
+      '<div class="body" id="body' + i + '">' + bodyHtml + '</div>' +
+      '<div class="cap"><div class="lb"><span>可複製文案</span>' +
+      '<button class="copy" data-i="' + i + '">複製文案</button></div>' +
+      '<div class="tx">' + d.cap + '</div><div class="hash">' + d.hash + '</div></div>' +
+      confirmHtml +
+      '<div class="c-act">' +
+      '<button class="btn openb" data-i="' + i + '">展開腳本 ▾</button>' +
+      '<button class="btn shotb" data-i="' + i + '">標記已拍</button>' +
+      '</div>';
+    box.appendChild(el);
+  });
+
+  initFilter();
+}
+
+// ── 靜態 HTML 卡 card-head 展開/收合 ──────────────────
+// 點 .card-head 展開，但排除 button（shot-toggle 等）不觸發
+document.addEventListener('click', function(e) {
+  var head = e.target.closest('.card-head');
+  if (head && e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+    var card = head.closest('.card');
+    if (card) card.classList.toggle('open');
+  }
+});
+
+// 事件委派
+document.addEventListener('click', function(e) {
+  var t = e.target;
+
+  if (t.classList.contains('openb')) {
+    var i = t.dataset.i;
+    var b = document.getElementById('body' + i);
+    if (b) {
+      b.classList.toggle('open');
+      t.textContent = b.classList.contains('open') ? '收合腳本 ▴' : '展開腳本 ▾';
+    }
+  }
+
+  if (t.classList.contains('shotb')) {
+    t.classList.toggle('on');
+    var card = t.closest('.card');
+    if (card) card.classList.toggle('shot');
+    t.textContent = t.classList.contains('on') ? '已拍 ✓' : '標記已拍';
+  }
+
+  if (t.classList.contains('copy')) {
+    var i = t.dataset.i;
+    var d = DATA[i];
+    if (!d) return;
+    var txt = d.cap + '\n\n' + d.hash;
+    copyText(txt, t, '已複製 ✓', '複製文案');
+  }
+
+  if (t.classList.contains('copy-thread')) {
+    var card = t.closest('.thread-card');
+    if (!card) return;
+    var textEl = card.querySelector('.thread-text');
+    var hashEl = card.querySelector('.thread-hash');
+    var txt = (textEl ? textEl.textContent.trim() : '') +
+              (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+    copyText(txt, t, '已複製 ✓', '複製脆文');
+  }
+
+  // Bug3 fix：靜態 article 卡的「已拍過」按鈕
+  if (t.classList.contains('shot-toggle')) {
+    t.classList.toggle('on');
+    var card = t.closest('.card');
+    if (card) {
+      card.classList.toggle('shot');
+      var isOn = t.classList.contains('on');
+      t.textContent = isOn ? '已拍 ✓' : '已拍過';
+      // 用 localStorage 記住狀態
+      if (card.id) {
+        try { localStorage.setItem('shot_' + card.id, isOn ? '1' : ''); } catch(e) {}
+      }
+    }
+  }
+});
+
+function copyText(txt, btn, doneLabel, origLabel) {
+  var orig = btn.textContent;
+  function doWrite(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    var ta = document.createElement('textarea');
+    ta.value = t; ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doWrite(txt).then(function() {
+    btn.textContent = doneLabel; btn.classList.add('done');
+    var toast = document.getElementById('toast');
+    if (toast) { toast.classList.add('show'); setTimeout(function(){ toast.classList.remove('show'); }, 1600); }
+    setTimeout(function(){ btn.textContent = origLabel || orig; btn.classList.remove('done'); }, 2000);
+  }).catch(function() {
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = origLabel || orig; }, 2000);
+  });
+}
+
+// Bug2 fix：copyScript — 讀 data-caption（文案）或 .say 文字（腳本）複製
+function copyScript(btn) {
+  var card = btn.closest('.card');
+  if (!card) return;
+  var caption = card.dataset.caption;
+  var hashtags = card.dataset.hashtags || '';
+  var txt;
+  if (caption) {
+    txt = caption + (hashtags ? '\n\n' + hashtags : '');
+  } else {
+    // fallback：讀腳本全文
+    var says = card.querySelectorAll('.say');
+    var lines = [];
+    says.forEach(function(el) { if (el.textContent.trim()) lines.push(el.textContent.trim()); });
+    txt = lines.join('\n') + (hashtags ? '\n\n' + hashtags : '');
+  }
+  var label = caption ? '複製文案' : '複製腳本';
+  copyText(txt, btn, '已複製 ✓', label);
+}
+
+// 還原 localStorage 已拍狀態
+function restoreShotState() {
+  document.querySelectorAll('.card[id]').forEach(function(card) {
+    try {
+      var saved = localStorage.getItem('shot_' + card.id);
+      if (saved === '1') {
+        card.classList.add('shot');
+        var btn = card.querySelector('.shot-toggle');
+        if (btn) { btn.classList.add('on'); btn.textContent = '已拍 ✓'; }
+      }
+    } catch(e) {}
+  });
+}
+
+// 脆文 section 摺疊
+function initThreadsToggle() {
+  document.querySelectorAll('.threads-section-head').forEach(function(head) {
+    head.addEventListener('click', function() {
+      var sec = this.closest('.threads-section');
+      if (sec) sec.classList.toggle('collapsed');
+    });
+  });
+}
+
+// 靜態 build 頁初始化：計數 + 派系篩選列從靜態 article.card 建立（yaml build 時 DATA 為空，走這條正路）
+function toggleGroup(grp){ if (grp) grp.classList.toggle('collapsed'); }
+
+function initStaticPage() {
+  var cards = document.querySelectorAll('article.card');
+  var bCount = document.getElementById('batch-count');
+  if (bCount) bCount.textContent = cards.length;
+  // C-016：依日期批次、不分派系 → 不建派系篩選列
+}
+
+renderCards();
+initStaticPage();
+restoreShotState();
+initThreadsToggle();
+</script>
+</body>
+</html>

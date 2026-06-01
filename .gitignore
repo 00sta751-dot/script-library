@@ -6,3 +6,7 @@ __pycache__/
 # 範本系統 per-owner 衍生推薦輸出（template_retriever 可重生，不版控 — review ARCH-03）
 template_recommendations_*.yaml
 template_recommendations_*.md
+# cleanup 工具腳本（清理邏輯已併入 build script，這些不再是必要步驟）
+_cleanup_factions.py
+_cleanup_factions_pass2.py
+_test_c016.html

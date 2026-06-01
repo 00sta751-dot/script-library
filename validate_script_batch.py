@@ -1207,6 +1207,173 @@ def _load_template_index_ids() -> Optional[set]:
     return ids
 
 
+# ── 派系名洩漏關鍵詞清單（C-016）──
+# 內部 yaml 欄位（faction/派系）不在此，只掃 HTML 可見輸出層
+_FACTION_LEAK_WORDS = [
+    # 派系名
+    "直球派", "嗆辣派", "市場觀察派", "人間觀察派", "故事戲劇派",
+    "拆解派", "結構分析派", "自嘲反差派", "圖卡部", "老前輩權威派",
+    "時事追擊派", "綜合派", "模板L_知識反差", "家人朋友模擬派",
+    "直球情侶版", "純雞湯", "直球揭秘",
+    # 製作方法洩漏詞（SOP 用語）
+    "修平派", "Erika", "毒舌正能量", "釣魚部",
+    "模板L", "模板A", "模板G",
+    # SOP 結構詞（若出現在 HTML 可見文字即洩漏）
+    "字幕卡", "流量密碼",
+]
+
+# owner → HTML 檔名
+_OWNER_HTML_MAP = {
+    "瑞祥":     "index.html",
+    "仲豪":     "kenny.html",
+    "昀臻":     "beauty.html",
+    "阿奇":     "achi.html",
+    "叭噗_小C": "bappu-cc/index.html",
+}
+
+def chk_c016_no_faction_leak_in_html(owner: str, lib_dir: Path) -> tuple[str, str]:
+    """C-016：HTML 可見輸出層不得出現派系名等製作字眼（v3 修寬 2026-06-01）
+    掃描範圍：
+      A. <span> 可見文字（豁免：hashtag / cta-arrow / thread-label / st 等操作指引 class）
+      C. data-cat="..." 屬性值
+      D. data-tags="..." 屬性值
+      E. HTML comment <!-- ... -->
+      F. yaml body **派系**：/ **類型**：meta 行（未爆彈守門）
+    不掃：
+      - yaml 內部欄位（faction/派系 欄位合法，不在 HTML 裡）
+      - data-hashtags（對外貼文 hashtag，由業主自定）
+      - CTA 操作指引（.cta 容器）/ hashtag-pool / scene / timeline 容器
+      - 豁免 span class：hashtag / cta-arrow / thread-label / pie / st 等
+    若 HTML 不存在則 WARN（build 尚未跑）。
+    """
+    # 豁免的 span class（不掃這些 class 的 span）
+    _EXEMPT_SPAN_CLASSES = {
+        'hashtag', 'cta-arrow', 'pie', 'thread-hash', 'batch',
+        'thread-label', 'roman', 'label', 'count', 'num', 'en',
+        'thread-id', 'ptag', 'tag', 'nm',
+        'st',           # 叭噗時間軸時間戳 span
+        'platform',     # 平台標籤
+        'po-time',      # 上傳時間
+        'rule',         # 分隔線
+        'group-label',  # kenny 群組 header 標題（UI 分組，非對外展示）
+        'group-en',     # kenny 群組英文副標
+        'group-count',  # kenny 群組計數
+        'group-toggle', # kenny 群組展開箭頭
+        'gn',           # bappu 群組名稱 span
+        'gc',           # bappu 群組代碼
+        'gx',           # bappu 群組計數
+        'gy',           # bappu 群組展開箭頭
+    }
+
+    html_rel = _OWNER_HTML_MAP.get(owner)
+    if not html_rel:
+        return "WARN", f"C-016 未知業主 '{owner}'，無法定位 HTML 檔，跳過"
+
+    html_path = lib_dir / html_rel
+    if not html_path.exists():
+        return "WARN", f"C-016 HTML 檔不存在（{html_rel}），build 尚未跑，跳過"
+
+    try:
+        html = html_path.read_text(encoding="utf-8")
+    except Exception as e:
+        return "WARN", f"C-016 HTML 讀取失敗：{e}"
+
+    # 先把操作指引容器移除（腳本庫內部操作員用，不掃）
+    html_no_cta = re.sub(r'<div[^>]+class="cta"[^>]*>.*?</div>', '', html, flags=re.DOTALL)
+    html_no_cta = re.sub(r'<div[^>]+class="hashtag-pool"[^>]*>.*?</div>', '', html_no_cta, flags=re.DOTALL)
+    html_no_cta = re.sub(r'<div[^>]+class="scene"[^>]*>.*?</div>', '', html_no_cta, flags=re.DOTALL)
+    html_no_cta = re.sub(r'<div[^>]+class="timeline"[^>]*>.*?</div>', '', html_no_cta, flags=re.DOTALL)
+
+    hits = []
+    scanned = 0
+
+    # A. <span> 可見文字（豁免特定 class）
+    for m in re.finditer(r'<span([^>]*)>([^<]+)</span>', html_no_cta, re.IGNORECASE):
+        attrs_str = m.group(1)
+        text = m.group(2)
+        text_stripped = text.strip()
+        if not text_stripped:
+            continue
+        cls_m = re.search(r'class="([^"]*)"', attrs_str)
+        span_classes = set(cls_m.group(1).split()) if cls_m else set()
+        if span_classes & _EXEMPT_SPAN_CLASSES:
+            continue
+        scanned += 1
+        for word in _FACTION_LEAK_WORDS:
+            if word in text_stripped:
+                hits.append(f"span文字「{text_stripped[:40]}」含製作字眼「{word}」")
+                break
+
+    # B. thread-label — 豁免（脆文操作員分類標籤，非對外展示層）
+    thread_labels = re.findall(r'<div[^>]*class="[^"]*thread-label[^"]*"[^>]*>([^<]*)</div>', html, re.IGNORECASE)
+    scanned += len(thread_labels)
+    # (不報 FAIL — 豁免)
+
+    # C. data-cat 屬性值
+    data_cat_vals = re.findall(r'data-cat="([^"]*)"', html, re.IGNORECASE)
+    scanned += len(data_cat_vals)
+    for val in data_cat_vals:
+        val_stripped = val.strip()
+        if not val_stripped:
+            continue
+        for word in _FACTION_LEAK_WORDS:
+            if word in val_stripped:
+                hits.append(f"data-cat=\"{val_stripped[:40]}\"含製作字眼「{word}」")
+                break
+
+    # D. data-tags 屬性值
+    data_tags_vals = re.findall(r'data-tags="([^"]*)"', html, re.IGNORECASE)
+    scanned += len(data_tags_vals)
+    for val in data_tags_vals:
+        val_stripped = val.strip()
+        if not val_stripped:
+            continue
+        for word in _FACTION_LEAK_WORDS:
+            if word in val_stripped:
+                hits.append(f"data-tags=\"{val_stripped[:40]}\"含製作字眼「{word}」")
+                break
+
+    # E. HTML comment（<!-- ... -->），排除 CSS 樣式塊中的 comment
+    comment_vals = re.findall(r'<!--(.*?)-->', html, re.DOTALL)
+    scanned += len(comment_vals)
+    for inner in comment_vals:
+        inner_stripped = inner.strip()
+        for word in _FACTION_LEAK_WORDS:
+            if word in inner_stripped:
+                hits.append(f"comment 含製作字眼「{word}」：「{inner_stripped[:40]}」")
+                break
+
+    # F. yaml body **派系**：/ **類型**：meta 行掃描（未爆彈守門）
+    yaml_owner_dirs = {
+        "瑞祥":     lib_dir.parent.parent / "L2_業主層" / "房仲_瑞祥" / "01_腳本生產",
+        "仲豪":     lib_dir.parent.parent / "L2_業主層" / "房仲_仲豪" / "01_腳本生產",
+        "昀臻":     lib_dir.parent.parent / "L2_業主層" / "美容_昀臻" / "01_腳本生產",
+        "阿奇":     lib_dir.parent.parent / "L2_業主層" / "餐飲_阿奇" / "01_腳本生產",
+        "叭噗_小C": lib_dir.parent.parent / "L2_業主層" / "情侶_叭噗_小C" / "01_腳本生產",
+    }
+    yaml_dir = yaml_owner_dirs.get(owner)
+    if yaml_dir and yaml_dir.exists():
+        yaml_body_hits = []
+        for yf in yaml_dir.rglob("script_*.yaml"):
+            try:
+                ycontent = yf.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+            for lno, line in enumerate(ycontent.splitlines(), 1):
+                if re.match(r'^\s*\*\*[派類][系型]\*\*：', line):
+                    yaml_body_hits.append(f"{yf.name}:{lno} → {line.strip()[:50]}")
+        if yaml_body_hits:
+            for yh in yaml_body_hits[:5]:
+                hits.append(f"yaml body 含 **派系/類型** meta 行：{yh}")
+            if len(yaml_body_hits) > 5:
+                hits.append(f"（yaml body 還有 {len(yaml_body_hits)-5} 處）")
+        scanned += len(yaml_body_hits)
+
+    if hits:
+        return "FAIL", f"C-016 HTML 可見層含製作字眼（共 {len(hits)} 處）：" + "；".join(hits[:5]) + (f"（還有 {len(hits)-5} 處）" if len(hits) > 5 else "")
+    return "PASS", f"C-016 HTML 可見層無派系名洩漏（掃描 {scanned} 項，{html_rel}）"
+
+
 def chk_v2_025_template_source_required(data: dict, fname: str) -> tuple[str, str]:
     """V2-025：template_source_ids 必填，且每個 id 存在於 template_index.jsonl（FAIL）
 

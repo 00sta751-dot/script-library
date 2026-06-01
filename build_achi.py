@@ -136,11 +136,11 @@ def owner_article(num, title, pie, insight, scene, timeline, cta,
         meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
 
     return (
-        '<article class="card" data-cat="' + esc_attr(pie) + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
-        '      <span class="pie">' + pie_e + '</span>\n'
+        '      <span class="pie"></span>\n'
         '      <span class="num">No. ' + str(num).zfill(2) + '</span>\n'
         '      <span class="batch">' + batch_e + '</span>\n'
         '    </div>\n' +
@@ -166,11 +166,11 @@ def owner_article(num, title, pie, insight, scene, timeline, cta,
 
 
 def section(roman, label, en, sect_id, cards, count):
-    """渲染 section header + cards wrapper"""
+    """渲染 section header + cards wrapper（C-016: label 不輸出到 HTML，只留 roman + en）"""
     return (
         '<header class="section-head" id="sect-' + str(sect_id) + '">\n'
         '  <span class="roman">' + roman + '</span>\n'
-        '  <span class="label">' + label + '<span class="en">' + en + '</span></span>\n'
+        '  <span class="label"><span class="en">' + en + '</span></span>\n'
         '  <span class="rule"></span>\n'
         '  <span class="count">' + str(count) + ' scripts</span>\n'
         '</header>\n'

@@ -22,8 +22,75 @@ _parser.add_argument('--num-start', dest='num_start', type=int, default=1,
                      help='article 編號起點（第 N 批 → 通常 (N-30)*13+1）')
 _parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
                      help='預期 yaml 數量（驗證用）')
+_parser.add_argument('--threads-md', dest='threads_md', default='',
+                     help='脆文 .md 檔案絕對路徑（--mode yaml 時可選；若提供則新批脆文取代舊批）')
 _args, _unknown = _parser.parse_known_args()
 MODE = _args.mode
+
+
+# ============================================================
+# threads markdown parser（讀 threads_*.md → [(tid, label, body, hashtag), ...]）
+# 格式：## Threads NN（...）\n主題：...\n\n<body>\n\n#hashtags
+# ============================================================
+
+def parse_threads_md(md_path: str):
+    """解析脆文 .md 檔，回傳 list of (tid, label, body, hashtag)。
+    支援瑞祥格式（## Threads 01（衍生自…）\n主題：X × Y\n\n<body>\n\n#tags）。
+    label 取「主題」行的第一段（× 後為派系，不顯示）。
+    hashtag 取最後一個 #開頭段落。
+    """
+    import re as _re2
+    with open(md_path, 'r', encoding='utf-8') as _f:
+        raw = _f.read()
+    # 切分 ## Threads XX 區塊
+    blocks = _re2.split(r'\n---\n', raw.strip())
+    results = []
+    for blk in blocks:
+        blk = blk.strip()
+        # 找 ## Threads NN
+        m_head = _re2.search(r'##\s+Threads\s+(\d+)', blk)
+        if not m_head:
+            continue
+        tid = f'T{int(m_head.group(1)):02d}'
+        # 找主題行
+        m_theme = _re2.search(r'主題：(.+)', blk)
+        if m_theme:
+            theme_raw = m_theme.group(1).strip()
+            # "文字 × 派系" → 取 × 前的部分當 label
+            label = theme_raw.split('×')[0].strip()
+        else:
+            label = '觀點型'
+        # body：去掉 frontmatter(---...---) + ## Threads 行 + 主題行 + hashtag 行
+        lines = blk.splitlines()
+        body_lines = []
+        hashtag = ''
+        in_frontmatter = False
+        skip_next_blank = False
+        for i, ln in enumerate(lines):
+            if ln.strip() == '---':
+                in_frontmatter = not in_frontmatter
+                continue
+            if in_frontmatter:
+                continue
+            if _re2.match(r'##\s+Threads\s+\d+', ln):
+                continue
+            if _re2.match(r'主題：', ln):
+                continue
+            # 第一個 # 開頭非標題行 = hashtag 行
+            if ln.strip().startswith('#') and not ln.strip().startswith('##'):
+                hashtag = ln.strip()
+                continue
+            # markdown frontmatter style lines（>...）—昀臻格式
+            if ln.strip().startswith('>'):
+                continue
+            # # Threads 脆文... 標題行
+            if _re2.match(r'^#\s+Threads', ln):
+                continue
+            body_lines.append(ln)
+        body = '\n'.join(body_lines).strip()
+        if body or hashtag:
+            results.append((tid, label, body, hashtag))
+    return results
 
 BATCH    = '第 33 批 · 2026-05-18'
 BATCH_32 = '第 32 批 · 2026-05-12'
@@ -74,7 +141,7 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
             img_safe = ''
         if img_safe:
             img_html = (
-                '    <div class="ref-link">圖卡部 · 圖卡附件：'
+                '    <div class="ref-link">附件圖卡：'
                 '<a href="' + img_safe + '" target="_blank">'
                 '<img src="' + img_safe + '" class="card-thumb" alt="圖卡預覽" '
                 'onclick="openLightbox(this); return false;">'
@@ -102,11 +169,11 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
     if po_time:
         meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
     return (
-        '<article class="card" data-cat="' + esc_attr(pie) + '" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" data-cat="" id="' + pid + '' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
-        '      <span class="pie">' + pie_e + '</span>\n'
+        '      <span class="pie"></span>\n'
         '      <span class="num">No. ' + str(num).zfill(2) + '</span>\n'
         '      <span class="batch">' + batch_e + '</span>\n'
         '    </div>\n' +
@@ -131,10 +198,11 @@ def rux_article(num, title, pie, insight, scene, timeline, cta, img=None, batch=
     )
 
 def section(roman, label, en, sect_id, cards, count):
+    # C-016: label（派系名）不輸出到 HTML，只保留 roman + en
     return (
         '<header class="section-head" id="sect-' + str(sect_id) + '">\n'
         '  <span class="roman">' + roman + '</span>\n'
-        '  <span class="label">' + label + '<span class="en">' + en + '</span></span>\n'
+        '  <span class="label"><span class="en">' + en + '</span></span>\n'
         '  <span class="rule"></span>\n'
         '  <span class="count">' + str(count) + ' scripts</span>\n'
         '</header>\n'
@@ -281,7 +349,7 @@ sect_spicy = section('II.', '嗆辣派', 'The Spicy Edge', 1, [
          ('25-40秒','第三個是最多人踩的：只問可以便宜嗎，沒問為什麼要賣。你不知道屋主怎麼想，你就沒辦法談。','先問他為什麼賣','這個我真的沒想到要問'),
          ('40-52秒','這 3 個雷不難避，只是沒人告訴你而已。現在知道了，下次看屋前先想一下。','現在知道了'),
          ('52-60秒','你有踩過哪個雷？或是你還有其他想問的，留言跟我說，我來幫你拆。','留言我幫你拆')],
-        '個人化諮詢（毒舌正能量位）',
+        '個人化諮詢',
         batch=BATCH_32),
 ], 5)
 
@@ -330,7 +398,7 @@ sect_human = section('III.', '人間觀察派', 'Human Observations', 2, [
          ('25-40秒', '那時我才懂，房子不只資產。是讓誰的生命放在裡面的地方。有時你住，有時你在乎的人住。最後承載的不是預算，是你的心。', '房子裝的是生命', '這個讓我想到我媽，眼眶有點熱'),
          ('40-52秒', '後來客戶來了，我沒跟他說這件事。但帶看那天，比平常更認真。', '帶看比平常更認真', ''),
          ('52-60秒', '你買的那間，最後誰住進去？', '你買的那間，最後誰住進去？', '')],
-        '純雞湯位——無 CTA',
+        '（無 CTA）',
         caption='車裡等客戶，想到一個客戶買左營小套房給媽媽。媽媽過世後他傳來一句話：她住那裡很喜歡，慶幸讓她住到那裡。',
              platform='IG Reels / FB Reels / TikTok', po_time='週四–五 19:30–21:00',
              hashtag=['#房仲日常', '#左營', '#家', '#房子的故事', '#高雄房仲', '#人生感悟', '#正能量', '#媽媽', '#高雄', '#人生']),
@@ -566,7 +634,7 @@ sect_senior = section('VIII.', '老前輩權威派', 'The Senior Voice', 7, [
          ('25-40秒','房子也一樣。房子對買家對，成交輕鬆到不像真的。硬撐的，就是一開始就對不上。','對就輕鬆','就是說啊，強推的都留遺憾'),
          ('40-52秒','這句話現在是我做這行的中心。你不用說服所有人，你只要找到真的需要你的那一個。','找到對的那個人'),
          ('52-60秒','你覺得你做的事情，有沒有幫到真的需要的人？留言跟我說說。','留言聊聊')],
-        'Erika 專業位（留言互動）',
+        '留言互動',
         batch=BATCH_32),
 ], 1)
 
@@ -632,14 +700,14 @@ sect_soul = section('XI.', '綜合派', 'Soul Food', 10, [
     rux_article(14, '有一種人 永遠找不到好房子',
         '綜合派',
         '他們在找的是確定感。確定這輩子不會後悔、確定這個家永遠是家。但這個確定感，房子給不了你，只能你自己給自己。',
-        '辦公室，語氣溫和，純雞湯',
+        '辦公室，語氣溫和',
         [('0-3秒','有一種人，不管看幾間房，永遠找不到好房子。','永遠找不到好房子'),
          ('3-12秒','不是市場爛、不是錢不夠，是他們其實不是在找房子。','—','那在找什麼？'),
          ('12-25秒','他們在找的是確定感。確定這輩子不會後悔、確定這個家永遠是家。但這個確定感，房子給不了你，只能你自己給自己。','確定感自己給'),
          ('25-40秒','找到好房子的人，不是運氣，是他們先決定我要在這裡生活，然後在這框架找房。','先決定生活方式','這個說法讓我想了一下'),
          ('40-52秒','房子只是工具，不是答案。你的生活才重要。搞清楚自己要什麼生活，好房子自然就找得到。','生活最重要'),
          ('52-60秒','你現在找房是找確定感還是找房子？這個問題不用回答我，但可以想一下。','想一下')],
-        '純雞湯（無強 CTA）',
+        '（無 CTA）',
         batch=BATCH_32),
     rux_article(2, '看屋當天 我在偷觀察你哪 3 件事',
         '直球派',
@@ -675,7 +743,7 @@ print('Section 綜合派 built OK')
 
 # 第 33 批 7 篇（2026-05-18 ship — 保留歷史 / 澤君 5/23 拍板兩批都顯示）
 THREADS_33 = [
-    ('T01', '嗆辣觀點型',
+    ('T01', '觀點型',
      '你說房價還會跌。\n\n我問你，這句話說多久了？\n\n去年說、前年說、大前年也說。\n\n房價跌的時候你買嗎？還是又說「陷阱，不能買」？\n\n等的人最後沒買到低點，只是錯過很多時間點。\n\n不用怕，問問不用錢。',
      '#高雄房仲 #買房心態'),
     ('T02', '人間觀察型',
@@ -684,7 +752,7 @@ THREADS_33 = [
     ('T03', '直球教學型（短）',
      '看屋別只看客廳。\n\n先看廁所。\n\n廁所通風、排水、牆縫，房子藏不住問題的地方。\n\n看完廁所再看主臥天花板角落。\n\n才看客廳。\n\n客廳是裝飾，廁所是真相。',
      '#看屋眉角 #高雄買房'),
-    ('T04', '毒舌正能量型',
+    ('T04', '正能量型',
      '我看過太多人，找房兩年，最後買的是第三週看的那間。\n\n為什麼？\n\n花兩年把那間翻出來對比，最後認了，當初那間就最好。\n\n不是不懂，需要時間確認直覺。\n\n問題是時間不等人，那間後來漲了。\n\n你直覺通常沒錯，只需有人幫確認它。',
      '#買房 #人生觀察'),
     ('T05', '在地觀察型',
@@ -700,22 +768,22 @@ THREADS_33 = [
 
 # 第 34 批 v2 7 篇（2026-05-23 三審修補版）
 THREADS_34_V2 = [
-    ('T01', '直球派／釣魚部',
+    ('T01', '教學型',
      '我跟你說，看屋只看格局的，後面都會後悔。\n\n真正該問的是——上一任屋主為什麼賣。\n\n不是好奇，是因為這個答案藏了 3 件事——\n\n第一，屋況。住沒幾年就賣，多半有原因。\n\n第二，鄰居。樓上小孩半夜哭、樓下抽菸飄上來、隔壁裝潢敲半年——這些屋主不會主動講，但你問他「住幾年了、為什麼搬」他會露口風。\n\n第三，社區。管委會有沒有運作、財報透不透明、住戶相處怎麼樣。\n\n問問不用錢，這 3 個答案，比你看十張平面圖有用。',
      '#看屋眉角 #高雄買房 #房仲日常'),
-    ('T02', '市場觀察／Erika 位',
+    ('T02', '市場觀察型',
      '30 坪登記的房子，主建物你住到幾坪？\n\n你知道嗎？很多人到簽約那天才知道——19 坪左右。\n\n高雄新成屋公設比常見區間 33-35%，這不是建商藏的，是規定要登記的。\n\n公設不是不能買，是你要知道自己買到哪些服務——管理室、走廊、健身房、頂樓花園、機房，這些算進去。\n\n主建物才是你真正睡覺的地方。\n\n這個數字你自己算一下，假設公設 35%，30 坪 × (1-35%) = 19.5 坪。\n\n買房前看清楚 3 個數字：主建物、陽台、公設。算清楚再簽。',
      '#公設比 #高雄買房 #房仲日常'),
-    ('T03', '嗆辣／毒舌正能量',
+    ('T03', '觀點型',
      '談價談到對方臉色不好看，你以為自己賺到了。\n\n我跟你說，這件事沒有你想的那麼複雜——你省了 30 萬。\n\n老屋翻修動輒 50 萬起跳，要看屋況。\n\n省價不是贏，買對才是。\n\n3 件事自己一定要做——\n\n第一，請第三方驗屋（漏水、管線、防水各檢一次）。\n\n第二，跟屋主拿修繕紀錄，沒紀錄就寫進合約「現況交屋認知」。\n\n第三，估價單拿 3 家比，不要只信第一家。\n\n你自己算一下，省 30 萬 vs 修 50 萬，哪一個比較划算。',
      '#高雄買房 #議價 #房仲心法'),
-    ('T04', '純雞湯',
+    ('T04', '雞湯型',
      '做房仲快十年，我見過的人說——\n\n人生只要做對兩件事就夠：找對一份撐得住的工作，找對一個出事不跑的人。\n\n方向對了，速度慢一點也到得了。\n\n你的速度跟別人不一樣，不代表你錯，代表你在走你那條。\n\n不用怕，你已經到了這一步，剩下的時間慢慢走。',
      '#人生觀察 #生活感悟 #高雄房仲'),
-    ('T05', '嗆辣／業務自省',
+    ('T05', '業務自省型',
      '做房仲這行，最讓我難受的一通電話——\n\n是客戶帶看 8 次，最後找別人簽。\n\n不是氣他，是氣自己。\n\n哪裡沒問清楚？哪個案場我沒帶到？哪個問題我答得太籠統？\n\n這行丟單不可怕，可怕的是你不知道洞在哪裡。\n\n下次帶看我會再問慢一點，再聽久一點。',
      '#房仲日常 #業務心法 #高雄'),
-    ('T06', '嗆辣／朋友對話',
+    ('T06', '朋友對話型',
      '朋友存到 200 萬，問我「你做房仲，自己的錢怎麼放？」\n\n我說放在我能算清楚的地方。\n\n上個月一個朋友存了一筆，他問我「我看到某個新案，介紹費還倒貼，要不要進」。\n\n我帶他到現場，把週邊 3 年實價登錄、捷運通車進度、學區、社區戶數攤給他看。看完他說：我不要了。\n\n我說：你看得懂的就買，看不懂的就先別碰。\n\n不是說房子就一定是答案。是說——你的錢要放在你看得懂的地方。\n\n不確定就先別下手，這個你自己算一下。',
      '#高雄房仲 #理財觀念 #買房'),
     ('T07', '在地觀察',
@@ -874,15 +942,43 @@ if MODE == 'yaml':
                 globals()[_sect_varname] = _inject_into_section(_cur, _arts)
                 print(f'  {_pie} → 注入 {_sect_varname} ({len(_arts)} 部)')
 
-    # 重建 all_sections（含 yaml 注入後）
+    # 新批所有 articles 合併建成單一「新批整批 section」放最上
+    _all_yaml_arts = [art for _pie in sorted(_yaml_by_pie.keys()) for art in _yaml_by_pie[_pie]]
+    _new_batch_label = batch_label  # e.g. "第 35 批 · 2026-06-01"
+    _new_batch_section = section(
+        '0.',
+        _new_batch_label,
+        _new_batch_label,
+        -1,
+        _all_yaml_arts,
+        len(_all_yaml_arts)
+    )
+    # 脆文 section：若有 --threads-md 則用新批脆文取代舊批，否則沿用舊 sect_threads
+    if _args.threads_md and os.path.isfile(_args.threads_md):
+        _new_threads_data = parse_threads_md(_args.threads_md)
+        print(f'threads_md parsed: {len(_new_threads_data)} 篇')
+        _batch_threads_label = batch_label
+        _new_sect_threads = (
+            '<header class="section-head" id="sect-threads">\n'
+            '  <span class="roman">✦</span>\n'
+            f'  <span class="label">脆文 Threads<span class="en">{_batch_threads_label} · {len(_new_threads_data)} 篇</span></span>\n'
+            '  <span class="rule"></span>\n'
+            f'  <span class="count">{len(_new_threads_data)} posts</span>\n'
+            '</header>\n'
+            '<div class="threads-grid">\n' +
+            '\n'.join(thread_card(t[0], t[1], t[2], t[3]) for t in _new_threads_data) +
+            '\n</div>'
+        )
+        _sect_threads_to_use = _new_sect_threads
+    else:
+        _sect_threads_to_use = sect_threads
+
+    # 重建 all_sections：只含新批 section + 新批脆文（清舊批）
     all_sections = '\n\n'.join([
-        globals()['sect_direct'], globals()['sect_spicy'], globals()['sect_human'],
-        globals()['sect_story'], globals()['sect_struct'], globals()['sect_market'],
-        globals()['sect_self'], globals()['sect_senior'], globals()['sect_trend'],
-        globals()['sect_fish'], globals()['sect_soul'],
-        sect_threads
-    ] + _extra_sections)
-    print('yaml-driven all_sections assembled')
+        _new_batch_section,
+        _sect_threads_to_use,
+    ])
+    print(f'yaml-driven all_sections assembled (新批 section: {len(_all_yaml_arts)} 部 + 脆文)')
 else:
     # legacy mode（預設）
     # Assemble all sections and replace in index.html
@@ -1173,19 +1269,30 @@ print('index.html DONE:', len(nc), 'chars')
 # Count articles and verify（含 inject_v2_meta_attrs 後 data-* 開頭格式）
 arts = re.findall(r'<article\b', nc)
 print('Total articles:', len(arts))
-print('Batch 32 marker check:', BATCH_32 in nc)
-print('Batch 33 marker check:', BATCH in nc)
-# Verify platform/po-time present in 33 batch articles
-plat_count = len(re.findall(r'class="platform"', nc))
-potime_count = len(re.findall(r'class="po-time"', nc))
-print(f'platform chips: {plat_count}, po-time chips: {potime_count}')
-assert plat_count == potime_count, f'platform chips ({plat_count}) != po-time chips ({potime_count}), mismatch'
-print('Platform/po-time assertion PASS')
-# Verify hashtag pools present for articles with platform metadata
-hashtag_pool_count = len(re.findall(r'class="hashtag-pool"', nc))
-print(f'hashtag-pool divs: {hashtag_pool_count}')
-assert hashtag_pool_count == plat_count, f'hashtag-pool count ({hashtag_pool_count}) != platform count ({plat_count}), mismatch'
-hashtag_span_count = len(re.findall(r'class="hashtag"', nc))
-print(f'hashtag spans total: {hashtag_span_count}')
-assert hashtag_span_count >= hashtag_pool_count, f'hashtag spans ({hashtag_span_count}) < hashtag-pool count ({hashtag_pool_count}): some pools are empty'
-print('Hashtag assertion PASS')
+if MODE == 'yaml':
+    # yaml-only 模式：只驗新批腳本數 + 脆文
+    _yaml_total_verify = sum(len(v) for v in _yaml_by_pie.values())
+    assert len(arts) >= _yaml_total_verify, f'Expected >= {_yaml_total_verify} articles (yaml batch), got {len(arts)}'
+    print(f'yaml mode articles assertion PASS: {len(arts)} >= {_yaml_total_verify}')
+    thread_cards = re.findall(r'class="thread-card"', nc)
+    print(f'Thread cards: {len(thread_cards)}')
+    assert len(thread_cards) >= 1, f'Expected thread cards, got {len(thread_cards)}'
+    print('Thread cards assertion PASS')
+else:
+    print('Batch 32 marker check:', BATCH_32 in nc)
+    print('Batch 33 marker check:', BATCH in nc)
+    # Verify platform/po-time present in 33 batch articles
+    plat_count = len(re.findall(r'class="platform"', nc))
+    potime_count = len(re.findall(r'class="po-time"', nc))
+    print(f'platform chips: {plat_count}, po-time chips: {potime_count}')
+    assert plat_count == potime_count, f'platform chips ({plat_count}) != po-time chips ({potime_count}), mismatch'
+    print('Platform/po-time assertion PASS')
+    # Verify hashtag pools present for articles with platform metadata
+    hashtag_pool_count = len(re.findall(r'class="hashtag-pool"', nc))
+    print(f'hashtag-pool divs: {hashtag_pool_count}')
+    assert hashtag_pool_count == plat_count, f'hashtag-pool count ({hashtag_pool_count}) != platform count ({plat_count}), mismatch'
+    hashtag_span_count = len(re.findall(r'class="hashtag"', nc))
+    print(f'hashtag spans total: {hashtag_span_count}')
+    assert hashtag_span_count >= hashtag_pool_count, f'hashtag spans ({hashtag_span_count}) < hashtag-pool count ({hashtag_pool_count}): some pools are empty'
+    print('Hashtag assertion PASS')
+print('All assertions PASS')

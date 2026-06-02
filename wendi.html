@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FBFAF5">
+<meta property="og:title" content="溫蒂的腳本｜24歲・嘉義人在高雄">
+<meta property="og:image" content="wendi-qver.png">
+<title>溫蒂的腳本 ｜ 24歲・嘉義人在高雄 🌿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- 此頁由 build_wendi.py 機械化讀腳本生成；勿手改，改 build_wendi.py 重跑 -->
+<style>
+:root{
+  --cream:#FBFAF5; --cream2:#F3F1E7; --paper:#FFFFFF;
+  --moss:#6FA84A; --moss-d:#4C7A30; --moss-l:#E9F4D8; --moss-glow:#F1F8E7;
+  --coral:#FF6F5E; --coral-d:#E8553F; --coral-l:#FFE6E1;
+  --ink:#2A3122; --ink2:#5A6150; --ink3:#8C9079; --ink4:#B4B7A4;
+  --line:#E6E7D9; --line2:#D8DAC8;
+  --display:'Outfit','Noto Sans TC',system-ui,sans-serif;
+  --sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+  --r-xl:20px; --r-lg:16px; --r-md:12px; --r-sm:8px;
+  --sh:0 6px 22px -10px rgba(60,80,30,.16);
+  --sh2:0 14px 40px -16px rgba(60,80,30,.26);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(circle at 88% -2%,var(--moss-glow) 0,transparent 38%),radial-gradient(circle at 4% 102%,var(--coral-l) 0,transparent 30%),var(--cream);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased;font-feature-settings:"palt";padding-bottom:80px}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.wrap{width:min(960px,92vw);margin:0 auto}
+.hero{padding:34px 0 18px}
+.bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(96px,auto);gap:13px}
+.bento .cell{border-radius:var(--r-lg);padding:18px 20px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.cell.id{grid-column:span 2;grid-row:span 2;background:linear-gradient(150deg,var(--moss-l),#fff 70%);border:1px solid var(--line);flex-direction:row;align-items:center;gap:18px}
+.cell.id .qv{width:124px;height:124px;flex-shrink:0;border-radius:24px;overflow:hidden;background:var(--moss-glow);border:3px solid #fff;box-shadow:var(--sh2);transform:rotate(-3deg)}
+.cell.id .qv img{width:100%;height:100%;object-fit:cover}
+.cell.id .who .name{font-family:var(--display);font-weight:800;font-size:clamp(30px,6vw,42px);line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
+.cell.id .who .name .en{display:block;font-size:15px;font-weight:600;color:var(--moss-d);letter-spacing:.18em;margin-top:3px}
+.cell.id .who .slo{margin-top:10px;font-size:14px;color:var(--ink2);font-weight:500;line-height:1.5}
+.cell.id .who .slo b{color:var(--coral-d);font-weight:700}
+.cell.role{grid-column:span 2;background:var(--ink);color:#fff;border:1px solid var(--ink)}
+.cell.role .k{font-size:11px;letter-spacing:.2em;color:var(--moss);font-weight:700;font-family:var(--display)}
+.cell.role .v{font-family:var(--display);font-weight:700;font-size:clamp(17px,3.4vw,22px);line-height:1.3;margin-top:3px}
+.cell.role .v small{display:block;font-size:13px;font-weight:400;color:#C7CBB8;margin-top:4px;font-family:var(--sans)}
+.cell.links{background:var(--paper);border:1px solid var(--line);flex-direction:row;align-items:center;gap:9px;flex-wrap:wrap}
+.cell.links a{display:inline-flex;align-items:center;gap:6px;background:var(--cream2);border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--ink2);transition:.2s}
+.cell.links a:hover{background:var(--moss);color:#fff;border-color:var(--moss);transform:translateY(-1px)}
+.cell.links a.line{background:var(--coral);color:#fff;border-color:var(--coral)}
+.cell.links a.line:hover{background:var(--coral-d);border-color:var(--coral-d)}
+.cell.stat{background:linear-gradient(145deg,var(--coral) 0,var(--coral-d) 100%);color:#fff;border:1px solid var(--coral-d)}
+.cell.stat .big{font-family:var(--display);font-weight:900;font-size:38px;line-height:1}
+.cell.stat .lb{font-size:12px;font-weight:500;color:#FFE2DC;margin-top:2px}
+@media(max-width:680px){.bento{grid-template-columns:repeat(2,1fr);gap:10px}.cell.id{grid-column:span 2;flex-direction:column;text-align:center}.cell.id .qv{transform:none}.cell.role{grid-column:span 2}.cell.links,.cell.stat{grid-column:span 1}}
+.group{margin-top:30px}
+.grp-head{cursor:pointer;user-select:none;-webkit-user-select:none;display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh);position:relative}
+.grp-head .tag{font-family:var(--display);font-weight:800;font-size:15px;color:#fff;background:var(--moss-d);border-radius:var(--r-sm);padding:5px 12px;flex-shrink:0}
+.grp-head .ttl{font-family:var(--display);font-weight:700;font-size:17px;color:var(--ink)}
+.grp-head .ttl small{font-family:var(--sans);font-weight:400;font-size:12.5px;color:var(--ink3);margin-left:8px}
+.grp-head .cnt{margin-left:auto;font-size:12.5px;color:var(--ink3);font-weight:500;flex-shrink:0;padding-right:30px}
+.grp-head::after{content:'−';position:absolute;right:18px;top:50%;transform:translateY(-50%);width:24px;height:24px;line-height:22px;text-align:center;font-size:16px;color:var(--moss-d);border:1.5px solid var(--moss);border-radius:50%}
+.group.collapsed .grp-head::after{content:'+'}
+.group.collapsed .cards{display:none}
+.cards{margin-top:14px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;align-items:start}
+@media(max-width:680px){.cards{grid-template-columns:1fr}}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh);transition:transform .25s,box-shadow .25s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--sh2)}
+.card .bar{height:5px;background:var(--moss)}
+.card.t-story .bar{background:linear-gradient(90deg,var(--moss),var(--moss-d))}
+.card.t-punch .bar{background:linear-gradient(90deg,var(--coral),var(--coral-d))}
+.card.t-life .bar{background:linear-gradient(90deg,#7BC4C4,#4C7A30)}
+.card-head{cursor:pointer;user-select:none;-webkit-user-select:none;padding:16px 18px;position:relative}
+.card-head .no{font-family:var(--display);font-weight:900;font-size:30px;color:var(--moss-l);line-height:.9;position:absolute;top:12px;right:16px;letter-spacing:-.02em}
+.card.t-punch .card-head .no{color:var(--coral-l)}
+.c-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px;padding-right:46px}
+.pill{font-size:10.5px;font-weight:700;border-radius:999px;padding:2.5px 9px;letter-spacing:.02em}
+.pill.ig{background:#FCE6EE;color:#C4587C}
+.pill.tk{background:#E5E2F0;color:#6357A0}
+.pill.th{background:#E5EAEC;color:#566B76}
+.pill.fish{background:var(--coral-l);color:var(--coral-d)}
+.pill.time{background:var(--moss-l);color:var(--moss-d)}
+.c-ttl{font-family:var(--display);font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);padding-right:40px}
+.card-head .insight{margin-top:11px;background:var(--moss-glow);border-left:3px solid var(--moss);border-radius:var(--r-sm);padding:10px 13px;font-size:13.5px;color:var(--ink2);line-height:1.6;font-weight:500}
+.card.t-punch .card-head .insight{background:var(--coral-l);border-left-color:var(--coral)}
+.scene{margin-bottom:13px;font-size:12.5px;color:var(--ink3);font-weight:500}
+.card-head .more{margin-top:12px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--moss-d)}
+.card.t-punch .card-head .more{color:var(--coral-d)}
+.card-head .more::after{content:'▾';transition:transform .25s}
+.card.open .card-head .more::after{transform:rotate(-180deg)}
+.card-body{display:none;padding:0 18px 18px}
+.card.open .card-body{display:block}
+.tl{border-top:1px dashed var(--line2);padding-top:14px}
+.tl .row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--cream2)}
+.tl .row:last-child{border-bottom:none}
+.tl .ts{flex-shrink:0;width:74px;font-size:10.5px;font-weight:700;color:var(--moss-d);font-family:var(--display);line-height:1.55;padding-top:1px}
+.card.t-punch .tl .ts{color:var(--coral-d)}
+.tl .rc{flex:1;min-width:0}
+.tl .ln{font-size:13.5px;color:var(--ink);line-height:1.65}
+.mirror{display:flex;align-items:flex-start;gap:8px;margin-top:8px;background:var(--moss-glow);border:1px solid var(--moss-l);border-left:3px solid var(--moss);border-radius:6px;padding:7px 11px;font-size:12.5px;color:var(--ink2);line-height:1.6}
+.mirror .mc{flex-shrink:0;background:var(--moss);color:#fff;border-radius:4px;padding:1px 8px;font-size:10.5px;font-weight:700;white-space:nowrap;font-family:var(--display);margin-top:1px}
+.mirror .mt{flex:1}
+.card.t-punch .mirror{background:var(--coral-l);border-color:#FBD3CB;border-left-color:var(--coral)}
+.card.t-punch .mirror .mc{background:var(--coral-d)}
+.meta-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.minfo{flex:1;min-width:130px;background:var(--cream);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 13px}
+.minfo .k{font-size:10px;letter-spacing:.14em;color:var(--ink3);font-weight:700;font-family:var(--display);margin-bottom:3px}
+.minfo .v{font-size:13px;color:var(--ink);line-height:1.6}
+.hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin-top:13px}
+.hashtag{font-size:11px;color:var(--moss-d);background:var(--moss-l);border-radius:5px;padding:2px 8px;font-weight:500;letter-spacing:.01em}
+.card.t-punch .hashtag{color:var(--coral-d);background:var(--coral-l)}
+.c-foot{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px dashed var(--line2)}
+.c-cta{flex:1;font-size:13px;color:var(--coral-d);font-weight:600;line-height:1.5}
+.c-cta b{background:var(--coral-l);border-radius:5px;padding:1px 7px}
+.copy{cursor:pointer;border:none;flex-shrink:0;background:var(--moss-d);color:#fff;border-radius:999px;padding:7px 16px;font-size:12px;font-weight:700;font-family:var(--display);transition:.2s}
+.copy:hover{background:var(--moss)}
+.copy.done{background:var(--coral)}
+.thread-sec{margin-top:34px}
+.sec-ttl{display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.sec-ttl .ico{font-size:22px}
+.sec-ttl h2{font-family:var(--display);font-weight:800;font-size:21px;color:var(--ink)}
+.sec-ttl small{color:var(--ink3);font-size:12.5px;font-weight:400;font-family:var(--sans)}
+.sec-ttl .ts-toggle{margin-left:auto;color:var(--moss-d);font-size:15px;transition:transform .25s}
+.thread-sec.collapsed .ts-toggle{transform:rotate(-90deg)}
+.thread-sec.collapsed .threads{display:none}
+.threads{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+@media(max-width:680px){.threads{grid-template-columns:1fr}}
+.th-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 17px;box-shadow:var(--sh);position:relative}
+.th-card .th-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.th-card .th-top .av{width:26px;height:26px;border-radius:8px;overflow:hidden;background:var(--moss-l)}
+.th-card .th-top .av img{width:100%;height:100%;object-fit:cover}
+.th-card .th-top .nm{font-weight:700;font-size:13px;color:var(--ink);font-family:var(--display)}
+.th-card .th-top .nm small{display:block;font-weight:400;font-size:11px;color:var(--ink3);font-family:var(--sans)}
+.th-card .tx{font-size:13.5px;color:var(--ink);line-height:1.75;white-space:pre-wrap}
+.th-card .th-hash{margin-top:9px;font-size:11.5px;color:var(--moss-d);font-weight:500;line-height:1.6}
+.th-card .th-copy{position:absolute;top:14px;right:15px;cursor:pointer;border:none;background:var(--cream2);color:var(--ink2);border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;font-family:var(--display);transition:.2s}
+.th-card .th-copy:hover{background:var(--moss);color:#fff}
+.th-card .th-copy.done{background:var(--coral);color:#fff}
+.foot{margin-top:40px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.9}
+.foot .by{font-family:var(--display);font-weight:600;color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero"><div class="bento">
+<div class="cell id"><div class="qv"><img src="wendi-qver.png" alt="溫蒂"></div>
+<div class="who"><div class="name">溫蒂<span class="en">WENDY · SKIN</span></div>
+<div class="slo">24歲嘉義人，一個人在高雄開工作室。<br><b>不完美，但敢走自己的路。</b></div></div></div>
+<div class="cell role"><div class="k">WHO I AM</div>
+<div class="v">高雄左營 · 油痘肌調理師<small>體內 + 體外同時調理，不只清粉刺</small></div></div>
+<div class="cell links">
+<a href="https://www.instagram.com/_yu0812_" target="_blank" rel="noopener">📸 IG</a>
+<a href="https://www.tiktok.com/@_yu0812_" target="_blank" rel="noopener">🎵 TikTok</a>
+<a href="https://www.threads.net/@_yu0812_" target="_blank" rel="noopener">🧵 Threads</a>
+<a class="line" href="https://page.line.me/162vpemu" target="_blank" rel="noopener">💬 LINE 預約</a></div>
+<div class="cell stat"><div class="big">13</div><div class="lb">支腳本 · 第 01 批</div></div>
+</div></header>
+<section class="group collapsed" id="b01"><div class="grp-head" onclick="toggleGroup('b01')"><span class="tag">第 01 批</span><span class="ttl">溫蒂首批 <small>2026-06-02</small></span><span class="cnt">13 支</span></div><div class="cards"><article class="card t-story" data-cat="" id="wendi01" data-caption="24歲一個人在高雄拿到鑰匙那天，站在門口站了很久。不是感動，是真的不知道接下來怎麼辦。沒有客人，沒有人知道我在這裡。後來我媽飛來高雄，成了我第一個客人。那一刻我才知道，我沒有一個人。有在走創業路的，留言「創業」，我們聊聊。" data-hashtags="#高雄創業 #創業女生 #嘉義人 #24歲 #美容師 #個人工作室 #創業故事 #高雄 #左營 #女生保養"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">01</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點</span></div><div class="c-ttl">24歲一個人在高雄開工作室那天</div><div class="insight">一個人開始不代表一個人撐，你以為沒有人，其實有人在等你站穩</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室內，自然光，一個人的日常感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">24歲一個人在高雄，沒有客人，沒有人知道我在這裡。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">工作室鑰匙拿到那天，我站在門口站了超久。不是感動，根本不知道接下來怎麼辦。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">不知道接下來怎麼辦⋯這我也有過</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">嘉義長大，大學在外地，然後直接飛來高雄開工作室。爸媽覺得我很衝動，我自己也沒把握。但我知道如果不做，我永遠搞不清楚自己到底行不行。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">第一個月客人屈指可數。我每天早起開門，等到晚上關門。有好幾個晚上坐在裡面，超想打電話回家，但又不知道說什麼。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我也有過一個人硬撐、又不敢打電話回家的時候</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">後來我媽飛來高雄，成了我第一個客人。那一刻我才知道，我沒有一個人。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">有在走創業路的，留言「創業」，我跟你聊聊。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我也想留言說一下我自己的故事</span></div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「工作室鑰匙拿到的那天」/「不知道接下來要怎麼辦」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">勵志感鋼琴 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#高雄創業</span><span class="hashtag">#創業女生</span><span class="hashtag">#嘉義人</span><span class="hashtag">#24歲</span><span class="hashtag">#美容師</span><span class="hashtag">#個人工作室</span><span class="hashtag">#創業故事</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span><span class="hashtag">#女生保養</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>創業</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi02" data-caption="我媽不是來勸我回去的，她是來做我第一個客人的。開工作室第一個月，她飛來高雄。不懂美容，但她坐上來讓我做完整流程，然後說：「這個我做了有感覺，你繼續做。」沒有大道理，但掛電話之後覺得可以繼續。創業路上有這種人的，留言告訴我。" data-hashtags="#美容師 #創業故事 #媽媽 #高雄創業 #個人工作室 #高雄 #左營 #女生保養 #保養日常 #知識型短影音"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">02</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間7-8點</span></div><div class="c-ttl">我媽飛來高雄她是我第一個客人</div><div class="insight">最好的支持不是大道理，是那個人坐下來讓你繼續做的那一刻</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室護膚檯，溫暖靜態感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">我媽不是來探望我的，她是來做我的客人的。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">開工作室第一個月，她打電話說要來高雄。我以為是勸我回嘉義，結果她說：「我幫你預約第一個客人，就是我。」</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">蛤？媽媽是來勸她回去的嗎？</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">我媽不懂美容，也不是真的有問題需要調理。但她在那個時間點飛來高雄，坐上我的床，讓我做一次完整的護膚流程。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">做完她沒說「你做得很好」，直接說：「這個我做了有感覺，你繼續做。」我沒辦法回話，就去倒杯水假裝找東西。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">天啊看到這段直接鼻酸，這太真實了</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">創業不是一個人的事，但那個第一步，往往是某個人相信你才開始的。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你身邊也有這種人嗎？留言告訴我，我想知道你的故事。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我也想說一說我身邊那個撐著我的人</span></div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「她是我第一個客人」/「你繼續做」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">溫暖 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#美容師</span><span class="hashtag">#創業故事</span><span class="hashtag">#媽媽</span><span class="hashtag">#高雄創業</span><span class="hashtag">#個人工作室</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span><span class="hashtag">#女生保養</span><span class="hashtag">#保養日常</span><span class="hashtag">#知識型短影音</span></div><div class="c-foot"><div class="c-cta">CTA：見腳本結尾</div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi03" data-caption="英文系出來做美容，聽起來很跳。但做這件事一直有意思，做的時候踏實，我就知道這是我的路。同學問不可惜嗎？我說不會。英文系給我的不是工作，是一種能力——怎麼把東西說清楚，讓人信。學什麼科系不重要，找到走得下去的事才重要。你呢？" data-hashtags="#創業女生 #美容師 #創業故事 #24歲 #高雄創業 #個人工作室 #女生保養 #高雄 #知識型短影音 #保養日常"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">03</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點 / 週末下午3點</span></div><div class="c-ttl">英文系出來做美容到底在想什麼</div><div class="insight">科系不是你的路，你走得下去的事才是</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 日常角落自然光，輕鬆隨性感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">英文系出來做美容。對，就這樣。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">我也沒一開始就想清楚啦。大學念英文系，說好要做翻譯、教英文，但心裡總覺得那不是我的路。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">等等，英文系跑去做美容？我也被人家說過類似的話</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">後來接觸美容，越學越喜歡。不是皮膚爛想救自己，是做這件事一直有意思，做的時候踏實。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">同學問我：「英文系不可惜嗎？」我說不會啊。英文系給我的不是工作，是一種能力——怎麼把東西說清楚，讓人信。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">這句話說中我了，大家都在問我那個科系幹嘛用</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">學什麼科系不重要，找到你走得下去的事才重要。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你也有過「這不是我要的」的感覺嗎？留言「創業」我們聊聊。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「英文系出來做美容」/「找到你走得下去的事」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕快 acoustic，青春感</div></div></div><div class="hashtag-pool"><span class="hashtag">#創業女生</span><span class="hashtag">#美容師</span><span class="hashtag">#創業故事</span><span class="hashtag">#24歲</span><span class="hashtag">#高雄創業</span><span class="hashtag">#個人工作室</span><span class="hashtag">#女生保養</span><span class="hashtag">#高雄</span><span class="hashtag">#知識型短影音</span><span class="hashtag">#保養日常</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>創業</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi04" data-caption="那段時間真的谷底。工作室客人少，自己也在懷疑走錯路。去看鄧紫棋演唱會，她說她也想過放棄，但走了這麼遠，回頭沒有意義。我坐台下哭了，想的不是她，是我。那一刻我知道，我的工作室不能關。有時候撐你走下去的，不是計畫，是那一秒想起自己是誰。" data-hashtags="#鄧紫棋 #創業女生 #創業故事 #高雄創業 #24歲 #個人工作室 #女生保養 #高雄 #美容師 #知識型短影音"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">04</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點 / 週末下午3點</span></div><div class="c-ttl">鄧紫棋那場演唱會讓我決定回來了</div><div class="insight">撐下去的力量有時不是來自計畫，是那一秒想起自己選了什麼</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 演唱會相關畫面或工作室內靜態回憶感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">一場演唱會讓我決定不放棄自己的工作室。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">那段時間真的谷底。工作室客人少，自己也在懷疑是不是走錯路。有天去看鄧紫棋演唱會。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我24歲也在懷疑自己能不能做下去</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">她站台上說她也想過放棄很多次。不是因為不難才堅持，是走到現在回頭沒意義。我坐台下哭了。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">我當時想的不是她，是我。24歲一個人在高雄，這工作室是我最大的賭。哭不是感動，是我知道回不了頭。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">等等這句話怎麼也說中我，根本在說我</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">有時候撐你走下去的，不是計畫，是那一秒想起自己是誰。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你有這種讓你撐下來的時刻嗎？分享給我。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">想分享一下我自己那個讓我撐住的時刻</span></div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「走了這麼遠，回頭沒有意義」/「我知道我不能就這樣回去」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">鄧紫棋歌曲（注意版權申請）/ 勵志感鋼琴備用</div></div></div><div class="hashtag-pool"><span class="hashtag">#鄧紫棋</span><span class="hashtag">#創業女生</span><span class="hashtag">#創業故事</span><span class="hashtag">#高雄創業</span><span class="hashtag">#24歲</span><span class="hashtag">#個人工作室</span><span class="hashtag">#女生保養</span><span class="hashtag">#高雄</span><span class="hashtag">#美容師</span><span class="hashtag">#知識型短影音</span></div><div class="c-foot"><div class="c-cta">CTA：見腳本結尾</div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-life" data-cat="" id="wendi05" data-caption="高雄這個週末有市集，去了才知道高雄藏著這種地方。駁二大勇區，每個攤位後面都是個認真做事的人。走在裡面突然覺得我也是這樣——一個人在工作室，認真做自己覺得值得的事。高雄的好，在街道裡，在那些沒名字的小角落。留言「市集」，我私訊你更多高雄隱藏去處。" data-hashtags="#高雄市集 #駁二 #高雄好去處 #高雄 #左營 #嘉義人在高雄 #個人工作室 #創業女生 #高雄生活 #美容師"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">05</div><div class="c-meta"><span class="pill fish">釣魚部</span><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">週五晚間7-8點</span></div><div class="c-ttl">這間高雄市集你一定要去</div><div class="insight">高雄的好不在大景點，在那些認真做事的人身上</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 駁二大勇區戶外市集，日間自然光</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">高雄這個週末有市集，去了才知道高雄藏這地方。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">駁二大勇區，街藝、品牌、吃的都有，但最讓我印象深的不是這些，是那邊人的狀態。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">駁二有這種市集？我住高雄都不知道</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">每個攤位後面都是個認真做事的人。手作、文創，不管做什麼，看得出他們喜歡。高雄有很多這樣的地方，你不走出去就不知道。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">走在裡面突然覺得我也是這樣——一個人在工作室，認真做自己覺得值得的事，不管別人懂不懂。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">這根本在說我，一個人認真做沒人在乎的事</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">高雄的好，在街道裡，在市集裡，在那些沒有名字的小角落裡。你在高雄嗎？</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">留言「市集」，我私訊你更多高雄隱藏版去處和我去過覺得值得的清單。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">高雄人舉手，我也想知道還有哪裡</span></div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「高雄藏了這種地方」/「一個人在工作室，認真做一件自己覺得有價值的事」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕鬆愉快 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#高雄市集</span><span class="hashtag">#駁二</span><span class="hashtag">#高雄好去處</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span><span class="hashtag">#嘉義人在高雄</span><span class="hashtag">#個人工作室</span><span class="hashtag">#創業女生</span><span class="hashtag">#高雄生活</span><span class="hashtag">#美容師</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>市集</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-life" data-cat="" id="wendi06" data-caption="你住高雄左營，週末都去哪？我在左營開工作室，工作完最想出去走走，但不是逛百貨的走法。蓮池潭傍晚走走，光線漂亮可以放空。傳統市場早上買菜，跟店家聊兩句，那種感覺百貨給不了。一個嘉義人來高雄，反而找到自己的節奏。你在左營有自己的口袋去處嗎？" data-hashtags="#高雄左營 #蓮池潭 #左營生活 #高雄 #嘉義人在高雄 #個人工作室 #高雄好去處 #美容師 #高雄生活 #女生保養"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">06</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill time">週五晚間7-8點</span></div><div class="c-ttl">高雄左營人不知道的週末去處</div><div class="insight">找到城市自己的節奏，它就從陌生變成家</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 蓮池潭傍晚戶外，或左營傳統市場，日常生活感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">你住高雄左營，週末都去哪？高鐵站那邊？我不太這樣。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">我在左營開工作室，工作完最想出去走走，但不是那種逛百貨的走法。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我在高雄也這樣，工作完就不想進百貨，但不知道去哪</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">蓮池潭我常傍晚去走走，人不多、光線漂亮，可以放空。附近有傳統市場，早上去買菜順便吃早餐、跟店家聊兩句，那感覺百貨給不了。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">我一個嘉義人剛來高雄，以為高雄很陌生。後來發現左營有自己的節奏，那種安靜，讓你能喘得過來。</div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">高雄不是只有百貨跟大景點。找到自己的節奏，城市就親近了。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">一個嘉義人來高雄反而找到節奏⋯這也太真實了</span></div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你住左營或高雄的，有自己的口袋去處嗎？留言跟我說，我想收集。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「把你自己的節奏找到」/「這個城市就變得親近了」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕鬆生活感 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#高雄左營</span><span class="hashtag">#蓮池潭</span><span class="hashtag">#左營生活</span><span class="hashtag">#高雄</span><span class="hashtag">#嘉義人在高雄</span><span class="hashtag">#個人工作室</span><span class="hashtag">#高雄好去處</span><span class="hashtag">#美容師</span><span class="hashtag">#高雄生活</span><span class="hashtag">#女生保養</span></div><div class="c-foot"><div class="c-cta">CTA：見腳本結尾</div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi07" data-caption="我在自媒體翻車過三次。第一次做很用心的美容教學，沒人看。第二次照爆款格式做，假到自己都不想看。第三次突然換勵志風格，掉粉。三次翻車之後才明白：自媒體不是跟對方法，是先搞清楚自己是誰，用最像你的方式說出來。你做自媒體有遇到什麼卡關嗎？" data-hashtags="#自媒體經營 #創業女生 #創業故事 #美容師 #個人工作室 #高雄創業 #高雄 #知識型短影音 #女生保養 #保養日常"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">07</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點</span></div><div class="c-ttl">我在自媒體翻車的那三件事</div><div class="insight">最像你的方式才能持續，照別人做只是在借別人的臉</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室內或日常角落，輕鬆自嘲感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">我在自媒體翻車過三次，每次都以為懂了，然後繼續翻。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">第一次拍很認真的美容教學，用心到爆炸，結果沒人看。當時以為品質不夠，後來才知道方向錯了。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我也是這樣，做很認真但就是沒人看，超挫折</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">第二次照爆款格式做，結果超假，我自己看都不像自己。第三次突然換風格想走勵志教練感，根本不搭，粉絲直接掉。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">翻車三次之後才明白：自媒體不是跟對方法，是先搞清楚自己是誰，用最像你的方式說出來。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">天啊第二個我也幹過，照爆款做完自己都不想看</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">我翻車的每一次，都讓我更清楚我不是什麼人，這樣其實也蠻有用的。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你在做自媒體有遇到什麼卡關嗎？留言「創業」，我們聊。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「翻車三次」/「用最像你的方式說出來」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕快帶點自嘲感的 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#自媒體經營</span><span class="hashtag">#創業女生</span><span class="hashtag">#創業故事</span><span class="hashtag">#美容師</span><span class="hashtag">#個人工作室</span><span class="hashtag">#高雄創業</span><span class="hashtag">#高雄</span><span class="hashtag">#知識型短影音</span><span class="hashtag">#女生保養</span><span class="hashtag">#保養日常</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>創業</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi08" data-caption="還在信「認真洗臉就夠了」？洗臉再勤方向錯也白搭。太多人早晚猛洗，皮膚沒變好反而越洗越糟。保養習慣、作息、飲食規不規律，都影響膚況。只顧表面清潔，沒顧整體保養方向，才是問題所在。你不是皮膚天生差，只是一直做得不完整。留言「調理」，我幫你看。" data-hashtags="#油痘肌 #粉刺 #保養 #護膚 #保養知識 #美容知識 #肌膚保養 #保養Tips #高雄 #左營"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">08</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點</span></div><div class="c-ttl">說「認真洗臉就夠了」的人給你看看</div><div class="insight">皮膚狀態不是靠勤勞決定的，方向錯再努力也白費</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室護膚檯，知識型氛圍</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">還在信「認真洗臉就夠了」？這句話到底害慘多少人。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">我直說，洗臉再勤方向錯也白搭。太多人早晚猛洗，皮膚沒變好反而越洗越糟。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">蛤？不是說認真洗臉是最基本最重要的嗎？</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">洗臉是基礎沒錯，但「只洗臉就夠」這套邏輯，只顧表面清潔，沒顧整體保養方向。保養習慣、作息、飲食規不規律，其實都影響皮膚狀態。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">有個客人認真洗臉保養快兩年，膚況還是很差，以為自己皮膚天生就這樣。後來才發現她沒整體調整。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">這個客人根本在說我，做了那麼久膚況就是不穩</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">你不是皮膚天生差，只是一直做得不完整。效果因人而異，但方向對了，改善才真的開始。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">留言「調理」，我幫你看是保養方式還是生活習慣卡住了。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「只解決了表面的清潔」/「你只是一直在做一件不夠完整的事」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">帶點直白感的輕快節奏</div></div><div class="minfo"><div class="k">合規自查</div><div class="v">無管制詞（治療/換膚/淡斑/修復/消炎/活化/根治/保證消除）；用「調整/整體調整」非醫療框架；已標「效果因人而異」</div></div></div><div class="hashtag-pool"><span class="hashtag">#油痘肌</span><span class="hashtag">#粉刺</span><span class="hashtag">#保養</span><span class="hashtag">#護膚</span><span class="hashtag">#保養知識</span><span class="hashtag">#美容知識</span><span class="hashtag">#肌膚保養</span><span class="hashtag">#保養Tips</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>調理</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi09" data-caption="她做了快兩年清潔，膚況還是一樣，來問我為什麼。每天洗臉、每週清粉刺、保養品用好幾罐，就是改善有限。後來才發現，她保養習慣和作息跟膚況需求根本不對齊。認真不等於方向對。只清表面，保養習慣跟作息沒一起照顧，問題會反覆來。你也有這種感覺嗎？留言「諮詢」。" data-hashtags="#油痘肌 #粉刺 #保養 #護膚 #肌膚保養 #保養科普 #美容知識 #保養Tips #高雄 #左營"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">09</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間7-8點</span></div><div class="c-ttl">這個客人做了兩年表面清潔的結果</div><div class="insight">認真做不等於方向對，調整比堅持更需要勇氣</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室護膚檯，溫暖一對一氛圍</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">她做了快兩年清潔，膚況還是一樣，來問我為什麼。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">她說每天洗臉、每週清粉刺、保養品用好幾罐，就是改善有限，不知道自己少了什麼。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">這根本在說我，洗了清了也保養了，就是沒什麼變化</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">我跟她聊日常——睡眠、飲食、壓力、保養順序。她確實很認真，但保養習慣和作息跟她膚況需求不對齊。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">她說：「我以為認真做就會變。」我懂那種挫敗。認真不等於方向對。只清表面，保養習慣跟作息沒一起調，問題會反覆來。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">等等，認真不等於方向對——這句話我需要</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">後來她把保養跟作息理順，自己也踏實了，不再亂買亂試。效果因人而異，重點是先搞懂方向，不是一直盲做。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你也有這種感覺，做了很久但沒什麼變化嗎？留言「諮詢」，我幫你看看。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「認真不等於方向對」/「方向對了，事情才有機會不一樣」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">溫暖 acoustic</div></div><div class="minfo"><div class="k">合規自查</div><div class="v">「膚況慢慢有了變化」非效能保證；「保養習慣+作息調整」非醫療框架；「效果因人而異」已標示；客戶去識別化（無姓名/可辨識資訊）</div></div></div><div class="hashtag-pool"><span class="hashtag">#油痘肌</span><span class="hashtag">#粉刺</span><span class="hashtag">#保養</span><span class="hashtag">#護膚</span><span class="hashtag">#肌膚保養</span><span class="hashtag">#保養科普</span><span class="hashtag">#美容知識</span><span class="hashtag">#保養Tips</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>諮詢</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-life" data-cat="" id="wendi10" data-caption="你在保養，但你知道保養的是皮膚還是焦慮嗎？很多人的保養習慣其實是焦慮的管理系統。多用一罐、多加一步，不做感覺皮膚要出問題。皮膚需要的是規律跟方向對的照顧，步驟太多反而增加負擔。好的保養習慣是讓皮膚休息，不是讓自己焦慮多一個出口。你覺得你在保養哪個？" data-hashtags="#保養 #護膚 #肌膚保養 #保養日常 #女生保養 #保養科普 #美容知識 #保養Tips #高雄 #左營"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">10</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill th">Threads</span><span class="pill time">平日晚間8點</span></div><div class="c-ttl">你的保養習慣救的是皮膚還是焦慮</div><div class="insight">保養是照顧皮膚的事，不是讓你焦慮多一個出口</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 日常角落自然光，輕柔靜態生活感</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">你在保養，但你知道保養的是皮膚還是焦慮嗎？</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">很多人的保養習慣其實是焦慮的管理系統。多用一罐、多加一步、看到新產品就買，因為不做感覺皮膚要出問題。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">保養皮膚還是保養焦慮？等等這兩個不一樣嗎？</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">皮膚需要的是規律跟方向對的照顧，不是越多越好。步驟太多反而增加負擔。問問自己：做的這些，是皮膚真的需要還是你安心需要？</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">有個客人說她明明很累，還是要把整套做完，不做會不安。我問：「你皮膚真的這麼需要嗎？」她停了，說不確定。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">她停了說不確定⋯那個我也是，不做就覺得皮膚要爛掉</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">好的保養習慣是讓皮膚休息，不是讓自己焦慮多一個出口。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你覺得你在保養皮膚還是焦慮？留言告訴我，我很好奇大家的答案。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「你在保養的是皮膚還是焦慮」/「好的保養習慣是讓皮膚休息」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕柔沉靜 acoustic</div></div></div><div class="hashtag-pool"><span class="hashtag">#保養</span><span class="hashtag">#護膚</span><span class="hashtag">#肌膚保養</span><span class="hashtag">#保養日常</span><span class="hashtag">#女生保養</span><span class="hashtag">#保養科普</span><span class="hashtag">#美容知識</span><span class="hashtag">#保養Tips</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span></div><div class="c-foot"><div class="c-cta">CTA：見腳本結尾</div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi11" data-caption="嘉義人不告訴你的一件事：離開嘉義的人，每一個都還記得。我24歲來高雄，嘉義家人還在那裡。嘉義的市場聲音、家人吃飯的桌子，平常不會想起，但就在心裡某個地方。我媽說：「下次回來我煮給你吃。」就這樣，沒大道理，但掛電話後覺得可以繼續。有想念的地方或人嗎？不用留言，只是讓你想一下。" data-hashtags="#嘉義 #嘉義人 #嘉義人在高雄 #高雄 #創業女生 #創業故事 #美容師 #個人工作室 #女生保養 #保養日常"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">11</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill th">Threads</span><span class="pill time">假日晚間7-8點</span></div><div class="c-ttl">嘉義人不告訴你的一件事</div><div class="insight">離開不是不愛那個地方，是把它帶著走了</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 日常生活場景，溫暖懷念感，不露臉vlog均可</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">嘉義人不告訴你的一件事：離開嘉義的人，其實每一個都還記得。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">我24歲來高雄，嘉義家人朋友還在那裡。有人問：「不想家嗎？」我說還好。其實想，只是說不清楚想什麼。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">我也離家出來，被問想不想家的時候我也說還好，但根本不是</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">嘉義的生活步調、市場聲音、家人吃飯的桌子，平常不會想起，但就是在心裡某個地方。離開不是不愛，是帶著走。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">我媽有時打來說：「在高雄吃得好嗎？」我說好。她說：「下次回來我煮給你吃。」就這樣，沒大道理，但我掛電話後覺得可以繼續。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">媽媽說『下次回來我煮給你吃』這句話我沒辦法了，直接哭了</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">有些事不說，不是沒有，是你知道它在，就夠了。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你有想念的地方或人嗎？不用留言，只是想讓你想一下。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「離開不是不愛，是帶著它走」/「你知道它在，就夠了」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">溫暖鋼琴 acoustic，帶點懷念感</div></div></div><div class="hashtag-pool"><span class="hashtag">#嘉義</span><span class="hashtag">#嘉義人</span><span class="hashtag">#嘉義人在高雄</span><span class="hashtag">#高雄</span><span class="hashtag">#創業女生</span><span class="hashtag">#創業故事</span><span class="hashtag">#美容師</span><span class="hashtag">#個人工作室</span><span class="hashtag">#女生保養</span><span class="hashtag">#保養日常</span></div><div class="c-foot"><div class="c-cta">CTA：見腳本結尾</div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi12" data-caption="24歲那個下午，我差點把工作室合約終止掉。連著幾週客人少、存款在減，坐在裡面很認真想，這事還要繼續多久。然後我想：我如果現在放，連自己能不能做到都不知道。那個想法讓我多坐了一會兒。你不用每天都充滿信心，你只需要今天撐過去，繼續。你有「差點放棄」的時刻嗎？留言「創業」，我跟你聊。" data-hashtags="#創業女生 #創業故事 #高雄創業 #24歲 #個人工作室 #美容師 #高雄 #左營 #女生保養 #知識型短影音"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">12</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間8點</span></div><div class="c-ttl">24歲想放棄的那個下午我在想什麼</div><div class="insight">不甘心在知道答案前先走，有時比信心更管用</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室內，一個人的靜態低光氛圍</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">24歲那個下午，我差點把工作室的合約終止掉。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">連著幾週客人少、存款在減，我每天開門、等、關門。那個下午特別難熬，坐在裡面很認真想，這事還要繼續多久。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">那種坐在裡面等但不知道在等什麼的感覺，我也有過</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">想了很多。想我為什麼從嘉義跑來高雄，想回去是不是輕鬆，想這事值不值得搭進去。然後我想：我如果現在放，連自己能不能做到都不知道。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">那個想法讓我多坐了一會兒。我沒有突然充滿鬥志，就是不甘心在知道答案前先走。然後月底，情況開始有點不一樣。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">不甘心在知道答案前先走——天啊這句話我需要截圖</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">你不用每天都充滿信心。你只需要今天撐過去，繼續。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">你有這種「差點放棄」的時刻嗎？留言「創業」，我跟你聊。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「我連知道自己能不能做到都不知道」/「你只需要今天撐過去，然後繼續」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">勵志感鋼琴，輕不沉重</div></div></div><div class="hashtag-pool"><span class="hashtag">#創業女生</span><span class="hashtag">#創業故事</span><span class="hashtag">#高雄創業</span><span class="hashtag">#24歲</span><span class="hashtag">#個人工作室</span><span class="hashtag">#美容師</span><span class="hashtag">#高雄</span><span class="hashtag">#左營</span><span class="hashtag">#女生保養</span><span class="hashtag">#知識型短影音</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>創業</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article>
+<article class="card t-story" data-cat="" id="wendi13" data-caption="清粉刺是對的，但如果清了很久粉刺還反覆回來，那不是粉刺的問題，是你只做了一半。粉刺反不反覆，跟三件事有關：清潔方式對不對、清爽保養有沒有顧到、生活習慣——睡眠、飲食、壓力。只清表面，平常保養方向才是長期關鍵。日常保養比你想的要再整體一點。留言「保養」，我跟你聊聊怎麼調。" data-hashtags="#粉刺 #油痘肌 #毛孔 #保養 #護膚 #肌膚保養 #保養科普 #美容知識 #保養Tips #高雄"><div class="bar"></div><div class="card-head" onclick="toggleCard(this)"><div class="no">13</div><div class="c-meta"><span class="pill ig">IG Reels</span><span class="pill tk">TikTok</span><span class="pill time">平日晚間7-8點</span></div><div class="c-ttl">你以為清粉刺就夠了問題出在這</div><div class="insight">清粉刺只是開始，日常保養習慣才是長期關鍵</div><div class="more">展開完整腳本</div></div><div class="card-body"><div class="scene">📍 工作室護膚檯，知識型教學氛圍</div><div class="tl"><div class="row"><div class="ts">0-3s<br>Hook</div><div class="rc"><div class="ln">你以為清粉刺就夠了？問題出在這。</div></div></div><div class="row"><div class="ts">3-12s<br>破題</div><div class="rc"><div class="ln">清粉刺是對的，但如果清了很久粉刺還反覆回來，那不是粉刺的問題，是你只做一半。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">清了很久還是反覆長？等等這不是我嗎</span></div></div></div><div class="row"><div class="ts">12-25s<br>核心</div><div class="rc"><div class="ln">粉刺反不反覆，其實跟三件日常的事有關：清潔方式對不對、清爽保養有沒有顧到、生活習慣——睡眠、飲食、壓力。只清表面每次都處理當下，平常保養方向才是長期關鍵。</div></div></div><div class="row"><div class="ts">25-40s<br>故事轉折</div><div class="rc"><div class="ln">我最常聽到的一句話是：「清完馬上又長。」很多時候是因為只顧清，平常保養習慣跟作息沒一起照顧。</div><div class="mirror"><span class="mc">🎭 藏鏡人</span><span class="mt">清完馬上又長回來，我就是這樣，聽到這句就想哭</span></div></div></div><div class="row"><div class="ts">40-52s<br>收束金句</div><div class="rc"><div class="ln">清粉刺是需要的，但不是全部。日常保養比你想的還要再整體一點。</div></div></div><div class="row"><div class="ts">52-60s<br>CTA</div><div class="rc"><div class="ln">留言「保養」，我跟你聊聊日常保養方向可以怎麼調。</div></div></div></div><div class="meta-grid"><div class="minfo"><div class="k">字幕卡</div><div class="v">「你只做了一半」/「清粉刺不是全部」</div></div><div class="minfo"><div class="k">BGM</div><div class="v">輕快清楚的 acoustic，帶知識感</div></div><div class="minfo"><div class="k">合規自查</div><div class="v">三件事拆解（皮脂分泌/角質代謝/生活習慣）= 教育性成因說明，非宣稱服務效能；「調整保養習慣和作息」非「調節體內/消炎」；無根治/保證/治療</div></div></div><div class="hashtag-pool"><span class="hashtag">#粉刺</span><span class="hashtag">#油痘肌</span><span class="hashtag">#毛孔</span><span class="hashtag">#保養</span><span class="hashtag">#護膚</span><span class="hashtag">#肌膚保養</span><span class="hashtag">#保養科普</span><span class="hashtag">#美容知識</span><span class="hashtag">#保養Tips</span><span class="hashtag">#高雄</span></div><div class="c-foot"><div class="c-cta">CTA 關鍵字：<b>保養</b></div><button class="copy" onclick="copyCaption(this)">複製文案</button></div></div></article></div></section>
+<section class="thread-sec collapsed" id="threadsec"><div class="sec-ttl" onclick="toggleThreads()"><span class="ico">🧵</span><h2>Threads 脆文</h2><small>7 篇 · 可直接複製貼文</small><span class="ts-toggle">▾</span></div><div class="threads"><div class="th-card" data-hashtags="#創業女生 #高雄創業"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #01 工作室那天</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">有時候最孤單的不是沒人，是你做了個沒人懂的決定，然後自己扛著走。
+
+我24歲來高雄開工作室那天，一個人搬進去，鑰匙放口袋，站門口想了超久。
+
+不是感動，是真的不確定接下來怎麼辦。
+
+但就是沒有回去。
+
+你有沒有做過「還沒把握但還是做」的決定？</div><div class="th-hash">#創業女生 #高雄創業</div></div>
+<div class="th-card" data-hashtags="#創業故事 #媽媽"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #02 媽媽是第一個客人</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">我媽從沒叫我回去，她選擇來找我。
+
+飛來高雄，成了我第一個客人。
+
+她不懂美容，也不是真的需要做臉，但她讓我做完整流程。
+
+做完她說：「這個我做了有感覺，你繼續做。」
+
+那句話比什麼鼓勵都實際。
+
+你身邊有這種人嗎？那種不說大道理，只出現然後讓你繼續走的人。</div><div class="th-hash">#創業故事 #媽媽</div></div>
+<div class="th-card" data-hashtags="#鄧紫棋 #創業女生"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #04 鄧紫棋演唱會</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">有人問我為什麼喜歡鄧紫棋，我說因為她讓我覺得不完美也可以走下去。
+
+她說她也有很多次以為要放棄，但走了這麼遠，回頭沒有意義。
+
+我在台下聽到這句話的時候，想的不是她，是我自己。
+
+那一刻我決定，不管多難，我的工作室不關。
+
+有沒有一個人，一段話，讓你撐過了某個關卡？</div><div class="th-hash">#鄧紫棋 #創業女生</div></div>
+<div class="th-card" data-hashtags="#自媒體經營 #創業故事"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #07 自媒體翻車</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">我翻車三次的心得：
+
+第一次，做很好的內容，沒人看。學到：方向比品質先。
+
+第二次，照爆款格式做，我自己都看不下去。學到：不像你的內容損耗信任。
+
+第三次，突然換風格走勵志，掉粉。學到：你是誰比想做什麼更重要。
+
+三次翻車，等於花錢上三堂課，CP值還不錯。
+
+你做自媒體翻過車嗎？</div><div class="th-hash">#自媒體經營 #創業故事</div></div>
+<div class="th-card" data-hashtags="#保養 #護膚"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #10 保養焦慮</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">你有沒有這種感覺：
+
+明明很累，還是要把整套做完，不做會不安。
+
+我遇到很多這樣的狀況，保養變成焦慮管理，不是真的照顧皮膚，是找一件可以控制的事。
+
+好的保養習慣是讓你休息，不是多一件要完成的事。
+
+你的保養習慣，是照顧皮膚還是安慰自己？</div><div class="th-hash">#保養 #護膚</div></div>
+<div class="th-card" data-hashtags="#嘉義人 #離家創業"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #11 嘉義雞湯</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">離開嘉義時，有人問：「不想家嗎？」
+
+我說還好。
+
+其實是撒謊。
+
+只是不知道從哪說起，不知道「想家」對我是什麼。
+
+後來慢慢明白，那不是因為生活不好，而是你把某個地方帶身上了，不需要每天想，但就在那裡。
+
+你有帶身上的地方嗎？</div><div class="th-hash">#嘉義人 #離家創業</div></div>
+<div class="th-card" data-hashtags="#創業女生 #高雄創業"><div class="th-top"><div class="av"><img src="wendi-qver.png" alt="溫蒂"></div><div class="nm">溫蒂<small>衍生自 #12 差點放棄</small></div></div><button class="th-copy" onclick="copyThread(this)">複製</button><div class="tx">你不需要每天都充滿信心。
+
+我24歲差點終止合約那個下午，沒什麼力量，也沒什麼頓悟。
+
+我就想到一件事：我如果現在走，連自己能不能做到都不知道。
+
+然後我就繼續坐著。
+
+不甘心，有時比信心有用。</div><div class="th-hash">#創業女生 #高雄創業</div></div></div></section>
+<footer class="foot"><div class="by">溫蒂的腳本庫 · WENDY</div>
+<div>高雄左營 · 油痘肌調理師 ｜ 體內 + 體外同時調理</div></footer>
+</div>
+<script>
+function toggleGroup(id){document.getElementById(id).classList.toggle('collapsed')}
+function toggleThreads(){document.getElementById('threadsec').classList.toggle('collapsed')}
+function toggleCard(head){head.closest('.card').classList.toggle('open')}
+function _copyText(text,btn,okLabel,defLabel){
+  function done(){btn.textContent=okLabel;btn.classList.add('done');setTimeout(function(){btn.textContent=defLabel;btn.classList.remove('done')},1600)}
+  function fb(){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.top='-9999px';document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){ok=false}document.body.removeChild(ta);if(ok){done()}else{btn.textContent='請長按手動複製';setTimeout(function(){btn.textContent=defLabel},1800)}}
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(done).catch(fb)}else{fb()}
+}
+function copyCaption(btn){var c=btn.closest('.card');var cap=c.getAttribute('data-caption')||'';var h=c.getAttribute('data-hashtags')||'';if(!cap){var old=btn.textContent;btn.textContent='本批無文案';setTimeout(function(){btn.textContent='複製文案'},1600);return}_copyText((cap+'\n\n'+h).trim(),btn,'已複製 ✓','複製文案')}
+function copyThread(btn){var c=btn.closest('.th-card');var tx=c.querySelector('.tx').innerText;var h=c.getAttribute('data-hashtags')||'';_copyText((tx+(h?'\n\n'+h:'')).trim(),btn,'已複製 ✓','複製')}
+</script>
+</body>
+</html>

@@ -56,7 +56,15 @@ OWNER_MAP = {
     'kenny.html':            {'build': 'build_all.py',       'prefix': 'kenny-'},
     'bappu-cc/index.html':   {'build': 'build_bappu.py',     'prefix': 'bappu-'},
     'shihting.html':         {'build': 'build_shihting.py',  'prefix': 'shihting-'},
+    'wendi.html':            {'build': 'build_wendi.py',     'prefix': 'wendi-'},
 }
+
+# 已對齊 v2 完整功能（caption/hashtag/複製文案/data-caption）的業主
+# — check 7/8 對這清單做功能驗證（未列入者尚未 migrate，跳過避免誤攔）
+# 註：shihting 有 1 個非標準 article（無 caption，性質待確認）→ 強制「每卡必有 caption」
+# 不適用，故不納入嚴格 check 8；待 shihting 第 14 卡確認後另議（Codex P1 採部分）
+V2_OWNERS_HTML = ['index.html', 'wendi.html']
+V2_OWNERS_BUILD = ['build_index.py', 'build_wendi.py']
 
 
 # === 工具 ===
@@ -319,9 +327,18 @@ def check_6_threads_grid_css():
 
         content = html_path.read_text(encoding='utf-8', errors='replace')
 
-        # 只驗有 threads-grid 的 html
+        # 便當格業主（溫蒂）用 .thread-sec.collapsed .threads 收合脆文（非 threads-grid）
         if 'threads-grid' not in content:
-            log(f'  ℹ {html_rel}: 無 threads-grid，跳過')
+            if 'thread-sec' in content:
+                bento_rule = '.thread-sec.collapsed .threads'
+                if bento_rule in content:
+                    log(f'  ✅ {html_rel}: thread-sec 脆文收合 CSS rule 存在')
+                else:
+                    msg = f'❌ {html_rel}: 有 thread-sec 但缺 {bento_rule} 收合 CSS rule'
+                    log(f'  {msg}')
+                    fails.append(msg)
+            else:
+                log(f'  ℹ {html_rel}: 無 threads-grid / thread-sec，跳過')
             continue
 
         # shihting.html 用獨立 threads-section 結構，檢查等效 rule
@@ -341,58 +358,63 @@ def check_6_threads_grid_css():
 
 
 def check_7_build_v2_keywords():
-    """檢查 7：build_*.py 含 v2 keyword（若已 migrate 到 v2 標竿）
-    僅驗 build_index.py（瑞祥 = v2 標竿）
-    其他業主尚未 migrate，跳過
+    """檢查 7：v2 業主 build_*.py 含核心功能 keyword（業主無關，驗功能非綁標竿實作）
+    僅驗 V2_OWNERS_BUILD 清單（已 migrate v2：build_index 標竿 + build_wendi 便當格）；
+    其他業主尚未 migrate，跳過避免誤攔
     """
-    log('=== Check 7：build_*.py v2 keyword 命中 ===')
+    log('=== Check 7：build_*.py v2 功能 keyword 命中 ===')
     fails = []
-    V2_KEYWORDS = ['hashtag-pool', 'platform=', 'po_time=', 'caption=',
-                   'threads-grid', 'copyScript']
+    # 業主無關功能 keyword（標竿 rux_article 與便當格 build_wendi 都涵蓋此 5 功能）
+    # caption=複製文案資料 / hashtag=標籤 / mirror=藏鏡人 / copy=複製函式 / collapsed=收合
+    V2_FUNC = ['caption', 'hashtag', 'mirror', 'copy', 'collapsed']
 
-    # 只驗 build_index.py（v2 標竿）
-    build_path = LIB / 'build_index.py'
-    if not build_path.exists():
-        log('  ℹ build_index.py 不存在，跳過')
-        return fails
-
-    content = build_path.read_text(encoding='utf-8', errors='replace')
-    found = [kw for kw in V2_KEYWORDS if kw in content]
-    if len(found) >= 3:
-        log(f'  ✅ build_index.py v2 keywords 命中 {len(found)}/{len(V2_KEYWORDS)}: {found}')
-    else:
-        msg = f'❌ build_index.py v2 keywords 命中不足（{len(found)}/{len(V2_KEYWORDS)}）: 找到 {found}'
-        log(f'  {msg}')
-        fails.append(msg)
+    for build_name in V2_OWNERS_BUILD:
+        build_path = LIB / build_name
+        if not build_path.exists():
+            log(f'  ℹ {build_name} 不存在，跳過')
+            continue
+        content = build_path.read_text(encoding='utf-8', errors='replace')
+        found = [kw for kw in V2_FUNC if kw in content]
+        if len(found) >= 4:
+            log(f'  ✅ {build_name} v2 功能 keyword 命中 {len(found)}/{len(V2_FUNC)}: {found}')
+        else:
+            msg = f'❌ {build_name} v2 功能 keyword 命中不足（{len(found)}/{len(V2_FUNC)}）: 找到 {found}'
+            log(f'  {msg}')
+            fails.append(msg)
 
     return fails
 
 
 def check_8_article_data_caption():
-    """檢查 8：index.html article 含 data-caption attribute（若 build 已加 caption=）
-    SOP v2 §2.6：複製文案按鈕讀 article.dataset.caption
+    """檢查 8：v2 業主 article 含 data-caption attribute
+    僅驗 V2_OWNERS_HTML 清單（已 migrate v2 的業主：標竿 index + 便當格 wendi）；
+    其他業主尚未 migrate，跳過。SOP v2 §2.6：複製文案按鈕讀 article.dataset.caption
     """
     log('=== Check 8：article data-caption attribute ===')
     fails = []
 
-    # 只驗 index.html（瑞祥 v2 標竿，其他業主尚未 migrate）
-    html_path = LIB / 'index.html'
-    if not html_path.exists():
-        log('  ℹ index.html 不存在，跳過')
-        return fails
+    # 驗所有 v2 業主（標竿 index + 便當格 wendi）；未 migrate 業主不在清單，跳過
+    for html_rel in V2_OWNERS_HTML:
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            log(f'  ℹ {html_rel} 不存在，跳過')
+            continue
 
-    content = html_path.read_text(encoding='utf-8', errors='replace')
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+        # 防 HTML 註解內的 <article 被誤計（defense-in-depth）
+        content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
 
-    # 計算有 data-caption 的 article
-    cap_count = len(re.findall(r'<article[^>]*data-caption="[^"]+', content))
-    total_count = len(re.findall(r'<article class="card"', content))
+        # 計算有 data-caption 的 article（regex 涵蓋 class="card ..." 含 tone 變體）
+        cap_count = len(re.findall(r'<article[^>]*data-caption="[^"]+', content))
+        total_count = len(re.findall(r'<article[\s>]', content))
 
-    if cap_count == 0:
-        msg = f'❌ index.html: 0/{total_count} article 有 data-caption（build 未加 caption=？）'
-        log(f'  {msg}')
-        fails.append(msg)
-    else:
-        log(f'  ✅ index.html: {cap_count}/{total_count} article 有 data-caption')
+        # SOP §2.6：每卡都要有 data-caption（複製文案資料源），不是「至少一卡」
+        if cap_count < total_count:
+            msg = f'❌ {html_rel}: 只有 {cap_count}/{total_count} article 有 data-caption（每卡必有，SOP §2.6 不可放水）'
+            log(f'  {msg}')
+            fails.append(msg)
+        else:
+            log(f'  ✅ {html_rel}: {cap_count}/{total_count} article 全有 data-caption')
 
     return fails
 

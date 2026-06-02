@@ -3,6 +3,7 @@ ps_test.py
 __pycache__/
 *.bak
 *.bak_*
+*.bak2*
 # 範本系統 per-owner 衍生推薦輸出（template_retriever 可重生，不版控 — review ARCH-03）
 template_recommendations_*.yaml
 template_recommendations_*.md

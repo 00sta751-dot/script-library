@@ -139,6 +139,31 @@ def gp_group_v2(key, label, arts, collapsed=True):
         '</div>'
     )
 
+def date_group_bappu(batch_label, gid, arts, collapsed=True):
+    """C-016 日期分組：group head 只顯示批次日期，不含派系名。
+    batch_label 格式：「第 NN 批 · YYYY-MM-DD」
+    使用叭噗既有 DOM class（.gp / .gh / .gc / .gx / .gb），check_12 可正確抓到。
+    """
+    inner = '\n'.join(arts)
+    cnt = str(len(arts))
+    cclass = 'gp collapsed' if collapsed else 'gp'
+    label_e = esc_text(batch_label)
+    return (
+        '\n<!-- date-group-' + gid + ' -->\n'
+        '<div class="' + cclass + '" data-g="' + gid + '">\n'
+        '<div class="gh" onclick="toggleGroup(this.parentElement)">\n'
+        '  <div class="gt">\n'
+        '    <span class="gc">' + label_e + '</span>\n'
+        '    <span class="gx">' + cnt + ' 部</span>\n'
+        '  </div>\n'
+        '  <span class="gy">▼</span>\n'
+        '</div>\n'
+        '<div class="gb">\n\n' +
+        inner + '\n\n'
+        '</div>\n'
+        '</div>'
+    )
+
 print('build_bappu.py v2 loaded OK')
 print('LIB:', LIB)
 
@@ -494,64 +519,11 @@ threads_section = (
 print('Threads section built OK')
 
 # ============================================================
-# Assemble v2 groups (cross-batch merge)
-# SOP §6.1 派系合併規則：派系相同跨批合一個 section
-# 第04批 b04_by_pie 動態合入各既有 group
+# Assemble v3 groups — 日期分組（C-016 + check_12 對齊）
+# 每批一個 date_group，最新批次最上，不分派系，卡片 --pie 色保留
 # ============================================================
 
-# 故事戲劇派（02批 4部 + 03批 3部 + 04批 動態合入）
-# 04批 04_07/04_08/04_10 = 故事戲劇派（04_07 待圖卡，img=None 已由 yaml_to_sc 處理）
-gA = gp_group_v2('A', '故事戲劇派',
-    [b02_01, b02_03, b02_04, b02_05, b03_01, b03_09, b03_10]
-    + _b04_by_pie.get('故事戲劇派', []))
-
-# 人間觀察派（02批 6部 + 03批 3部 + 04批 動態合入）
-# 04批 04_09/04_13 = 人間觀察派
-gB = gp_group_v2('B', '人間觀察派',
-    [b02_02, b02_07, b02_08, b02_09, b02_19, b02_20, b03_02, b03_11]
-    + _b04_by_pie.get('人間觀察派', []))
-
-# 拆解派（02批 2部 + 03批 1部）— 04批無此派系
-gD = gp_group_v2('D', '拆解派', [b02_12, b02_13, b03_08])
-
-# 自嘲反差派（02批 2部 + 03批 1部 + 04批 動態合入）
-# 04批 04_11 = 自嘲反差派
-gF = gp_group_v2('F', '自嘲反差派',
-    [b02_10, b02_11, b03_07]
-    + _b04_by_pie.get('自嘲反差派', []))
-
-# 家人朋友模擬派（02批 2部）— 04批無此派系
-gC = gp_group_v2('C', '家人朋友模擬派', [b02_14, b02_15])
-
-# 直球情侶版 / 直球派（02批 4部 + 03批 2部 + 04批 動態合入）
-# 04批 04_12 = 直球派（label 連接既有「直球情侶版」SOP §6.1 相近派系用 / 連接）
-gG = gp_group_v2('G', '直球情侶版 / 直球派',
-    [b02_16, b02_17, b02_18, b03_12, b03_13]
-    + _b04_by_pie.get('直球派', []))
-
-# 圖卡部（02批 1部 + 03批 1部 + 04批 04_07 釣魚部圖卡）
-gH = gp_group_v2('H', '圖卡部',
-    [b02_06, b03_04_card]
-    + _b04_by_pie.get('圖卡部', []))
-
-# 模板L_知識反差（04批新增 — 6部）
-# 02/03批無此派系，04批獨立新建 group
-gL = gp_group_v2('L', '模板L_知識反差',
-    _b04_by_pie.get('模板L_知識反差', []))
-
-# 印 group 部數供驗證
-print(f'gA 故事戲劇派: {len([b02_01, b02_03, b02_04, b02_05, b03_01, b03_09, b03_10] + _b04_by_pie.get("故事戲劇派", []))} 部')
-print(f'gB 人間觀察派: {len([b02_02, b02_07, b02_08, b02_09, b02_19, b02_20, b03_02, b03_11] + _b04_by_pie.get("人間觀察派", []))} 部')
-print(f'gD 拆解派: 3 部')
-print(f'gF 自嘲反差派: {len([b02_10, b02_11, b03_07] + _b04_by_pie.get("自嘲反差派", []))} 部')
-print(f'gC 家人朋友模擬派: 2 部')
-print(f'gG 直球情侶版/直球派: {len([b02_16, b02_17, b02_18, b03_12, b03_13] + _b04_by_pie.get("直球派", []))} 部')
-print(f'gH 圖卡部: {len([b02_06, b03_04_card] + _b04_by_pie.get("圖卡部", []))} 部')
-print(f'gL 模板L_知識反差: {len(_b04_by_pie.get("模板L_知識反差", []))} 部')
-_b04_total_merged = sum(len(_b04_by_pie.get(p, [])) for p in ['故事戲劇派','人間觀察派','自嘲反差派','直球派','模板L_知識反差','圖卡部'])
-print(f'04批已合入 {_b04_total_merged}/13 部')
-
-# 04 批未消費派系防護（Codex×3 P0 corrective action 5/21 PM）
+# 04 批未消費派系防護（Codex×3 P0 corrective action 5/21 PM — 保留不動）
 B04_ALLOWED_PIES = {'故事戲劇派', '人間觀察派', '自嘲反差派', '直球派', '模板L_知識反差', '圖卡部'}
 _b04_actual_pies = set(_b04_by_pie.keys())
 _b04_unused = _b04_actual_pies - B04_ALLOWED_PIES
@@ -570,7 +542,26 @@ assert _b04_guard_total == EXPECTED_COUNT_04, (
 _b04_actual_pie_count = len(_b04_actual_pies)
 print(f'✅ 04 批防護 PASS: {_b04_actual_pie_count} 派系 / {EXPECTED_COUNT_04} 部 / 0 silent drop')
 
-all_groups = '\n'.join([gA, gB, gD, gF, gC, gG, gH, gL, threads_section])
+# 彙整各批次所有文章（不分派系）
+_b02_all = [b02_01, b02_02, b02_03, b02_04, b02_05, b02_06,
+            b02_07, b02_08, b02_09, b02_10, b02_11, b02_12,
+            b02_13, b02_14, b02_15, b02_16, b02_17, b02_18,
+            b02_19, b02_20]
+_b03_all = [b03_01, b03_02, b03_04_card, b03_07, b03_08,
+            b03_09, b03_10, b03_11, b03_12, b03_13]
+# 04批：所有派系合入（保留卡片顏色，不分 group）
+_b04_all = []
+for _pie in ['故事戲劇派', '人間觀察派', '自嘲反差派', '直球派', '模板L_知識反差', '圖卡部']:
+    _b04_all += _b04_by_pie.get(_pie, [])
+
+# 日期分組（最新最上）
+g_b04 = date_group_bappu(BATCH_04, 'batch-04', _b04_all, collapsed=True)
+g_b03 = date_group_bappu(BATCH_03, 'batch-03', _b03_all, collapsed=True)
+g_b02 = date_group_bappu(BATCH_02, 'batch-02', _b02_all, collapsed=True)
+
+print(f'✅ 日期分組: 第04批={len(_b04_all)} 部 / 第03批={len(_b03_all)} 部 / 第02批={len(_b02_all)} 部')
+
+all_groups = '\n'.join([g_b04, g_b03, g_b02, threads_section])
 
 # ============================================================
 # Write to bappu-cc/index.html
@@ -586,7 +577,10 @@ if first_gp < 0:
 main_wrap_close = c.find('</div><!-- .main-wrap -->')
 print(f'bappu: first_gp={first_gp}, main_wrap_close={main_wrap_close}')
 
-nc = c[:first_gp] + all_groups + '\n\n' + c[main_wrap_close:]
+# P2 清理：移除 c[:first_gp] 段中殘留的舊 <!-- group-X --> 格式 HTML 註解
+import re as _re
+_prefix = _re.sub(r'\n?<!--\s*group-[A-Za-z]\s*-->', '', c[:first_gp])
+nc = _prefix + all_groups + '\n\n' + c[main_wrap_close:]
 
 # ---- V2 CSS patch ----
 V2_CSS_MARKER = '/* ========== V2 GROUP COLLAPSED + copyScript (build_bappu.py v2) ========== */'
@@ -843,46 +837,20 @@ if MODE == 'yaml':
     for _pie, _arts in sorted(_new_by_pie.items()):
         print(f'  {_pie}: {len(_arts)} 部')
 
-    # 派系 → group 對應表（對齊現有叭噗 group 結構）
-    BAPPU_PIE_TO_GROUP = {
-        '故事戲劇派': 'gA',
-        '人間觀察派': 'gB',
-        '拆解派':     'gD',
-        '自嘲反差派': 'gF',
-        '家人朋友模擬派': 'gC',
-        '直球派':     'gG', '直球情侶版': 'gG',
-        '圖卡部':     'gH',
-        '模板L_知識反差': 'gL',
-    }
+    # yaml-driven 新批次：建一個新的日期 group，插到最前（最新最上）
+    _new_all_arts = []
+    for _pie_arts in _new_by_pie.values():
+        _new_all_arts += _pie_arts
+    _new_batch_gid = 'batch-' + re.sub(r'[^0-9]', '', _new_batch_label)[:6]
+    _g_new_batch = date_group_bappu(_new_batch_label, _new_batch_gid, _new_all_arts, collapsed=True)
+    print(f'  新批次 date_group: gid={_new_batch_gid}, 共 {len(_new_all_arts)} 部')
 
-    def _inject_bappu_group(group_html: str, new_arts: list) -> str:
-        """在 group <div class="gb">...\n\n</div>\n</div> 前插入新 articles"""
-        inject_html = '\n'.join(new_arts)
-        close_seq = '\n\n</div>\n</div>'
-        last_close = group_html.rfind(close_seq)
-        if last_close < 0:
-            return group_html + '\n' + inject_html
-        return group_html[:last_close] + '\n' + inject_html + group_html[last_close:]
-
-    _extra_bappu_groups = []
-    for _pie, _arts in _new_by_pie.items():
-        _gvar = BAPPU_PIE_TO_GROUP.get(_pie, '')
-        if _gvar and _gvar in globals():
-            globals()[_gvar] = _inject_bappu_group(globals()[_gvar], _arts)
-            print(f'  {_pie} → 注入 {_gvar} ({len(_arts)} 部)')
-        else:
-            # 未知派系 → 獨立新 group
-            _new_grp = gp_group_v2(str(len(_extra_bappu_groups) + 90), _pie, _arts)
-            _extra_bappu_groups.append(_new_grp)
-            print(f'  {_pie} → 新建 group ({len(_arts)} 部)')
-
-    # 重組 all_groups（含 inject 後）並重寫 HTML
+    # 重組 all_groups（新批次最上，既有批次保留）
     all_groups_new = '\n'.join([
-        globals()['gA'], globals()['gB'], globals()['gD'],
-        globals()['gF'], globals()['gC'], globals()['gG'],
-        globals()['gH'], globals()['gL'],
+        _g_new_batch,
+        globals()['g_b04'], globals()['g_b03'], globals()['g_b02'],
         threads_section
-    ] + _extra_bappu_groups)
+    ])
 
     # 重新替換 HTML（讀最新已寫入的 bappu-cc/index.html）
     with open(bappu_path, 'r', encoding='utf-8') as _f:
@@ -906,5 +874,8 @@ dl_count = len(re.findall(r'<a class="download-btn"', nc))
 print(f'download-btn count: {dl_count}')
 assert len(arts) >= 20, f'Expected >= 20 articles, got {len(arts)}'
 assert dl_count >= 1, f'Expected >= 1 download-btn, got {dl_count}'
-assert 'data-g="H"' in nc, 'Missing group H (圖卡部)'  # C-016: 不驗字面派系名，改驗 group key
+# v3 日期分組：驗 batch-04/batch-03/batch-02 group 存在（取代舊 data-g="H" 驗證）
+assert 'data-g="batch-04"' in nc, 'Missing date group batch-04'
+assert 'data-g="batch-03"' in nc, 'Missing date group batch-03'
+assert 'data-g="batch-02"' in nc, 'Missing date group batch-02'
 print('All assertions PASS')

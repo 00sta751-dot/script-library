@@ -34,6 +34,26 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+# ── P1-③：從 validate_deploy 共用 FACTION_LEAK_WORDS（單一真理源）──
+try:
+    _VD_DIR = Path(__file__).resolve().parent
+    if str(_VD_DIR) not in sys.path:
+        sys.path.insert(0, str(_VD_DIR))
+    from validate_deploy import FACTION_LEAK_WORDS as _FACTION_LEAK_WORDS
+    _FACTION_IMPORT_OK = True
+except Exception as _fe:
+    # fallback：import 失敗時保留舊清單，守門不失效
+    _FACTION_IMPORT_OK = False
+    _FACTION_LEAK_WORDS = [
+        "直球派", "嗆辣派", "市場觀察派", "人間觀察派", "故事戲劇派",
+        "拆解派", "結構分析派", "自嘲反差派", "圖卡部", "老前輩權威派",
+        "時事追擊派", "綜合派", "模板L_知識反差", "家人朋友模擬派",
+        "直球情侶版", "純雞湯", "直球揭秘",
+        "修平派", "Erika", "毒舌正能量", "釣魚部",
+        "模板L", "模板A", "模板G",
+        "字幕卡", "流量密碼",
+    ]
+
 # ── normalize_script_to_canonical（yaml_to_sc.py v3）──
 # 接 canonical 讀腳本，供 V2-025/V2-026 使用
 # 若 import 失敗（例如路徑問題），check 會自動 WARN 不 FAIL
@@ -1207,20 +1227,9 @@ def _load_template_index_ids() -> Optional[set]:
     return ids
 
 
-# ── 派系名洩漏關鍵詞清單（C-016）──
-# 內部 yaml 欄位（faction/派系）不在此，只掃 HTML 可見輸出層
-_FACTION_LEAK_WORDS = [
-    # 派系名
-    "直球派", "嗆辣派", "市場觀察派", "人間觀察派", "故事戲劇派",
-    "拆解派", "結構分析派", "自嘲反差派", "圖卡部", "老前輩權威派",
-    "時事追擊派", "綜合派", "模板L_知識反差", "家人朋友模擬派",
-    "直球情侶版", "純雞湯", "直球揭秘",
-    # 製作方法洩漏詞（SOP 用語）
-    "修平派", "Erika", "毒舌正能量", "釣魚部",
-    "模板L", "模板A", "模板G",
-    # SOP 結構詞（若出現在 HTML 可見文字即洩漏）
-    "字幕卡", "流量密碼",
-]
+# ── 派系名洩漏關鍵詞清單（C-016）——單一真理源來自 validate_deploy.FACTION_LEAK_WORDS ──
+# P1-③：已於頂部 import，_FACTION_LEAK_WORDS 指向 validate_deploy 共用清單（或 fallback）
+# 此處不再維護本地清單，修改派系清單請至 validate_deploy.py FACTION_LEAK_WORDS
 
 # owner → HTML 檔名
 _OWNER_HTML_MAP = {

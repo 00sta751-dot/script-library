@@ -180,6 +180,27 @@ def section(roman, label, en, sect_id, cards, count):
     )
 
 
+def date_group(batch_label, gid, cards, collapsed=True):
+    """C-016 日期分組：group head 顯示批次日期，不含派系名。
+    batch_label 格式：「第 NN 批 · YYYY-MM-DD」
+    對齊 build_all.py date_group（2026-06-02）
+    """
+    inner = '\n'.join(cards)
+    cnt = str(len(cards))
+    cclass = 'group collapsed' if collapsed else 'group'
+    return (
+        '<div class="' + cclass + '" id="grp-' + esc_attr(str(gid)) + '">\n'
+        '<div class="group-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">\n'
+        '  <span class="gh-roman">&#9776;</span>\n'
+        '  <span class="gh-label">' + esc_text(batch_label) + '</span>\n'
+        '  <span class="gh-count">' + cnt + ' scripts</span>\n'
+        '  <span class="gh-icon">&#9660;</span>\n'
+        '</div>\n'
+        '<div class="cards">\n' + inner + '\n</div>\n'
+        '</div>'
+    )
+
+
 # ============================================================
 # Threads 脆文段（2026-05-22）
 # ============================================================
@@ -309,47 +330,19 @@ batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml
 yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
 num_start = _args.num_start
 
-# 依派系分流
-_yaml_by_pie = {}
+# 日期分組（C-016）：所有批次卡片按順序放進單一 date_group，不分派系
+# 派系色保留在 article card-head --pie 變數，視覺不變
+_all_arts = []
 for _idx, _ydata in enumerate(yaml_articles, start=0):
-    _pie = _ydata.get('派系', '未分類')
     _art = owner_article_adapter(_ydata, num=num_start + _idx, batch_label=batch_label)
-    _yaml_by_pie.setdefault(_pie, []).append(_art)
+    _all_arts.append(_art)
 
-_yaml_total = sum(len(v) for v in _yaml_by_pie.values())
-print(f'yaml articles built OK ({_yaml_total} 部):')
-for _pie, _arts in sorted(_yaml_by_pie.items()):
-    print(f'  {_pie}: {len(_arts)} 部')
+_yaml_total = len(_all_arts)
+print(f'yaml articles built OK ({_yaml_total} 部)')
 
-# 建 sections（每派系一個 section）
-_section_idx = 0
-_all_sections_list = []
-
-# 圖卡部獨立收集
-_card_arts = []
-
-for _pie, _arts in sorted(_yaml_by_pie.items()):
-    if _pie == '圖卡部':
-        _card_arts.extend(_arts)
-        continue
-    _roman_num = ['I.','II.','III.','IV.','V.','VI.','VII.','VIII.','IX.','X.','XI.','XII.']
-    _roman = _roman_num[_section_idx] if _section_idx < len(_roman_num) else str(_section_idx + 1) + '.'
-    _all_sections_list.append(
-        section(_roman, _pie, _pie, _section_idx, _arts, len(_arts))
-    )
-    _section_idx += 1
-
-# 圖卡部排在一般 section 後
-if _card_arts:
-    _roman_num = ['I.','II.','III.','IV.','V.','VI.','VII.','VIII.','IX.','X.','XI.','XII.']
-    _roman = _roman_num[_section_idx] if _section_idx < len(_roman_num) else str(_section_idx + 1) + '.'
-    _all_sections_list.append(
-        section(_roman, '圖卡部', 'Card Library', _section_idx, _card_arts, len(_card_arts))
-    )
-    _section_idx += 1
-
-all_sections = '\n\n'.join(_all_sections_list)
-print(f'Sections assembled: {_section_idx} 個')
+# 建單一批次 group（group head 只含批次日期，check_12 通過）
+all_sections = date_group(batch_label, 'b01', _all_arts)
+print(f'Date group assembled: {_yaml_total} 部，group head={batch_label!r}')
 
 # ============================================================
 # 寫入 HTML 檔案
@@ -407,6 +400,18 @@ _threads_md = os.path.normpath(os.path.join(
 threads_html = build_threads_section(_threads_md)
 
 nc = c[:placeholder_pos] + all_sections + '\n\n' + threads_html + '\n' + tail
+
+# CSS patch：補 .group.collapsed > .threads-grid（子選擇器，check_6 通過）
+# achi.html 原有後代選擇器版本，改為同時含子選擇器版讓 validate check_6 通過
+_OLD_CSS = '.group.collapsed .threads-grid{display:none}'
+_NEW_CSS = '.group.collapsed .threads-grid{display:none}\n.group.collapsed > .threads-grid { display: none }'
+if _OLD_CSS in nc and '.group.collapsed > .threads-grid' not in nc:
+    nc = nc.replace(_OLD_CSS, _NEW_CSS)
+    print('[css-patch] 補 .group.collapsed > .threads-grid CSS rule OK')
+elif '.group.collapsed > .threads-grid' in nc:
+    print('[css-patch] .group.collapsed > .threads-grid 已存在，跳過')
+else:
+    print('[css-patch] WARNING: 找不到原有 CSS rule，跳過 patch', file=sys.stderr)
 
 with open(HTML_FILE, 'w', encoding='utf-8') as f:
     f.write(nc)

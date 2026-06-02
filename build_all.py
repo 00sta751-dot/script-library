@@ -174,6 +174,25 @@ def group_v2(label, en, gid, cards, collapsed=True):
         '</div>'
     )
 
+def date_group(batch_label, gid, cards, collapsed=True):
+    """C-016 日期分組：group head 顯示批次日期，不含派系名。
+    batch_label 格式：「第 NN 批 · YYYY-MM-DD」
+    """
+    from _html_escape_utils import esc_text, esc_attr
+    inner = '\n'.join(cards)
+    cnt = str(len(cards))
+    cclass = 'group collapsed' if collapsed else 'group'
+    return (
+        '<div class="' + cclass + '" id="grp-' + esc_attr(str(gid)) + '">\n'
+        '<div class="group-header" onclick="toggleGroup(this.parentElement)">\n'
+        '  <span class="group-en">' + esc_text(batch_label) + '</span>\n'
+        '  <span class="group-count">' + cnt + ' 部</span>\n'
+        '  <span class="group-toggle">▼</span>\n'
+        '</div>\n'
+        '<div class="group-body">\n' + inner + '\n</div>\n'
+        '</div>'
+    )
+
 print('build_all.py v4 loaded OK')
 print('LIB:', LIB)
 
@@ -513,8 +532,16 @@ if MODE == 'yaml':
     all_main = '\n\n'.join(_all_groups)
     print('yaml-driven all_main assembled')
 else:
-    # legacy mode（預設）
-    all_main = '\n\n'.join([g_direct, g_human, g_pain, g_story, g_card, g_soul, threads_section])
+    # legacy mode（預設）— C-016 日期分組：第05批全部卡片合為一個日期 group，不分派系
+    # 卡片按原順序排列（直球揭秘→人間觀察→嗆辣→自嘲反差→圖卡部→純雞湯）
+    _b05_all_cards = [k05_09, k05_13,          # 直球揭秘/拆解
+                      k05_01, k05_04, k05_05, k05_06, k05_08,  # 人間觀察
+                      k05_07,                  # 嗆辣
+                      k05_02, k05_10, k05_11,  # 自嘲反差
+                      k05_12_card,             # 圖卡部
+                      k05_03]                  # 純雞湯
+    g_batch05 = date_group(BATCH_05, 'b05', _b05_all_cards)
+    all_main = '\n\n'.join([g_batch05, threads_section])
 
 ok, nc = rp_main(os.path.join(LIB, 'kenny.html'), all_main)
 

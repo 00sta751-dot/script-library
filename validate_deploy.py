@@ -5,7 +5,7 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-11 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件）：
+12 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件 + v4 新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
@@ -21,6 +21,10 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
 11. 藏鏡人獨立泡泡 <div class="mirror"> 計數 HARD BLOCK
     — 每個 html 的 mirror count 必須 >= 該 html 的 article/card 數量
     — 確保 mirror 渲染邏輯正確，不混入台詞字串
+--- v4 新增（2026-06-02 日期分組紅線）---
+12. group head 不得含派系名（中文/英文副名）HARD BLOCK
+    — 白名單：圖卡部/Card Library/脆文/Threads 放行
+    — 正確做法：group head 應含「第N批」或 YYYY-MM-DD 日期
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -49,7 +53,7 @@ except Exception:
 LIB = Path(__file__).parent.resolve()
 LOG_FILE = LIB / '.validate_deploy.log'
 
-# 5 業主 html 對應 build script + 圖卡 prefix
+# 7 業主 html 對應 build script + 圖卡 prefix（2026-06-02 補 achi — 閘門完整性）
 OWNER_MAP = {
     'beauty.html':           {'build': 'build_beauty.py',    'prefix': 'yunzhen-'},
     'index.html':            {'build': 'build_index.py',     'prefix': 'rui-'},
@@ -57,6 +61,7 @@ OWNER_MAP = {
     'bappu-cc/index.html':   {'build': 'build_bappu.py',     'prefix': 'bappu-'},
     'shihting.html':         {'build': 'build_shihting.py',  'prefix': 'shihting-'},
     'wendi.html':            {'build': 'build_wendi.py',     'prefix': 'wendi-'},
+    'achi.html':             {'build': 'build_achi.py',      'prefix': 'achi-'},
 }
 
 # 已對齊 v2 完整功能（caption/hashtag/複製文案/data-caption）的業主
@@ -626,6 +631,267 @@ def check_11_mirror_dom_count():
     return fails
 
 
+# === check 12（日期分組紅線 — 2026-06-02 v2）===
+
+# ---- P1-e：單一 FACTION_LEAK_WORDS 來源（validate_deploy + validate_script_batch 共用）----
+# 動態讀 L0 SOP yaml §7 schools.list[*].name（14 派），union 已知別名
+_L0_SOP_YAML = Path(__file__).resolve().parent.parent.parent.parent / 'L0_跨行業公版' / '_腳本生產SOP_v3.0.yaml'
+
+def _load_faction_names_from_l0() -> list:
+    """從 L0 SOP yaml §7 schools.list 讀 14 派 name（單一真理源）。
+    讀取失敗時 fallback 到 hardcoded 清單（防守門失效）。
+    """
+    try:
+        import yaml as _yaml
+        with open(_L0_SOP_YAML, encoding='utf-8') as _f:
+            _data = _yaml.safe_load(_f)
+        _names = [s['name'] for s in _data.get('schools', {}).get('list', []) if 'name' in s]
+        if len(_names) >= 10:  # 合理性驗
+            return _names
+    except Exception:
+        pass
+    # fallback（L0 yaml 不可讀時守門不失效）
+    return [
+        '直球派', '人間觀察派', '嗆辣派', '雙城合作派', '結構分析派',
+        '老前輩權威派', '時事追擊派', '爆文公式派', '綜合派', '市場觀察派',
+        '故事戲劇派', '自嘲反差派', '拆解派', '家人朋友模擬派',
+    ]
+
+# 14 派 + 業主專屬別名（build script 實際使用的派系名）
+FACTION_LEAK_WORDS: list = (
+    _load_faction_names_from_l0()
+    + [
+        # 業主專屬別名（各 build_*.py 實際出現）
+        '直球情侶版',        # 叭噗 build_bappu
+        '模板L_知識反差',    # 叭噗 build_bappu
+        '直球揭秘',          # 瑞祥 build_index 英文副名對應
+        '純雞湯',            # 老清單殘留
+        '個人化諮詢',        # cta 字串（在 group head 出現即洩漏）
+        '圖卡部',            # 與白名單共存：白名單先判，殘餘再查（圖卡部·嗆辣派 → 殘餘含嗆辣派 FAIL）
+        # 製作字眼（SOP 用語 + 參考來源 — 對齊 validate_script_batch._FACTION_LEAK_WORDS）
+        '修平派', 'Erika',
+        '毒舌正能量', '釣魚部',
+        '模板L', '模板A', '模板G',
+        '字幕卡', '流量密碼',
+        # 英文副名
+        'The Direct Voice', 'Direct Voice', 'Direct Knowledge',
+        'Human Observations', 'Human Obs',
+        'Market Insight',
+        'Story Drama',
+        'Spicy',
+        'Senior Voice',
+        'Trending Now',
+        'Self-Deprecating', 'Self-Irony',
+        'Breakdown',
+        'Structural Analysis',
+        'Soul Food',
+    ]
+)
+
+
+def check_12_no_faction_group_head():
+    """檢查 12：所有業主 html 的 group head 不得出現派系名（中文/英文副名）v2
+    破口清單（2026-06-02 算盤+Codex 雙審）全修版：
+    P0  — 叭噗 DOM 抓對（.gp > .gh > .gc，非卡片內 batch-tag）
+    P1-a — 派系清單動態讀 L0 yaml §7 + union 別名（FACTION_LEAK_WORDS 共用）
+    P1-b — 白名單收緊：移除白名單詞後殘餘不得含派系名
+    P1-c — not heads / has_date=False（非白名單頁）→ FAIL
+    P1-d — 掃 production html/build，不在 OWNER_MAP → FAIL
+    P1-e — 單一 FACTION_LEAK_WORDS 來源（上方常數，validate_script_batch 共用）
+    P2  — _extract_group_heads 正則排除 JS 模板片段（' + labelText + ' 等）
+    """
+    log('=== Check 12：group head 派系名紅線（日期分組標準 v2）===')
+    fails = []
+
+    ALL_FACTIONS = FACTION_LEAK_WORDS  # P1-e 共用
+
+    # ---- 白名單：group head 含這些字 → 移除後才判派系名 ----
+    WHITELIST_SUBSTRINGS = ['圖卡部', 'Card Library', '圖卡', '脆文', 'Threads']
+
+    def _is_whitelisted(text: str) -> bool:
+        """P1-b 修正：真白名單 = WHITELIST_SUBSTRINGS 中有詞 + 移除後殘餘無派系名
+        若完全不含白名單詞（如純文字群組「測試群組」）→ 回 False，不豁免日期要求。
+        範例：「圖卡部·嗆辣派」→ 移除「圖卡部」殘餘「·嗆辣派」含派系名 → False。
+        範例：「圖卡部 Card Library」→ 移除後殘餘乾淨 → True（豁免日期）。
+        """
+        # step 1：不含白名單詞 → 非白名單，直接 False
+        if not any(w in text for w in WHITELIST_SUBSTRINGS):
+            return False
+        # step 2：移除白名單詞後殘餘不含派系名才算真白名單
+        residual = text
+        for w in WHITELIST_SUBSTRINGS:
+            residual = residual.replace(w, '')
+        for faction in ALL_FACTIONS:
+            if faction in residual:
+                return False
+        return True
+
+    _JS_TEMPLATE_PAT = re.compile(
+        r"'\s*\+\s*\w+\s*\+\s*'|"   # ' + varName + '
+        r'"\s*\+\s*\w+\s*\+\s*"|'   # " + varName + "
+        r'`\$\{[^}]+\}`'             # template literal ${...}
+    )
+
+    def _extract_group_heads(html_content: str) -> list:
+        """從 html 中抽取所有 group head 的可見文字（多種格式兼容 + P2 JS 模板排除）"""
+        # P2：先移除 JS <script> 區塊，避免 JS 字串被誤抓為 group head
+        html_no_script = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL)
+
+        heads = []
+
+        # 格式 1：kenny.html — <div class="group-header">...<span class="group-en">X</span>
+        for m in re.finditer(r'<div[^>]+class="group-header"[^>]*>(.*?)</div>', html_no_script, re.DOTALL):
+            block = m.group(1)
+            for sm in re.finditer(r'<span[^>]*class="group-en"[^>]*>([^<]*)</span>', block):
+                t = sm.group(1).strip()
+                if t and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+            for sm in re.finditer(r'<span[^>]*class="group-label"[^>]*>([^<]*)</span>', block):
+                t = sm.group(1).strip()
+                if t and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+
+        # 格式 2：beauty/index/shihting — section-head header 裡的 label span
+        for m in re.finditer(r'<header[^>]+class="[^"]*section-head[^"]*"[^>]*>(.*?)</header>', html_no_script, re.DOTALL):
+            block = m.group(1)
+            for sm in re.finditer(r'<span[^>]*class="label"[^>]*>(.*?)</span>', block, re.DOTALL):
+                t = re.sub(r'<[^>]+>', '', sm.group(1)).strip()
+                if t and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+
+        # 格式 3：wendi — grp-head / sect-head / batch-head div
+        for cls in ('grp-head', 'sect-head', 'batch-head'):
+            for m in re.finditer(r'<div[^>]+class="' + cls + r'"[^>]*>(.*?)</div>', html_no_script, re.DOTALL):
+                text = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+                if text and not _JS_TEMPLATE_PAT.search(text):
+                    heads.append(text)
+
+        # 格式 4（P0 修正）：bappu — .gp > .gh > .gc / .gn（group container 的直接 head）
+        # .gc = group date label（「第 04 批 · 2026-05-21」）或縮寫圖示（「T」for Threads）
+        # .gn = group 名稱（「脆文 Threads」）— Threads 群組用 .gn 作白名單判斷
+        # 過濾 .gc 單字元縮寫（如「T」）— 純圖示 key，不納入分組驗證
+        for m in re.finditer(r'<div[^>]+class="gh"[^>]*>(.*?)</div>', html_no_script, re.DOTALL):
+            block = m.group(1)
+            for sm in re.finditer(r'<span[^>]*class="gc"[^>]*>([^<]*)</span>', block):
+                t = sm.group(1).strip()
+                if t and len(t) > 1 and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+            for sm in re.finditer(r'<span[^>]*class="gn"[^>]*>([^<]*)</span>', block):
+                t = sm.group(1).strip()
+                if t and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+
+        # 格式 5：achi — <div class="group-head">...<span class="gh-label">第 01 批 · 2026-05-22</span>
+        for m in re.finditer(r'<div[^>]+class="group-head"[^>]*>(.*?)</div>', html_no_script, re.DOTALL):
+            block = m.group(1)
+            for sm in re.finditer(r'<span[^>]*class="gh-label"[^>]*>([^<]*)</span>', block):
+                t = sm.group(1).strip()
+                if t and not _JS_TEMPLATE_PAT.search(t):
+                    heads.append(t)
+
+        return heads
+
+    # ---- P1-d：掃 production html + build，不在 OWNER_MAP → FAIL ----
+    # 排除規則（非業主腳本頁）：
+    #   html: _ 開頭（測試檔）/ *_preview* / *_selfcontained* / *_test* / 已知靜態資訊頁
+    #   build: build_template_*.py（範本工具，非業主 build script）
+    _HTML_EXCLUDE_PREFIXES = ('_',)
+    _HTML_EXCLUDE_SUBSTRINGS = ('_preview', '_selfcontained', '_test')
+    _HTML_STATIC_WHITELIST = {'tax-2026.html'}  # 非業主靜態資訊頁，已知合法
+    _BUILD_TOOL_PREFIXES = ('build_template',)   # 範本工具腳本，非業主 build
+
+    def _is_excluded_html(name: str) -> bool:
+        if name in _HTML_STATIC_WHITELIST:
+            return True
+        if any(name.startswith(p) for p in _HTML_EXCLUDE_PREFIXES):
+            return True
+        if any(s in name for s in _HTML_EXCLUDE_SUBSTRINGS):
+            return True
+        return False
+
+    def _is_excluded_build(name: str) -> bool:
+        return any(name.startswith(p) for p in _BUILD_TOOL_PREFIXES)
+
+    known_html = set(OWNER_MAP.keys())
+    known_build = {v['build'] for v in OWNER_MAP.values()}
+    unregistered = []
+    for html_path in LIB.glob('*.html'):
+        rel = html_path.name
+        if rel not in known_html and not _is_excluded_html(rel):
+            unregistered.append(f'html/{rel}')
+    for html_path in (LIB / 'bappu-cc').glob('*.html') if (LIB / 'bappu-cc').exists() else []:
+        rel = 'bappu-cc/' + html_path.name
+        if rel not in known_html and not _is_excluded_html(html_path.name):
+            unregistered.append(f'html/{rel}')
+    for py_path in LIB.glob('build_*.py'):
+        bname = py_path.name
+        if bname not in known_build and not _is_excluded_build(bname):
+            unregistered.append(f'build/{bname}')
+    if unregistered:
+        for u in unregistered:
+            msg = f'❌ {u} 不在 OWNER_MAP — 新業主未登記，check_12 無法驗證，禁止上線'
+            log(f'  {msg}')
+            fails.append(msg)
+    else:
+        log(f'  ✅ P1-d: 所有業主 html/build 均在 OWNER_MAP（{len(known_html)} 業主）')
+
+    # ---- 逐業主驗 group head ----
+    for html_rel in OWNER_MAP.keys():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            log(f'  ℹ {html_rel}: 不存在，跳過')
+            continue
+
+        content = html_path.read_text(encoding='utf-8', errors='replace')
+        heads = _extract_group_heads(content)
+
+        # P1-c：偵測不到 group head → FAIL（非 skip）
+        if not heads:
+            msg = f'❌ {html_rel}: 偵測不到任何 group head — build 結構異常或格式未納管，FAIL'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+
+        file_fails = []
+        non_wl_heads = [h for h in heads if not _is_whitelisted(h)]
+
+        for head_text in heads:
+            if _is_whitelisted(head_text):
+                continue  # P1-b 真白名單放行
+            for faction in ALL_FACTIONS:
+                if faction in head_text:
+                    file_fails.append(
+                        f'group head [{head_text!r}] 含派系名 [{faction}] — 應改為日期分組'
+                    )
+                    break  # 一個 head 只報一次
+
+        # P1-①（head 級）：每個非白名單 head 都必須 match 日期格式
+        # 不用 any()（頁級寬鬆），改成逐 head 驗：有任一非白名單 head 無日期 → FAIL
+        # 目的：防「1 個日期 group + 其他非日期 group」混合頁漏過
+        _DATE_PAT = re.compile(r'第\s*\d+\s*批|20\d{2}-\d{2}-\d{2}')
+        has_date = True  # 初始假設全 PASS，逐 head 驗
+        for h in heads:
+            if _is_whitelisted(h):
+                continue  # 白名單 head（圖卡部/脆文/Threads）不強制含日期
+            if not _DATE_PAT.search(h):
+                has_date = False
+                file_fails.append(
+                    f'非白名單 group head [{h!r}] 無日期標記 — 應含「第N批」或 YYYY-MM-DD'
+                )
+
+        if file_fails:
+            for ff in file_fails:
+                msg = f'❌ {html_rel}: {ff}'
+                log(f'  {msg}')
+                fails.append(msg)
+        else:
+            log(f'  ✅ {html_rel}: {len(heads)} 個 group head，無派系名，'
+                f'has_date={has_date}（head 級，每個非白名單 head 含日期），'
+                f'heads={heads[:3]}{"..." if len(heads)>3 else ""}')
+
+    return fails
+
+
 # === main ===
 
 def main():
@@ -665,6 +931,9 @@ def main():
     # v3 新增
     all_fails += check_11_mirror_dom_count()
     log('')
+    # v4 新增（2026-06-02 日期分組紅線）
+    all_fails += check_12_no_faction_group_head()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -676,7 +945,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 11 件齊')
+        log('✅ 全部通過 — 12 件齊')
         sys.exit(0)
 
 

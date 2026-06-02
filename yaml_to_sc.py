@@ -745,7 +745,14 @@ def load_yaml_articles(yaml_dir: str, expected_count: int = None) -> list:
     files = sorted(glob.glob(pattern))
 
     if not files:
-        raise ValueError(f'yaml_dir 內無 script_*.yaml：{yaml_dir}')
+        # fallback：有些批次 yaml 命名無 script_ 前綴（如 yunzhen_12_*.yaml）
+        pattern_fallback = os.path.join(yaml_dir, '*.yaml')
+        files = sorted(glob.glob(pattern_fallback))
+        if files:
+            import sys as _sys_fb
+            print(f'[load_yaml_articles] script_*.yaml 無結果，fallback *.yaml 找到 {len(files)} 個', file=_sys_fb.stderr)
+        else:
+            raise ValueError(f'yaml_dir 內無 script_*.yaml 或 *.yaml：{yaml_dir}')
 
     if expected_count is not None and len(files) != expected_count:
         raise ValueError(

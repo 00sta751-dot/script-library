@@ -199,12 +199,14 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
     )
 
 def section_group(roman, label, en, sect_id, cards, count):
-    # C-016: label（派系名）不輸出到 HTML，只保留 roman + en
+    # C-016 v5（日期分組）：label 輸出批次日期為主標題，roman 為前綴符號（可空），en 為副標（可空）
+    _roman_html = ('  <span class="roman">' + esc_text(roman) + '</span>\n') if roman else ''
+    _en_html = ('<span class="en"> ' + esc_text(en) + '</span>') if en and en != label else ''
     return (
-        '<div class="group collapsed" id="grp-' + str(sect_id) + '">\n'
-        '<header class="section-head" onclick="toggleGroup(this.parentElement)">\n'
-        '  <span class="roman">' + roman + '</span>\n'
-        '  <span class="label"><span class="en"> ' + en + '</span></span>\n'
+        '<div class="group collapsed" id="grp-' + esc_attr(str(sect_id)) + '">\n'
+        '<header class="section-head" onclick="toggleGroup(this.parentElement)">\n' +
+        _roman_html +
+        '  <span class="label">' + esc_text(label) + _en_html + '</span>\n'
         '  <span class="rule"></span>\n'
         '  <span class="count">' + str(count) + ' scripts</span>\n'
         '</header>\n'
@@ -696,14 +698,14 @@ def beauty_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
 # ============================================================
 # yaml-driven 主路由（--mode yaml 時執行，否則用 legacy 路徑）
 # 支援多批次：--yaml-dir dir11,dir12 + --batch-label "第11批·...,第12批·..."
-# 累積式：所有批次 articles 都保留，最後一批為 ★ 最新批次 section
+# C-016 日期分組：每批一個 group，不分派系，最新批最上
 # ============================================================
-_yaml_by_pie = {}        # 累積所有批次（供 section inject 用）
-_yaml_batches = []       # 每批次資料：[(batch_label, by_pie_dict), ...]
+_yaml_batches = []       # 每批次資料：[(batch_label, flat_arts_list), ...]
+_yaml_batches_card = []  # 每批次圖卡部 articles（派系=='圖卡部' 的）
 _yaml_latest_label = ''  # 最新批次 label（最後一個 yaml-dir）
 
 if MODE == 'yaml':
-    print(f'\n=== yaml-driven mode v4 (昀臻 beauty) ===')
+    print(f'\n=== yaml-driven mode v5 (昀臻 beauty, C-016 日期分組) ===')
     if not _args.yaml_dir:
         print('ERROR: --mode yaml 必須指定 --yaml-dir', file=sys.stderr)
         sys.exit(1)
@@ -729,124 +731,96 @@ if MODE == 'yaml':
         _this_expected = _single_expected if _dir_i == 0 else None
         print(f'\n  載入 batch {_dir_i+1}/{len(_yaml_dirs)}: {os.path.basename(_yaml_dir_path)} [{_this_batch_label}]')
         _this_yaml_articles = load_yaml_articles(_yaml_dir_path, expected_count=_this_expected)
-        _this_by_pie = {}
+        _this_flat = []
+        _this_card = []
         for _idx, _ydata in enumerate(_this_yaml_articles, start=0):
             _pie = _ydata.get('派系', '未分類')
             _art = beauty_article_adapter(_ydata, num=_num_cursor + _idx, batch_label=_this_batch_label)
-            _this_by_pie.setdefault(_pie, []).append(_art)
-            _yaml_by_pie.setdefault(_pie, []).append(_art)  # 也合入全域
+            if _pie == '圖卡部':
+                _this_card.append(_art)
+            else:
+                _this_flat.append(_art)
         _num_cursor += len(_this_yaml_articles)
-        _yaml_batches.append((_this_batch_label, _this_by_pie))
-        print(f'    {len(_this_yaml_articles)} 部 → num_start={_num_cursor - len(_this_yaml_articles)}')
+        _yaml_batches.append((_this_batch_label, _this_flat))
+        _yaml_batches_card.extend(_this_card)
+        print(f'    {len(_this_yaml_articles)} 部（一般 {len(_this_flat)} / 圖卡 {len(_this_card)}）→ num_start={_num_cursor - len(_this_yaml_articles)}')
 
     # 最新批次 label = 最後一個 yaml-dir
     if _yaml_batches:
         _yaml_latest_label = _yaml_batches[-1][0]
 
-    _yaml_total = sum(len(v) for v in _yaml_by_pie.values())
-    print(f'\nyaml articles total OK ({_yaml_total} 部 across {len(_yaml_batches)} 批次):')
-    for _pie, _arts in sorted(_yaml_by_pie.items()):
-        print(f'  {_pie}: {len(_arts)} 部')
+    _yaml_total = sum(len(arts) for _, arts in _yaml_batches) + len(_yaml_batches_card)
+    print(f'\nyaml articles total OK ({_yaml_total} 部 across {len(_yaml_batches)} 批次，圖卡 {len(_yaml_batches_card)} 部)')
 
 # ============================================================
-# Assemble section groups (v2:派系合併跨批)
+# Assemble section groups（C-016：日期/批次分組，不分派系）
 # ============================================================
 
-# 直球派：06批 #1,#6,#9 + 07批 #21 + 09批 #01,#02,#06,#07(夏天),#09
-direct_cards = [a06_01, a06_06, a06_09, a06_11, a06_16, a07_21,
-                a09_01, a09_02, a09_06, a09_09]
-sect_direct = section_group('I.', '直球派', 'The Direct Voice', 0, direct_cards, len(direct_cards))
+# --- 舊批次（硬編碼）按批次歸組，不再按派系 ---
 
-# 故事戲劇派：06批 #2,#16 + 07批 無 + 09批 #04
-story_cards = [a06_02, a06_08, a06_16, a09_01]
-# Restructure: 故事戲劇派 = #02, #08(家人朋友模擬) we keep separate
-story_cards = [a06_02, a07_27]
-sect_story = section_group('II.', '故事戲劇派 / 家人朋友派', 'Story & Friends', 1,
-    [a06_02, a06_08, a09_08], len([a06_02, a06_08, a09_08]))
+# 第 06 批（11 部，圖卡部無）
+_b06_cards = [a06_01, a06_02, a06_04, a06_05, a06_06,
+              a06_08, a06_09, a06_11, a06_13, a06_16, a06_20]
+sect_b06 = section_group('', BATCH_06, BATCH_06, 'b06', _b06_cards, len(_b06_cards))
 
-# 人間觀察派：06批 #5,#20 + 07批 #27,#31 + 09批 #11,#12
-human_cards = [a06_05, a06_20, a07_27, a07_31, a09_11, a09_12]
-sect_human = section_group('III.', '人間觀察派', 'Human Observations', 2, human_cards, len(human_cards))
+# 第 07 批（4 部一般 + 1 圖卡）
+_b07_cards = [a07_21, a07_25, a07_27, a07_31]
+sect_b07 = section_group('', BATCH_07, BATCH_07, 'b07', _b07_cards, len(_b07_cards))
 
-# 市場觀察派：06批 #11 + 07批 #25 + 09批 #03
-market_cards = [a06_11, a07_25, a09_03]
-sect_market = section_group('IV.', '市場觀察派', 'Market Insight', 3, market_cards, len(market_cards))
+# 第 09 批（8 部一般 + 1 圖卡）
+_b09_cards = [a09_01, a09_02, a09_03, a09_06, a09_08,
+              a09_09, a09_11, a09_12, a09_13]
+sect_b09 = section_group('', BATCH_09, BATCH_09, 'b09', _b09_cards, len(_b09_cards))
 
-# 拆解派 / 結構分析派：06批 #13 + 09批 #13
-struct_cards = [a06_13, a09_13]
-sect_struct = section_group('V.', '拆解 / 結構分析派', 'Breakdown & Analysis', 4, struct_cards, len(struct_cards))
+# 圖卡部：舊批圖卡固定 + yaml 新批圖卡派系 articles
+_card_pool = [a07_24_card, a09_05_card] + _yaml_batches_card
+sect_card = section_group('', '圖卡部', 'Card Library', 'card', _card_pool, len(_card_pool))
 
-# 圖卡部：07批 #24 + 09批 #05
-card_cards = [a07_24_card, a09_05_card]
-sect_card = section_group('VI.', '圖卡部', 'Card Library', 5, card_cards, len(card_cards))
+# --- yaml 新批次 sections（每批一個，最新批最上）---
+# _yaml_batches 順序為舊→新（依 --yaml-dir 參數順序），反轉後最新在最前
+_yaml_batch_sections = []
+for _b_i, (_b_label, _b_arts) in enumerate(reversed(_yaml_batches)):
+    _grp_id = f'b_yaml_{len(_yaml_batches) - _b_i}'
+    _b_sect = section_group('', _b_label, _b_label, _grp_id, _b_arts, len(_b_arts))
+    _yaml_batch_sections.append(_b_sect)
+    print(f'  yaml section 組裝: {_b_label} ({len(_b_arts)} 部)')
 
-# B2B / 美業招生：06批 #4 + 09批 #10,#12
-b2b_cards = [a06_04, a09_12]
-sect_b2b = section_group('VII.', '美業心法 / 招生', 'B2B Academy', 6, b2b_cards, len(b2b_cards))
-
-# yaml mode：把 yaml articles 注入對應 section
-if MODE == 'yaml' and _yaml_by_pie:
-    BEAUTY_PIE_TO_SECT = {
-        '直球派': 'sect_direct', '毒舌正能量': 'sect_direct',
-        '故事戲劇派': 'sect_story', '家人朋友模擬派': 'sect_story',
-        '人間觀察派': 'sect_human',
-        '市場觀察派': 'sect_market',
-        '拆解派': 'sect_struct', '結構分析派': 'sect_struct',
-        '圖卡部': 'sect_card',
-        '純雞湯': 'sect_b2b',  # 無雞湯 section，暫放 b2b
-    }
-
-    def _inject_beauty_section(sect_html: str, new_arts: list) -> str:
-        inject_html = '\n'.join(new_arts)
-        # section_group 結構：<div class="cards">...\n</div>\n</div>
-        close_seq = '\n</div>\n</div>'
-        last_close = sect_html.rfind(close_seq)
-        if last_close < 0:
-            return sect_html + '\n' + inject_html
-        return sect_html[:last_close] + '\n' + inject_html + sect_html[last_close:]
-
-    # 依照 BEAUTY_PIE_TO_SECT 把所有 yaml 批次（含舊批）注入對應 section
-    for _pie, _arts in _yaml_by_pie.items():
-        _sv = BEAUTY_PIE_TO_SECT.get(_pie, '')
-        if _sv:
-            globals()[_sv] = _inject_beauty_section(globals()[_sv], _arts)
-            print(f'  beauty yaml {_pie} → 注入 {_sv} ({len(_arts)} 部 累計)')
-
-    # 脆文 section：若有 --threads-md 則用新批脆文取代舊批
-    if _args.threads_md and os.path.isfile(_args.threads_md):
-        _new_threads_data_b = parse_threads_md(_args.threads_md)
-        print(f'beauty threads_md parsed: {len(_new_threads_data_b)} 篇')
-        _batch_threads_label_b = _yaml_latest_label
-        _new_sect_threads_b = (
-            '<div class="group collapsed" id="grp-threads">\n'
-            '<header class="section-head" onclick="toggleGroup(this.parentElement)">\n'
-            '  <span class="roman">✦</span>\n'
-            f'  <span class="label">脆文 Threads<span class="en"> {_batch_threads_label_b} · {len(_new_threads_data_b)} 篇</span></span>\n'
-            '  <span class="rule"></span>\n'
-            f'  <span class="count">{len(_new_threads_data_b)} posts</span>\n'
-            '</header>\n'
-            '<div class="threads-grid">\n' +
-            '\n'.join(thread_card_beauty(t[0], t[1], t[2], t[3]) for t in _new_threads_data_b) +
-            '\n</div>\n'
-            '</div>'
-        )
-        _sect_threads_b_to_use = _new_sect_threads_b
-    else:
-        _sect_threads_b_to_use = sect_threads
-
-    # 累積式組裝：硬編碼舊批各 section（已 inject 全部 yaml）+ 脆文
-    # SOP §2.1：每次新批不砍舊批，新批號 + 舊批號同頁並存
-    # C-016：不加額外 ★grp-new section，新批 articles 直接注入對應派系 group（每部顯示一次）
-    all_sections = '\n\n'.join([
-        sect_direct, sect_story, sect_human, sect_market,
-        sect_struct, sect_card, sect_b2b,
-        _sect_threads_b_to_use,
-    ])
+# --- 脆文 section ---
+if MODE == 'yaml' and _args.threads_md and os.path.isfile(_args.threads_md):
+    _new_threads_data_b = parse_threads_md(_args.threads_md)
+    print(f'beauty threads_md parsed: {len(_new_threads_data_b)} 篇')
+    _batch_threads_label_b = _yaml_latest_label
+    _sect_threads_b_to_use = (
+        '<div class="group collapsed" id="grp-threads">\n'
+        '<header class="section-head" onclick="toggleGroup(this.parentElement)">\n'
+        '  <span class="roman">✦</span>\n'
+        f'  <span class="label">脆文 Threads<span class="en"> {_batch_threads_label_b} · {len(_new_threads_data_b)} 篇</span></span>\n'
+        '  <span class="rule"></span>\n'
+        f'  <span class="count">{len(_new_threads_data_b)} posts</span>\n'
+        '</header>\n'
+        '<div class="threads-grid">\n' +
+        '\n'.join(thread_card_beauty(t[0], t[1], t[2], t[3]) for t in _new_threads_data_b) +
+        '\n</div>\n'
+        '</div>'
+    )
 else:
+    _sect_threads_b_to_use = sect_threads
+
+# --- 組裝 all_sections（C-016 日期/批次分組，最新批最上）---
+# 順序：yaml 新批（最新→最舊）→ 舊批（09→07→06）→ 圖卡部 → 脆文
+if MODE == 'yaml':
+    # yaml mode：yaml 新批 sections + 舊批三個 + 圖卡部 + 脆文
+    all_sections = '\n\n'.join(
+        _yaml_batch_sections
+        + [sect_b09, sect_b07, sect_b06]
+        + [sect_card, _sect_threads_b_to_use]
+    )
+    print(f'Sections assembled: {len(_yaml_batch_sections)} yaml批 + 舊批(09/07/06) + 圖卡部 + 脆文（C-016 日期分組，無派系名）')
+else:
+    # legacy mode（不帶 --mode yaml 時）：只有舊批三個 + 圖卡部 + 脆文
     all_sections = '\n\n'.join([
-        sect_direct, sect_story, sect_human, sect_market,
-        sect_struct, sect_card, sect_b2b,
-        sect_threads
+        sect_b09, sect_b07, sect_b06,
+        sect_card, sect_threads,
     ])
 
 # ============================================================
@@ -862,12 +836,12 @@ if sec_end < 0:
     sec_end = c.find('</section>')
 print(f'section start: {sec_start}, section end: {sec_end}')
 
-# New section content — 累積式：硬編碼舊批 + 所有 yaml 批次
+# New section content — C-016 日期分組：舊批 + yaml 新批 articles 總數
 _LEGACY_ARTICLE_LIST = [a06_01,a06_02,a06_04,a06_05,a06_06,a06_08,a06_09,a06_11,a06_13,a06_16,a06_20,
          a07_21,a07_24_card,a07_25,a07_27,a07_31,
          a09_01,a09_02,a09_03,a09_05_card,a09_06,a09_08,a09_09,a09_11,a09_12,a09_13]
-if MODE == 'yaml' and _yaml_by_pie:
-    _yaml_total_all = sum(len(v) for v in _yaml_by_pie.values())
+if MODE == 'yaml' and _yaml_batches:
+    _yaml_total_all = sum(len(arts) for _, arts in _yaml_batches) + len(_yaml_batches_card)
     _beauty_total_count = len(_LEGACY_ARTICLE_LIST) + _yaml_total_all
     _beauty_card_label = _yaml_latest_label
 else:
@@ -1121,9 +1095,9 @@ print('beauty.html DONE:', len(nc), 'chars')
 # Verify（yaml mode 下 inject_v2_meta_attrs 在 article 標籤插入 data-* → 改用 <article\b 搜）
 arts = re.findall(r'<article\b', nc)
 print('Total articles:', len(arts))
-if MODE == 'yaml' and _yaml_by_pie:
-    # yaml-only 模式：只驗新批腳本數
-    _yaml_total_verify = sum(len(v) for v in _yaml_by_pie.values())
+if MODE == 'yaml' and _yaml_batches:
+    # yaml-only 模式：驗新批腳本數（一般 + 圖卡）
+    _yaml_total_verify = sum(len(arts_) for _, arts_ in _yaml_batches) + len(_yaml_batches_card)
     assert len(arts) >= _yaml_total_verify, f'Expected >= {_yaml_total_verify} articles (yaml batch), got {len(arts)}'
     print(f'yaml mode assertion PASS: {len(arts)} articles >= {_yaml_total_verify}')
     # 驗脆文

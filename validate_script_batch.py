@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_script_batch.py — 腳本批次品管員（20 件自動擋 / v2 — 階段 3 升級）
+validate_script_batch.py — 腳本批次品管員（v2 — 階段 3 升級 / 含 V2 schema 守門）
 對齊 SOP _腳本生產SOP_v3.0.yaml §11 9 件 + §14 §15 + guardian 補 6 件 C-010 ~ C-015
 v2 新增 5 件 V2-001 ~ V2-005（yaml schema 新欄位驗 + migration plan）
 
@@ -83,6 +83,8 @@ OWNER_PREF_PATHS = {
     "昀臻":     L2_BASE / "美容_昀臻"    / "00_業主核心檔" / "source_overlay" / "_昀臻偏好.md",
     "叭噗_小C": L2_BASE / "情侶_叭噗_小C" / "00_業主核心檔" / "source_overlay" / "_叭噗_小C偏好.md",
     "阿奇":     L2_BASE / "餐飲_阿奇"    / "00_業主核心檔" / "source_overlay" / "_阿奇偏好.md",
+    "溫蒂":     L2_BASE / "美容_溫蒂"    / "00_業主核心檔" / "source_overlay" / "_溫蒂偏好.md",
+    "詩婷":     L2_BASE / "房仲_詩婷"    / "00_業主核心檔" / "source_overlay" / "_詩婷偏好.md",
 }
 
 # ── 禁用詞（SOP §11 L1-002）──
@@ -225,7 +227,7 @@ def get_all_text(data: dict) -> str:
     return " ".join(parts)
 
 # ────────────────────────────────────────────
-# 15 件 check 函式（逐一回傳 (PASS/FAIL/WARN, detail)）
+# check 函式集（逐一回傳 (PASS/FAIL/WARN, detail)）
 # ────────────────────────────────────────────
 
 def _ts_normalize(ts: str) -> str:
@@ -734,15 +736,306 @@ def _is_legacy_yaml(data: dict) -> bool:
         return False
 
 
-def chk_v2_001_voice_lock(data: dict, fname: str) -> tuple[str, str]:
-    """V2-001：voice_lock 欄位存在（明確聲明是否強制語料）"""
+def _load_voice_lock_from_l2(owner: str) -> Optional[dict]:
+    """從 L2 偏好.md 的 fenced yaml 區塊解析 owner_voice，回傳通用 shape dict 或 None。
+
+    通用 shape（回傳給上層統一吃）：
+      {
+        'catchphrase': list[str],
+        'signature_words': list[str],
+        'banned_phrases': list[str],
+      }
+
+    叭噗_小C 特例：L2 偏好.md 用拆鍵
+      bappu_catchphrase / xiaoc_catchphrase → 合併成 catchphrase list
+      bappu_banned / xiaoc_banned → 合併成 banned_phrases list
+    其餘 6 家：直接用通用鍵 catchphrase / signature_words / banned_phrases。
+
+    回傳 None 情形：
+      - L2 偏好.md 不存在或讀取失敗
+      - fenced yaml 區塊不存在
+      - owner_voice 區塊不存在
+    """
+    pref_path = OWNER_PREF_PATHS.get(owner)
+    if not pref_path or not pref_path.exists():
+        return None
+    try:
+        text = pref_path.read_text(encoding='utf-8')
+    except Exception:
+        return None
+
+    # 抓 ```yaml ... ``` fenced 區塊，找含 voice_lock/owner_voice 的那個
+    fence_re = re.compile(r'```yaml\s*\n(.*?)```', re.DOTALL)
+    raw_voice: Optional[dict] = None
+    for m in fence_re.finditer(text):
+        block_text = m.group(1)
+        if 'owner_voice' not in block_text and 'bappu_catchphrase' not in block_text:
+            continue
+        try:
+            parsed = yaml.safe_load(block_text)
+        except Exception:
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        # owner_voice 是子鍵
+        if 'owner_voice' in parsed:
+            raw_voice = parsed['owner_voice']
+            break
+        # 叭噗：拆鍵直接在頂層
+        if 'bappu_catchphrase' in parsed or 'bappu_banned' in parsed:
+            raw_voice = parsed
+            break
+
+    if raw_voice is None:
+        return None
+
+    if owner == '叭噗_小C':
+        # 拆鍵正規化 → 通用 shape
+        bappu_cp  = raw_voice.get('bappu_catchphrase', []) or []
+        xiaoc_cp  = raw_voice.get('xiaoc_catchphrase', []) or []
+        bappu_ban = raw_voice.get('bappu_banned', []) or []
+        xiaoc_ban = raw_voice.get('xiaoc_banned', []) or []
+        return {
+            'catchphrase':     list(bappu_cp) + list(xiaoc_cp),
+            'signature_words': list(raw_voice.get('signature_words', []) or []),
+            'banned_phrases':  list(bappu_ban) + list(xiaoc_ban),
+        }
+    else:
+        return {
+            'catchphrase':     list(raw_voice.get('catchphrase', []) or []),
+            'signature_words': list(raw_voice.get('signature_words', []) or []),
+            'banned_phrases':  list(raw_voice.get('banned_phrases', []) or []),
+        }
+
+
+def _get_owner_voice(data: dict, owner: str) -> Optional[dict]:
+    """取 owner_voice，來源 precedence：
+    1. 腳本 yaml 頂層 data['owner_voice']（若存在且有 banned_phrases 或 catchphrase 鍵）
+    2. fallback：_load_voice_lock_from_l2(owner)
+    回傳通用 shape dict 或 None。
+    """
+    ov = data.get('owner_voice')
+    _has_common = isinstance(ov, dict) and (
+        'banned_phrases' in ov or 'catchphrase' in ov or 'signature_words' in ov
+    )
+    # 叭噗_小C 純拆鍵頂層（只 bappu_/xiaoc_、無通用鍵）也算有頂層 voice；
+    # 拆鍵 gate 僅限叭噗觸發 — 避免非叭噗業主誤帶拆鍵→gate 成立卻走通用空 return→誤阻 fallback L2 漏守門（Codex P1 連鎖）
+    _has_bappu_split = (
+        isinstance(ov, dict) and owner == '叭噗_小C' and (
+            'bappu_catchphrase' in ov or 'xiaoc_catchphrase' in ov
+            or 'bappu_banned' in ov or 'xiaoc_banned' in ov
+        )
+    )
+    if _has_common or _has_bappu_split:
+        if owner == '叭噗_小C':
+            bappu_cp  = ov.get('bappu_catchphrase', ov.get('catchphrase', [])) or []
+            xiaoc_cp  = ov.get('xiaoc_catchphrase', []) or []
+            bappu_ban = ov.get('bappu_banned', ov.get('banned_phrases', [])) or []
+            xiaoc_ban = ov.get('xiaoc_banned', []) or []
+            return {
+                'catchphrase':     list(bappu_cp) + list(xiaoc_cp),
+                'signature_words': list(ov.get('signature_words', []) or []),
+                'banned_phrases':  list(bappu_ban) + list(xiaoc_ban),
+            }
+        return {
+            'catchphrase':     list(ov.get('catchphrase', []) or []),
+            'signature_words': list(ov.get('signature_words', []) or []),
+            'banned_phrases':  list(ov.get('banned_phrases', []) or []),
+        }
+    # fallback L2
+    return _load_voice_lock_from_l2(owner)
+
+
+def _normalize_voice_text(s: str) -> str:
+    """正規化台詞文字，供 catchphrase / banned 比對用。
+    步驟：unicode NFKC → 省略號統一 → 全/半形標點統一 → 去空白。
+    """
+    import unicodedata as _uc
+    s = _uc.normalize('NFKC', s)
+    s = re.sub(r'[…⋯]|\.\.\.', '___ELLIPSIS___', s)
+    s = s.replace('？', '?').replace('，', ',').replace('！', '!').replace('。', '.')
+    s = re.sub(r'\s+', '', s)
+    return s
+
+
+def _catchphrase_to_regex(phrase: str) -> re.Pattern:
+    """把 catchphrase 轉成正規表達式，省略號當萬用符（非貪婪，最多 30 字）。"""
+    import unicodedata as _uc
+    norm = _uc.normalize('NFKC', str(phrase))
+    norm = norm.replace('？', '?').replace('，', ',').replace('！', '!').replace('。', '.')
+    parts = re.split(r'[…⋯]|\.\.\.', norm)
+    escaped = [re.escape(p) for p in parts if p]  # 過濾空段（防純省略號/空 phrase）
+    if not escaped:
+        return re.compile(r'(?!)')  # 空 phrase → 永不匹配（防 match-all 假 PASS，御史 Codex 盲點2）
+    pattern = r'.{0,30}?'.join(escaped)
+    return re.compile(pattern, re.DOTALL)
+
+
+def _extract_dialogue_lines(data: dict, owner: str) -> list[str]:
+    """抽出一支 yaml 全文所有台詞行（含翠文）。"""
+    lines_out = []
+    scenes = data.get('scenes', [])
+    if not isinstance(scenes, list):
+        return []
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        # 通用化：抓所有以「台詞」開頭的欄位（台詞 / 台詞_溫蒂 / 台詞_詩婷 / 台詞_叭噗 / 台詞_小C …）
+        # + 字幕類通用欄位。涵蓋全 7 業主「台詞_<業主名>」格式（叭噗雙人兩行自然納入，免寫死特例）。
+        for key, val in scene.items():
+            if not val:
+                continue
+            # 收嚴：只認「台詞」或「台詞_<業主>」，排除「台詞備註/台詞數」等非台詞 key（御史 Codex 盲點1）
+            if key == '台詞' or str(key).startswith('台詞_') or key in ('旁白', '字幕', '翠文', 'dialogue'):
+                lines_out.append(str(val))
+    return lines_out
+
+
+def _extract_hook_dialogue_lines(data: dict, owner: str) -> list[str]:
+    """只抽 Hook 段（scenes[0]，0-3s）的台詞行。"""
+    scenes = data.get('scenes', [])
+    if not isinstance(scenes, list) or not scenes:
+        return []
+    hook_scene = scenes[0]
+    if not isinstance(hook_scene, dict):
+        return []
+    lines_out = []
+    # 通用化：抓 Hook 段所有以「台詞」開頭的欄位 + 字幕類（涵蓋全 7 業主 台詞_<業主> 格式）
+    for key, val in hook_scene.items():
+        if not val:
+            continue
+        # 收嚴：只認「台詞」或「台詞_<業主>」，排除「台詞備註/台詞數」等非台詞 key（御史 Codex 盲點1）
+        if key == '台詞' or str(key).startswith('台詞_') or key in ('旁白', '字幕', '翠文', 'dialogue'):
+            lines_out.append(str(val))
+    return lines_out
+
+
+# ── FIX-1：chk_v2_001b — banned_phrases 禁語守門 ──
+def chk_v2_001b_banned_phrases(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
+    """V2-001b：全文台詞不得出現業主聲音禁用語（banned_phrases）。
+
+    來源 precedence：
+    1. 腳本 yaml 頂層 data['owner_voice']['banned_phrases']
+    2. fallback：L2 偏好.md fenced yaml owner_voice.banned_phrases
+    3. 叭噗_小C：合併 bappu_banned + xiaoc_banned
+    三者皆無 → SKIP（非無風險 PASS）
+
+    legacy 判定：_is_v2025_legacy()（不用過期的 _is_legacy_yaml）。
+    fname 需傳入「parent_dir/file」格式，讓 _extract_batch_date 能抓批次目錄日期。
+    """
+    if _is_v2025_legacy(data, fname):
+        return "WARN", "legacy 批次（6/1 前）— banned_phrases 守門 WARN，新批次強制 FAIL"
+
+    if not owner:
+        return "SKIP", "未傳入 owner — banned_phrases 跳過"
+
+    ov = _get_owner_voice(data, owner)
+    if ov is None:
+        return "WARN", f"owner_voice 無法從 yaml 或 L2 偏好.md 取得（{owner}）— banned_phrases 守門跳過"
+
+    banned = ov.get('banned_phrases', [])
+    if not banned:
+        return "WARN", f"banned_phrases 清單空（{owner}）— 確認 L2 偏好.md 已填寫"
+
+    all_lines = _extract_dialogue_lines(data, owner)
+    if not all_lines:
+        return "WARN", "找不到台詞欄位 — banned_phrases 守門跳過"
+
+    hits = []
+    for phrase in banned:
+        p_norm = _normalize_voice_text(str(phrase))
+        for line in all_lines:
+            l_norm = _normalize_voice_text(line)
+            if p_norm in l_norm:
+                hits.append(f"「{phrase}」出現於：{line[:40]}")
+
+    if hits:
+        return "FAIL", "台詞命中 banned_phrases：" + "；".join(hits)
+    return "PASS", f"全文台詞無 banned_phrases 命中（banned={len(banned)} 條）"
+
+
+# ── FIX-2：chk_v2_001c — catchphrase 入 Hook 守門（首期 WARN） ──
+def chk_v2_001c_catchphrase_in_hook(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
+    """V2-001c：Hook 段（scenes[0] 0-3s）應有業主 catchphrase/signature_words 語料。
+
+    比對：Hook 段所有台詞行 × catchphrase + signature_words，任一命中即 PASS。
+    叭噗_小C：台詞_叭噗 + 台詞_小C 兩行各別比。
+    正規化：unicode NFKC + 省略號萬用 + 全/半形統一 + 去空白。
+
+    上線策略：首期 WARN（不擋 commit）。
+    門檻：觀察 3 批、誤擋率 < 10% 才升 FAIL。
+
+    legacy：_is_v2025_legacy()。
+    """
+    if _is_v2025_legacy(data, fname):
+        return "WARN", "legacy 批次（6/1 前）— catchphrase Hook 守門 WARN"
+
+    if not owner:
+        return "WARN", "未傳入 owner — catchphrase Hook 守門跳過"
+
+    ov = _get_owner_voice(data, owner)
+    if ov is None:
+        return "WARN", f"owner_voice 無法取得（{owner}）— catchphrase Hook 守門跳過"
+
+    catchphrases = ov.get('catchphrase', [])
+    sig_words    = ov.get('signature_words', [])
+    all_phrases  = list(catchphrases) + list(sig_words)
+
+    if not all_phrases:
+        return "WARN", f"catchphrase/signature_words 清單空（{owner}）— 確認 L2 偏好.md"
+
+    hook_lines = _extract_hook_dialogue_lines(data, owner)
+    if not hook_lines:
+        return "WARN", "Hook 段找不到台詞行 — catchphrase 守門跳過"
+
+    for phrase in all_phrases:
+        try:
+            pat = _catchphrase_to_regex(str(phrase))
+        except Exception:
+            continue
+        for line in hook_lines:
+            if pat.search(line):
+                return "PASS", f"Hook 命中 catchphrase：「{phrase}」"
+
+    return "WARN", (
+        f"Hook 段未見 catchphrase/signature_words（{owner}）— "
+        f"確認業主聲音是否有入 Hook（觀察 3 批後升 FAIL）"
+    )
+
+
+def chk_v2_001_voice_lock(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
+    """V2-001：voice_lock 欄位存在 + shape 驗（FIX-1c）。
+
+    shape 驗邏輯（對齊 FIX-1c 契約）：
+    - voice_lock 資料源頭以 L2 偏好.md 為準，腳本 yaml 頂層為選配快取。
+    - 若 voice_lock:true → 嘗試從 L2 偏好.md 撈 owner_voice 三欄；
+      撈不到才 WARN（不強制要求腳本 yaml 頂層有 owner_voice）。
+    """
     has_field = 'voice_lock' in data
-    if has_field:
-        val = data['voice_lock']
-        return "PASS", f"voice_lock = {val}（明確聲明）"
-    if _is_legacy_yaml(data):
-        return "WARN", f"缺 voice_lock（legacy yaml 過渡期，legacy_allowed_until: {data.get('legacy_allowed_until')}）"
-    return "FAIL", "缺 voice_lock 欄位（新批次必須聲明 true/false）"
+    if not has_field:
+        if _is_legacy_yaml(data):
+            return "WARN", f"缺 voice_lock（legacy yaml 過渡期，legacy_allowed_until: {data.get('legacy_allowed_until')}）"
+        return "FAIL", "缺 voice_lock 欄位（新批次必須聲明 true/false）"
+
+    val = data['voice_lock']
+    # voice_lock: false 或未啟用 → 不驗 shape
+    if not val:
+        return "PASS", f"voice_lock = {val}（明確聲明不強制語料）"
+
+    # voice_lock: true → 驗 shape（FIX-1c）
+    if owner:
+        ov = _get_owner_voice(data, owner)
+        if ov is None:
+            return "WARN", (
+                f"voice_lock=true 但 owner_voice 無法從 yaml 或 L2 偏好.md 撈到"
+                f"（owner={owner}）— 請補 L2 偏好.md §voice_lock yaml 欄位"
+            )
+        missing = [k for k in ('catchphrase', 'signature_words', 'banned_phrases') if not ov.get(k)]
+        if missing:
+            return "WARN", f"voice_lock=true，owner_voice 缺欄位：{missing}（owner={owner}）"
+        return "PASS", f"voice_lock = {val}，owner_voice 三欄齊（owner={owner}）"
+
+    return "PASS", f"voice_lock = {val}（明確聲明）"
 
 
 def chk_v2_002_policy_alignment(data: dict, fname: str, owner: str = '') -> tuple[str, str]:
@@ -1239,6 +1532,8 @@ _OWNER_HTML_MAP = {
     "昀臻":     "beauty.html",
     "阿奇":     "achi.html",
     "叭噗_小C": "bappu-cc/index.html",
+    "溫蒂":     "wendi.html",
+    "詩婷":     "shihting.html",
 }
 
 def chk_c016_no_faction_leak_in_html(owner: str, lib_dir: Path) -> tuple[str, str]:
@@ -1360,6 +1655,8 @@ def chk_c016_no_faction_leak_in_html(owner: str, lib_dir: Path) -> tuple[str, st
         "昀臻":     lib_dir.parent.parent / "L2_業主層" / "美容_昀臻" / "01_腳本生產",
         "阿奇":     lib_dir.parent.parent / "L2_業主層" / "餐飲_阿奇" / "01_腳本生產",
         "叭噗_小C": lib_dir.parent.parent / "L2_業主層" / "情侶_叭噗_小C" / "01_腳本生產",
+        "溫蒂":     lib_dir.parent.parent / "L2_業主層" / "美容_溫蒂" / "01_腳本生產",
+        "詩婷":     lib_dir.parent.parent / "L2_業主層" / "房仲_詩婷" / "01_腳本生產",
     }
     yaml_dir = yaml_owner_dirs.get(owner)
     if yaml_dir and yaml_dir.exists():
@@ -1575,7 +1872,7 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
     _fname_with_dir = f"{f.parent.name}/{f.name}"
     results = []
     checks = [
-        # 原 15 件
+        # per-file checks
         ("L1-001", chk_l1_001_schema(data, f.name)),
         ("L1-002", chk_l1_002_banned(data, f.name)),
         ("L1-003", chk_l1_003_mirror(data, f.name)),
@@ -1587,7 +1884,9 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("C-013",  chk_c013_dm_card(data, f.name, owner)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
         # v2 新增 5 件（V2-001 ~ V2-005）
-        ("V2-001", chk_v2_001_voice_lock(data, f.name)),
+        ("V2-001",  chk_v2_001_voice_lock(data, f.name, owner)),
+        ("V2-001b", chk_v2_001b_banned_phrases(data, _fname_with_dir, owner)),
+        ("V2-001c", chk_v2_001c_catchphrase_in_hook(data, _fname_with_dir, owner)),
         ("V2-002", chk_v2_002_policy_alignment(data, f.name, owner)),
         ("V2-003", chk_v2_003_publish_distribution_mode(data, f.name)),
         ("V2-004", chk_v2_004_platform_variants(data, f.name)),
@@ -1612,7 +1911,7 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
 # 主程式
 # ────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="腳本批次品管員 — 15 件自動擋")
+    parser = argparse.ArgumentParser(description="腳本批次品管員（含 V2 schema + voice_lock 守門）")
     parser.add_argument("--owner",     help="業主名（瑞祥/仲豪/昀臻/叭噗_小C/阿奇）")
     parser.add_argument("--batch-dir", required=True, help="第 N 批 yaml 資料夾絕對路徑")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
@@ -1628,7 +1927,7 @@ def main():
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"  腳本批次品管員 v2.0（20 件自動擋 — 含 V2 schema 升級）")
+    print(f"  腳本批次品管員 v2.1（含 V2 schema + voice_lock 守門）")
     print(f"  批次資料夾：{batch_dir}")
     print(f"{'='*60}\n")
 
@@ -1683,15 +1982,16 @@ def main():
         ("V2-010", chk_v2_010_batch_summary(batch_dir)),
         ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
     ]
-    print("── 批次級 check（11 件）──")
+    print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:
         icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
         print(f"  {icon} [{cid}] {status}: {detail}")
         all_results.append((cid, status, "batch", detail))
     print()
 
-    # ── Per-file checks（10 件 × N yaml）──
-    print("── 逐篇 check（10 件 × 每篇）──")
+    # ── Per-file checks（件數動態，避免數字過時）──
+    _per_file_results_count: int = 0  # 第一支跑完後更新
+    print("── 逐篇 check（per-file × 每篇）──")
     for f, data in valid_yamls:
         title = data.get("title", f.name)
         print(f"\n  [{f.name}] {title}")

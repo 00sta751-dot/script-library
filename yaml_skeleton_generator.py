@@ -77,6 +77,7 @@ OWNER_DIALOGUE_KEY = {
     "昀臻":     "台詞_昀臻",
     "叭噗_小C": "台詞_叭噗",
     "阿奇":     "台詞_阿奇",
+    "溫蒂":     "台詞_溫蒂",
 }
 
 # 業主主推平台
@@ -86,6 +87,7 @@ OWNER_PLATFORM = {
     "昀臻":     "IG Reels",
     "叭噗_小C": "IG Reels",
     "阿奇":     "FB Reels",
+    "溫蒂":     "IG Reels",
 }
 
 

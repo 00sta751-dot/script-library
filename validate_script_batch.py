@@ -1030,14 +1030,15 @@ def chk_v2_011_no_fiction(data: dict, fname: str, owner: str) -> tuple[str, str]
 
 
 def chk_v2_012_beauty_med_words(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """V2-012：昀臻醫療效能禁用詞驗 — per-file（昀臻 特化）"""
-    if owner != '昀臻':
-        return "PASS", "(非昀臻，跳過)"
+    """V2-012：美容業主醫療效能禁用詞驗 — per-file（昀臻 / 溫蒂 等美容業主）"""
+    BEAUTY_OWNERS = {'昀臻', '溫蒂'}
+    if owner not in BEAUTY_OWNERS:
+        return "PASS", "(非美容業主，跳過)"
     all_text = get_all_text(data)
     hits = [w for w in BEAUTY_MED_WORDS if w in all_text]
     if hits:
-        return "FAIL", f"昀臻台詞含醫療效能禁用詞：{hits[:5]}（對齊第 09 批算盤 20 條）"
-    return "PASS", "昀臻醫療詞驗 PASS"
+        return "FAIL", f"{owner}台詞含醫療效能禁用詞：{hits[:5]}（對齊第 09 批算盤 20 條）"
+    return "PASS", f"{owner}醫療詞驗 PASS"
 
 
 def chk_v2_013_zhonghao_life_ratio(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:

@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-build_wendi.py — 溫蒂腳本庫 build（便當格原創版型 / 機械化讀腳本生成）
+build_wendi.py — 溫蒂腳本庫 build（便當格原創版型 / yaml-driven）
 
 ※ 本檔為 parser + 模板渲染程式；解析的腳本台詞是業主原文（已過編劇/算盤/御史驗證），
   非霸告對使用者的狀態宣稱，遮羞詞規則不適用解析到的台詞內容。
 
 設計：
   - 版型＝便當格 Bento（vs 詩婷置中單欄）；配色草木綠＋珊瑚＋奶油；無襯線
-  - 藏鏡人＝機械化：從腳本「藏鏡人互動點：①時間【類型】「台詞」」解析，
-    按時間段對應內嵌到時間軸該段（同既有頁 mirror 機制，配溫蒂綠）
+  - 藏鏡人＝機械化：從 yaml 藏鏡人欄位對應到時間軸段（每支需 ≥2）
   - C-016：data-cat=""、0 派系名、無派系篩選列、可收合日期群組
+  - yaml-driven（§6.5 SOP）：--mode yaml --yaml-dir 為標準模式
 
 用法：
-  python build_wendi.py [--script-md <腳本.md>] [--batch-label "第 01 批 · 2026-06-02"]
+  python build_wendi.py --mode yaml --yaml-dir "<yaml批次資料夾>" --batch-label "第 02 批 · 2026-06-03"
 """
 import re
 import os
@@ -23,12 +23,18 @@ import argparse
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
 
-_p = argparse.ArgumentParser()
-_p.add_argument('--script-md', dest='script_md', default=os.path.join(
-    LIB, '..', '..', '..', 'L2_業主層', '美容_溫蒂', '01_腳本生產',
-    '第01批_溫蒂首批_2026-06-02', '第01批_13腳本.md'))
-_p.add_argument('--batch-label', dest='batch_label', default='第 01 批 · 2026-06-02')
+_p = argparse.ArgumentParser(description='build_wendi.py — 溫蒂腳本庫 build script（yaml-driven）')
+_p.add_argument('--mode', choices=['yaml'], default='yaml',
+                help='yaml=yaml-driven（標準模式）')
+_p.add_argument('--yaml-dir', dest='yaml_dir', default='',
+                help='yaml 批次資料夾絕對路徑（必填）')
+_p.add_argument('--batch-label', dest='batch_label', default='',
+                help='批次顯示名稱，如「第 02 批 · 2026-06-03」')
+_p.add_argument('--expected-count', dest='expected_count', type=int, default=None,
+                help='預期 yaml 數量（驗證用）')
 _p.add_argument('--out', dest='out', default=os.path.join(LIB, 'wendi.html'))
 _args, _ = _p.parse_known_args()
 
@@ -85,7 +91,126 @@ def parse_mirrors(line):
 
 
 # ============================================================
-# 解析單部腳本
+# yaml-driven adapter（yaml dict → render_card 的 script dict）
+# ============================================================
+def _norm_time_yaml(ts_str):
+    """yaml timestamp "0-3s" → key "0-3"（供 mirror 對應）"""
+    ts_str = str(ts_str).replace('–', '-').replace('秒', 's')
+    m = re.match(r'\s*(\d+)\s*-\s*(\d+)', ts_str)
+    return f'{m.group(1)}-{m.group(2)}' if m else ts_str.strip()
+
+
+def wendi_yaml_adapter(yaml_data: dict, num: int) -> dict:
+    """yaml dict → render_card 需要的 script dict。
+
+    讀取 yaml 結構：
+      title / 派系 / main_platform / suggested_po_time /
+      scenes[]（timestamp/type/台詞_溫蒂/翠文/畫面）/
+      藏鏡人（位置1/句子1/位置2/句子2）/
+      caption / hashtag[] /
+      is_fishing（True→force='釣魚部'）
+    """
+    title = str(yaml_data.get('title', '') or '')
+
+    # 派系 → PIE_TONE 內部 map（C-016 不輸出派系名）
+    pie = str(yaml_data.get('派系', '') or '')
+
+    # 平台
+    plat = str(yaml_data.get('main_platform', '') or 'IG Reels')
+
+    # 建議 PO 時間
+    po = str(yaml_data.get('suggested_po_time', '') or '')
+
+    # force（釣魚部）
+    force = ''
+    if yaml_data.get('is_fishing') or str(yaml_data.get('required_slot', '') or '').strip() == '釣魚部':
+        force = '釣魚部'
+
+    # 藏鏡人 map：從頂層 藏鏡人 dict 建 {時間key: 台詞}，
+    # 以及從 scenes 內的 藏鏡人 欄位補充
+    mirrors = {}
+    top_mirror = yaml_data.get('藏鏡人') or {}
+    if isinstance(top_mirror, dict):
+        for pos_key in ('位置1', '位置2', '位置3'):
+            sent_key = pos_key.replace('位置', '句子')
+            pos_val = str(top_mirror.get(pos_key, '') or '')
+            sent_val = str(top_mirror.get(sent_key, '') or '')
+            if pos_val and sent_val:
+                # 位置格式如 "Hook後 0-3s（懸念型）" 或 "轉折段後 25-40s（共鳴型）"
+                tkey = _norm_time_yaml(pos_val)
+                mirrors[tkey] = sent_val.strip('「」')
+
+    # 時間軸（從 scenes 讀）
+    scenes_data = yaml_data.get('scenes') or []
+    timeline = []
+    for sc in scenes_data:
+        ts_raw = str(sc.get('timestamp', '') or '')
+        sc_type = str(sc.get('type', '') or '')
+        seg = ts_raw.rstrip('s') + ('s' if ts_raw.endswith('s') else '')
+        # seg 格式 "0-3s" + type "Hook" → "0-3s Hook"
+        seg_label = (seg + ' ' + sc_type).strip() if sc_type else seg
+
+        line = str(sc.get('台詞_溫蒂', '') or '')
+        timeline.append((seg_label, line))
+
+        # scenes 內的 藏鏡人 欄位也補入 mirrors（覆蓋頂層，以場景位置為準）
+        sc_mirror = str(sc.get('藏鏡人', '') or '').strip()
+        if sc_mirror:
+            tkey = _norm_time_yaml(ts_raw)
+            mirrors[tkey] = sc_mirror.strip('「」')
+
+    # 場景（從第一個 scene 的畫面或整體取）
+    scene = ''
+    if scenes_data:
+        scene = str(scenes_data[0].get('畫面', '') or '')
+
+    # insight（yaml 通常無獨立 insight，用 hook 台詞替代）
+    insight = ''
+    if scenes_data:
+        insight = str(scenes_data[0].get('台詞_溫蒂', '') or '')
+
+    # CTA 關鍵字（從 CTA 段台詞抓「留言 X」）
+    cta_kw = ''
+    for sc in scenes_data:
+        if str(sc.get('type', '') or '').upper() == 'CTA':
+            cta_line = str(sc.get('台詞_溫蒂', '') or '')
+            km = re.search(r'留言[「『]([^」』]+)[」』]', cta_line)
+            if km:
+                cta_kw = km.group(1).strip()
+            break
+
+    # caption（直接讀頂層 caption）
+    caption = str(yaml_data.get('caption', '') or '')
+
+    # hashtag（list → 空格串）
+    hashtag_raw = yaml_data.get('hashtag') or []
+    if isinstance(hashtag_raw, list):
+        hashtags = ' '.join(str(t) for t in hashtag_raw if t)
+    else:
+        hashtags = str(hashtag_raw)
+
+    return dict(
+        no=str(num).zfill(2),
+        title=title,
+        force=force,
+        pie=pie,
+        plat=plat,
+        po=po,
+        timeline=timeline,
+        subtitle='',   # yaml 無獨立 subtitle，翠文在 timeline 內（不顯示於 minfo）
+        bgm='',
+        compliance='',
+        mirrors=mirrors,
+        cta_kw=cta_kw,
+        caption=caption,
+        hashtags=hashtags,
+        insight=insight,
+        scene=scene,
+    )
+
+
+# ============================================================
+# 解析單部腳本（舊 .md 模式保留函式，但主路由已切到 yaml）
 # ============================================================
 def parse_scripts(md):
     # 以 "## NN — 標題" 切（13 部在「## 13 部標題／派系一覽」表格之後）
@@ -185,7 +310,43 @@ def parse_scripts(md):
 
 
 # ============================================================
-# 解析脆文
+# 解析脆文（新格式：## Threads NN（衍生自...）---分隔）
+# ============================================================
+def parse_threads_new_fmt(md_text: str) -> list:
+    """解析脆文 .md（新格式：## Threads NN（衍生自...） + body + # hashtag）
+    格式同 build_shihting.py parse_threads_md。
+    回傳 list of dict(tid, src, body, hashtags)
+    """
+    blocks = re.split(r'\n---\n', md_text.strip())
+    results = []
+    for blk in blocks:
+        blk = blk.strip()
+        m_head = re.search(r'##\s+Threads\s+(\d+)[（(]([^）)]+)[）)]', blk)
+        if not m_head:
+            continue
+        tid = m_head.group(1).strip()
+        src = m_head.group(2).strip()
+
+        lines = blk.splitlines()
+        body_lines = []
+        hashtag = ''
+        for ln in lines:
+            if re.match(r'##\s+Threads\s+\d+', ln):
+                continue
+            if re.match(r'主題：', ln):
+                continue
+            if ln.strip().startswith('#') and not ln.strip().startswith('##'):
+                hashtag = ln.strip()
+                continue
+            body_lines.append(ln)
+        body = '\n'.join(body_lines).strip()
+        if body or hashtag:
+            results.append(dict(tid=tid, src=src, body=body, hashtags=hashtag))
+    return results
+
+
+# ============================================================
+# 解析脆文（舊 .md 格式，保留備用）
 # ============================================================
 def parse_threads(md):
     m = re.search(r'##\s*7\s*篇\s*Threads[^\n]*\n(.+)$', md, re.DOTALL)
@@ -453,19 +614,36 @@ function copyThread(btn){var c=btn.closest('.th-card');var tx=c.querySelector('.
 # main
 # ============================================================
 def main():
-    path = os.path.abspath(_args.script_md)
-    if not os.path.isfile(path):
-        print(f'ERROR: 腳本檔不存在：{path}', file=sys.stderr)
+    # ==== yaml-driven 模式（標準，唯一支援路徑）====
+    if not _args.yaml_dir:
+        print('ERROR: --yaml-dir 必填（新業主標準模式：--mode yaml --yaml-dir <路徑>）', file=sys.stderr)
         sys.exit(1)
-    with open(path, 'r', encoding='utf-8') as f:
-        md = f.read()
 
-    scripts = parse_scripts(md)
-    threads = parse_threads(md)
-    print(f'parsed: {len(scripts)} 腳本, {len(threads)} 脆文')
-    if not scripts:
-        print('ERROR: 解析不到任何腳本，中止出貨', file=sys.stderr)
+    yaml_dir = os.path.abspath(_args.yaml_dir)
+    if not os.path.isdir(yaml_dir):
+        print(f'ERROR: yaml-dir 不存在：{yaml_dir}', file=sys.stderr)
         sys.exit(1)
+
+    from yaml_to_sc import load_yaml_articles
+    yaml_articles = load_yaml_articles(yaml_dir, expected_count=_args.expected_count)
+
+    if not yaml_articles:
+        print('ERROR: yaml-dir 內沒有找到任何 script_*.yaml，中止出貨', file=sys.stderr)
+        sys.exit(1)
+
+    batch_label = _args.batch_label or os.path.basename(yaml_dir)
+    print(f'build_wendi.py loaded OK（yaml-driven）')
+    print(f'yaml-dir: {yaml_dir}')
+    print(f'batch-label: {batch_label}')
+    print(f'yaml 數量: {len(yaml_articles)}')
+
+    scripts = []
+    for idx, ydata in enumerate(yaml_articles, start=1):
+        s = wendi_yaml_adapter(ydata, num=idx)
+        scripts.append(s)
+
+    print(f'parsed: {len(scripts)} 腳本（yaml-driven）')
+
     if len(scripts) != 13:
         print(f'WARNING: 腳本數 {len(scripts)} != 13（非標準批次，請確認）', file=sys.stderr)
 
@@ -475,14 +653,32 @@ def main():
         print(f'ERROR: 以下腳本藏鏡人 <2，中止出貨：{miss}', file=sys.stderr)
         sys.exit(1)
 
+    # 脆文（yaml-dir 下的 threads_*.md，若存在；走新格式解析器）
+    threads = []
+    import glob as _glob
+    for threads_md_path in sorted(_glob.glob(os.path.join(yaml_dir, 'threads_*.md'))):
+        with open(threads_md_path, 'r', encoding='utf-8') as f:
+            threads_md = f.read()
+        parsed = parse_threads_new_fmt(threads_md)
+        if parsed:
+            threads.extend(parsed)
+        else:
+            # fallback：舊格式（## 7 篇 Threads 大標）
+            threads.extend(parse_threads(threads_md))
+    print(f'脆文: {len(threads)} 篇')
+
     cards = '\n'.join(render_card(s) for s in scripts)
     threads_html = '\n'.join(render_thread(t) for t in threads)
 
+    # batch_id：從 batch_label 取第一個「第 XX 批」供 id 用
+    batch_id_m = re.search(r'第\s*(\d+)\s*批', batch_label)
+    batch_id = 'b' + batch_id_m.group(1).zfill(2) if batch_id_m else 'bnew'
+
     section = (
-        f'<section class="group collapsed" id="b01">'
-        f'<div class="grp-head" onclick="toggleGroup(\'b01\')">'
-        f'<span class="tag">第 01 批</span>'
-        f'<span class="ttl">溫蒂首批 <small>2026-06-02</small></span>'
+        f'<section class="group collapsed" id="{esc(batch_id)}">'
+        f'<div class="grp-head" onclick="toggleGroup(\'{esc_attr(batch_id)}\')">'
+        f'<span class="tag">{esc(batch_label.split("·")[0].strip())}</span>'
+        f'<span class="ttl">{esc(batch_label)} <small></small></span>'
         f'<span class="cnt">{len(scripts)} 支</span></div>'
         f'<div class="cards">{cards}</div></section>'
     )
@@ -524,7 +720,7 @@ def main():
 <a href="https://www.tiktok.com/@_yu0812_" target="_blank" rel="noopener">🎵 TikTok</a>
 <a href="https://www.threads.net/@_yu0812_" target="_blank" rel="noopener">🧵 Threads</a>
 <a class="line" href="https://page.line.me/162vpemu" target="_blank" rel="noopener">💬 LINE 預約</a></div>
-<div class="cell stat"><div class="big">{len(scripts)}</div><div class="lb">支腳本 · 第 01 批</div></div>
+<div class="cell stat"><div class="big">{len(scripts)}</div><div class="lb">支腳本 · {esc(batch_label)}</div></div>
 </div></header>
 {section}
 {thr_section}
@@ -539,7 +735,15 @@ def main():
 
     with open(_args.out, 'w', encoding='utf-8') as f:
         f.write(page)
-    print(f'HTML 已生成：{_args.out}  ({len(page)} bytes)')
+    size = os.path.getsize(_args.out)
+    print(f'HTML 已生成：{_args.out}  ({size} bytes)')
+    print(f'Total articles: {len(scripts)}')
+    print()
+    print('next step:')
+    print(f'  1. python validate_deploy.py')
+    print(f'  2. git add wendi.html build_wendi.py')
+    print(f'  3. git commit + push（霸告親手）')
+    print(f'  4. Playwright drive 線上自驗 9 件（SOP §8）')
 
 
 if __name__ == '__main__':

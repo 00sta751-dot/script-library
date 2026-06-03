@@ -55,6 +55,10 @@ OWNER_META = {
         "dir": L2_BASE / "餐飲_阿奇",
         "pref": L2_BASE / "餐飲_阿奇" / "00_業主核心檔" / "source_overlay" / "_阿奇偏好.md",
     },
+    "溫蒂": {
+        "dir": L2_BASE / "美容_溫蒂",
+        "pref": L2_BASE / "美容_溫蒂" / "00_業主核心檔" / "source_overlay" / "_溫蒂偏好.md",
+    },
 }
 
 

@@ -78,6 +78,7 @@ OWNER_DIALOGUE_KEY = {
     "叭噗_小C": "台詞_叭噗",
     "阿奇":     "台詞_阿奇",
     "溫蒂":     "台詞_溫蒂",
+    "詩婷":     "台詞_詩婷",
 }
 
 # 業主主推平台
@@ -88,6 +89,7 @@ OWNER_PLATFORM = {
     "叭噗_小C": "IG Reels",
     "阿奇":     "FB Reels",
     "溫蒂":     "IG Reels",
+    "詩婷":     "IG Reels",
 }
 
 

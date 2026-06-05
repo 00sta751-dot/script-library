@@ -59,6 +59,10 @@ OWNER_META = {
         "dir": L2_BASE / "美容_溫蒂",
         "pref": L2_BASE / "美容_溫蒂" / "00_業主核心檔" / "source_overlay" / "_溫蒂偏好.md",
     },
+    "詩婷": {
+        "dir": L2_BASE / "房仲_詩婷",
+        "pref": L2_BASE / "房仲_詩婷" / "00_業主核心檔" / "source_overlay" / "_詩婷偏好.md",
+    },
 }
 
 
@@ -387,8 +391,20 @@ def _owner_code(owner: str) -> str:
         "昀臻": "yunzhen",
         "叭噗_小C": "bappu",
         "阿奇": "achi",
+        "詩婷": "shihting",   # 2026-06-05 補（對齊 validate_deploy prefix）
+        "溫蒂": "wendi",      # 2026-06-05 補
     }
-    return mapping.get(owner, owner.lower()[:6])
+    code = mapping.get(owner)
+    if code:
+        return code
+    # fallback：非 mapping 業主 → 若含非 ASCII（中文）會產出壞 script_id，fail-loud
+    fb = owner.lower()[:6]
+    if not fb.isascii():
+        raise SystemExit(
+            f"[topic_distributor] _owner_code 缺業主代號 mapping：{owner!r}（中文 fallback 會產壞 script_id）。"
+            f"請補進 _owner_code mapping（對齊 validate_deploy OWNER_MAP prefix）。"
+        )
+    return fb
 
 
 def _batch_code(batch: str) -> str:

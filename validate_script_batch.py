@@ -642,19 +642,35 @@ def chk_c013_dm_card(data: dict, fname: str, owner: str) -> tuple[str, str]:
         return "FAIL", f"釣魚部 dm_card 缺少欄位：{missing}"
     return "PASS", "釣魚部 dm_card 6 件齊"
 
-def chk_c014_card_style(batch_dir: Path, owner: str, batch_tag: str) -> tuple[str, str]:
-    """C-014：圖卡風格 18 選 1 推薦走過"""
-    # 找業主核心檔資料夾
+def chk_c014_card_style(yamls, batch_dir: Path, owner: str, batch_tag: str) -> tuple[str, str]:
+    """C-014：知識型圖卡風格 18 選 1 推薦走過（B6 2026-06-05：知識圖卡改按需 — intent-aware）。
+    判定邏輯：先看本批有沒有「知識圖卡意圖」（任一腳本填了非空「圖卡主題」）。
+      - 無意圖 + 無風格選擇檔 → PASS 跳過（本批本來就不做知識圖卡，不 WARN-spam）。
+      - 有意圖 + 無風格選擇檔 → WARN（要做知識圖卡卻沒走 18 選 1 推薦制，提醒補）。
+      - 有風格選擇檔 → 驗風格 id。
+    釣魚部 dm_card（①）不在此 check（走 C-013），其用 dm_card 欄位、非「圖卡主題」。"""
+    # B6：本批是否有知識圖卡意圖（腳本填了非空「圖卡主題」；釣魚部用 dm_card 不填此欄）
+    has_knowledge_card_intent = any(
+        str((data or {}).get("圖卡主題") or "").strip()
+        for _, data in (yamls or [])
+    )
+    # B6：無知識圖卡意圖 → 本批不做知識圖卡，直接 PASS-skip（先於 owner 目錄判斷，避免 owner 不在 map 時被 WARN-spam）
+    if not has_knowledge_card_intent:
+        return "PASS", "本批無知識圖卡意圖（無腳本填「圖卡主題」），按需跳過 C-014（B6 2026-06-05）"
+    # 以下只在「本批確實要做知識圖卡」時才走：找風格選擇檔
+    # 找業主核心檔資料夾（7 業主全列；缺漏業主走 OWNER_PREF_PATHS fallback）
     owner_dir_map = {
         "瑞祥":     L2_BASE / "房仲_瑞祥"    / "00_業主核心檔" / "source_overlay",
         "仲豪":     L2_BASE / "房仲_仲豪"    / "00_業主核心檔" / "source_overlay",
         "昀臻":     L2_BASE / "美容_昀臻"    / "00_業主核心檔" / "source_overlay",
         "叭噗_小C": L2_BASE / "情侶_叭噗_小C" / "00_業主核心檔" / "source_overlay",
         "阿奇":     L2_BASE / "餐飲_阿奇"    / "00_業主核心檔" / "source_overlay",
+        "詩婷":     L2_BASE / "房仲_詩婷"    / "00_業主核心檔" / "source_overlay",
+        "溫蒂":     L2_BASE / "美容_溫蒂"    / "00_業主核心檔" / "source_overlay",
     }
     overlay_dir = owner_dir_map.get(owner)
     if not overlay_dir or not overlay_dir.exists():
-        return "WARN", f"找不到業主 source_overlay 資料夾（{overlay_dir}），跳過圖卡風格驗證"
+        return "WARN", f"本批有知識圖卡意圖但找不到業主 source_overlay 資料夾（{overlay_dir}），無法驗風格選擇檔"
     # 抓批次編號（e.g. 第01批）
     batch_num_m = re.search(r"第(\d+)批", batch_tag)
     batch_num = batch_num_m.group(0) if batch_num_m else batch_tag
@@ -663,7 +679,7 @@ def chk_c014_card_style(batch_dir: Path, owner: str, batch_tag: str) -> tuple[st
     if not candidates:
         candidates = list(overlay_dir.glob("*圖卡風格*.md"))
     if not candidates:
-        return "WARN", f"找不到圖卡風格選擇檔（在 {overlay_dir}，批次 {batch_num}）— 請在 source_overlay 建立 _圖卡風格選擇_{batch_num}.md"
+        return "WARN", f"本批有知識圖卡意圖（腳本填了「圖卡主題」）但找不到圖卡風格選擇檔（{overlay_dir}，批次 {batch_num}）— 要做知識圖卡請走 18 選 1 推薦制，建 _圖卡風格選擇_{batch_num}.md"
     # 驗內容含 style-N- 或 id: N
     for p in candidates:
         content = p.read_text(encoding="utf-8")
@@ -1973,7 +1989,7 @@ def main():
         ("L1-009", chk_l1_009_派系_coverage(valid_yamls)),
         ("C-011",  chk_c011_派系_ratio(valid_yamls, owner, pref_text)),
         ("C-012",  chk_c012_identity_ratio(valid_yamls, owner, pref_text)),
-        ("C-014",  chk_c014_card_style(batch_dir, owner, batch_tag)),
+        ("C-014",  chk_c014_card_style(valid_yamls, batch_dir, owner, batch_tag)),
         # v3 新增 6 件 batch checks（2026-05-23 三審修補）
         ("V2-006", chk_v2_006_required_slot(valid_yamls)),
         ("V2-007", chk_v2_007_threads_seven(batch_dir)),

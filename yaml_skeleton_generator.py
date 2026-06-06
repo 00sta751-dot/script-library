@@ -28,10 +28,36 @@ try:
 except Exception:
     pass
 
+# ── _sop_config import（B 段 2026-06-05）──
+try:
+    _SC_DIR = Path(__file__).resolve().parent
+    import sys as _sys
+    if str(_SC_DIR) not in _sys.path:
+        _sys.path.insert(0, str(_SC_DIR))
+    from _sop_config import (
+        load_l0_batch_spec as _load_l0_batch_spec,
+        load_l0_time_slots as _load_l0_time_slots,
+    )
+    _SOP_CONFIG_OK = True
+except Exception as _sop_err:
+    print(
+        f"[WARN] yaml_skeleton_generator: _sop_config import failed ({_sop_err}); "
+        f"using hardcoded fallback",
+        file=sys.stderr,
+    )
+    _SOP_CONFIG_OK = False
+
+    def _load_l0_batch_spec():  # type: ignore
+        return {"main_scripts": 13, "duration_seconds": 60, "title_max_chars": 15, "actor_interaction_min": 2}
+
+    def _load_l0_time_slots():  # type: ignore
+        return ()
+
 # ════════════════════════════════════════
 # 6 段時間軸 — IMMUTABLE（SOP §2 固定，禁改）
 # ════════════════════════════════════════
-TIME_SLOTS = [
+# B 段：HARDCODED_TIME_SLOTS 作為 fallback；實際骨架由 build_time_slots() 從 L0 組裝
+HARDCODED_TIME_SLOTS = [
     {
         "timestamp": "0-3s",
         "type": "Hook",
@@ -70,6 +96,39 @@ TIME_SLOTS = [
     },
 ]
 
+# 本地 type mapping（與 L0 段數綁定，B 段 §4 防呆）
+LOCAL_SLOT_TYPES = ["Hook", "破題", "核心論述", "案例轉折", "收束金句", "CTA"]
+
+
+def build_time_slots() -> list:
+    """
+    從 L0 time_slots + 本地 type mapping 組骨架用 slot list。
+    若 L0 slots 數 != LOCAL_SLOT_TYPES 數 → fallback HARDCODED_TIME_SLOTS + WARN。
+    """
+    l0 = _load_l0_time_slots()
+    if len(l0) != len(LOCAL_SLOT_TYPES):
+        print(
+            f"[WARN] yaml_skeleton_generator: L0 time_slots count "
+            f"{len(l0)} != local type mapping {len(LOCAL_SLOT_TYPES)}; using hardcoded skeleton fallback",
+            file=sys.stderr,
+        )
+        return list(HARDCODED_TIME_SLOTS)
+    # timestamp 來自 L0（config 值）；type/task/note 用本地骨架文字（presentation 非 config，
+    # 保持 skeleton 輸出 byte-identical 零行為改變 — B 段 §0 承諾「數字不變、只改來源」）。
+    return [
+        {
+            "timestamp": s["timestamp"],
+            "type":      LOCAL_SLOT_TYPES[i],
+            "task":      HARDCODED_TIME_SLOTS[i]["task"],
+            "note":      HARDCODED_TIME_SLOTS[i]["note"],
+        }
+        for i, s in enumerate(l0)
+    ]
+
+
+# 舊名 TIME_SLOTS 指向 build_time_slots()，維持向後相容（其他非關鍵引用不壞）
+TIME_SLOTS = build_time_slots()
+
 # 業主台詞欄位名對照（不同業主 yaml 用不同 key）
 OWNER_DIALOGUE_KEY = {
     "瑞祥":     "台詞_瑞祥",
@@ -101,6 +160,9 @@ def build_yaml_skeleton(item: dict) -> str:
     """
     item: topic plan 裡一條記錄
     回傳完整 yaml 文字（字串，含 --- frontmatter markers）
+    B 段 2026-06-05：duration / title_max_chars / actor_interaction_min 改讀 L0；
+    藏鏡人位置改用 seg_type in {"Hook","案例轉折"} 不寫死 timestamp；
+    TIME_SLOTS 改由 build_time_slots() 組裝。
     """
     owner = item.get("owner", "未知")
     batch = item.get("batch", "01")
@@ -112,37 +174,51 @@ def build_yaml_skeleton(item: dict) -> str:
     dialogue_key = OWNER_DIALOGUE_KEY.get(owner, "台詞")
     platform = OWNER_PLATFORM.get(owner, "FB Reels")
 
+    # 讀 L0 值
+    bs = _load_l0_batch_spec()
+    duration_seconds   = int(bs.get("duration_seconds", 60))
+    title_max_chars    = int(bs.get("title_max_chars", 15))
+    actor_min          = int(bs.get("actor_interaction_min", 2))
+
+    # 骨架用的 slot list（由 build_time_slots() 從 L0 組裝）
+    active_slots = build_time_slots()
+
     # ── Frontmatter ──
     lines = ["---"]
     lines.append(f"script_id: {script_id}")
     lines.append(f"owner: {owner}")
     lines.append(f"batch: \"{batch}\"")
     lines.append(f"batch_tag: {batch_tag}")
-    lines.append(f"title: [編劇填]  # 15 字內金句")
+    lines.append(f"title: \"[編劇填]\"  # {title_max_chars} 字內金句")
     lines.append(f"template: {school}方向")
     lines.append(f"pattern: [編劇填]  # e.g. 創業故事型 / 觀點分享型")
     lines.append(f"雙身份分類: {identity}")
     lines.append(f"dominant_viewer_takeaway: [編劇填]  # e.g. 共鳴認同 / 實用學習")
-    lines.append(f"duration: 60s")
+    lines.append(f"duration: {duration_seconds}s")
     lines.append(f"main_platform: {platform}")
-    lines.append(f"suggested_po_time: [編劇填]  # e.g. 週三晚 8PM")
+    lines.append(f"publish_mode: manual_today  # enum: manual_today / platform_scheduled / draft_only")
+    lines.append(f"distribution_mode: organic_only  # enum: organic_only / boost_candidate / paid_ad")
+    lines.append(f"voice_lock: true  # 聲明業主聲音語料強制入 Hook（見 L2 偏好.md §voice_lock）")
+    lines.append(f"suggested_po_time: \"[編劇填]\"  # e.g. 週三晚 8PM")
     lines.append(f"派系: {school}")
     lines.append(f"")
     lines.append(f"# 題目方向（topic_distributor.py 分配，編劇填內文後請刪此行）")
     lines.append(f"# direction: {direction}")
     lines.append(f"")
 
-    # ── 藏鏡人 block ──
+    # ── 藏鏡人 block（位置描述固定用 slot type 名稱，不寫死 timestamp）──
+    hook_ts     = next((s["timestamp"] for s in active_slots if s["type"] == "Hook"),     "0-3s")
+    turning_ts  = next((s["timestamp"] for s in active_slots if s["type"] == "案例轉折"), "25-40s")
     lines.append("藏鏡人:")
-    lines.append("  位置1: Hook後 0-3s（懸念型）")
+    lines.append(f"  位置1: Hook後 {hook_ts}（懸念型）")
     lines.append("  句子1: \"[編劇填]\"")
-    lines.append("  位置2: 轉折段後 25-40s（共鳴型）")
+    lines.append(f"  位置2: 轉折段後 {turning_ts}（共鳴型）")
     lines.append("  句子2: \"[編劇填]\"")
     lines.append("")
 
-    # ── 6 段 scenes ──
+    # ── scenes ──
     lines.append("scenes:")
-    for slot in TIME_SLOTS:
+    for slot in active_slots:
         ts = slot["timestamp"]
         seg_type = slot["type"]
         task = slot["task"]
@@ -154,10 +230,8 @@ def build_yaml_skeleton(item: dict) -> str:
         lines.append(f"    # 注意：{note}")
         lines.append(f"    {dialogue_key}: \"[編劇填]\"")
 
-        # Hook 和轉折段附藏鏡人欄位
-        if ts == "0-3s":
-            lines.append("    藏鏡人: \"[編劇填]\"")
-        elif ts == "25-40s":
+        # 藏鏡人欄位：Hook 和 案例轉折 段，用 seg_type 判斷不寫死 timestamp
+        if seg_type in {"Hook", "案例轉折"}:
             lines.append("    藏鏡人: \"[編劇填]\"")
 
         lines.append(f"    畫面: \"[編劇填]\"  # 視覺場景建議（地點/穿著/氛圍/道具）")
@@ -183,7 +257,7 @@ def build_yaml_skeleton(item: dict) -> str:
     # ── schema_check ──
     lines.append("schema_check:")
     lines.append("  禁虛構: true")
-    lines.append("  藏鏡人數量: 2  # 請維持 >= 2")
+    lines.append(f"  藏鏡人數量: {actor_min}  # 請維持 >= {actor_min}")
     lines.append("  答案完整不拆集: true")
     lines.append("  CTA類型: \"[編劇填]\"  # e.g. 互動留言型 / 釣魚型 / 個人化諮詢型")
     lines.append("  禁用詞自查: \"[編劇填後改為 PASS]\"")
@@ -199,7 +273,7 @@ def build_yaml_skeleton(item: dict) -> str:
 # ════════════════════════════════════════
 
 def main():
-    parser = argparse.ArgumentParser(description="yaml 骨架機 — 產 13 個空 yaml 骨架")
+    parser = argparse.ArgumentParser(description="yaml 骨架機 — 產 SOP batch_spec.main_scripts 個空 yaml 骨架")
     parser.add_argument("--topic-plan", required=True, help="topic_distributor.py 產的 JSON 路徑")
     parser.add_argument("--output-dir", required=True, help="產出目標資料夾（會自動建立）")
     parser.add_argument("--tmp",        action="store_true", help="輸出 .tmp yaml（自驗用，不 commit）")

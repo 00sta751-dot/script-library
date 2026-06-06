@@ -29,6 +29,37 @@ try:
 except Exception:
     pass
 
+# ── 共用派系解析器（第一刀 2026-06-05）──
+try:
+    _FP_DIR = Path(__file__).resolve().parent
+    import sys as _sys
+    if str(_FP_DIR) not in _sys.path:
+        _sys.path.insert(0, str(_FP_DIR))
+    from _faction_parser import (
+        load_l0_faction_names as _load_l0_faction_names,
+        parse_faction_mix_from_headings as _parse_faction_mix,
+        FactionParseResult as _FactionParseResult,
+    )
+    _FACTION_PARSER_OK = True
+except Exception as _fp_err:
+    _FACTION_PARSER_OK = False
+    _load_l0_faction_names = None  # type: ignore
+    _parse_faction_mix = None      # type: ignore
+
+# ── 共用雙身份解析器（第二刀 2026-06-05）──
+try:
+    _FP_DIR2 = Path(__file__).resolve().parent
+    if str(_FP_DIR2) not in _sys.path:
+        _sys.path.insert(0, str(_FP_DIR2))
+    from _identity_parser import (
+        parse_identity_mix_from_headings as _parse_identity_mix,
+        IdentityParseResult as _IdentityParseResult,
+    )
+    _IDENTITY_PARSER_OK = True
+except Exception as _ip_err:
+    _IDENTITY_PARSER_OK = False
+    _parse_identity_mix = None  # type: ignore
+
 # ── 路徑常數 ──
 L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
 SOP_YAML = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_腳本生產SOP_v3.0.yaml")
@@ -85,93 +116,51 @@ def load_pref_text(owner: str) -> Optional[str]:
 #    支援「§8.X」「第 8 章」兩種 heading
 # ════════════════════════════════════════
 
+# 14 派系庫白名單（第一刀 2026-06-05：改從 L0 yaml 動態讀，廢除第三份硬編）
+# 若 _faction_parser 可用則從 L0 yaml 載；否則 fallback 硬編（對齊 validate_deploy 做法）
+if _FACTION_PARSER_OK:
+    VALID_SCHOOLS: frozenset[str] = _load_l0_faction_names()
+else:
+    VALID_SCHOOLS = frozenset({
+        "直球派", "人間觀察派", "嗆辣派", "雙城合作派", "結構分析派",
+        "老前輩權威派", "時事追擊派", "爆文公式派", "綜合派", "市場觀察派",
+        "故事戲劇派", "自嘲反差派", "拆解派", "家人朋友模擬派",
+    })
+
+
 def parse_school_ratios(pref_text: str) -> dict[str, int]:
     """
-    抓偏好.md 裡「派系名 佔 N%」格式
-    回傳 {派系名: 比例} e.g. {"自嘲反差派": 50, "故事戲劇派": 30, ...}
-    fallback：grep 任意「XX派 ... NN%」
+    薄 wrapper（第一刀 2026-06-05）：呼叫 _faction_parser.parse_faction_mix_from_headings。
+    只回傳 canonical_ratios（L0 14 標準名）。
+    unknown / provisional 狀態只印 warning，不靜默 normalize（消除 C-011 放水洞）。
+    若 _faction_parser 不可用，退回 empty dict（由 main() 均等 fallback 處理）。
     """
-    ratios: dict[str, int] = {}
-    in_section = False
+    if not _FACTION_PARSER_OK:
+        print("[WARN] _faction_parser 不可用，parse_school_ratios 回空（均等 fallback）")
+        return {}
 
-    for line in pref_text.splitlines():
-        # 進入派系章節（支援 §8 / 第 8 章 / 第8章）
-        if re.search(r"(?:§8|第\s*8\s*章|8\.4|派系搭配|派系比例)", line):
-            in_section = True
-            continue
-        # 下一個主章節結束
-        if in_section and re.match(r"^#{1,3}\s", line) and not re.search(r"8\.", line):
-            break
+    result: _FactionParseResult = _parse_faction_mix(pref_text, valid_schools=VALID_SCHOOLS)
 
-        if not in_section:
-            continue
+    # 印 warning（透明，不靜默）
+    for w in result.warnings:
+        print(f"[WARN] parse_school_ratios: {w}")
 
-        # 抓表格行或純文字行中的「派系名 佔/占 NN%」
-        # 格式 1：| 故事戲劇派 | 40% | ...
-        m1 = re.search(r"\|\s*\*{0,2}([一-龥a-zA-Z（）_\/]+派)\*{0,2}\s*\|\s*(\d+)%", line)
-        if m1:
-            name = m1.group(1).strip()
-            ratios[name] = int(m1.group(2))
-            continue
+    if result.provisional:
+        print("[WARN] 偏好.md 標記「建議傾向/尚無批次」，派系比例尚未算盤覆核，回空")
+        return {}
 
-        # 格式 2：- **主推（佔 50%）**：自嘲反差派 / ...
-        # 格式 3：  自嘲反差派（佔 50%）
-        m2 = re.search(r"([一-龥a-zA-Z（）_\/]+派)\s*[（\(]?[^)）]*?[)）]?\s*[佔占]\s*(\d+)%", line)
-        if m2:
-            name = m2.group(1).strip()
-            if name not in ratios:
-                ratios[name] = int(m2.group(2))
-            continue
+    if result.unknown_ratios:
+        # Codex P0 修（2026-06-05）：unknown 非空時不可只回 canonical-only。
+        # distribute_topics 以 sum(school_ratios) 當分母正規化 → canonical 子集合被塌成
+        # 單一派系 100%（仲豪 {直球派:36} → round(13×36/36)=13 支全直球派 = 產錯批次）。
+        # fail-loud 拒絕產出、逼走 Phase 2 補 alias 對照表，不靜默產錯。
+        raise ValueError(
+            f"偏好含未知派系名（非 L0 14 標準名）：{result.unknown_ratios}。"
+            f"現有工具無法可靠分題（canonical 子集合會被 distribute 塌成單一派系 100%），"
+            f"需 Phase 2 補 alias 對照表後才能分題。本次拒絕產出（fail-loud）。"
+        )
 
-        # 格式 4：純「主推（佔 50%）」行附派系清單（取代理比例）
-        # 如「主推（佔 50%）：自嘲反差派 / 故事戲劇派 / 家人朋友模擬派」
-        m3 = re.search(r"主推[（\(]佔\s*(\d+)%[)）].*?[:：]\s*(.+)", line)
-        if m3:
-            pct = int(m3.group(1))
-            names_str = m3.group(2)
-            names = re.findall(r"([一-龥a-zA-Z（）_]+派)", names_str)
-            if names:
-                per = pct // len(names)
-                for n in names:
-                    if n not in ratios:
-                        ratios[n] = per
-            continue
-
-        m4 = re.search(r"替代[（\(]佔\s*(\d+)%[)）].*?[:：]\s*(.+)", line)
-        if m4:
-            pct = int(m4.group(1))
-            names_str = m4.group(2)
-            names = re.findall(r"([一-龥a-zA-Z（）_]+派)", names_str)
-            if names:
-                per = pct // len(names)
-                for n in names:
-                    if n not in ratios:
-                        ratios[n] = per
-            continue
-
-        m5 = re.search(r"少量[加料]?[（\(]佔\s*(\d+)%[)）].*?[:：]\s*(.+)", line)
-        if m5:
-            pct = int(m5.group(1))
-            names_str = m5.group(2)
-            names = re.findall(r"([一-龥a-zA-Z（）_]+派)", names_str)
-            if names:
-                per = pct // len(names)
-                for n in names:
-                    if n not in ratios:
-                        ratios[n] = per
-            continue
-
-    if not ratios:
-        # 全域 fallback：掃全文任意 XX派...NN%
-        print("[WARN] 偏好.md §8 無法從派系章節解析比例，改全文 fallback grep")
-        for line in pref_text.splitlines():
-            m = re.search(r"([一-龥a-zA-Z（）_\/]+派)\s*[^%]*?[佔占]?\s*(\d+)%", line)
-            if m:
-                name = m.group(1).strip()
-                if name not in ratios:
-                    ratios[name] = int(m.group(2))
-
-    return ratios
+    return dict(result.canonical_ratios)
 
 
 # ════════════════════════════════════════
@@ -180,31 +169,16 @@ def parse_school_ratios(pref_text: str) -> dict[str, int]:
 
 def parse_identity_ratios(pref_text: str) -> dict[str, int]:
     """
-    抓偏好.md 第 3 章 雙身份比例
-    回傳 {身份類型: 比例} e.g. {"生活 / 觀點 / 個人故事": 50, "餐飲（胖奇熱狗堡）": 30, ...}
+    抓偏好.md 雙身份比例（heading-based，第二刀 2026-06-05）
+    薄 wrapper 呼叫 _identity_parser.parse_identity_mix_from_headings。
+    回傳 {身份類型: 比例} e.g. {"生活 / 觀點 / 個人故事": 50, "餐飲": 30, ...}
+    名稱已 normalize（全形/半形括號 strip）。
     """
-    ratios: dict[str, int] = {}
-    in_section = False
-
-    for line in pref_text.splitlines():
-        if re.search(r"(?:第\s*3\s*章|雙身份比例|§3)", line):
-            in_section = True
-            continue
-        if in_section and re.match(r"^#{1,3}\s", line) and not re.search(r"[3三]", line):
-            in_section = False
-        if not in_section:
-            continue
-
-        # 表格行：| 生活 / 觀點 | 50% | ... 或 | 身份類型 | 比例 |
-        m = re.search(r"\|\s*([^|]+?)\s*\|\s*(\d+)%", line)
-        if m:
-            label = m.group(1).strip()
-            # 跳過 header 行
-            if label in ("內容類型", "建議比例", "理由", "---"):
-                continue
-            ratios[label] = int(m.group(2))
-
-    return ratios
+    if _IDENTITY_PARSER_OK and _parse_identity_mix is not None:
+        result = _parse_identity_mix(pref_text)
+        return dict(result.ratios)
+    # fallback：_identity_parser 不可用時回空，讓呼叫方走 fallback 路徑
+    return {}
 
 
 # ════════════════════════════════════════
@@ -281,17 +255,20 @@ def collect_used_topics(owner: str) -> list[dict]:
 
 
 # ════════════════════════════════════════
-# 6. SOP batch_spec 讀取
+# 6. SOP batch_spec 讀取（B 段 2026-06-05：薄 wrapper 改讀 _sop_config）
 # ════════════════════════════════════════
 
 def load_sop_batch_spec() -> dict:
-    if not SOP_YAML.exists():
-        return {"main_scripts": 13, "cta_distribution": {}}
+    """薄 wrapper：呼叫 _sop_config.load_l0_batch_spec，回傳完整 batch_spec dict。
+    B 段 2026-06-05（Codex must-fix）：補 try/except 恢復 graceful fallback——與
+    validate/skeleton 容錯姿態一致；_sop_config 模組 import/load 失敗 → 退舊硬編值不 crash。"""
     try:
-        data = yaml.safe_load(SOP_YAML.read_text(encoding="utf-8"))
-        return data.get("batch_spec", {})
-    except Exception:
-        return {"main_scripts": 13}
+        from _sop_config import load_l0_batch_spec
+        return load_l0_batch_spec()
+    except Exception as e:
+        print(f"[WARN] topic_distributor: _sop_config import/load failed ({e}); using hardcoded fallback",
+              file=sys.stderr)
+        return {"main_scripts": 13, "cta_distribution": {}}
 
 
 # ════════════════════════════════════════

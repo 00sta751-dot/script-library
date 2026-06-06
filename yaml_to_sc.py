@@ -562,6 +562,12 @@ def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> di
     if not isinstance(platform_variants_kw, dict):
         platform_variants_kw = {}
 
+    # 釣魚部 opt-in 圖卡資產（釣魚下架 2026-06-05 / Codex must-fix）：build 優先吃 top-level img，
+    # 否則 fallback 到 dm_card.asset_path / dm_card.img —— 封「C-013 驗 dm_card.asset_path 過、但 build 沒讀 → 站上圖卡空白」洞。
+    _dm_card = original_yaml.get('dm_card')
+    _dm_card = _dm_card if isinstance(_dm_card, dict) else {}
+    _img = original_yaml.get('img') or _dm_card.get('asset_path') or _dm_card.get('img') or None
+
     return {
         'num': num,
         'title': original_yaml['title'],
@@ -574,7 +580,7 @@ def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> di
         'platform_chip': platform_chip,
         'po_time': po_time,
         'hashtag': hashtag,
-        'img': original_yaml.get('img') or None,
+        'img': _img,
         'voice_lock': voice_lock,
         'policy_alignment': policy_alignment,
         'trial_reels': trial_reels,

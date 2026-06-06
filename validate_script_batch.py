@@ -34,6 +34,36 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+# ── 共用派系解析器（第一刀 2026-06-05）──
+try:
+    _FP_DIR = Path(__file__).resolve().parent
+    if str(_FP_DIR) not in sys.path:
+        sys.path.insert(0, str(_FP_DIR))
+    from _faction_parser import (
+        load_l0_faction_names as _load_l0_faction_names,
+        parse_faction_mix_from_headings as _parse_faction_mix,
+        FactionParseResult as _FactionParseResult,
+    )
+    _FACTION_PARSER_OK = True
+except Exception as _fp_err:
+    _FACTION_PARSER_OK = False
+    _load_l0_faction_names = None  # type: ignore
+    _parse_faction_mix = None      # type: ignore
+
+# ── 共用雙身份解析器（第二刀 2026-06-05）──
+try:
+    _FP_DIR2 = Path(__file__).resolve().parent
+    if str(_FP_DIR2) not in sys.path:
+        sys.path.insert(0, str(_FP_DIR2))
+    from _identity_parser import (
+        parse_identity_mix_from_headings as _parse_identity_mix,
+        IdentityParseResult as _IdentityParseResult,
+    )
+    _IDENTITY_PARSER_OK = True
+except Exception as _ip_err:
+    _IDENTITY_PARSER_OK = False
+    _parse_identity_mix = None  # type: ignore
+
 # ── P1-③：從 validate_deploy 共用 FACTION_LEAK_WORDS（單一真理源）──
 try:
     _VD_DIR = Path(__file__).resolve().parent
@@ -66,6 +96,52 @@ try:
 except Exception as _e:
     _CANONICAL_AVAILABLE = False
     _normalize_canonical = None  # type: ignore
+
+# ── _sop_config：讀 L0 batch_spec + time_slots（B 段 2026-06-05）──
+try:
+    _SOP_CFG_DIR = Path(__file__).resolve().parent
+    if str(_SOP_CFG_DIR) not in sys.path:
+        sys.path.insert(0, str(_SOP_CFG_DIR))
+    from _sop_config import (
+        load_l0_batch_spec as _load_l0_batch_spec,
+        load_l0_time_slots as _load_l0_time_slots,
+        normalize_timestamp as _sop_ts_normalize,
+    )
+    _SOP_CONFIG_OK = True
+except Exception as _sop_err:
+    print(
+        f"[WARN] validate_script_batch: _sop_config import failed ({_sop_err}); "
+        f"using hardcoded SOP fallback",
+        file=sys.stderr,
+    )
+    _SOP_CONFIG_OK = False
+
+    # fallback 函式（回舊硬編值，守門不失效）
+    def _load_l0_batch_spec():  # type: ignore
+        return {
+            "main_scripts": 13, "fishing_script": 1, "threads_posts": 7,
+            "visual_aid_scripts": 0, "duration_seconds": 60, "title_max_chars": 15,
+            "traffic_codes_min": 3, "actor_interaction_min": 2,
+            "school_diversity_min": 3, "theme_diversity_min": 4, "cta_distribution": {},
+        }
+
+    def _load_l0_time_slots():  # type: ignore
+        return (
+            {"raw_slot": "0-3秒",   "timestamp": "0-3s",   "start":  0, "end":  3, "task": "Hook", "note": ""},
+            {"raw_slot": "3-12秒",  "timestamp": "3-12s",  "start":  3, "end": 12, "task": "破題", "note": ""},
+            {"raw_slot": "12-25秒", "timestamp": "12-25s", "start": 12, "end": 25, "task": "核心", "note": ""},
+            {"raw_slot": "25-40秒", "timestamp": "25-40s", "start": 25, "end": 40, "task": "案例", "note": ""},
+            {"raw_slot": "40-52秒", "timestamp": "40-52s", "start": 40, "end": 52, "task": "收束", "note": ""},
+            {"raw_slot": "52-60秒", "timestamp": "52-60s", "start": 52, "end": 60, "task": "CTA",  "note": ""},
+        )
+
+    def _sop_ts_normalize(value: str) -> str:  # type: ignore
+        import re as _re
+        value = value.replace("–", "-").replace("—", "-").replace(" ", "")
+        value = _re.sub(r"秒$", "s", value)
+        if _re.match(r"^\d+-\d+$", value):
+            value = value + "s"
+        return value
 
 # UTF-8 輸出防亂碼（Windows cp950）
 try:
@@ -162,22 +238,15 @@ def parse_schema_distribution(pref_text: str, section_header: str) -> dict[str, 
     return dist
 
 def parse_identity_distribution(pref_text: str) -> dict[str, int]:
-    """從偏好.md 第 3 章雙身份比例抓 '身份類型 XX%'"""
-    dist = {}
-    in_section = False
-    for line in pref_text.splitlines():
-        if "第 3 章" in line or "雙身份比例" in line:
-            in_section = True
-            continue
-        if in_section:
-            if line.startswith("##"):
-                break
-            m = re.search(r"\|\s*([^|]+?)\s*\|\s*(\d+)%", line)
-            if m:
-                label = m.group(1).strip()
-                if label and label != "內容類型" and label != "建議比例" and label != "理由":
-                    dist[label] = int(m.group(2))
-    return dist
+    """
+    從偏好.md 雙身份比例抓 {身份類型: %}（heading-based，第二刀 2026-06-05）
+    薄 wrapper 呼叫 _identity_parser。名稱已 normalize（括號 strip）。
+    """
+    if _IDENTITY_PARSER_OK and _parse_identity_mix is not None:
+        result = _parse_identity_mix(pref_text)
+        return dict(result.ratios)
+    # fallback：_identity_parser 不可用，回空
+    return {}
 
 # ────────────────────────────────────────────
 # 取翠文欄位值（在 scenes 每段的 "翠文" key）
@@ -261,15 +330,17 @@ def _get_canonical_scenes(data: dict) -> Optional[list]:
 def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
     """L1-001：schema 對齊 — 6 段時間軸完整且順序正確
     有 canonical 用 canonical（支援 markdown body 格式），沒有 fallback 舊邏輯。
+    B 段 2026-06-05：expected_order 改讀 L0 time_slots（廢硬編）。
     """
-    expected_order = ["0-3s", "3-12s", "12-25s", "25-40s", "40-52s", "52-60s"]
+    expected_order = [s["timestamp"] for s in _load_l0_time_slots()]
+    expected_len = len(expected_order)
 
     # 嘗試用 canonical
     canonical_scenes = _get_canonical_scenes(data)
     if canonical_scenes is not None:
-        if len(canonical_scenes) != 6:
+        if len(canonical_scenes) != expected_len:
             ts_list = [s.get('timestamp', '?') for s in canonical_scenes]
-            return "FAIL", f"scenes 段數 = {len(canonical_scenes)}，需要 6 段（實際：{ts_list}）"
+            return "FAIL", f"scenes 段數 = {len(canonical_scenes)}，需要 {expected_len} 段（實際：{ts_list}）"
         actual = [_ts_normalize(s.get('timestamp', '')) for s in canonical_scenes]
         for i, (exp, got) in enumerate(zip(expected_order, actual)):
             if got != exp:
@@ -278,8 +349,8 @@ def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
 
     # fallback：舊邏輯（structured frontmatter）
     scenes = get_scenes(data)
-    if len(scenes) != 6:
-        return "FAIL", f"scenes 段數 = {len(scenes)}，需要 6 段（實際：{[s.get('timestamp','?') for s in scenes]}）"
+    if len(scenes) != expected_len:
+        return "FAIL", f"scenes 段數 = {len(scenes)}，需要 {expected_len} 段（實際：{[s.get('timestamp','?') for s in scenes]}）"
     actual = [s.get("timestamp", "") for s in scenes]
     for i, (exp, got) in enumerate(zip(expected_order, actual)):
         if got != exp:
@@ -305,16 +376,19 @@ def chk_l1_002_banned(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", "無禁用詞"
 
 def chk_l1_003_mirror(data: dict, fname: str) -> tuple[str, str]:
-    """L1-003：藏鏡人互動點 >= 2
+    """L1-003：藏鏡人互動點 >= actor_interaction_min
     有 canonical 用 canonical（offscreen_interaction 欄位），沒有 fallback 舊邏輯。
     §14 P0：mirror 要吃 canonical，不是舊貪婪 regex。
+    B 段 2026-06-05：min_count 改讀 L0 batch_spec（廢硬編）。
     """
+    min_count = _load_l0_batch_spec()["actor_interaction_min"]
+
     # 嘗試用 canonical
     canonical_scenes = _get_canonical_scenes(data)
     if canonical_scenes is not None:
         count = sum(1 for s in canonical_scenes if s.get('offscreen_interaction'))
-        if count < 2:
-            return "FAIL", f"藏鏡人互動點 = {count}，需要 >= 2（canonical 層驗）"
+        if count < min_count:
+            return "FAIL", f"藏鏡人互動點 = {count}，需要 >= {min_count}（canonical 層驗）"
         return "PASS", f"藏鏡人互動點 = {count}（canonical 層驗）"
 
     # fallback：舊邏輯
@@ -329,8 +403,8 @@ def chk_l1_003_mirror(data: dict, fname: str) -> tuple[str, str]:
         top_count = sum(1 for k in top_mirror if k.startswith("位置"))
         if top_count > count:
             count = top_count
-    if count < 2:
-        return "FAIL", f"藏鏡人互動點 = {count}，需要 >= 2"
+    if count < min_count:
+        return "FAIL", f"藏鏡人互動點 = {count}，需要 >= {min_count}"
     return "PASS", f"藏鏡人互動點 = {count}"
 
 def _canonical_all_text(canonical_scenes: list, caption: str = '') -> str:
@@ -349,19 +423,22 @@ def _canonical_all_text(canonical_scenes: list, caption: str = '') -> str:
 
 
 def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
-    """L1-004：流量密碼 >= 3（以 schema_check 欄位 or 台詞關鍵詞代理）
+    """L1-004：流量密碼 >= traffic_codes_min（以 schema_check 欄位 or 台詞關鍵詞代理）
     有 canonical 用 canonical（dialogue + subtitle + offscreen 全文），沒有 fallback 舊邏輯。
+    B 段 2026-06-05：min_count 改讀 L0 batch_spec（廢硬編）。
     """
+    min_count = _load_l0_batch_spec()["traffic_codes_min"]
+
     sc = data.get("schema_check", {})
     if isinstance(sc, dict):
         fd = sc.get("流量密碼數量") or sc.get("流量密碼")
         if fd:
             try:
                 n = int(str(fd))
-                if n >= 3:
+                if n >= min_count:
                     return "PASS", f"schema_check 流量密碼數量 = {n}"
                 else:
-                    return "FAIL", f"schema_check 流量密碼數量 = {n}，需 >= 3"
+                    return "FAIL", f"schema_check 流量密碼數量 = {n}，需 >= {min_count}"
             except Exception:
                 pass
 
@@ -383,9 +460,9 @@ def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
             hits += 1
         if cap and ("？" in cap or "留言" in cap):
             hits += 1
-        if hits >= 3:
-            return "PASS", f"流量密碼信號 >= 3（偵測到 {hits} 個，含懸念+互動+反問，canonical 層驗）"
-        return "FAIL", f"流量密碼信號偵測 = {hits}，低於 3（canonical 層驗，請確認台詞有反問/懸念/互動引導）"
+        if hits >= min_count:
+            return "PASS", f"流量密碼信號 >= {min_count}（偵測到 {hits} 個，含懸念+互動+反問，canonical 層驗）"
+        return "FAIL", f"流量密碼信號偵測 = {hits}，低於 {min_count}（canonical 層驗，請確認台詞有反問/懸念/互動引導）"
 
     # fallback：舊邏輯
     text = get_all_text(data)
@@ -395,9 +472,9 @@ def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
     cap = data.get("caption", "")
     if cap and ("？" in cap or "留言" in cap):
         hits += 1
-    if hits >= 3:
-        return "PASS", f"流量密碼信號 >= 3（偵測到 {hits} 個信號，含懸念+互動+反問）"
-    return "FAIL", f"流量密碼信號偵測 = {hits}，低於 3（請確認台詞有反問/懸念/互動引導）"
+    if hits >= min_count:
+        return "PASS", f"流量密碼信號 >= {min_count}（偵測到 {hits} 個信號，含懸念+互動+反問）"
+    return "FAIL", f"流量密碼信號偵測 = {hits}，低於 {min_count}（請確認台詞有反問/懸念/互動引導）"
 
 def chk_l1_005_number_source(data: dict, fname: str) -> tuple[str, str]:
     """L1-005：業務數字（% / 萬 / 元）必有來源標記"""
@@ -422,9 +499,12 @@ def chk_l1_005_number_source(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", f"業務數字 {hits[:5]}{'...' if len(hits)>5 else ''}，已有來源標記或為個人經歷數字"
 
 def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
-    """L1-006：52-60s 段落有 CTA 引導語（純雞湯除外）
+    """L1-006：末段（L0 time_slots 最後一段）有 CTA 引導語（純雞湯除外）
     有 canonical 用 canonical（timestamp 正規化 + dialogue），沒有 fallback 舊邏輯。
+    B 段 2026-06-05：cta_slot 改讀 L0 time_slots 末段（廢硬編 '52-60s'）。
     """
+    cta_slot = _load_l0_time_slots()[-1]["timestamp"]
+
     sc = data.get("schema_check", {})
     # 純雞湯豁免
     if data.get("純雞湯標記") or (isinstance(sc, dict) and (sc.get("純雞湯") or sc.get("無CTA"))):
@@ -442,8 +522,8 @@ def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
             return "FAIL", "canonical scenes 為空，找不到 CTA 段"
         last = canonical_scenes[-1]
         ts_norm = _ts_normalize(last.get('timestamp', ''))
-        if ts_norm != '52-60s':
-            return "FAIL", f"最後一段 timestamp = '{last.get('timestamp','')}' (正規化: '{ts_norm}')，不是 '52-60s'"
+        if ts_norm != cta_slot:
+            return "FAIL", f"最後一段 timestamp = '{last.get('timestamp','')}' (正規化: '{ts_norm}')，不是 '{cta_slot}'"
         role = last.get('role', '')
         if 'CTA' not in role and 'cta' not in role.lower():
             return "FAIL", f"最後一段 role = '{role}'，應含 CTA（canonical 層驗）"
@@ -451,48 +531,56 @@ def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
         # 也從 subtitle 找
         text += ' ' + last.get('subtitle', '')
         if any(k in text for k in cta_keywords):
-            return "PASS", f"52-60s CTA 段存在，含引導語（canonical 層驗，{text[:40]}…）"
-        return "FAIL", f"52-60s CTA 段文字無引導語關鍵詞（canonical 層驗，{text[:60]}）"
+            return "PASS", f"{cta_slot} CTA 段存在，含引導語（canonical 層驗，{text[:40]}…）"
+        return "FAIL", f"{cta_slot} CTA 段文字無引導語關鍵詞（canonical 層驗，{text[:60]}）"
 
     # fallback：舊邏輯
     scenes = get_scenes(data)
     last = scenes[-1] if scenes else {}
     ts = last.get("timestamp", "")
-    if ts != "52-60s":
-        return "FAIL", f"最後一段 timestamp = '{ts}'，不是 '52-60s'"
+    if ts != cta_slot:
+        return "FAIL", f"最後一段 timestamp = '{ts}'，不是 '{cta_slot}'"
     seg_type = last.get("type", "")
     if "CTA" not in seg_type and "cta" not in seg_type.lower():
         return "FAIL", f"最後一段 type = '{seg_type}'，應含 CTA"
     dialogue_parts = _get_all_dialogue(last)
     text = " ".join(dialogue_parts) if dialogue_parts else ""
     if any(k in text for k in cta_keywords):
-        return "PASS", f"52-60s CTA 段存在，含引導語（{text[:40]}…）"
-    return "FAIL", f"52-60s CTA 段文字無引導語關鍵詞（{text[:60]}）"
+        return "PASS", f"{cta_slot} CTA 段存在，含引導語（{text[:40]}…）"
+    return "FAIL", f"{cta_slot} CTA 段文字無引導語關鍵詞（{text[:60]}）"
 
 def chk_l1_007_title_len(data: dict, fname: str) -> tuple[str, str]:
-    """L1-007：標題 <= 15 字"""
+    """L1-007：標題 <= title_max_chars 字
+    B 段 2026-06-05：max_chars 改讀 L0 batch_spec（廢硬編 15）。
+    """
+    max_chars = _load_l0_batch_spec()["title_max_chars"]
     title = data.get("title", "")
     if not title:
         return "FAIL", "title 欄位空白"
     # 計算純中文+英文字數（不含空格/標點）
     chars = re.sub(r"[\s！，。？「」：、【】…—\-]+", "", title)
     n = len(chars)
-    if n <= 15:
-        return "PASS", f"標題 '{title}'，字數 = {n} <= 15"
-    return "FAIL", f"標題 '{title}'，字數 = {n} > 15"
+    if n <= max_chars:
+        return "PASS", f"標題 '{title}'，字數 = {n} <= {max_chars}"
+    return "FAIL", f"標題 '{title}'，字數 = {n} > {max_chars}"
 
 def chk_l1_008_batch_count(yamls: list[tuple[Path, dict]], batch_dir: Path) -> tuple[str, str]:
-    """L1-008：批次數量 13-14 主腳本（此函式是 batch-level check）"""
+    """L1-008：批次數量剛好 = main_scripts（exact，此函式是 batch-level check）
+    B 段 2026-06-05：由 13-14 區間改為 exact 13（澤君 2026-06-05 拍板）。
+    """
     valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
     n = len(valid)
-    if 13 <= n <= 14:
-        return "PASS", f"主腳本 yaml 數量 = {n}（範圍 13-14）"
-    return "FAIL", f"主腳本 yaml 數量 = {n}，SOP 要求 13-14 支"
+    expected = int(_load_l0_batch_spec()["main_scripts"])
+    if n == expected:
+        return "PASS", f"主腳本 yaml 數量 = {n}，符合 SOP exact {expected} 支"
+    return "FAIL", f"主腳本 yaml 數量 = {n}，SOP 要求剛好 {expected} 支"
 
 def chk_l1_009_派系_coverage(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
-    """L1-009：派系覆蓋度 >= 3 種
+    """L1-009：派系覆蓋度 >= school_diversity_min 種
     支援 '派系' key（阿奇/叭噗格式）及 'faction' key（瑞祥 markdown 格式）。
+    B 段 2026-06-05：min_count 改讀 L0 batch_spec（廢硬編）。
     """
+    min_count = _load_l0_batch_spec()["school_diversity_min"]
     types = set()
     for _, d in yamls:
         if "__parse_error__" in d:
@@ -504,9 +592,9 @@ def chk_l1_009_派系_coverage(yamls: list[tuple[Path, dict]]) -> tuple[str, str
             if m:
                 types.add(m.group(1).strip())
     n = len(types)
-    if n >= 3:
+    if n >= min_count:
         return "PASS", f"派系覆蓋 = {n} 種：{sorted(types)}"
-    return "FAIL", f"派系覆蓋 = {n} 種（{sorted(types)}），需 >= 3 種"
+    return "FAIL", f"派系覆蓋 = {n} 種（{sorted(types)}），需 >= {min_count} 種"
 
 def chk_c010_翠文_non_empty(data: dict, fname: str) -> tuple[str, str]:
     """C-010：翠文非空 + 非畫面描述（字幕 ≠ 畫面說明）"""
@@ -531,19 +619,58 @@ def chk_c010_翠文_non_empty(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", f"全 {len(scenes)} 段翠文非空，無畫面描述 keyword"
 
 def chk_c011_派系_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text: Optional[str]) -> tuple[str, str]:
-    """C-011：派系比例對齊業主偏好.md §8（±5% 容許）"""
+    """
+    C-011：派系比例對齊業主偏好.md（±5% 容許）
+    第一刀 2026-06-05：改用 _faction_parser，三態可審計（不新增 status）。
+    | 情況 | 判定 | detail 前綴 |
+    | canonical 完整、偏差 <=5% | PASS | — |
+    | canonical vs 實際偏差 >5% | FAIL | — |
+    | 有 % 但有 unknown（仲豪）| WARN | [WAIVED:UNKNOWN_ALIAS] + 列 unknown |
+    | 無 % 且 provisional（詩婷）| WARN | [WAIVED:PROVISIONAL] |
+    | 無 % 且非 provisional | FAIL | 找不到可驗證派系比例 |
+    | 找不到偏好檔 | 維持現有流程 | — |
+    """
     if not pref_text:
         return "WARN", f"找不到業主 '{owner}' 偏好.md，無法驗派系比例（路徑：{OWNER_PREF_PATHS.get(owner,'未知')}）"
-    expected = parse_schema_distribution(pref_text, "§8") or parse_schema_distribution(pref_text, "第 8 章")
-    if not expected:
-        return "WARN", "偏好.md 第 8 章無法解析到 XX% 格式的比例，跳過派系比例驗證"
-    # 統計本批派系
+
+    # ── 解析偏好檔 ──
+    if _FACTION_PARSER_OK:
+        # 第一刀：用 _faction_parser（支援第5章/第8章 + unknown 分流）
+        _valid = _load_l0_faction_names()
+        parsed: _FactionParseResult = _parse_faction_mix(pref_text, valid_schools=_valid)
+        expected_canonical = dict(parsed.canonical_ratios)
+        has_unknown = bool(parsed.unknown_ratios)
+        is_provisional = parsed.provisional
+
+        # provisional 無比例（御史/Codex 收口 2026-06-05：有 canonical 比例時不可被
+        # 「建議傾向」字樣豁免——否則「真比例表＋一句建議傾向」會被誤 waive）
+        if is_provisional and not expected_canonical:
+            return "WARN", "[WAIVED:PROVISIONAL] 偏好.md 標記「建議傾向/尚無批次」且無可解析比例，派系比例待算盤覆核，跳過 C-011"
+
+        # 有 unknown（仲豪型）但無 canonical
+        if not expected_canonical and has_unknown:
+            unknown_desc = ", ".join(f"{k}:{v}%" for k, v in parsed.unknown_ratios.items())
+            return "WARN", f"[WAIVED:UNKNOWN_ALIAS] 偏好.md 含未知派系名（非 L0 14 標準名）：{unknown_desc}，待 Phase 2 補 alias，跳過 C-011"
+
+        # 找不到任何比例（非 provisional、非 unknown）
+        if not expected_canonical and not has_unknown:
+            return "FAIL", "偏好.md 無法解析到可驗證的派系比例（非 provisional），C-011 FAIL"
+
+    else:
+        # fallback：舊版 parse_schema_distribution（只認 §8 / 第8章）
+        expected_canonical = parse_schema_distribution(pref_text, "§8") or parse_schema_distribution(pref_text, "第 8 章")
+        has_unknown = False
+        is_provisional = False
+        if not expected_canonical:
+            return "WARN", "偏好.md 第 8 章無法解析到 XX% 格式的比例，跳過派系比例驗證（_faction_parser 不可用）"
+
+    # ── 統計本批派系 ──
     actual_count: dict[str, int] = {}
     total = 0
     for _, d in yamls:
         if "__parse_error__" in d:
             continue
-        派系 = d.get("派系", "") or d.get("template", "")
+        派系 = d.get("派系", "") or d.get("faction", "") or d.get("template", "")
         m = re.match(r"([^\(（]+)", str(派系))
         if m:
             name = m.group(1).strip()
@@ -552,19 +679,24 @@ def chk_c011_派系_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text:
     if total == 0:
         return "WARN", "批次無有效 yaml，無法計算派系比例"
     actual_pct = {k: round(v / total * 100) for k, v in actual_count.items()}
-    # 找禁用派系命中
-    BANNED_TEMPLATE_MARKERS = ["嗆辣派", "爆文公式派"]
-    banned_hits = [k for k in actual_count if any(b in k for b in BANNED_TEMPLATE_MARKERS)]
-    if banned_hits:
-        return "FAIL", f"禁用派系出現在批次中：{banned_hits}"
-    # 修 1（P0）：真實 expected vs actual 對比，abs(diff) > 5% → FAIL
-    # key 正規化：expected key 有時帶括號如「故事戲劇派（派1）」，
-    # 對齊 actual_count 的截取規則（re.match [^\(（]+）
+
+    # 有 unknown 但 canonical 非空（仲豪型：直球派36% + unknown 別名）→ WAIVED
+    # 算盤 MODIFY 修（2026-06-05）：原訊息「僅驗 canonical 部分」是謊報——此處 early return，
+    # 下方 tolerance 根本沒跑＝零驗證，訊息卻說「已驗」。誠實版：unknown 部分無對照表無法驗、
+    # canonical 部分為避免「分母含 unknown 腳本」失真也暫不驗，整批比例驗證待 Phase 2 補 alias 後再做。
+    if has_unknown and expected_canonical:
+        unknown_desc = ", ".join(f"{k}:{v}%" for k, v in parsed.unknown_ratios.items())  # type: ignore[possibly-undefined]
+        return "WARN", (
+            f"[WAIVED:UNKNOWN_ALIAS] 偏好含非 L0 標準名：{unknown_desc}（canonical：{expected_canonical}）。"
+            f"本批派系比例暫不驗（待 Phase 2 補 alias 對照表後驗全比例，非「已驗通過」）"
+        )
+
+    # ── 偏差計算 ──
     TOLERANCE = 5
     def _norm_key(s: str) -> str:
         mx = re.match(r"([^\(（]+)", s)
         return mx.group(1).strip() if mx else s.strip()
-    normalized_expected = {_norm_key(k): v for k, v in expected.items()}
+    normalized_expected = {_norm_key(k): v for k, v in expected_canonical.items()}
     over_tol = []
     for name, exp_pct in normalized_expected.items():
         act_pct = actual_pct.get(name, 0)
@@ -575,13 +707,63 @@ def chk_c011_派系_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text:
         return "FAIL", f"C-011 派系比例超出 ±{TOLERANCE}%：" + "；".join(over_tol) + f"  （實際分佈：{actual_pct}）"
     return "PASS", f"C-011 派系比例對齊（±{TOLERANCE}% 內）：{actual_pct}（偏好參考：{normalized_expected}）"
 
+def _parse_kb_owner_industries(pref_text: str) -> Optional[list]:
+    """
+    從偏好.md 解析 kb-owner fenced block 的 industries 欄位。
+    解析成功回傳 list，失敗回傳 None。
+    """
+    m = re.search(r"```kb-owner\n(.*?)```", pref_text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        data = yaml.safe_load(m.group(1))
+        if not isinstance(data, dict):
+            return None
+        industries = data.get("industries")
+        if industries is None:
+            industry_id = data.get("industry_id")
+            if industry_id:
+                industries = [industry_id]
+        if isinstance(industries, list):
+            return industries
+        return None
+    except Exception:
+        return None
+
+
+def _normalize_identity_label(s: str) -> str:
+    """normalize：strip 全形/半形括號 + trim（對齊 _identity_parser）"""
+    return re.sub(r"（[^）]*）|\([^)]*\)", "", str(s)).strip()
+
+
 def chk_c012_identity_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text: Optional[str]) -> tuple[str, str]:
-    """C-012：雙身份比例對齊業主偏好.md §3"""
+    """
+    C-012：雙身份比例對齊業主偏好.md（第二刀 2026-06-05）
+    gate：讀 kb-owner industries 判斷雙行業（阿奇）vs 單行業（其餘6）。
+    雙行業 required：解析不到比例 OR 批次無「雙身份分類」欄 → FAIL
+    單行業：乾淨 skip → PASS
+    kb-owner parse 失敗：fail-loud WARN
+    """
     if not pref_text:
         return "WARN", f"找不到業主 '{owner}' 偏好.md，跳過雙身份比例驗證"
+
+    # gate：讀 kb-owner industries 判斷雙行業
+    industries = _parse_kb_owner_industries(pref_text)
+    if industries is None:
+        return "WARN", f"C-012 警告：業主 '{owner}' 偏好.md 無法解析 kb-owner block，無法判斷是否為雙行業業主"
+
+    is_dual = len([i for i in industries if i]) > 1
+
+    if not is_dual:
+        # 單行業：乾淨 skip
+        return "PASS", f"C-012 非雙身份業主（單行業 {industries}），C-012 不適用"
+
+    # 雙行業 required
     expected = parse_identity_distribution(pref_text)
     if not expected:
-        return "WARN", "偏好.md 第 3 章無法解析比例，跳過雙身份比例驗證"
+        return "FAIL", f"C-012 FAIL：業主 '{owner}' 為雙行業（{industries}），但偏好.md 無法解析雙身份比例"
+
+    # 統計批次 yaml 的「雙身份分類」欄（排 parse error）
     actual_count: dict[str, int] = {}
     total = 0
     for _, d in yamls:
@@ -589,13 +771,33 @@ def chk_c012_identity_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_tex
             continue
         itype = d.get("雙身份分類", "")
         if itype:
-            label = re.sub(r"[（\(].*", "", str(itype)).strip()
+            label = _normalize_identity_label(str(itype))
             actual_count[label] = actual_count.get(label, 0) + 1
             total += 1
+
     if total == 0:
-        return "WARN", "批次 yaml 無雙身份分類欄位，跳過驗證"
+        return "FAIL", f"C-012 FAIL：業主 '{owner}' 為雙行業（{industries}），但批次 yaml 全無「雙身份分類」欄"
+
     actual_pct = {k: round(v / total * 100) for k, v in actual_count.items()}
-    # 修 1（P0）：真實 expected vs actual 對比，abs(diff) > 5% → FAIL
+
+    # LABEL_MISMATCH 偵測（霸告 2026-06-05 修，類比第一刀仲豪 WAIVED:UNKNOWN_ALIAS）：
+    # yaml「雙身份分類」標籤 vs 偏好類型名 normalize 後交集為空 = 命名體系不一致，非「比例錯」。
+    # 阿奇 yaml 用實例標籤（胖奇熱狗堡/觀點分享/房仲副軸/個人生活）、偏好用類型名（餐飲/生活觀點個人故事/房仲/開箱），
+    # 缺對照表時直接字串比對會讓所有 expected key act_pct=0 → 誤判巨大偏差 FAIL（行為惡化）。
+    # 改 WAIVED 不誤擋（待 Phase 2 補 alias 對照表 + 澤君拍板比例；阿奇偏好標題現為「霸告建議—待澤君拍板」）。
+    if not (set(expected.keys()) & set(actual_pct.keys())):
+        # Codex 收口（2026-06-05）：LABEL_MISMATCH WAIVE 綁「偏好比例標 provisional（待拍板/建議）」，
+        # 堵放水「雙行業全標錯但比例已定案」。阿奇偏好標「雙身份比例（霸告建議—待澤君拍板）」→ WAIVE；
+        # 未來比例已定案仍命名不一致 → FAIL（逼對齊命名或補 alias 對照表）。
+        _prov = bool(re.search(r"雙身份比例.{0,30}(待.{0,6}拍板|建議|尚無|初步|未定)", pref_text))
+        _msg = (f"yaml「雙身份分類」標籤與偏好類型名命名不一致"
+                f"（標籤={sorted(actual_pct.keys())} vs 偏好類型名={sorted(expected.keys())}）")
+        if _prov:
+            return "WARN", (f"[WAIVED:LABEL_MISMATCH] {_msg}，且偏好比例標 provisional（待拍板/建議），"
+                            f"待 Phase 2 對照表 + 澤君拍板比例，本批暫不驗（非比例錯、非已驗通過）")
+        return "FAIL", (f"C-012 FAIL：{_msg}，且偏好比例已定案（非 provisional）→ 須對齊命名或補 alias 對照表")
+
+    # 對比（兩邊已 normalize，±5% 容許）
     TOLERANCE = 5
     over_tol = []
     for name, exp_pct in expected.items():
@@ -603,27 +805,48 @@ def chk_c012_identity_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_tex
         diff = act_pct - exp_pct
         if abs(diff) > TOLERANCE:
             over_tol.append(f"{name} 預期 {exp_pct}% 實際 {act_pct}%（偏差 {diff:+d}%）")
+
     if over_tol:
         return "FAIL", f"C-012 雙身份比例超出 ±{TOLERANCE}%：" + "；".join(over_tol) + f"  （實際分佈：{actual_pct}）"
     return "PASS", f"C-012 雙身份比例對齊（±{TOLERANCE}% 內）：{actual_pct}（偏好參考：{expected}）"
 
-def chk_c013_dm_card(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """C-013：釣魚部腳本 dm_card 6 件齊"""
-    title = data.get("title", "")
-    template = data.get("template", "")
-    pattern = data.get("pattern", "")
-    # 釣魚部偵測：必須有明確的釣魚部標記
-    has_dm_card_field = isinstance(data.get("dm_card"), dict)  # dm_card 必須是字典型欄位
-    has_fishing_marker = (data.get("釣魚部標記") or data.get("dm_card_配套") or
-                          data.get("dm_card配套") or has_dm_card_field)
-    is_dm = (("釣魚部" in title or "釣魚部" in template or "釣魚部" in pattern) or
-             has_fishing_marker)
-    if not is_dm:
-        return "PASS", "非釣魚部腳本，跳過 dm_card 驗證"
-    # 驗 6 件：行業專業 / 在地優勢 / 痛點 / 解法 / 行動呼籲 / LINE QR 連結
-    sc = data.get("schema_check", {}) or {}
-    dm = data.get("dm_card", {}) or {}
-    # 把整個 data 轉成字串（含 dm_card 底下的 list / dict 全轉文字）做 keyword 比對
+def chk_c013_dm_card(data: dict, fname: str, owner: str, fishing_policy: Optional[dict] = None) -> tuple[str, str]:
+    """C-013：釣魚部腳本 dm_card 6 件齊（雙模式）
+
+    fishing_policy 由 load_fishing_policy() 回傳，mode ∈ {off, opt_in, legacy, invalid}。
+    - 無 fishing signals → PASS skip（任何 mode 都一樣）
+    - off/invalid + 有信號 → FAIL（fail-closed；C-013B 也會在 batch-level 抓，這裡再 per-file 確認）
+    - legacy → 舊 dm_card 6 件驗（dm_card 缺仍 FAIL，不趁 cutover 放水）
+    - opt_in → dm_card 必須是 dict + 6 件齊
+    """
+    if fishing_policy is None:
+        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
+
+    mode = fishing_policy.get("mode", "off")
+
+    # 共用信號偵測（legacy 模式用舊 criteria 保零回歸；off/opt_in 用全偵測 fail-closed）
+    signals = _fishing_signals(data, legacy=(mode == "legacy"))
+    if not signals:
+        return "PASS", "非釣魚部腳本（無釣魚信號），跳過 dm_card 驗證"
+
+    # 有釣魚信號 → 按 mode 分路
+    if mode in ("off", "invalid"):
+        return "FAIL", (
+            f"C-013：偵測到釣魚部信號但 mode={mode}（fail-closed）。"
+            f"信號：{signals}。"
+            f"Policy：{fishing_policy.get('detail','')}"
+        )
+
+    # legacy 或 opt_in：驗 dm_card 6 件
+    dm = data.get("dm_card")
+
+    # opt_in 模式：dm_card 必須是 dict
+    if mode == "opt_in" and not isinstance(dm, dict):
+        return "FAIL", (
+            f"C-013 opt_in：dm_card 必須是 dict，但得到 {type(dm).__name__!r}（{dm!r}）"
+        )
+
+    # legacy/opt_in 驗 6 件
     ALL_TEXT = str(data)
     SIX_FIELDS = {
         "行業專業": ["行業專業", "專業", "問題標題", "怎麼做"],
@@ -635,12 +858,53 @@ def chk_c013_dm_card(data: dict, fname: str, owner: str) -> tuple[str, str]:
     }
     missing = []
     for field, keywords in SIX_FIELDS.items():
-        found = any(k in ALL_TEXT for k in keywords)
-        if not found:
+        found_kw = any(k in ALL_TEXT for k in keywords)
+        if not found_kw:
             missing.append(field)
     if missing:
-        return "FAIL", f"釣魚部 dm_card 缺少欄位：{missing}"
-    return "PASS", "釣魚部 dm_card 6 件齊"
+        mode_label = "legacy" if mode == "legacy" else "opt_in"
+        return "FAIL", f"釣魚部 dm_card 缺少欄位（{mode_label}）：{missing}"
+    # opt-in 圖卡交付鏈驗證（保鏢硬條件2 / Codex must-fix）：opt_in 釣魚必須有圖片資產路徑非空，
+    # 否則「validator 6 件驗過、但網站 build 找不到圖片 → 站上圖卡空白」。legacy 豁免、off 不適用（off 沒釣魚）。
+    if mode == "opt_in":
+        asset = ""
+        if isinstance(dm, dict):
+            asset = str(dm.get("asset_path") or dm.get("img") or "").strip()
+        if not asset:
+            asset = str(data.get("img") or "").strip()
+        if not asset:
+            return "FAIL", "釣魚部 opt_in：dm_card 6 件齊但缺圖片資產路徑（dm_card.asset_path / img 皆空）→ 網站圖卡會空白"
+        return "PASS", f"釣魚部 dm_card 6 件齊 + 圖片資產路徑（mode=opt_in）"
+    return "PASS", f"釣魚部 dm_card 6 件齊（mode={mode}）"
+
+def chk_c013b_no_fishing_when_off(yamls: list, fishing_policy: Optional[dict] = None) -> tuple[str, str]:
+    """C-013B：batch-level — off/invalid 模式整批掃釣魚信號，有命中→FAIL（fail-closed）。
+    opt_in / legacy → PASS skip。
+    掛在 C-014 後、V2-006 前（見 batch_checks 排列）。
+    """
+    if fishing_policy is None:
+        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
+
+    mode = fishing_policy.get("mode", "off")
+
+    if mode in ("opt_in", "legacy"):
+        return "PASS", f"C-013B skip（mode={mode}，釣魚功能啟用或舊批豁免）"
+
+    # off 或 invalid：掃全批
+    hits = []
+    for f, data in yamls:
+        sigs = _fishing_signals(data)
+        if sigs:
+            hits.append(f"{f.name}: {sigs}")
+
+    if hits:
+        return "FAIL", (
+            f"C-013B：mode={mode} 但偵測到釣魚信號（{len(hits)} 支）。"
+            f"Policy：{fishing_policy.get('detail','')}。"
+            f"命中：{hits}"
+        )
+    return "PASS", f"C-013B：無釣魚信號（mode={mode}）"
+
 
 def chk_c014_card_style(yamls, batch_dir: Path, owner: str, batch_tag: str) -> tuple[str, str]:
     """C-014：知識型圖卡風格 18 選 1 推薦走過（B6 2026-06-05：知識圖卡改按需 — intent-aware）。
@@ -1178,13 +1442,17 @@ def chk_v2_005_trial_reels_consistency(data: dict, fname: str) -> tuple[str, str
 
 import difflib
 
-# 4 強制位 keyword 對應表（V2-006）
-REQUIRED_SLOTS = {
-    "釣魚部":      ["釣魚", "fishing"],
-    "毒舌正能量":  ["毒舌正能量", "毒舌"],
-    "純雞湯":      ["純雞湯"],
+# 強制位 keyword 對應表（V2-006）— 拆 BASE（3 件）+ FISHING_SLOT（1 件）
+REQUIRED_SLOTS_BASE = {
+    "毒舌正能量":   ["毒舌正能量", "毒舌"],
+    "純雞湯":       ["純雞湯"],
     "Erika 拆解派": ["Erika", "拆解派", "教育型"],
 }
+REQUIRED_SLOTS_FISHING = {
+    "釣魚部": ["釣魚", "fishing"],
+}
+# 向後相容（舊引用點暫留，以 BASE+FISHING 合集代替舊 4-key dict）
+REQUIRED_SLOTS = {**REQUIRED_SLOTS_FISHING, **REQUIRED_SLOTS_BASE}
 
 # 昀臻醫療效能禁用詞（V2-012 — 對齊第 09 批算盤報告 20 條）
 BEAUTY_MED_WORDS = [
@@ -1197,16 +1465,40 @@ BEAUTY_MED_WORDS = [
 FICTION_SIGNAL_WORDS = ["有個客戶說", "曾經有個案例", "我朋友的客戶", "聽說有個", "傳說中的"]
 
 
-def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
-    """V2-006：4 強制位覆蓋驗（釣魚/毒舌/雞湯/Erika）— batch-level
+def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]], fishing_policy: Optional[dict] = None) -> tuple[str, str]:
+    """V2-006：強制位覆蓋驗（釣魚/毒舌/雞湯/Erika）— batch-level（雙模式）
+
+    mode 決定強制位數量：
+    - off     → 3 強制位（BASE：毒舌/純雞湯/Erika）；釣魚部 key 不建不驗
+    - opt_in  → 4 強制位（BASE + 釣魚部）；釣魚部 exactly 1 支
+    - legacy  → 4 強制位（BASE + 釣魚部）；不加 exactly 1 限制（防舊批回歸失敗）
+    - invalid → FAIL（policy 本身有問題）
+
     Codex R1 盲點 4 修法：用 required_slot 欄位 / faction 含嗆辣派 ≠ 毒舌
     """
+    if fishing_policy is None:
+        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
+
+    mode = fishing_policy.get("mode", "off")
+
+    if mode == "invalid":
+        return "FAIL", f"V2-006：fishing_policy invalid → batch FAIL。{fishing_policy.get('detail','')}"
+
     valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
-    found = {slot: [] for slot in REQUIRED_SLOTS}
+
+    # 按 mode 決定要驗的 slot 集合
+    if mode == "off":
+        slots_to_check = REQUIRED_SLOTS_BASE
+    else:  # opt_in / legacy
+        slots_to_check = {**REQUIRED_SLOTS_BASE, **REQUIRED_SLOTS_FISHING}
+
+    # 動態建 found dict（只建納入驗證的 slot）
+    found = {slot: [] for slot in slots_to_check}
+
     for f, data in valid:
         slot_field = str(data.get('required_slot', ''))
         type_field = str(data.get('type', ''))
-        for slot, keywords in REQUIRED_SLOTS.items():
+        for slot, keywords in slots_to_check.items():
             if slot_field == slot:
                 found[slot].append(f.name)
                 continue
@@ -1215,21 +1507,33 @@ def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
                     if f.name not in found[slot]:
                         found[slot].append(f.name)
                     break
-        if data.get('is_fishing') and f.name not in found["釣魚部"]:
+        # is_fishing 輔助偵測（只在 釣魚部 在 found 時才 append）
+        if "釣魚部" in found and data.get('is_fishing') and f.name not in found["釣魚部"]:
             found["釣魚部"].append(f.name)
         if data.get('is_chicken_soup') and f.name not in found["純雞湯"]:
             found["純雞湯"].append(f.name)
+
     missing = [s for s, files in found.items() if not files]
+    req_count = len(slots_to_check)
     if missing:
-        return "FAIL", f"4 強制位缺 {len(missing)} 件：{missing}（建議 yaml 加 required_slot 欄位）"
+        return "FAIL", f"{req_count} 強制位缺 {len(missing)} 件：{missing}（mode={mode}，建議 yaml 加 required_slot 欄位）"
+
+    # opt_in 額外驗：釣魚部 exactly 1 支
+    if mode == "opt_in":
+        fishing_count = len(found.get("釣魚部", []))
+        if fishing_count != 1:
+            return "FAIL", f"V2-006 opt_in：釣魚部應 exactly 1 支，實際 {fishing_count} 支"
+
     counts = {s: len(files) for s, files in found.items()}
-    return "PASS", f"4 強制位齊備：{counts}"
+    return "PASS", f"{req_count} 強制位齊備（mode={mode}）：{counts}"
 
 
 def chk_v2_007_threads_seven(batch_dir: Path) -> tuple[str, str]:
-    """V2-007：Threads 脆文 7 篇存在驗 — batch-level
-    Glob *Threads*.md / *脆文*.md / threads_*.md，v2 優先
+    """V2-007：Threads 脆文 >= threads_posts 篇存在驗 — batch-level
+    Glob *Threads*.md / *脆文*.md / threads_*.md，v2 優先。
+    B 段 2026-06-05：expected 改讀 L0 batch_spec（廢硬編 7）。
     """
+    expected = _load_l0_batch_spec()["threads_posts"]
     candidates = []
     for pattern in ['*Threads*.md', '*脆文*.md', 'threads_*.md']:
         candidates.extend(batch_dir.glob(pattern))
@@ -1243,9 +1547,9 @@ def chk_v2_007_threads_seven(batch_dir: Path) -> tuple[str, str]:
         return "FAIL", f"讀 {target.name} 失敗：{e}"
     threads_sections = re.findall(r'^## (?:Threads|脆文)\s*\d+', text, re.MULTILINE)
     count = len(threads_sections)
-    if count < 7:
-        return "FAIL", f"{target.name} 只找到 {count} 篇脆文（要 ≥ 7）"
-    return "PASS", f"{target.name} 找到 {count} 篇脆文（≥ 7）"
+    if count < expected:
+        return "FAIL", f"{target.name} 只找到 {count} 篇脆文（要 ≥ {expected}）"
+    return "PASS", f"{target.name} 找到 {count} 篇脆文（≥ {expected}）"
 
 
 def chk_v2_007b_standalone_threads(data: dict, fname: str) -> tuple[str, str]:
@@ -1441,6 +1745,138 @@ _V2_025_CUTOFF = _dt.date(2026, 6, 1)
 
 # P1-3：strict 模式旗標（由 main() 設定，讓 check fn 讀取）
 _STRICT_MODE: bool = False
+
+# 釣魚部下架 cutoff（2026-06-06 起新批預設 OFF）
+_FISHING_CUTOFF = _dt.date(2026, 6, 6)
+
+
+def _fishing_signals(data: dict, legacy: bool = False) -> list:
+    """偵測 yaml 是否含有釣魚部相關信號，回傳信號描述清單（空 list = 無信號）。
+    供 C-013、C-013B 共用（V2-006 不呼叫本函式，自行直接讀 required_slot/type/is_fishing）。
+
+    legacy=True（霸告 2026-06-05 修零回歸）：只用「舊碼偵測過的 criteria」——
+      title/template/pattern 含釣魚部 + dm_card dict + 釣魚部標記 + dm_card_配套，
+      **排除新增的 type / required_slot / is_fishing 三欄**。
+    用途：legacy 模式（6/6 前舊批）C-013 必須與舊碼逐字同結果，否則現役批（詩婷01/昀臻12
+      用 required_slot/is_fishing 標釣魚、舊碼漏偵測）會被新偵測誤判 FAIL，違反澤君「舊批不回頭算帳」。
+    off/opt_in（新批）用 legacy=False 全偵測 → fail-closed 不漏。
+    """
+    signals = []
+    title    = str(data.get("title", ""))
+    template = str(data.get("template", ""))
+    pattern  = str(data.get("pattern", ""))
+    type_    = str(data.get("type", ""))
+    req_slot = str(data.get("required_slot", ""))
+
+    if "釣魚部" in title:
+        signals.append(f"title 含「釣魚部」")
+    if "釣魚部" in template:
+        signals.append(f"template 含「釣魚部」")
+    if "釣魚部" in pattern:
+        signals.append(f"pattern 含「釣魚部」")
+    if not legacy:
+        # ↓ 3 欄為新增偵測（舊碼未查）；legacy 排除以保舊批逐字零回歸
+        if "fishing" in type_.lower() or "釣魚部" in type_:
+            signals.append(f"type 含釣魚信號：{type_!r}")
+        if "釣魚部" in req_slot or "fishing" in req_slot.lower():
+            signals.append(f"required_slot 含釣魚信號：{req_slot!r}")
+        if data.get("is_fishing"):
+            signals.append("is_fishing=true")
+    if isinstance(data.get("dm_card"), dict):
+        signals.append("dm_card 欄位存在（dict）")
+    if data.get("釣魚部標記"):
+        signals.append("釣魚部標記 欄位存在")
+    if data.get("dm_card_配套") or data.get("dm_card配套"):
+        signals.append("dm_card_配套 欄位存在")
+    return signals
+
+
+def load_fishing_policy(batch_dir: "Path", yamls: list) -> dict:
+    """讀取 _batch_flags.yml 決定釣魚部模式。
+
+    回傳 dict:
+      mode      ∈ {off, opt_in, legacy, invalid}
+      batch_date: _dt.date | None
+      detail    : 說明字串
+
+    判定邏輯（§7）：
+    - 無 flag 檔：batch_date < _FISHING_CUTOFF → legacy；否則 → off
+    - enabled 非 boolean true → off/legacy（不可把 "true" 字串當真）
+    - enabled:true 但 approved_by≠澤君 / approved_at 不可 parse 或 <cutoff / reason 空 → invalid
+    - 完整有效 → opt_in
+
+    batch_date：對批內每個 yaml 用 _extract_batch_date 取日期取 max；再 fallback 用目錄名抽。
+    """
+    # 計算 batch_date
+    dates = []
+    for f, data in yamls:
+        d = _extract_batch_date(data, f"{batch_dir.name}/{f.name}")
+        if d:
+            dates.append(d)
+    # fallback：直接從目錄名抽
+    dir_date = _extract_batch_date({}, str(batch_dir.name))
+    if dir_date:
+        dates.append(dir_date)
+    batch_date = max(dates) if dates else None
+
+    # 讀旗標檔（必須 .yml，不用 .yaml 避免被 load_yamls glob 算成第 14 支）
+    flag_path = batch_dir / "_batch_flags.yml"
+    if not flag_path.exists():
+        if batch_date is not None and batch_date < _FISHING_CUTOFF:
+            return {"mode": "legacy", "batch_date": batch_date,
+                    "detail": f"無旗標檔 + 批次日期 {batch_date} < {_FISHING_CUTOFF} → legacy"}
+        else:
+            return {"mode": "off", "batch_date": batch_date,
+                    "detail": f"無旗標檔 + 批次日期 {batch_date or '未知'} ≥ {_FISHING_CUTOFF} → off（fail-closed）"}
+
+    # 有旗標檔
+    try:
+        import yaml as _yaml_mod
+        raw = _yaml_mod.safe_load(flag_path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        return {"mode": "invalid", "batch_date": batch_date,
+                "detail": f"_batch_flags.yml 解析失敗：{e} → invalid（fail-closed）"}
+
+    fishing_cfg = raw.get("fishing_dm_card", {}) or {}
+    enabled = fishing_cfg.get("enabled")
+
+    # enabled 必須是 Python boolean True（不接受字串 "true"）
+    if enabled is not True:
+        # 有旗標但 enabled 非 true → 按日期決定 off/legacy
+        if batch_date is not None and batch_date < _FISHING_CUTOFF:
+            return {"mode": "legacy", "batch_date": batch_date,
+                    "detail": f"_batch_flags.yml 存在但 enabled 非 boolean true（{enabled!r}）+ 舊批 → legacy"}
+        else:
+            return {"mode": "off", "batch_date": batch_date,
+                    "detail": f"_batch_flags.yml 存在但 enabled 非 boolean true（{enabled!r}）→ off"}
+
+    # enabled is True，驗三項條件
+    approved_by  = fishing_cfg.get("approved_by", "")
+    approved_at  = fishing_cfg.get("approved_at", "")
+    reason       = fishing_cfg.get("reason", "")
+
+    errors = []
+    if approved_by != "澤君":
+        errors.append(f"approved_by={approved_by!r}（需為「澤君」）")
+    # 解析 approved_at
+    approved_date = None
+    try:
+        approved_date = _extract_batch_date({"batch_date": str(approved_at)}, "")
+    except Exception:
+        pass
+    if approved_date is None:
+        errors.append(f"approved_at={approved_at!r} 無法解析日期")
+    elif approved_date < _FISHING_CUTOFF:
+        errors.append(f"approved_at={approved_date} < cutoff {_FISHING_CUTOFF}")
+    if not str(reason).strip():
+        errors.append("reason 為空")
+
+    if errors:
+        return {"mode": "invalid", "batch_date": batch_date,
+                "detail": f"opt-in 條件不完整 → invalid：{'; '.join(errors)}"}
+
+    return {"mode": "opt_in", "batch_date": batch_date,
+            "detail": f"opt-in 有效（approved_by=澤君, approved_at={approved_date}, reason={reason!r}）"}
 
 
 def _extract_batch_date(data: dict, fname: str = '') -> Optional[_dt.date]:
@@ -1790,6 +2226,37 @@ def chk_v2_025_template_source_required(data: dict, fname: str) -> tuple[str, st
     return "PASS", f"template_source_ids 已填 {len(source_ids)} 張，全在索引中"
 
 
+def _is_skeleton_mode(yamls: list[tuple]) -> bool:
+    """判斷整批是否為「骨架未填階段」。
+
+    邏輯：批次內任一 yaml 的 title 欄位值為 '[編劇填]' 字樣（即 yaml_skeleton_generator.py
+    產出的骨架尚未被編劇填寫），視為骨架模式。
+    骨架模式下 V2-025/026 跳過（編劇尚未填範本引用，不應 FAIL），
+    但已填編劇的真實批次（title 不是 placeholder）照常驗，不放水。
+
+    閾值：批次內 >= 50% yaml 的 title 為 placeholder → 骨架模式。
+    （防止真實批次裡混入少量未填骨架時誤判為骨架模式）
+    """
+    if not yamls:
+        return False
+    placeholder_count = 0
+    valid_count = 0
+    for _, data in yamls:
+        if not isinstance(data, dict):
+            continue
+        if "__parse_error__" in data or "__schema_error__" in data:
+            continue
+        valid_count += 1
+        title = str(data.get("title", "") or "")
+        # _is_placeholder 定義在下方，此處直接判斷常見的骨架 placeholder
+        token = re.split(r'[\s#]', title.strip())[0].lower() if title.strip() else ""
+        if token in ('[編劇填]', 'pending', 'todo', '待填') or not title.strip():
+            placeholder_count += 1
+    if valid_count == 0:
+        return False
+    return (placeholder_count / valid_count) >= 0.5
+
+
 def _is_placeholder(val) -> bool:
     """判斷一個值是否為 skeleton 產生的 placeholder（未實際填寫）。
 
@@ -1880,10 +2347,14 @@ def chk_v2_026_template_adaptation_required(data: dict, fname: str) -> tuple[str
 # ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
-def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str, str, str]]:
+def run_per_file_checks(f: Path, data: dict, owner: str, is_skeleton: bool = False, fishing_policy: Optional[dict] = None) -> list[tuple[str, str, str, str]]:
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
+    is_skeleton：由 _is_skeleton_mode(yamls) 傳入，骨架階段跳過 V2-025/026
+    fishing_policy：由 load_fishing_policy() 算出後傳入，讓 C-013 知道模式
     """
+    if fishing_policy is None:
+        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
     # P1-1：傳入「批次目錄名/檔名」讓 _extract_batch_date 能從目錄名（如第34批_試水批_2026-05-23）抓日期
     _fname_with_dir = f"{f.parent.name}/{f.name}"
     results = []
@@ -1897,7 +2368,7 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("L1-006", chk_l1_006_cta(data, f.name)),
         ("L1-007", chk_l1_007_title_len(data, f.name)),
         ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
-        ("C-013",  chk_c013_dm_card(data, f.name, owner)),
+        ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
         # v2 新增 5 件（V2-001 ~ V2-005）
         ("V2-001",  chk_v2_001_voice_lock(data, f.name, owner)),
@@ -1914,11 +2385,18 @@ def run_per_file_checks(f: Path, data: dict, owner: str) -> list[tuple[str, str,
         ("V2-014",  chk_v2_014_bappu_taboo(data, f.name, owner)),
         ("V2-015",  chk_v2_015_bappu_q1q2q3(data, f.name, owner)),
         ("V2-016",  chk_v2_016_trial_observe_until(data, f.name, owner)),
-        # v4 新增 2 件（2026-05-31 爆款範本引用系統）
-        # P1-1：V2-025 改傳 _fname_with_dir 讓日期解析能吃批次目錄名
-        ("V2-025",  chk_v2_025_template_source_required(data, _fname_with_dir)),
-        ("V2-026",  chk_v2_026_template_adaptation_required(data, _fname_with_dir)),
     ]
+    # v4 新增 2 件（2026-05-31 爆款範本引用系統）
+    # BUG-6/7 修（2026-06-05）：骨架階段（編劇未填）跳過 V2-025/026，
+    # 避免骨架的 template_source_ids:[] + template_adaptation placeholder 系統性 FAIL。
+    # 已填編劇的真實批次（is_skeleton=False）照常驗，不放水。
+    if is_skeleton:
+        checks.append(("V2-025", ("SKIP", "骨架階段跳過（編劇尚未填範本引用，等填完後再驗）")))
+        checks.append(("V2-026", ("SKIP", "骨架階段跳過（編劇尚未填 template_adaptation，等填完後再驗）")))
+    else:
+        # P1-1：V2-025 改傳 _fname_with_dir 讓日期解析能吃批次目錄名
+        checks.append(("V2-025", chk_v2_025_template_source_required(data, _fname_with_dir)))
+        checks.append(("V2-026", chk_v2_026_template_adaptation_required(data, _fname_with_dir)))
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
     return results
@@ -1981,17 +2459,23 @@ def main():
     if not pref_text:
         print(f"[WARN] 找不到業主偏好.md（{OWNER_PREF_PATHS.get(owner,'未知路徑')}）— C-011/C-012 跳過\n")
 
+    # ── 釣魚部 policy（雙模式）──
+    fishing_policy = load_fishing_policy(batch_dir, valid_yamls)
+    print(f"[INFO] 釣魚部模式：{fishing_policy['mode']}（{fishing_policy['detail']}）\n")
+
     all_results: list[tuple[str, str, str, str]] = []
 
-    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014 + v3 新 6 件）──
+    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014 + C-013B + v3 新 6 件）──
     batch_checks = [
         ("L1-008", chk_l1_008_batch_count(yamls, batch_dir)),
         ("L1-009", chk_l1_009_派系_coverage(valid_yamls)),
         ("C-011",  chk_c011_派系_ratio(valid_yamls, owner, pref_text)),
         ("C-012",  chk_c012_identity_ratio(valid_yamls, owner, pref_text)),
         ("C-014",  chk_c014_card_style(valid_yamls, batch_dir, owner, batch_tag)),
+        # C-013B batch-level 釣魚掃描（off/invalid 時 fail-closed）
+        ("C-013B", chk_c013b_no_fishing_when_off(valid_yamls, fishing_policy)),
         # v3 新增 6 件 batch checks（2026-05-23 三審修補）
-        ("V2-006", chk_v2_006_required_slot(valid_yamls)),
+        ("V2-006", chk_v2_006_required_slot(valid_yamls, fishing_policy)),
         ("V2-007", chk_v2_007_threads_seven(batch_dir)),
         ("V2-008", chk_v2_008_used_titles_dedup(valid_yamls, owner)),
         ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
@@ -2006,12 +2490,16 @@ def main():
     print()
 
     # ── Per-file checks（件數動態，避免數字過時）──
+    # BUG-6/7 修（2026-06-05）：偵測骨架模式，骨架階段跳過 V2-025/026
+    _skeleton_mode = _is_skeleton_mode(valid_yamls)
+    if _skeleton_mode:
+        print("[INFO] 偵測到骨架模式（批次 >= 50% yaml 的 title 為 placeholder）— V2-025/026 本批跳過")
     _per_file_results_count: int = 0  # 第一支跑完後更新
     print("── 逐篇 check（per-file × 每篇）──")
     for f, data in valid_yamls:
         title = data.get("title", f.name)
         print(f"\n  [{f.name}] {title}")
-        per_results = run_per_file_checks(f, data, owner)
+        per_results = run_per_file_checks(f, data, owner, is_skeleton=_skeleton_mode, fishing_policy=fishing_policy)
         for cid, status, fname, detail in per_results:
             icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
             print(f"    {icon} [{cid}] {status}: {detail}")
@@ -2107,7 +2595,7 @@ if __name__ == "__main__":
             'scenes': [{'timestamp': '0-3s', 'type': 'Hook', '台詞_瑞祥': '測試', '畫面': '測試'}],
             'caption': '測試',
             'hashtag': ['#test'],
-            'legacy_allowed_until': '2026-06-01',  # 過渡期
+            'legacy_allowed_until': '2026-12-31',  # 過渡期（2026-06-05 bump：原 6/1 已過期＝時間到期非第一刀問題，bump 讓 V2 legacy 測試回 WARN、--fixtures 全綠不遮蔽未來真迴歸）
         }
         r1 = chk_v2_001_voice_lock(f3, 'f3.yaml')
         fcheck('F3 V2-001 WARN（不 FAIL）', r1[0] == 'WARN', r1[1])
@@ -2585,6 +3073,275 @@ if __name__ == "__main__":
             d29 == _dt.date(2026, 5, 31),
             f"抓到：{d29}"
         )
+
+        # ── 第一刀 chk_c011 三態整合 fixtures（算盤 MODIFY 補，2026-06-05）──
+        # 鎖住 PASS/FAIL/WARN[WAIVED] 三態回歸 + 防「僅驗 canonical」謊報訊息復活。
+        print("\n[F-C011a] chk_c011 仲豪型（含非 L0 標準派系名）→ WARN[WAIVED:UNKNOWN_ALIAS] 且不謊報")
+        _c011_zh_pref = (
+            "## 第 5 章：派系偏好\n\n### 5.2 主推比例\n\n"
+            "| 派別 | 佔比 |\n|------|------|\n"
+            "| **直球派** | 36% |\n| **揭秘型** | 27% |\n| **共鳴/痛點型** | 36% |\n"
+        )
+        _c011_zh_yamls = [(Path('zh1.yaml'), {'派系': '直球派'}), (Path('zh2.yaml'), {'派系': '揭秘型'})]
+        _rc = chk_c011_派系_ratio(_c011_zh_yamls, '仲豪', _c011_zh_pref)
+        fcheck('F-C011a 仲豪 → WARN', _rc[0] == 'WARN', _rc[1])
+        fcheck('F-C011a detail 含 [WAIVED:UNKNOWN_ALIAS]', '[WAIVED:UNKNOWN_ALIAS]' in _rc[1], _rc[1])
+        fcheck('F-C011a 不謊報（誠實標「暫不驗」、無「僅驗 canonical 部分」假訊息）',
+               '暫不驗' in _rc[1] and '僅驗 canonical 部分' not in _rc[1], _rc[1])
+
+        print("\n[F-C011b] chk_c011 詩婷型（建議傾向/尚無批次）→ WARN[WAIVED:PROVISIONAL]")
+        _c011_st_pref = (
+            "## 第 5 章：派系偏好\n\n"
+            "> ⚠️ 詩婷尚無腳本批次，以下為「初步建議傾向」，禁腦補寫死比例。\n\n"
+            "### 5.1 初步建議主推傾向\n\n"
+            "| 派別 | 建議傾向 |\n|------|------|\n| **共鳴/痛點型** | 主力傾向 |\n"
+        )
+        _c011_st_yamls = [(Path('st1.yaml'), {'派系': '人間觀察派'})]
+        _rc = chk_c011_派系_ratio(_c011_st_yamls, '詩婷', _c011_st_pref)
+        fcheck('F-C011b 詩婷 → WARN', _rc[0] == 'WARN', _rc[1])
+        fcheck('F-C011b detail 含 [WAIVED:PROVISIONAL]', '[WAIVED:PROVISIONAL]' in _rc[1], _rc[1])
+
+        print("\n[F-C011c] chk_c011 瑞祥型（偏好50/30/20、批次全嗆辣派）→ FAIL（真驗證有跑、反證放水）")
+        _c011_rx_pref = (
+            "## 第 5 章：派系偏好\n\n### 5.2 主推派系\n\n"
+            "| 派別 | 占比 |\n|------|------|\n"
+            "| **嗆辣派** | 50% |\n| **人間觀察派** | 30% |\n| **市場觀察派** | 20% |\n"
+        )
+        _c011_rx_yamls = [(Path(f'rx{i}.yaml'), {'派系': '嗆辣派'}) for i in range(10)]
+        _rc = chk_c011_派系_ratio(_c011_rx_yamls, '瑞祥', _c011_rx_pref)
+        fcheck('F-C011c 瑞祥比例偏 → FAIL（證明真驗證有跑、非放水）', _rc[0] == 'FAIL', _rc[1])
+
+        print("\n[F-C011d] chk_c011 有派系章節但無%、非 provisional → FAIL（反放水 backstop）")
+        _c011_np_pref = (
+            "## 第 5 章：派系偏好\n\n### 5.2 主推派系\n\n"
+            "主推嗆辣派和人間觀察派，市場觀察派輔助。\n"
+        )
+        _c011_np_yamls = [(Path('np1.yaml'), {'派系': '嗆辣派'})]
+        _rc = chk_c011_派系_ratio(_c011_np_yamls, '測試', _c011_np_pref)
+        fcheck('F-C011d 無%非provisional → FAIL（反放水）', _rc[0] == 'FAIL', _rc[1])
+
+        # ── 第二刀 chk_c012 雙身份三態整合 fixtures（算盤 MODIFY 補，2026-06-05）──
+        # 鎖 gate(kb-owner industries)/LABEL_MISMATCH WAIVED/命名一致才驗/無欄 FAIL/單行業 skip 回歸
+        _c012_dual_pref = (
+            "```kb-owner\nowner_id: AQI\nowner_name: 阿奇\nindustries: [餐飲, 房仲]\n```\n\n"
+            "## 第 3 章：雙身份比例（霸告建議—待澤君拍板）\n\n"
+            "| 內容類型 | 建議比例 | 理由 |\n|---|---|---|\n"
+            "| 生活 / 觀點 / 個人故事 | 50% | 主力 |\n"
+            "| 餐飲（胖奇熱狗堡）| 30% | 主軸 |\n"
+            "| 房仲 | 15% | 副業 |\n"
+            "| 開箱 | 5% | 少量 |\n"
+        )
+        print("\n[F-C012a] chk_c012 雙行業命名不一致（標籤≠類型名）→ WARN[WAIVED:LABEL_MISMATCH]")
+        _ya = [(Path(f'a{i}.yaml'), {'雙身份分類': '觀點分享（真人）'}) for i in range(7)] + \
+              [(Path(f'b{i}.yaml'), {'雙身份分類': '胖奇熱狗堡（主軸）'}) for i in range(3)]
+        _rc = chk_c012_identity_ratio(_ya, '阿奇', _c012_dual_pref)
+        fcheck('F-C012a 命名不一致 → WARN', _rc[0] == 'WARN', _rc[1])
+        fcheck('F-C012a detail 含 [WAIVED:LABEL_MISMATCH]', '[WAIVED:LABEL_MISMATCH]' in _rc[1], _rc[1])
+
+        print("\n[F-C012b] chk_c012 雙行業命名一致+比例對齊 → PASS（證明命名一致時真驗）")
+        _yb = [(Path(f'g{i}.yaml'), {'雙身份分類': '生活 / 觀點 / 個人故事'}) for i in range(10)] + \
+              [(Path(f'r{i}.yaml'), {'雙身份分類': '餐飲（胖奇熱狗堡）'}) for i in range(6)] + \
+              [(Path(f'h{i}.yaml'), {'雙身份分類': '房仲'}) for i in range(3)] + \
+              [(Path('k0.yaml'), {'雙身份分類': '開箱'})]
+        _rc = chk_c012_identity_ratio(_yb, '阿奇', _c012_dual_pref)
+        fcheck('F-C012b 命名一致比例對 → PASS', _rc[0] == 'PASS', _rc[1])
+
+        print("\n[F-C012c] chk_c012 雙行業命名一致+比例偏 → FAIL（證明真驗有跑、非放水）")
+        _yc = [(Path(f'g{i}.yaml'), {'雙身份分類': '生活 / 觀點 / 個人故事'}) for i in range(10)]
+        _rc = chk_c012_identity_ratio(_yc, '阿奇', _c012_dual_pref)
+        fcheck('F-C012c 比例偏 → FAIL', _rc[0] == 'FAIL', _rc[1])
+
+        print("\n[F-C012d] chk_c012 雙行業無「雙身份分類」欄 → FAIL（reqired backstop）")
+        _yd = [(Path(f'x{i}.yaml'), {'title': 'no identity'}) for i in range(5)]
+        _rc = chk_c012_identity_ratio(_yd, '阿奇', _c012_dual_pref)
+        fcheck('F-C012d 無雙身份分類欄 → FAIL', _rc[0] == 'FAIL', _rc[1])
+
+        print("\n[F-C012e] chk_c012 單行業 → PASS-不適用（不 WARN-spam）")
+        _c012_single_pref = "```kb-owner\nowner_id: RUIXIANG\nowner_name: 瑞祥\nindustry_id: 房仲\n```\n\n## 第 3 章：人物設定\n"
+        _rc = chk_c012_identity_ratio([(Path('s1.yaml'), {'雙身份分類': '房仲'})], '瑞祥', _c012_single_pref)
+        fcheck('F-C012e 單行業 → PASS-不適用', _rc[0] == 'PASS' and '不適用' in _rc[1], _rc[1])
+
+        print("\n[F-C012f] chk_c012 kb-owner 無法解析 → fail-loud WARN（不靜默當單行業）")
+        _rc = chk_c012_identity_ratio([(Path('n1.yaml'), {'雙身份分類': '房仲'})], '未知', "## 第 3 章：人物設定\n沒有 kb-owner block\n")
+        fcheck('F-C012f kb-owner 不可解析 → WARN', _rc[0] == 'WARN', _rc[1])
+
+        print("\n[F-C012g] chk_c012 命名不一致 + 偏好比例已定案(非provisional) → FAIL（堵 Codex#2 放水全標錯）")
+        _c012_g_pref = (
+            "```kb-owner\nowner_id: XX\nowner_name: 測試\nindustries: [餐飲, 房仲]\n```\n\n"
+            "## 第 3 章：雙身份比例\n\n"  # 無 provisional 標記（比例已定案）
+            "| 內容類型 | 建議比例 | 理由 |\n|---|---|---|\n"
+            "| 餐飲 | 60% | x |\n| 房仲 | 40% | y |\n"
+        )
+        _yg = [(Path(f'gg{i}.yaml'), {'雙身份分類': '亂標A'}) for i in range(6)] + \
+              [(Path(f'hh{i}.yaml'), {'雙身份分類': '亂標B'}) for i in range(4)]
+        _rc = chk_c012_identity_ratio(_yg, '測試', _c012_g_pref)
+        fcheck('F-C012g 非provisional命名不一致 → FAIL', _rc[0] == 'FAIL', _rc[1])
+
+        # ── F-FISH 系列：釣魚部雙模式 fixtures（5 組）──
+        import tempfile as _tmpmod, os as _osmod
+
+        def _make_fake_batch(yamls_data: list, flag_content: Optional[str] = None, dir_suffix: str = "") -> "Path":
+            """建立暫存批次目錄，內含 yaml 檔（含日期的目錄名），可選加 _batch_flags.yml。"""
+            tmp_dir = _tmpmod.mkdtemp(prefix=f"test_batch_{dir_suffix}_")
+            tmp_path = Path(tmp_dir)
+            for i, data in enumerate(yamls_data):
+                import yaml as _yaml_inner
+                (tmp_path / f"script_test_{i+1:02d}.yaml").write_text(
+                    _yaml_inner.dump(data, allow_unicode=True), encoding="utf-8"
+                )
+            if flag_content is not None:
+                (tmp_path / "_batch_flags.yml").write_text(flag_content, encoding="utf-8")
+            return tmp_path
+
+        # ── F-FISH1：off 模式（2026-06-07 無旗標）→ 無釣魚信號 → PASS ──
+        print("\n[F-FISH1] off 模式（新批無旗標）+ 無釣魚信號 → C-013B PASS + V2-006 3強制位 PASS")
+        _fish1_yamls = [
+            {"title": "一般腳本_毒舌", "required_slot": "毒舌正能量"},
+            {"title": "一般腳本_雞湯", "required_slot": "純雞湯"},
+            {"title": "一般腳本_Erika", "required_slot": "Erika 拆解派"},
+        ]
+        _fish1_dir = _make_fake_batch(_fish1_yamls, flag_content=None, dir_suffix="fish1_2026-06-07")
+        # rename 讓目錄名含日期（off 模式）
+        _fish1_dir_dated = _fish1_dir.parent / f"第01批_2026-06-07"
+        _fish1_dir.rename(_fish1_dir_dated)
+        _fish1_dir = _fish1_dir_dated
+        try:
+            _f1_policy = load_fishing_policy(_fish1_dir, [(p, __import__('yaml').safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish1_dir.glob("*.yaml"))])
+            fcheck("F-FISH1 mode=off", _f1_policy["mode"] == "off", _f1_policy["detail"])
+            # C-013B
+            _f1_ydata = [(p, __import__('yaml').safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish1_dir.glob("*.yaml"))]
+            _r = chk_c013b_no_fishing_when_off(_f1_ydata, _f1_policy)
+            fcheck("F-FISH1 C-013B PASS（無釣魚信號）", _r[0] == "PASS", _r[1])
+            # V2-006 3 強制位
+            _r2 = chk_v2_006_required_slot(_f1_ydata, _f1_policy)
+            fcheck("F-FISH1 V2-006 3強制位 PASS", _r2[0] == "PASS", _r2[1])
+        finally:
+            import shutil as _shutil
+            _shutil.rmtree(_fish1_dir, ignore_errors=True)
+
+        # ── F-FISH2：off 模式（2026-06-07）+ 偷塞釣魚腳本 → C-013B FAIL + C-013 per-file FAIL ──
+        print("\n[F-FISH2] off 模式（新批）+ 偷塞釣魚腳本 → C-013B FAIL + C-013 per-file FAIL（驗 C-013 真吃到 policy）")
+        _fish2_yamls = [
+            {"title": "一般腳本_毒舌", "required_slot": "毒舌正能量"},
+            {"title": "一般腳本_雞湯", "required_slot": "純雞湯"},
+            {"title": "一般腳本_Erika", "required_slot": "Erika 拆解派"},
+            # 偷塞釣魚腳本（應 FAIL）
+            {"title": "釣魚部測試", "required_slot": "釣魚部", "is_fishing": True,
+             "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x"}},
+        ]
+        _fish2_dir = _make_fake_batch(_fish2_yamls, flag_content=None, dir_suffix="fish2")
+        _fish2_dir_dated = _fish2_dir.parent / f"第02批_2026-06-07"
+        _fish2_dir.rename(_fish2_dir_dated)
+        _fish2_dir = _fish2_dir_dated
+        try:
+            import yaml as _yaml_fish2
+            _f2_ydata = [(p, _yaml_fish2.safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish2_dir.glob("*.yaml"))]
+            _f2_policy = load_fishing_policy(_fish2_dir, _f2_ydata)
+            fcheck("F-FISH2 mode=off", _f2_policy["mode"] == "off", _f2_policy["detail"])
+            # C-013B batch-level 應 FAIL
+            _r = chk_c013b_no_fishing_when_off(_f2_ydata, _f2_policy)
+            fcheck("F-FISH2 C-013B FAIL（off 偷塞釣魚）", _r[0] == "FAIL", _r[1])
+            # C-013 per-file 應 FAIL（驗三層真串通）
+            _fishing_yaml_data = _fish2_yamls[3]  # 第 4 支釣魚腳本 data
+            _r3 = chk_c013_dm_card(_fishing_yaml_data, "script_test_04.yaml", "瑞祥", _f2_policy)
+            fcheck("F-FISH2 C-013 per-file FAIL（off + 釣魚信號，non-legacy 放水洞封堵）",
+                   _r3[0] == "FAIL", _r3[1])
+        finally:
+            _shutil.rmtree(_fish2_dir, ignore_errors=True)
+
+        # ── F-FISH3：opt_in 模式 + 1 釣魚腳本含完整 dm_card → PASS ──
+        print("\n[F-FISH3] opt_in 模式 + 1 釣魚腳本含完整 dm_card → C-013 PASS + C-013B PASS + V2-006 4強制位 PASS")
+        _flag3 = "fishing_dm_card:\n  enabled: true\n  approved_by: 澤君\n  approved_at: '2026-06-06'\n  reason: '特別測試 F-FISH3'\n"
+        _fish3_yamls = [
+            {"title": "毒舌腳本", "required_slot": "毒舌正能量"},
+            {"title": "雞湯腳本", "required_slot": "純雞湯"},
+            {"title": "Erika腳本", "required_slot": "Erika 拆解派"},
+            {"title": "釣魚部測試", "required_slot": "釣魚部", "is_fishing": True,
+             "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x",
+                         "asset_path": "assets/dm_cards/test.png"}},
+        ]
+        _fish3_dir = _make_fake_batch(_fish3_yamls, flag_content=_flag3, dir_suffix="fish3")
+        _fish3_dir_dated = _fish3_dir.parent / f"第03批_2026-06-06"
+        _fish3_dir.rename(_fish3_dir_dated)
+        _fish3_dir = _fish3_dir_dated
+        try:
+            import yaml as _yaml_fish3
+            _f3_ydata = [(p, _yaml_fish3.safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish3_dir.glob("*.yaml"))]
+            _f3_policy = load_fishing_policy(_fish3_dir, _f3_ydata)
+            fcheck("F-FISH3 mode=opt_in", _f3_policy["mode"] == "opt_in", _f3_policy["detail"])
+            # C-013B opt_in → PASS skip
+            _r = chk_c013b_no_fishing_when_off(_f3_ydata, _f3_policy)
+            fcheck("F-FISH3 C-013B PASS（opt_in skip）", _r[0] == "PASS", _r[1])
+            # V2-006 4 強制位
+            _r2 = chk_v2_006_required_slot(_f3_ydata, _f3_policy)
+            fcheck("F-FISH3 V2-006 4強制位 PASS", _r2[0] == "PASS", _r2[1])
+            # C-013 per-file 釣魚腳本 PASS
+            _r3 = chk_c013_dm_card(_fish3_yamls[3], "script_test_04.yaml", "瑞祥", _f3_policy)
+            fcheck("F-FISH3 C-013 PASS（opt_in + dm_card 完整）", _r3[0] == "PASS", _r3[1])
+        finally:
+            _shutil.rmtree(_fish3_dir, ignore_errors=True)
+
+        # ── F-FISH4：opt_in 模式 + 釣魚腳本缺 dm_card → FAIL ──
+        print("\n[F-FISH4] opt_in 模式 + 釣魚腳本缺 dm_card → C-013 FAIL")
+        _fish4_yaml_data = {
+            "title": "釣魚部", "required_slot": "釣魚部", "is_fishing": True,
+            # 故意不給 dm_card（缺 dm_card 欄位）
+        }
+        _f4_policy = {"mode": "opt_in", "batch_date": _dt.date(2026, 6, 6),
+                      "detail": "opt_in 測試 F-FISH4"}
+        _r = chk_c013_dm_card(_fish4_yaml_data, "f4.yaml", "瑞祥", _f4_policy)
+        fcheck("F-FISH4 C-013 FAIL（opt_in 缺 dm_card dict）", _r[0] == "FAIL", _r[1])
+
+        # ── F-FISH5：legacy 模式（2026-06-05 無旗標）+ 釣魚腳本含完整 dm_card → PASS（舊批豁免）──
+        print("\n[F-FISH5] legacy 模式（2026-06-05 無旗標舊批）+ 釣魚腳本有完整 dm_card → C-013 PASS（dm_card 缺仍 FAIL）")
+        # 測試 legacy PASS 路徑
+        _fish5_yaml_ok = {
+            "title": "釣魚部", "required_slot": "釣魚部", "is_fishing": True,
+            "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x"},
+        }
+        _f5_policy = {"mode": "legacy", "batch_date": _dt.date(2026, 6, 5),
+                      "detail": "無旗標 + 批次日期 2026-06-05 < 2026-06-06 → legacy"}
+        _r = chk_c013_dm_card(_fish5_yaml_ok, "f5_ok.yaml", "瑞祥", _f5_policy)
+        fcheck("F-FISH5a C-013 PASS（legacy + dm_card 完整）", _r[0] == "PASS", _r[1])
+        # 驗 legacy dm_card 缺仍 FAIL（不趁 cutover 放水）
+        _fish5_yaml_bad = {
+            "title": "釣魚部", "required_slot": "釣魚部", "is_fishing": True,
+            # 故意不給 dm_card
+        }
+        _r2 = chk_c013_dm_card(_fish5_yaml_bad, "f5_bad.yaml", "瑞祥", _f5_policy)
+        fcheck("F-FISH5b C-013 FAIL（legacy + 缺 dm_card，不趁 cutover 放水）", _r2[0] == "FAIL", _r2[1])
+
+        # ── F-FISH6（霸告 2026-06-05 修零回歸後鎖回歸）：legacy + 只有 required_slot/is_fishing
+        #    （無 title釣魚部、無 dm_card dict）→ C-013 PASS skip。舊碼漏偵測這型（詩婷01/昀臻12 實際案例），
+        #    legacy 必逐字保舊行為不誤判 FAIL；同一支在 off 新批必 FAIL（fail-closed 未放鬆）──
+        print("\n[F-FISH6] legacy 只 required_slot/is_fishing（無 title釣魚部/dm_card）→ legacy PASS skip / off FAIL")
+        _fish6_yaml = {
+            "title": "首購族最常問我的三件事",  # 不含「釣魚部」
+            "required_slot": "釣魚部", "is_fishing": True,
+            # 無 dm_card dict、無 釣魚部標記
+        }
+        _f6_legacy = {"mode": "legacy", "batch_date": _dt.date(2026, 6, 1), "detail": "legacy 測試 F-FISH6"}
+        _r6a = chk_c013_dm_card(_fish6_yaml, "f6.yaml", "詩婷", _f6_legacy)
+        fcheck("F-FISH6a legacy 只 required_slot/is_fishing → C-013 PASS skip（零回歸鎖）", _r6a[0] == "PASS", _r6a[1])
+        _f6_off = {"mode": "off", "batch_date": _dt.date(2026, 6, 10), "detail": "off 測試 F-FISH6"}
+        _r6b = chk_c013_dm_card(_fish6_yaml, "f6.yaml", "詩婷", _f6_off)
+        fcheck("F-FISH6b 同支在 off 新批 → C-013 FAIL（fail-closed 未放鬆）", _r6b[0] == "FAIL", _r6b[1])
+
+        # ── F-FISH7（保鏢硬條件2 / Codex must-fix）：opt_in + dm_card 6 件齊但「缺圖片資產路徑」→ FAIL
+        #    封「validator 6 件驗過、但網站圖卡空白」漏洞。有 asset_path → PASS ──
+        print("\n[F-FISH7] opt_in + dm_card 6 件齊但缺 asset_path → C-013 FAIL（圖卡交付鏈）")
+        _f7_policy = {"mode": "opt_in", "batch_date": _dt.date(2026, 6, 6), "detail": "opt_in 測試 F-FISH7"}
+        _fish7_no_asset = {
+            "title": "釣魚部測試", "required_slot": "釣魚部", "is_fishing": True,
+            "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x"},
+            # 故意不給 asset_path / img
+        }
+        _r7a = chk_c013_dm_card(_fish7_no_asset, "f7.yaml", "瑞祥", _f7_policy)
+        fcheck("F-FISH7a opt_in 6件齊但無 asset_path → C-013 FAIL", _r7a[0] == "FAIL", _r7a[1])
+        _fish7_with_asset = dict(_fish7_no_asset)
+        _fish7_with_asset["dm_card"] = dict(_fish7_no_asset["dm_card"], asset_path="assets/dm_cards/x.png")
+        _r7b = chk_c013_dm_card(_fish7_with_asset, "f7b.yaml", "瑞祥", _f7_policy)
+        fcheck("F-FISH7b opt_in 6件齊 + asset_path → C-013 PASS", _r7b[0] == "PASS", _r7b[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

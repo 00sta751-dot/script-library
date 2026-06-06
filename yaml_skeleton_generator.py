@@ -129,27 +129,57 @@ def build_time_slots() -> list:
 # 舊名 TIME_SLOTS 指向 build_time_slots()，維持向後相容（其他非關鍵引用不壞）
 TIME_SLOTS = build_time_slots()
 
-# 業主台詞欄位名對照（不同業主 yaml 用不同 key）
-OWNER_DIALOGUE_KEY = {
-    "瑞祥":     "台詞_瑞祥",
-    "仲豪":     "台詞_仲豪",
-    "昀臻":     "台詞_昀臻",
-    "叭噗_小C": "台詞_叭噗",
-    "阿奇":     "台詞_阿奇",
-    "溫蒂":     "台詞_溫蒂",
-    "詩婷":     "台詞_詩婷",
-}
+# Phase 2 FIX2：lazy proxy + cached projection loader（import 不碰 generated.json）
+from functools import lru_cache
+_YSG_DIR = Path(__file__).resolve().parent
+if str(_YSG_DIR) not in sys.path:
+    sys.path.insert(0, str(_YSG_DIR))
+from _lazy_map import LazyMap
 
-# 業主主推平台
-OWNER_PLATFORM = {
-    "瑞祥":     "FB Reels",
-    "仲豪":     "FB Reels",
-    "昀臻":     "IG Reels",
-    "叭噗_小C": "IG Reels",
-    "阿奇":     "FB Reels",
-    "溫蒂":     "IG Reels",
-    "詩婷":     "IG Reels",
-}
+# ── owner_projection.generated.json loader（Phase 2 step1 2026-06-06）──
+# 讀 sibling owner_projection.generated.json，建 OWNER_DIALOGUE_KEY / OWNER_PLATFORM。
+# JSON 不存在 / 壞 / 缺欄位 → fail-loud raise SystemExit（禁保留硬編 fallback）。
+def _load_owner_projection() -> tuple[dict, dict]:
+    _proj_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+    if not _proj_path.exists():
+        raise SystemExit(
+            f"[ERROR] yaml_skeleton_generator: owner_projection.generated.json not found at {_proj_path}\n"
+            f"  Run gen_owner_projection_cache.py to regenerate."
+        )
+    try:
+        _proj_data = json.loads(_proj_path.read_text(encoding="utf-8"))
+    except Exception as _e:
+        raise SystemExit(
+            f"[ERROR] yaml_skeleton_generator: failed to parse owner_projection.generated.json: {_e}"
+        )
+    _owners = _proj_data.get("owners")
+    if not isinstance(_owners, dict):
+        raise SystemExit(
+            "[ERROR] yaml_skeleton_generator: owner_projection.generated.json missing 'owners' dict"
+        )
+    _dialogue_key: dict = {}
+    _platform: dict = {}
+    for _name, _rec in _owners.items():
+        if "dialogue_key" not in _rec:
+            raise SystemExit(
+                f"[ERROR] yaml_skeleton_generator: owner '{_name}' missing 'dialogue_key' in projection"
+            )
+        if "platform" not in _rec:
+            raise SystemExit(
+                f"[ERROR] yaml_skeleton_generator: owner '{_name}' missing 'platform' in projection"
+            )
+        _dialogue_key[_name] = _rec["dialogue_key"]
+        _platform[_name] = _rec["platform"]
+    return _dialogue_key, _platform
+
+
+# 業主台詞欄位名對照 + 業主主推平台（Phase 2 FIX2 lazy——首次存取才載入；_proj_pair 快取一次）
+@lru_cache(maxsize=1)
+def _proj_pair():
+    return _load_owner_projection()
+
+OWNER_DIALOGUE_KEY = LazyMap(lambda: _proj_pair()[0])
+OWNER_PLATFORM = LazyMap(lambda: _proj_pair()[1])
 
 
 # ════════════════════════════════════════

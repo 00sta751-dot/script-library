@@ -153,15 +153,43 @@ except Exception:
 # ── 業主偏好.md 路徑表（動態 lookup，不硬寫比例數字）──
 L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
 
-OWNER_PREF_PATHS = {
-    "瑞祥":     L2_BASE / "房仲_瑞祥"    / "00_業主核心檔" / "source_overlay" / "_瑞祥偏好.md",
-    "仲豪":     L2_BASE / "房仲_仲豪"    / "00_業主核心檔" / "source_overlay" / "_仲豪偏好.md",
-    "昀臻":     L2_BASE / "美容_昀臻"    / "00_業主核心檔" / "source_overlay" / "_昀臻偏好.md",
-    "叭噗_小C": L2_BASE / "情侶_叭噗_小C" / "00_業主核心檔" / "source_overlay" / "_叭噗_小C偏好.md",
-    "阿奇":     L2_BASE / "餐飲_阿奇"    / "00_業主核心檔" / "source_overlay" / "_阿奇偏好.md",
-    "溫蒂":     L2_BASE / "美容_溫蒂"    / "00_業主核心檔" / "source_overlay" / "_溫蒂偏好.md",
-    "詩婷":     L2_BASE / "房仲_詩婷"    / "00_業主核心檔" / "source_overlay" / "_詩婷偏好.md",
-}
+# Phase 2 FIX2：lazy proxy（import 不碰 generated.json；dir 已於上方 sibling import 加入 sys.path）
+from _lazy_map import LazyMap
+
+# ── Phase 2 Step 4：從 owner_projection.generated.json 載入 4 張 roster/path 表 ──
+def _load_owner_projection() -> dict:
+    """讀 sibling owner_projection.generated.json；缺/壞 fail-loud（不回硬表）。"""
+    import json as _json
+    _proj_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+    if not _proj_path.exists():
+        raise FileNotFoundError(
+            f"[validate_script_batch] owner_projection.generated.json 不存在：{_proj_path}\n"
+            "請先執行 gen_owner_projection_cache.py 產生 cache。"
+        )
+    try:
+        with open(_proj_path, encoding="utf-8") as _f:
+            _data = _json.load(_f)
+    except Exception as _e:
+        raise RuntimeError(
+            f"[validate_script_batch] 讀 owner_projection.generated.json 失敗：{_e}"
+        ) from _e
+    if "owners" not in _data or not isinstance(_data["owners"], dict):
+        raise ValueError(
+            f"[validate_script_batch] owner_projection.generated.json 缺 'owners' key 或格式錯誤"
+        )
+    return _data["owners"]
+
+_OWNER_PROJ = LazyMap(_load_owner_projection)  # Phase 2 FIX2：lazy——import 不載 JSON
+
+# OWNER_PREF_PATHS：key 順序對齊原硬編（瑞祥/仲豪/昀臻/叭噗_小C/阿奇/溫蒂/詩婷）
+OWNER_PREF_PATHS = LazyMap(lambda: {
+    owner: Path(rec["l2_path"])
+    for owner, rec in sorted(
+        _OWNER_PROJ.items(),
+        key=lambda x: ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "溫蒂", "詩婷"].index(x[0])
+        if x[0] in ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "溫蒂", "詩婷"] else 99
+    )
+})
 
 # ── 禁用詞（SOP §11 L1-002）──
 BANNED_WORDS = ["應該", "大概", "可能", "差不多", "基本上", "我猜"]
@@ -923,14 +951,14 @@ def chk_c014_card_style(yamls, batch_dir: Path, owner: str, batch_tag: str) -> t
         return "PASS", "本批無知識圖卡意圖（無腳本填「圖卡主題」），按需跳過 C-014（B6 2026-06-05）"
     # 以下只在「本批確實要做知識圖卡」時才走：找風格選擇檔
     # 找業主核心檔資料夾（7 業主全列；缺漏業主走 OWNER_PREF_PATHS fallback）
+    # Phase 2 Step 4：從 projection 產（key 順序對齊原硬編：瑞祥/仲豪/昀臻/叭噗_小C/阿奇/詩婷/溫蒂）
     owner_dir_map = {
-        "瑞祥":     L2_BASE / "房仲_瑞祥"    / "00_業主核心檔" / "source_overlay",
-        "仲豪":     L2_BASE / "房仲_仲豪"    / "00_業主核心檔" / "source_overlay",
-        "昀臻":     L2_BASE / "美容_昀臻"    / "00_業主核心檔" / "source_overlay",
-        "叭噗_小C": L2_BASE / "情侶_叭噗_小C" / "00_業主核心檔" / "source_overlay",
-        "阿奇":     L2_BASE / "餐飲_阿奇"    / "00_業主核心檔" / "source_overlay",
-        "詩婷":     L2_BASE / "房仲_詩婷"    / "00_業主核心檔" / "source_overlay",
-        "溫蒂":     L2_BASE / "美容_溫蒂"    / "00_業主核心檔" / "source_overlay",
+        owner: L2_BASE / rec["owner_dir"] / "00_業主核心檔" / "source_overlay"
+        for owner, rec in sorted(
+            _OWNER_PROJ.items(),
+            key=lambda x: ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "詩婷", "溫蒂"].index(x[0])
+            if x[0] in ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "詩婷", "溫蒂"] else 99
+        )
     }
     overlay_dir = owner_dir_map.get(owner)
     if not overlay_dir or not overlay_dir.exists():
@@ -1987,15 +2015,15 @@ def _load_template_index_ids() -> Optional[set]:
 # 此處不再維護本地清單，修改派系清單請至 validate_deploy.py FACTION_LEAK_WORDS
 
 # owner → HTML 檔名
-_OWNER_HTML_MAP = {
-    "瑞祥":     "index.html",
-    "仲豪":     "kenny.html",
-    "昀臻":     "beauty.html",
-    "阿奇":     "achi.html",
-    "叭噗_小C": "bappu-cc/index.html",
-    "溫蒂":     "wendi.html",
-    "詩婷":     "shihting.html",
-}
+# Phase 2 Step 4：從 projection 產（key 順序對齊原硬編：瑞祥/仲豪/昀臻/阿奇/叭噗_小C/溫蒂/詩婷）
+_OWNER_HTML_MAP = LazyMap(lambda: {
+    owner: rec["html_file"]
+    for owner, rec in sorted(
+        _OWNER_PROJ.items(),
+        key=lambda x: ["瑞祥", "仲豪", "昀臻", "阿奇", "叭噗_小C", "溫蒂", "詩婷"].index(x[0])
+        if x[0] in ["瑞祥", "仲豪", "昀臻", "阿奇", "叭噗_小C", "溫蒂", "詩婷"] else 99
+    )
+})
 
 def chk_c016_no_faction_leak_in_html(owner: str, lib_dir: Path) -> tuple[str, str]:
     """C-016：HTML 可見輸出層不得出現派系名等製作字眼（v3 修寬 2026-06-01）
@@ -2110,14 +2138,15 @@ def chk_c016_no_faction_leak_in_html(owner: str, lib_dir: Path) -> tuple[str, st
                 break
 
     # F. yaml body **派系**：/ **類型**：meta 行掃描（未爆彈守門）
+    # Phase 2 Step 4：從 projection 產（key 順序對齊原硬編：瑞祥/仲豪/昀臻/阿奇/叭噗_小C/溫蒂/詩婷）
+    # ⚠️ 保留 lib_dir.parent.parent 構造方式（非 L2_BASE），確保路徑逐字對齊原硬編
     yaml_owner_dirs = {
-        "瑞祥":     lib_dir.parent.parent / "L2_業主層" / "房仲_瑞祥" / "01_腳本生產",
-        "仲豪":     lib_dir.parent.parent / "L2_業主層" / "房仲_仲豪" / "01_腳本生產",
-        "昀臻":     lib_dir.parent.parent / "L2_業主層" / "美容_昀臻" / "01_腳本生產",
-        "阿奇":     lib_dir.parent.parent / "L2_業主層" / "餐飲_阿奇" / "01_腳本生產",
-        "叭噗_小C": lib_dir.parent.parent / "L2_業主層" / "情侶_叭噗_小C" / "01_腳本生產",
-        "溫蒂":     lib_dir.parent.parent / "L2_業主層" / "美容_溫蒂" / "01_腳本生產",
-        "詩婷":     lib_dir.parent.parent / "L2_業主層" / "房仲_詩婷" / "01_腳本生產",
+        owner: lib_dir.parent.parent / "L2_業主層" / rec["owner_dir"] / "01_腳本生產"
+        for owner, rec in sorted(
+            _OWNER_PROJ.items(),
+            key=lambda x: ["瑞祥", "仲豪", "昀臻", "阿奇", "叭噗_小C", "溫蒂", "詩婷"].index(x[0])
+            if x[0] in ["瑞祥", "仲豪", "昀臻", "阿奇", "叭噗_小C", "溫蒂", "詩婷"] else 99
+        )
     }
     yaml_dir = yaml_owner_dirs.get(owner)
     if yaml_dir and yaml_dir.exists():

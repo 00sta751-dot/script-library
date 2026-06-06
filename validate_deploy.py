@@ -25,6 +25,14 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
 12. group head 不得含派系名（中文/英文副名）HARD BLOCK
     — 白名單：圖卡部/Card Library/脆文/Threads 放行
     — 正確做法：group head 應含「第N批」或 YYYY-MM-DD 日期
+--- v5 新增（2026-06-06 Phase 2 FIX3 — owner_projection cache 新鮮度閘）---
+13. owner_projection.generated.json 新鮮度 HARD BLOCK
+    — Gate A（自包含、永遠 strict）：generated._metadata.runtime_overrides_sha256
+      == sha256(本地 owner_runtime_overrides.json)；缺/不符 → FAIL（overrides 改了沒 regen）
+    — Gate B（cross-repo verifier）：跑 my-assistant validate_owner_projection_cache.py
+      預設 strict（verifier 缺/exit≠0 → FAIL）；OWNER_PROJECTION_VERIFIER_OPTIONAL=1 時
+      env/暫態問題可跳過，但 verifier 跑出乾淨 stale/mismatch 仍 FAIL
+    — stale 一律 FAIL（禁 WARN）
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -42,6 +50,12 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
+# Phase 2 FIX2 2026-06-06：sibling import LazyMap（lazy proxy，import 不碰 generated.json）
+_THIS_DIR = str(Path(__file__).resolve().parent)
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+from _lazy_map import LazyMap
+
 # Windows cp950 → utf-8 fix（emoji + 中文 print 不噴）
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -53,16 +67,65 @@ except Exception:
 LIB = Path(__file__).parent.resolve()
 LOG_FILE = LIB / '.validate_deploy.log'
 
-# 7 業主 html 對應 build script + 圖卡 prefix（2026-06-02 補 achi — 閘門完整性）
-OWNER_MAP = {
-    'beauty.html':           {'build': 'build_beauty.py',    'prefix': 'yunzhen-'},
-    'index.html':            {'build': 'build_index.py',     'prefix': 'rui-'},
-    'kenny.html':            {'build': 'build_all.py',       'prefix': 'kenny-'},
-    'bappu-cc/index.html':   {'build': 'build_bappu.py',     'prefix': 'bappu-'},
-    'shihting.html':         {'build': 'build_shihting.py',  'prefix': 'shihting-'},
-    'wendi.html':            {'build': 'build_wendi.py',     'prefix': 'wendi-'},
-    'achi.html':             {'build': 'build_achi.py',      'prefix': 'achi-'},
-}
+# OWNER_MAP — 由 owner_projection.generated.json 產（Phase 2 step3）
+# 原硬編 7 筆已刪；html 順序以 _OWNER_MAP_HTML_ORDER 固定，保證行為零改變。
+def _load_owner_map() -> dict:
+    """讀 sibling owner_projection.generated.json，fail-loud（不存在/壞 JSON/缺欄位 → SystemExit）。
+    回傳 OWNER_MAP: {html_file: {'build': build_script, 'prefix': card_prefix}}，
+    key 順序同原硬編（beauty/index/kenny/bappu-cc/shihting/wendi/achi）。
+    """
+    _proj_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+    if not _proj_path.exists():
+        raise SystemExit(
+            f"[validate_deploy] owner_projection.generated.json 不存在：{_proj_path}\n"
+            f"請先跑 gen_owner_projection_cache.py 產生此檔。"
+        )
+    try:
+        with open(_proj_path, encoding="utf-8") as _f:
+            _proj = json.load(_f)
+    except Exception as _e:
+        raise SystemExit(
+            f"[validate_deploy] owner_projection.generated.json 解析失敗：{_e}"
+        )
+    _owners = _proj.get("owners")
+    if not isinstance(_owners, dict) or not _owners:
+        raise SystemExit(
+            f"[validate_deploy] owner_projection.generated.json 缺 'owners' 欄位或為空。"
+        )
+    # 必要欄位驗證（逐 owner）
+    _required = {"html_file", "build_script", "card_prefix"}
+    for _name, _rec in _owners.items():
+        _missing = _required - set(_rec.keys())
+        if _missing:
+            raise SystemExit(
+                f"[validate_deploy] owner_projection.generated.json owner={_name!r} 缺欄位：{_missing}"
+            )
+    # 建 html → {build, prefix} 映射（key=html_file）
+    _raw = {
+        _rec["html_file"]: {"build": _rec["build_script"], "prefix": _rec["card_prefix"]}
+        for _rec in _owners.values()
+    }
+    # 原硬編順序（beauty/index/kenny/bappu-cc/shihting/wendi/achi）— 保證行為零改變
+    _HTML_ORDER = [
+        'beauty.html',
+        'index.html',
+        'kenny.html',
+        'bappu-cc/index.html',
+        'shihting.html',
+        'wendi.html',
+        'achi.html',
+    ]
+    _ordered = {}
+    for _k in _HTML_ORDER:
+        if _k in _raw:
+            _ordered[_k] = _raw[_k]
+    # 若 projection 新增業主（不在 _HTML_ORDER），補到尾端
+    for _k, _v in _raw.items():
+        if _k not in _ordered:
+            _ordered[_k] = _v
+    return _ordered
+
+OWNER_MAP = LazyMap(_load_owner_map)  # Phase 2 FIX2：lazy——import 不載 JSON，--force-skip-validation 可先進 main
 
 # 已對齊 v2 完整功能（caption/hashtag/複製文案/data-caption）的業主
 # — check 7/8 對這清單做功能驗證（未列入者尚未 migrate，跳過避免誤攔）
@@ -892,6 +955,104 @@ def check_12_no_faction_group_head():
     return fails
 
 
+# === check 13（owner_projection cache 新鮮度 — 2026-06-06 Phase 2 FIX3）===
+
+def check_13_owner_projection_cache_freshness():
+    """檢查 13：owner_projection.generated.json 新鮮度（Phase 2 FIX3）。
+    Gate A（自包含、永遠 strict）：cache._metadata.runtime_overrides_sha256
+        == sha256(本地 owner_runtime_overrides.json)。缺/不符 → FAIL。純讀 2 sibling，無 L2/跨 repo。
+    Gate B（cross-repo verifier，模式分離）：跑 my-assistant validate_owner_projection_cache.py。
+        預設 strict：verifier 缺/exit≠0 → FAIL。
+        OWNER_PROJECTION_VERIFIER_OPTIONAL=1（pre-commit 便利模式）：verifier 缺/crash/timeout
+        （非乾淨判決，疑 env/L2 暫態）→ SKIP+WARN；但跑出乾淨 stale/mismatch（output 含
+        verifier 'FAIL' marker）→ 仍 FAIL。
+    stale/無法驗證一律 FAIL（禁 WARN）——僅 OPTIONAL 模式的 env 問題可跳過。
+    """
+    import hashlib
+    log('=== Check 13：owner_projection cache 新鮮度（Gate A 自包含 + Gate B verifier）===')
+    fails = []
+    optional = os.environ.get('OWNER_PROJECTION_VERIFIER_OPTIONAL') == '1'
+
+    proj_path = LIB / 'owner_projection.generated.json'
+    overrides_path = LIB / 'owner_runtime_overrides.json'
+
+    # ── Gate A：自包含 sha 對照（永遠 strict）──
+    if not proj_path.exists():
+        msg = '❌ Gate A: owner_projection.generated.json 不存在（跑 gen_owner_projection_cache.py）'
+        log(f'  {msg}'); fails.append(msg); return fails
+    if not overrides_path.exists():
+        msg = '❌ Gate A: owner_runtime_overrides.json 不存在'
+        log(f'  {msg}'); fails.append(msg); return fails
+    try:
+        _proj = json.loads(proj_path.read_text(encoding='utf-8'))
+    except Exception as e:
+        msg = f'❌ Gate A: generated.json 解析失敗：{e}'
+        log(f'  {msg}'); fails.append(msg); return fails
+    cached_sha = _proj.get('_metadata', {}).get('runtime_overrides_sha256', '')
+    current_sha = hashlib.sha256(overrides_path.read_bytes()).hexdigest()
+    if not cached_sha:
+        msg = '❌ Gate A: generated.json 缺 _metadata.runtime_overrides_sha256'
+        log(f'  {msg}'); fails.append(msg)
+    elif cached_sha != current_sha:
+        msg = (f'❌ Gate A: cache STALE — overrides 已改但未 regen'
+               f'（cached={cached_sha[:16]}... current={current_sha[:16]}...）；跑 gen_owner_projection_cache.py')
+        log(f'  {msg}'); fails.append(msg)
+    else:
+        log('  ✅ Gate A: runtime_overrides_sha256 對齊（cache 對 overrides 新鮮）')
+
+    # ── Gate B：cross-repo verifier（模式分離）──
+    verifier = os.environ.get('OWNER_PROJECTION_VERIFIER', '')
+    if not verifier:
+        kb_dir = os.environ.get('KB_RESOLVER_DIR', '')
+        verifier = (str(Path(kb_dir) / 'validate_owner_projection_cache.py') if kb_dir
+                    else r'C:\Users\00sta\Documents\my-assistant\tools\kb_resolver\validate_owner_projection_cache.py')
+    if not Path(verifier).exists():
+        if optional:
+            log(f'  ⚠ Gate B: 找不到 verifier（{verifier}）— OPTIONAL 模式跳過（Gate A 已驗自包含新鮮度）')
+        else:
+            msg = f'❌ Gate B: 找不到 cache verifier（{verifier}）— deploy 模式必須有（或設 OWNER_PROJECTION_VERIFIER_OPTIONAL=1）'
+            log(f'  {msg}'); fails.append(msg)
+        return fails
+    try:
+        # Codex r2：明確傳 --cache/--overrides 指向「本 repo 正在部署的檔」，
+        # 否則 verifier 會驗它自己 hardcoded 預設路徑（clone/複本時 Gate B 驗錯 repo、stale 漏網）
+        proc = subprocess.run([sys.executable, verifier,
+                               '--cache', str(proj_path),
+                               '--overrides', str(overrides_path)],
+                              capture_output=True,
+                              text=True, encoding='utf-8', errors='replace', timeout=60)
+    except subprocess.TimeoutExpired:
+        if optional:
+            log('  ⚠ Gate B: verifier 逾時（60s）— OPTIONAL 模式跳過（疑 env/L2 暫態）')
+        else:
+            msg = '❌ Gate B: verifier 執行逾時（60s）'
+            log(f'  {msg}'); fails.append(msg)
+        return fails
+    except Exception as e:
+        if optional:
+            log(f'  ⚠ Gate B: verifier 執行例外（{e}）— OPTIONAL 模式跳過')
+        else:
+            msg = f'❌ Gate B: verifier 執行例外：{e}'
+            log(f'  {msg}'); fails.append(msg)
+        return fails
+    if proc.returncode == 0:
+        log('  ✅ Gate B: verifier PASS（cache 與重算一致、source sha 未變）')
+    else:
+        out = (proc.stdout or '') + (proc.stderr or '')
+        clean_verdict = '[validate_owner_projection_cache] FAIL' in out
+        first = (out.strip().splitlines() or ['(no output)'])[0]
+        if clean_verdict:
+            # 真 stale/mismatch 判決 —— OPTIONAL 也不放過
+            msg = f'❌ Gate B: cache STALE/mismatch（verifier 乾淨 FAIL）— {first}'
+            log(f'  {msg}'); fails.append(msg)
+        elif optional:
+            log(f'  ⚠ Gate B: verifier 非乾淨退出（exit {proc.returncode}，疑 env/L2 暫態）— OPTIONAL 模式跳過 — {first}')
+        else:
+            msg = f'❌ Gate B: verifier exit {proc.returncode} — {first}'
+            log(f'  {msg}'); fails.append(msg)
+    return fails
+
+
 # === main ===
 
 def main():
@@ -934,6 +1095,9 @@ def main():
     # v4 新增（2026-06-02 日期分組紅線）
     all_fails += check_12_no_faction_group_head()
     log('')
+    # v5 新增（2026-06-06 Phase 2 FIX3 — owner_projection cache 新鮮度閘）
+    all_fails += check_13_owner_projection_cache_freshness()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -945,7 +1109,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 12 件齊')
+        log('✅ 全部通過 — 13 件齊')
         sys.exit(0)
 
 

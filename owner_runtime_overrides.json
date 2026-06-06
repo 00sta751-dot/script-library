@@ -1,0 +1,73 @@
+{
+  "_schema": {
+    "_note": "手寫真資料 — 工具運行 metadata。值 == legacy AST 抽出值（零行為改變）。",
+    "_fields": {
+      "owner_code":            "必填 — script_id prefix（ASCII lowercase，無底線）",
+      "html_file":             "必填 — 對應 script-library/ 下的 HTML 相對路徑",
+      "build_script":          "必填 — 對應 build_*.py 檔名",
+      "card_prefix":           "必填 — 圖卡 PNG 檔名前綴（含連字號）",
+      "platform":              "必填 — 主推平台（IG Reels / FB Reels）",
+      "dialogue_key":          "必填 — yaml 台詞欄位名（台詞_<業主>）",
+      "sub_industries":        "選填 — 副行業列表（雙身份業主才填；排除 industries[0] 主行業）"
+    },
+    "_no_extras": true,
+    "_version": "step0-2026-06-06"
+  },
+  "瑞祥": {
+    "owner_code": "ruixiang",
+    "html_file": "index.html",
+    "build_script": "build_index.py",
+    "card_prefix": "rui-",
+    "platform": "FB Reels",
+    "dialogue_key": "台詞_瑞祥"
+  },
+  "仲豪": {
+    "owner_code": "zhonghao",
+    "html_file": "kenny.html",
+    "build_script": "build_all.py",
+    "card_prefix": "kenny-",
+    "platform": "FB Reels",
+    "dialogue_key": "台詞_仲豪"
+  },
+  "昀臻": {
+    "owner_code": "yunzhen",
+    "html_file": "beauty.html",
+    "build_script": "build_beauty.py",
+    "card_prefix": "yunzhen-",
+    "platform": "IG Reels",
+    "dialogue_key": "台詞_昀臻"
+  },
+  "叭噗_小C": {
+    "owner_code": "bappu",
+    "html_file": "bappu-cc/index.html",
+    "build_script": "build_bappu.py",
+    "card_prefix": "bappu-",
+    "platform": "IG Reels",
+    "dialogue_key": "台詞_叭噗"
+  },
+  "阿奇": {
+    "owner_code": "achi",
+    "html_file": "achi.html",
+    "build_script": "build_achi.py",
+    "card_prefix": "achi-",
+    "platform": "FB Reels",
+    "dialogue_key": "台詞_阿奇",
+    "sub_industries": ["房仲"]
+  },
+  "詩婷": {
+    "owner_code": "shihting",
+    "html_file": "shihting.html",
+    "build_script": "build_shihting.py",
+    "card_prefix": "shihting-",
+    "platform": "IG Reels",
+    "dialogue_key": "台詞_詩婷"
+  },
+  "溫蒂": {
+    "owner_code": "wendi",
+    "html_file": "wendi.html",
+    "build_script": "build_wendi.py",
+    "card_prefix": "wendi-",
+    "platform": "IG Reels",
+    "dialogue_key": "台詞_溫蒂"
+  }
+}

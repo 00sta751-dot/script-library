@@ -64,37 +64,54 @@ except Exception as _ip_err:
 L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
 SOP_YAML = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_腳本生產SOP_v3.0.yaml")
 
-# 業主資料夾 + 偏好.md 對照表
-OWNER_META = {
-    "瑞祥": {
-        "dir": L2_BASE / "房仲_瑞祥",
-        "pref": L2_BASE / "房仲_瑞祥" / "00_業主核心檔" / "source_overlay" / "_瑞祥偏好.md",
-    },
-    "仲豪": {
-        "dir": L2_BASE / "房仲_仲豪",
-        "pref": L2_BASE / "房仲_仲豪" / "00_業主核心檔" / "source_overlay" / "_仲豪偏好.md",
-    },
-    "昀臻": {
-        "dir": L2_BASE / "美容_昀臻",
-        "pref": L2_BASE / "美容_昀臻" / "00_業主核心檔" / "source_overlay" / "_昀臻偏好.md",
-    },
-    "叭噗_小C": {
-        "dir": L2_BASE / "情侶_叭噗_小C",
-        "pref": L2_BASE / "情侶_叭噗_小C" / "00_業主核心檔" / "source_overlay" / "_叭噗_小C偏好.md",
-    },
-    "阿奇": {
-        "dir": L2_BASE / "餐飲_阿奇",
-        "pref": L2_BASE / "餐飲_阿奇" / "00_業主核心檔" / "source_overlay" / "_阿奇偏好.md",
-    },
-    "溫蒂": {
-        "dir": L2_BASE / "美容_溫蒂",
-        "pref": L2_BASE / "美容_溫蒂" / "00_業主核心檔" / "source_overlay" / "_溫蒂偏好.md",
-    },
-    "詩婷": {
-        "dir": L2_BASE / "房仲_詩婷",
-        "pref": L2_BASE / "房仲_詩婷" / "00_業主核心檔" / "source_overlay" / "_詩婷偏好.md",
-    },
-}
+# Phase 2 FIX2：lazy proxy（import 不碰 generated.json；dir 已於上方 sibling import 加入 sys.path）
+from _lazy_map import LazyMap
+
+# ── owner_projection.generated.json loader（Phase 2 step2）──
+def _load_owner_projection() -> dict:
+    """
+    讀 sibling owner_projection.generated.json，fail-loud（不存在/壞 JSON/缺欄位 → SystemExit）。
+    回傳 owners dict（{name: rec}）。
+    """
+    _proj_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+    if not _proj_path.exists():
+        raise SystemExit(
+            f"[topic_distributor] owner_projection.generated.json 不存在：{_proj_path}\n"
+            f"請先跑 gen_owner_projection_cache.py 產生此檔。"
+        )
+    try:
+        with open(_proj_path, encoding="utf-8") as _f:
+            _proj = json.load(_f)
+    except Exception as _e:
+        raise SystemExit(
+            f"[topic_distributor] owner_projection.generated.json 解析失敗：{_e}"
+        )
+    _owners = _proj.get("owners")
+    if not isinstance(_owners, dict) or not _owners:
+        raise SystemExit(
+            f"[topic_distributor] owner_projection.generated.json 缺 'owners' 欄位或為空。"
+        )
+    # 必要欄位驗證（逐 owner）
+    _required = {"owner_dir", "l2_path", "owner_code"}
+    for _name, _rec in _owners.items():
+        _missing = _required - set(_rec.keys())
+        if _missing:
+            raise SystemExit(
+                f"[topic_distributor] owner_projection.generated.json owner={_name!r} 缺欄位：{_missing}"
+            )
+    return _owners
+
+# Phase 2 FIX2：lazy——import 不載 JSON；首次存取才 materialize（proxy.items() 觸發載入）
+_OWNER_PROJECTION = LazyMap(_load_owner_projection)
+
+# 業主資料夾 + 偏好.md 對照表（lazy；builder 於首次存取才迭代 _OWNER_PROJECTION）
+OWNER_META = LazyMap(lambda: {
+    _name: {
+        "dir": L2_BASE / _rec["owner_dir"],
+        "pref": Path(_rec["l2_path"]),
+    }
+    for _name, _rec in _OWNER_PROJECTION.items()
+})
 
 
 # ════════════════════════════════════════
@@ -362,15 +379,8 @@ def _pick_identity(ratios: dict[str, int], total: int, seq: int, main_count: int
 
 
 def _owner_code(owner: str) -> str:
-    mapping = {
-        "瑞祥": "ruixiang",
-        "仲豪": "zhonghao",
-        "昀臻": "yunzhen",
-        "叭噗_小C": "bappu",
-        "阿奇": "achi",
-        "詩婷": "shihting",   # 2026-06-05 補（對齊 validate_deploy prefix）
-        "溫蒂": "wendi",      # 2026-06-05 補
-    }
+    # mapping 由 owner_projection.generated.json 產（Phase 2 step2）
+    mapping = {_name: _rec["owner_code"] for _name, _rec in _OWNER_PROJECTION.items()}
     code = mapping.get(owner)
     if code:
         return code
@@ -379,7 +389,7 @@ def _owner_code(owner: str) -> str:
     if not fb.isascii():
         raise SystemExit(
             f"[topic_distributor] _owner_code 缺業主代號 mapping：{owner!r}（中文 fallback 會產壞 script_id）。"
-            f"請補進 _owner_code mapping（對齊 validate_deploy OWNER_MAP prefix）。"
+            f"請補進 owner_projection.generated.json 並重跑 gen_owner_projection_cache.py。"
         )
     return fb
 

@@ -1,0 +1,72 @@
+{
+  "_meta": {
+    "schema_version": "v1",
+    "purpose": "Phase 2 零行為凍結 baseline（pre-cut legacy 值）。由 legacy_table_extractor.py 讀 .bak_phase2_step* 產出，禁手改。",
+    "legacy_owner_count": 7,
+    "created_at": "2026-06-06T11:48:49Z",
+    "source_backup_sha256": {
+      "validate_deploy": "60e660714068da4b3c98eec6ccd0832a69c6155c4436b7eb97f59ffb0bd85039",
+      "topic_distributor": "90eb783d04ecc8ced8bcdb956d41ab936267018bfd6dfe5b4d6cb831a1298355",
+      "yaml_skeleton": "cb676b059ec42a18de2c6f1b896fa57a36c98acce926788130b30032af1b22f5",
+      "validate_script_batch": "c35e314771508ccbfa445751467deb408dc804ae20dddc59164b67beb8dbd93a"
+    }
+  },
+  "owners": {
+    "仲豪": {
+      "owner_code": "zhonghao",
+      "html_file": "kenny.html",
+      "build_script": "build_all.py",
+      "card_prefix": "kenny-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_仲豪"
+    },
+    "叭噗_小C": {
+      "owner_code": "bappu",
+      "html_file": "bappu-cc/index.html",
+      "build_script": "build_bappu.py",
+      "card_prefix": "bappu-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_叭噗"
+    },
+    "昀臻": {
+      "owner_code": "yunzhen",
+      "html_file": "beauty.html",
+      "build_script": "build_beauty.py",
+      "card_prefix": "yunzhen-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_昀臻"
+    },
+    "溫蒂": {
+      "owner_code": "wendi",
+      "html_file": "wendi.html",
+      "build_script": "build_wendi.py",
+      "card_prefix": "wendi-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_溫蒂"
+    },
+    "瑞祥": {
+      "owner_code": "ruixiang",
+      "html_file": "index.html",
+      "build_script": "build_index.py",
+      "card_prefix": "rui-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_瑞祥"
+    },
+    "詩婷": {
+      "owner_code": "shihting",
+      "html_file": "shihting.html",
+      "build_script": "build_shihting.py",
+      "card_prefix": "shihting-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_詩婷"
+    },
+    "阿奇": {
+      "owner_code": "achi",
+      "html_file": "achi.html",
+      "build_script": "build_achi.py",
+      "card_prefix": "achi-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_阿奇"
+    }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "_metadata": {
+    "generated": true,
+    "do_not_edit": true,
+    "generator": "gen_owner_projection_cache.py",
+    "generated_at": "2026-06-06T11:43:46Z",
+    "owner_discovery_py_sha256": "21006bdaa7ae35d53c6771740984a41fb6a384182b9ef52cb9c04bf70921d01b",
+    "kb_rule_parser_py_sha256": "f25ef14a0cba8beaec5e624eef3577dcbc8c7db9b9c5e5d131c622bbc5fcd01a",
+    "generator_py_sha256": "5b14a35e15fde620e47a916585d297d610dfd3f88d38c5953196de9c42b7c857",
+    "runtime_overrides_sha256": "790d5969a8f95498957839698669ac54c9fdf9403feaf420a2a45055d0d62444",
+    "discovery_fingerprint": "1b336d2a72a315b84ad2e1fc075138c7946ddaff653d59355cc1a0162ce83e6e",
+    "projection_fingerprint": "ab8fbf90544149b721de77361abda9bed068612bec6dbaf0314c780c31e763a5"
+  },
+  "runtime_aliases": {
+    "叭噗": "叭噗_小C"
+  },
+  "owners": {
+    "仲豪": {
+      "owner_id": "ZHONGHAO",
+      "owner_name": "仲豪",
+      "industry_id": "房仲",
+      "industries": [
+        "房仲"
+      ],
+      "owner_dir": "房仲_仲豪",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_仲豪/00_業主核心檔/source_overlay/_仲豪偏好.md",
+      "owner_code": "zhonghao",
+      "html_file": "kenny.html",
+      "build_script": "build_all.py",
+      "card_prefix": "kenny-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_仲豪"
+    },
+    "叭噗_小C": {
+      "owner_id": "BAPU",
+      "owner_name": "叭噗_小C",
+      "industry_id": "情侶",
+      "industries": [
+        "情侶"
+      ],
+      "owner_dir": "情侶_叭噗_小C",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/情侶_叭噗_小C/00_業主核心檔/source_overlay/_叭噗_小C偏好.md",
+      "owner_code": "bappu",
+      "html_file": "bappu-cc/index.html",
+      "build_script": "build_bappu.py",
+      "card_prefix": "bappu-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_叭噗"
+    },
+    "昀臻": {
+      "owner_id": "YUNZHEN",
+      "owner_name": "昀臻",
+      "industry_id": "美容",
+      "industries": [
+        "美容"
+      ],
+      "owner_dir": "美容_昀臻",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/美容_昀臻/00_業主核心檔/source_overlay/_昀臻偏好.md",
+      "owner_code": "yunzhen",
+      "html_file": "beauty.html",
+      "build_script": "build_beauty.py",
+      "card_prefix": "yunzhen-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_昀臻"
+    },
+    "溫蒂": {
+      "owner_id": "WENDI",
+      "owner_name": "溫蒂",
+      "industry_id": "美容",
+      "industries": [
+        "美容"
+      ],
+      "owner_dir": "美容_溫蒂",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/美容_溫蒂/00_業主核心檔/source_overlay/_溫蒂偏好.md",
+      "owner_code": "wendi",
+      "html_file": "wendi.html",
+      "build_script": "build_wendi.py",
+      "card_prefix": "wendi-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_溫蒂"
+    },
+    "瑞祥": {
+      "owner_id": "RUIXIANG",
+      "owner_name": "瑞祥",
+      "industry_id": "房仲",
+      "industries": [
+        "房仲"
+      ],
+      "owner_dir": "房仲_瑞祥",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_瑞祥/00_業主核心檔/source_overlay/_瑞祥偏好.md",
+      "owner_code": "ruixiang",
+      "html_file": "index.html",
+      "build_script": "build_index.py",
+      "card_prefix": "rui-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_瑞祥"
+    },
+    "詩婷": {
+      "owner_id": "SHITING",
+      "owner_name": "詩婷",
+      "industry_id": "房仲",
+      "industries": [
+        "房仲"
+      ],
+      "owner_dir": "房仲_詩婷",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_詩婷/00_業主核心檔/source_overlay/_詩婷偏好.md",
+      "owner_code": "shihting",
+      "html_file": "shihting.html",
+      "build_script": "build_shihting.py",
+      "card_prefix": "shihting-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_詩婷"
+    },
+    "阿奇": {
+      "owner_id": "AQI",
+      "owner_name": "阿奇",
+      "industry_id": "餐飲",
+      "industries": [
+        "餐飲",
+        "房仲"
+      ],
+      "owner_dir": "餐飲_阿奇",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/餐飲_阿奇/00_業主核心檔/source_overlay/_阿奇偏好.md",
+      "owner_code": "achi",
+      "html_file": "achi.html",
+      "build_script": "build_achi.py",
+      "card_prefix": "achi-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_阿奇",
+      "sub_industries": [
+        "房仲"
+      ]
+    }
+  }
+}

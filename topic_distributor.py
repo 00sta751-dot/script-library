@@ -464,7 +464,11 @@ def main():
     print(f"[OK] 讀入偏好.md ({len(pref_text)} chars)")
 
     # 解析派系比例
-    school_ratios = parse_school_ratios(pref_text)
+    try:
+        school_ratios = parse_school_ratios(pref_text)
+    except ValueError as e:
+        print(f"[ERROR] 派系比例解析失敗：{e}", file=sys.stderr)
+        sys.exit(1)
     if not school_ratios:
         print("[WARN] 偏好.md 無法解析派系比例，使用均等分配")
         school_ratios = {"故事戲劇派": 40, "人間觀察派": 30, "直球派": 20, "其他": 10}

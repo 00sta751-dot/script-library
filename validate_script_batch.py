@@ -846,8 +846,8 @@ def chk_c013_dm_card(data: dict, fname: str, owner: str, fishing_policy: Optiona
             f"C-013 opt_in：dm_card 必須是 dict，但得到 {type(dm).__name__!r}（{dm!r}）"
         )
 
-    # legacy/opt_in 驗 6 件
-    ALL_TEXT = str(data)
+    # legacy/opt_in 驗 6 件（opt_in 只掃 dm_card dict、防關鍵字散在 caption/台詞放水；legacy 保留掃全包零回歸）
+    ALL_TEXT = str(dm) if mode == "opt_in" else str(data)
     SIX_FIELDS = {
         "行業專業": ["行業專業", "專業", "問題標題", "怎麼做"],
         "在地優勢": ["在地優勢", "在地", "雷區"],
@@ -1518,11 +1518,13 @@ def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]], fishing_policy: Opt
     if missing:
         return "FAIL", f"{req_count} 強制位缺 {len(missing)} 件：{missing}（mode={mode}，建議 yaml 加 required_slot 欄位）"
 
-    # opt_in 額外驗：釣魚部 exactly 1 支
+    # opt_in 額外驗：釣魚信號 exactly 1 支（union：slot/type/is_fishing 找到 ∪ dm_card-only 信號）
     if mode == "opt_in":
-        fishing_count = len(found.get("釣魚部", []))
-        if fishing_count != 1:
-            return "FAIL", f"V2-006 opt_in：釣魚部應 exactly 1 支，實際 {fishing_count} 支"
+        fishing_files = set(found.get("釣魚部", [])) | {
+            f.name for f, data in valid if _fishing_signals(data, legacy=False)
+        }
+        if len(fishing_files) != 1:
+            return "FAIL", f"V2-006 opt_in：釣魚信號應 exactly 1 支，實際 {len(fishing_files)} 支：{sorted(fishing_files)}"
 
     counts = {s: len(files) for s, files in found.items()}
     return "PASS", f"{req_count} 強制位齊備（mode={mode}）：{counts}"
@@ -1837,7 +1839,14 @@ def load_fishing_policy(batch_dir: "Path", yamls: list) -> dict:
         return {"mode": "invalid", "batch_date": batch_date,
                 "detail": f"_batch_flags.yml 解析失敗：{e} → invalid（fail-closed）"}
 
+    if not isinstance(raw, dict):
+        return {"mode": "invalid", "batch_date": batch_date,
+                "detail": f"_batch_flags.yml top-level 非 mapping（{type(raw).__name__}）→ invalid（fail-closed）"}
+
     fishing_cfg = raw.get("fishing_dm_card", {}) or {}
+    if not isinstance(fishing_cfg, dict):
+        return {"mode": "invalid", "batch_date": batch_date,
+                "detail": f"_batch_flags.yml fishing_dm_card 非 mapping（{type(fishing_cfg).__name__}）→ invalid（fail-closed）"}
     enabled = fishing_cfg.get("enabled")
 
     # enabled 必須是 Python boolean True（不接受字串 "true"）
@@ -3342,6 +3351,89 @@ if __name__ == "__main__":
         _fish7_with_asset["dm_card"] = dict(_fish7_no_asset["dm_card"], asset_path="assets/dm_cards/x.png")
         _r7b = chk_c013_dm_card(_fish7_with_asset, "f7b.yaml", "瑞祥", _f7_policy)
         fcheck("F-FISH7b opt_in 6件齊 + asset_path → C-013 PASS", _r7b[0] == "PASS", _r7b[1])
+
+        # ── F-FISH8a：_batch_flags.yml top-level 是 list → load_fishing_policy mode==invalid ──
+        print("\n[F-FISH8a] _batch_flags.yml top-level 是 list（非 mapping）→ load_fishing_policy mode==invalid")
+        _fish8a_dir = _make_fake_batch(
+            [{"title": "一般腳本", "required_slot": "毒舌正能量"}],
+            flag_content="- bad\n",
+            dir_suffix="fish8a",
+        )
+        _fish8a_dir_dated = _fish8a_dir.parent / f"第08批_2026-06-08a"
+        _fish8a_dir.rename(_fish8a_dir_dated)
+        _fish8a_dir = _fish8a_dir_dated
+        try:
+            import yaml as _yaml_fish8a
+            _f8a_ydata = [(p, _yaml_fish8a.safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish8a_dir.glob("*.yaml"))]
+            _f8a_policy = load_fishing_policy(_fish8a_dir, _f8a_ydata)
+            fcheck("F-FISH8a top-level list → mode==invalid", _f8a_policy["mode"] == "invalid", _f8a_policy["detail"])
+        finally:
+            _shutil.rmtree(_fish8a_dir, ignore_errors=True)
+
+        # ── F-FISH8b：fishing_dm_card: true（非 dict）→ mode==invalid ──
+        print("\n[F-FISH8b] fishing_dm_card: true（非 dict）→ load_fishing_policy mode==invalid")
+        _fish8b_dir = _make_fake_batch(
+            [{"title": "一般腳本", "required_slot": "毒舌正能量"}],
+            flag_content="fishing_dm_card: true\n",
+            dir_suffix="fish8b",
+        )
+        _fish8b_dir_dated = _fish8b_dir.parent / f"第08批_2026-06-08b"
+        _fish8b_dir.rename(_fish8b_dir_dated)
+        _fish8b_dir = _fish8b_dir_dated
+        try:
+            import yaml as _yaml_fish8b
+            _f8b_ydata = [(p, _yaml_fish8b.safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish8b_dir.glob("*.yaml"))]
+            _f8b_policy = load_fishing_policy(_fish8b_dir, _f8b_ydata)
+            fcheck("F-FISH8b fishing_dm_card: true（非 dict）→ mode==invalid", _f8b_policy["mode"] == "invalid", _f8b_policy["detail"])
+        finally:
+            _shutil.rmtree(_fish8b_dir, ignore_errors=True)
+
+        # ── F-FISH9：opt_in + 正式釣魚腳本 + dm_card-only 第二支 → V2-006 FAIL（union 釣魚信號 2 支）──
+        #    另加 type:釣魚型 反例確保 union 含 type 信號
+        print("\n[F-FISH9] opt_in + 正式釣魚(required_slot+is_fishing+dm_card) + dm_card-only 第二支 → V2-006 FAIL（union 2支）")
+        _f9_flag = "fishing_dm_card:\n  enabled: true\n  approved_by: 澤君\n  approved_at: '2026-06-08'\n  reason: '測試 F-FISH9'\n"
+        _fish9_yamls = [
+            {"title": "毒舌腳本", "required_slot": "毒舌正能量"},
+            {"title": "雞湯腳本", "required_slot": "純雞湯"},
+            {"title": "Erika腳本", "required_slot": "Erika 拆解派"},
+            # 正式釣魚支（slot + is_fishing + dm_card 全齊）
+            {"title": "釣魚部正式", "required_slot": "釣魚部", "is_fishing": True,
+             "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x",
+                         "asset_path": "assets/dm_cards/real.png"}},
+            # dm_card-only 第二支（無 required_slot/is_fishing，但 dm_card dict 存在 → _fishing_signals 偵測到）
+            {"title": "普通腳本但夾帶dm_card",
+             "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x",
+                         "asset_path": "assets/dm_cards/extra.png"}},
+            # type:釣魚型 反例（union 應含 type 信號）
+            {"title": "釣魚型測試", "type": "釣魚型"},
+        ]
+        _fish9_dir = _make_fake_batch(_fish9_yamls, flag_content=_f9_flag, dir_suffix="fish9")
+        _fish9_dir_dated = _fish9_dir.parent / f"第09批_2026-06-09"
+        _fish9_dir.rename(_fish9_dir_dated)
+        _fish9_dir = _fish9_dir_dated
+        try:
+            import yaml as _yaml_fish9
+            _f9_ydata = [(p, _yaml_fish9.safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish9_dir.glob("*.yaml"))]
+            _f9_policy = load_fishing_policy(_fish9_dir, _f9_ydata)
+            fcheck("F-FISH9 mode=opt_in", _f9_policy["mode"] == "opt_in", _f9_policy["detail"])
+            _r9 = chk_v2_006_required_slot(_f9_ydata, _f9_policy)
+            fcheck("F-FISH9 V2-006 FAIL（union 釣魚信號 > 1 支）", _r9[0] == "FAIL", _r9[1])
+        finally:
+            _shutil.rmtree(_fish9_dir, ignore_errors=True)
+
+        # ── F-FISH10：opt_in 單檔，dm_card 只有 asset_path，但 caption 含六字關鍵字
+        #    → chk_c013_dm_card FAIL（opt_in 只掃 dm_card dict，不再靠掃全包放水）──
+        print("\n[F-FISH10] opt_in 只掃 dm_card dict — caption 含六字關鍵字仍 FAIL（反放水）")
+        _f10_policy = {"mode": "opt_in", "batch_date": _dt.date(2026, 6, 8), "detail": "opt_in 測試 F-FISH10"}
+        _fish10_yaml = {
+            "title": "釣魚部測試", "required_slot": "釣魚部", "is_fishing": True,
+            # dm_card 只有 asset_path，缺 6 件內容欄位
+            "dm_card": {"asset_path": "assets/dm_cards/test.png"},
+            # caption 包含 6 件關鍵字（舊碼掃全包會放水，新碼 opt_in 只掃 dm_card dict 應 FAIL）
+            "caption": "行業專業 在地優勢 痛點 解法 行動呼籲 LINE QR",
+        }
+        _r10 = chk_c013_dm_card(_fish10_yaml, "f10.yaml", "瑞祥", _f10_policy)
+        fcheck("F-FISH10 opt_in 只掃 dm_card → caption 放水封堵（FAIL）", _r10[0] == "FAIL", _r10[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
+validate_deploy.py — 短影音腳本上線前驗證腳本 (14 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-12 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件 + v4 新增 1 件）：
+14 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件 + v4 新增 1 件 + v5 新增 1 件 + v6 新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
@@ -33,6 +33,13 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
       預設 strict（verifier 缺/exit≠0 → FAIL）；OWNER_PROJECTION_VERIFIER_OPTIONAL=1 時
       env/暫態問題可跳過，但 verifier 跑出乾淨 stale/mismatch 仍 FAIL
     — stale 一律 FAIL（禁 WARN）
+--- v6 新增（2026-06-07 owner-scoped 成品禁詞掃描）---
+14. owner-scoped 成品禁詞掃描 HARD BLOCK
+    — 逐業主呼叫 my-assistant forbidden_terms_validator.py
+    — html → owner_id 對應從 owner_projection.generated.json 讀（不猜檔名）
+    — 全 hard-fail：validator 不存在 / exit 非 0 且非乾淨命中 / owner_id 對應缺 → FAIL
+    — 該業主 KB 無 forbidden_terms hard_gate → PASS with info（不報錯）
+    — 有 forbidden_terms 但 HTML 命中 → FAIL（block 並列出命中詞位置）
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -40,6 +47,7 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (v3: 11 件檢查)
 建檔：2026-05-16 / 3 輪 cross-check 後 Codex+Gemini 雙 GO 定稿
 v2 升級：2026-05-18 SOP v2 9 件功能邏輯對齊
 v3 升級：2026-05-20 加第 11 件藏鏡人獨立泡泡 HARD BLOCK
+v6 升級：2026-06-07 加第 14 件 owner-scoped 成品禁詞掃描
 """
 
 import os
@@ -1053,6 +1061,202 @@ def check_13_owner_projection_cache_freshness():
     return fails
 
 
+# === check 14（owner-scoped 成品禁詞掃描 — 2026-06-07 v6）===
+
+def check_14_owner_forbidden_terms():
+    """檢查 14：owner-scoped 成品禁詞掃描 HARD BLOCK（v6）。
+
+    逐業主呼叫 my-assistant forbidden_terms_validator.py，掃已部署 HTML 有無
+    業主 KB 宣告的禁詞（L2 hard_gate forbidden_terms）。
+
+    路徑解析（沿用 check_13 Gate B 的 cross-repo 路徑解析 pattern）：
+      1. 先讀 env FORBIDDEN_TERMS_VALIDATOR（絕對路徑）
+      2. 再讀 env KB_RESOLVER_DIR → 上一層 validators/ 目錄
+      3. fallback 到 hardcoded my-assistant 路徑
+
+    html → owner_id 對應：從 owner_projection.generated.json 讀，不猜檔名。
+    逐業主逐 html 呼叫 validator，manifest 由 owner_projection 欄位組裝。
+
+    全 hard-fail 條件：
+      - validator script 不存在
+      - owner_projection 解析失敗
+      - 某業主 html 找不到對應 owner_id
+      - validator subprocess exit 1（配置錯誤）
+      - validator 命中 forbidden_terms（exit 2）
+
+    允許 PASS 條件：
+      - validator exit 0（乾淨，含「0 forbidden_terms configured」情境）
+
+    錯誤訊息必含「修 validator/KB，不要 --no-verify 放行」提示。
+    """
+    log('=== Check 14：owner-scoped 成品禁詞掃描 HARD BLOCK ===')
+    fails = []
+
+    # ── 找 validator script（沿用 check_13 Gate B path resolution pattern）──
+    validator_path = os.environ.get('FORBIDDEN_TERMS_VALIDATOR', '')
+    if not validator_path:
+        kb_dir = os.environ.get('KB_RESOLVER_DIR', '')
+        if kb_dir:
+            # KB_RESOLVER_DIR 是 tools/kb_resolver/，往上一層到 tools/validators/
+            validator_path = str(Path(kb_dir).parent / 'validators' / 'forbidden_terms_validator.py')
+        else:
+            validator_path = r'C:\Users\00sta\Documents\my-assistant\tools\validators\forbidden_terms_validator.py'
+    if not Path(validator_path).exists():
+        msg = (f'❌ Check 14: 找不到 forbidden_terms_validator.py（{validator_path}）'
+               f' — 修 validator/KB，不要 --no-verify 放行')
+        log(f'  {msg}'); fails.append(msg)
+        return fails
+    log(f'  ℹ validator: {validator_path}')
+
+    # ── 讀 owner_projection.generated.json 建 html_file → owner_id + l2_path 反向 map ──
+    proj_path = LIB / 'owner_projection.generated.json'
+    if not proj_path.exists():
+        msg = ('❌ Check 14: owner_projection.generated.json 不存在'
+               ' — 跑 gen_owner_projection_cache.py，不要 --no-verify 放行')
+        log(f'  {msg}'); fails.append(msg)
+        return fails
+    try:
+        proj_data = json.loads(proj_path.read_text(encoding='utf-8'))
+    except Exception as e:
+        msg = f'❌ Check 14: owner_projection.generated.json 解析失敗：{e} — 修 validator/KB，不要 --no-verify 放行'
+        log(f'  {msg}'); fails.append(msg)
+        return fails
+
+    owners_rec = proj_data.get('owners', {})
+    if not owners_rec:
+        msg = '❌ Check 14: owner_projection.generated.json 缺 owners 欄位或為空 — 修 validator/KB，不要 --no-verify 放行'
+        log(f'  {msg}'); fails.append(msg)
+        return fails
+
+    # html_file → {owner_id, l2_path, l1_paths (from l2_path industry), l0_path}
+    # For manifest: l0/l1 paths 從 owner_projection 所記 l2_path 同目錄取，
+    # 但 validator 透過 resolver.py 自行走 owner_discovery，
+    # 直接傳 owner_id + l2_path 讓 validator CLI 用 --manifest 即可。
+    # 這裡改用 subprocess 傳 --manifest 臨時 JSON 給 validator。
+    html_to_owner: dict = {}  # html_rel (str) -> {owner_id, l2_path, industry_id}
+    for _oname, _rec in owners_rec.items():
+        _html = _rec.get('html_file', '')
+        _oid = _rec.get('owner_id', '')
+        _l2 = _rec.get('l2_path', '')
+        _ind = _rec.get('industry_id', '')
+        if _html and _oid:
+            html_to_owner[_html] = {
+                'owner_id': _oid,
+                'l2_path': _l2,
+                'industry_id': _ind,
+                'owner_name': _oname,
+            }
+
+    # ── 逐業主掃 HTML ──
+    import tempfile
+
+    # 找 L0 path（從任一業主的 manifest 推導，所有業主共用同一 L0）
+    # 用 check_13 裡已知的 my-assistant 路徑慣例推導
+    _ma_root = str(Path(validator_path).parent.parent.parent)  # my-assistant root
+    _short_root = str(Path(_ma_root).parent / 'Claude' / 'Projects' / '短影音系統')
+    _l0_path = str(Path(_short_root) / 'L0_跨行業公版' / '_生成方法論.md')
+    _l1_root = str(Path(_short_root) / 'L1_行業層')
+
+    # Industry → L1 path mapping（從 proj owners 動態推導）
+    _industry_l1_map: dict[str, list[str]] = {}
+    for _oname, _rec in owners_rec.items():
+        _ind = _rec.get('industry_id', '')
+        if _ind and _ind not in _industry_l1_map:
+            # 慣例：L1_行業層/<industry_id>/_<industry_id>層.md
+            _l1_candidate = str(Path(_l1_root) / _ind / f'_{_ind}層.md')
+            _industry_l1_map[_ind] = [_l1_candidate] if Path(_l1_candidate).exists() else []
+
+    for html_rel, owner_info in html_to_owner.items():
+        html_path = LIB / html_rel
+        if not html_path.exists():
+            log(f'  ℹ {html_rel}: html 不存在，跳過')
+            continue
+
+        owner_id = owner_info['owner_id']
+        l2_path = owner_info['l2_path']
+        industry_id = owner_info['industry_id']
+        owner_name = owner_info['owner_name']
+        l1_paths = _industry_l1_map.get(industry_id, [])
+
+        # build manifest JSON for this owner
+        manifest = {
+            'owner_id': owner_id,
+            'industry_id': industry_id,
+            'l0_path': _l0_path,
+            'l1_paths': l1_paths,
+            'l2_path': l2_path if l2_path else None,
+        }
+
+        # write manifest to temp file
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.json', delete=False, encoding='utf-8'
+            ) as _tf:
+                json.dump(manifest, _tf, ensure_ascii=False)
+                _tmp_manifest = _tf.name
+        except Exception as e:
+            msg = f'❌ Check 14 [{owner_id}]: 無法建 temp manifest：{e} — 修 validator/KB，不要 --no-verify 放行'
+            log(f'  {msg}'); fails.append(msg)
+            continue
+
+        try:
+            proc = subprocess.run(
+                [sys.executable, validator_path,
+                 '--owner', owner_id,
+                 '--html', str(html_path),
+                 '--manifest', _tmp_manifest],
+                capture_output=True,
+                text=True, encoding='utf-8', errors='replace', timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            msg = f'❌ Check 14 [{owner_id}] {html_rel}: validator 執行逾時（60s）— 修 validator/KB，不要 --no-verify 放行'
+            log(f'  {msg}'); fails.append(msg)
+            continue
+        except Exception as e:
+            msg = f'❌ Check 14 [{owner_id}] {html_rel}: validator 執行例外：{e} — 修 validator/KB，不要 --no-verify 放行'
+            log(f'  {msg}'); fails.append(msg)
+            continue
+        finally:
+            try:
+                os.unlink(_tmp_manifest)
+            except Exception:
+                pass
+
+        out = (proc.stdout or '').strip()
+        err = (proc.stderr or '').strip()
+        combined = (out + '\n' + err).strip()
+
+        if proc.returncode == 0:
+            # PASS（乾淨或 0 terms configured）
+            detail_line = next(
+                (l for l in out.splitlines() if l.startswith('Detail')), out.splitlines()[-1] if out else ''
+            )
+            log(f'  ✅ {owner_id} {html_rel}: PASS — {detail_line}')
+        elif proc.returncode == 2:
+            # forbidden terms found → HARD BLOCK
+            hits_lines = [l for l in out.splitlines() if l.strip().startswith('[') or 'gate=' in l or 'snippet' in l]
+            hits_summary = ' | '.join(hits_lines[:5])
+            msg = (f'❌ Check 14 [{owner_id}] {html_rel}: 禁詞命中 HARD BLOCK'
+                   f' — {hits_summary}'
+                   f' — 修 validator/KB，不要 --no-verify 放行')
+            log(f'  {msg}')
+            # also print full output for context
+            for line in out.splitlines():
+                log(f'    {line}')
+            fails.append(msg)
+        else:
+            # exit 1 = configuration error → HARD BLOCK
+            first_err = (combined.splitlines() or ['(no output)'])[0]
+            msg = (f'❌ Check 14 [{owner_id}] {html_rel}: validator 配置錯誤（exit {proc.returncode}）'
+                   f' — {first_err}'
+                   f' — 修 validator/KB，不要 --no-verify 放行')
+            log(f'  {msg}'); fails.append(msg)
+
+    if not fails:
+        log(f'  ✅ Check 14 全 {len(html_to_owner)} 業主掃描通過')
+    return fails
+
+
 # === main ===
 
 def main():
@@ -1098,6 +1302,9 @@ def main():
     # v5 新增（2026-06-06 Phase 2 FIX3 — owner_projection cache 新鮮度閘）
     all_fails += check_13_owner_projection_cache_freshness()
     log('')
+    # v6 新增（2026-06-07 owner-scoped 成品禁詞掃描）
+    all_fails += check_14_owner_forbidden_terms()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -1109,7 +1316,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 13 件齊')
+        log('✅ 全部通過 — 14 件齊')
         sys.exit(0)
 
 

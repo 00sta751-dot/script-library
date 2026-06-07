@@ -5,6 +5,7 @@ if LIB not in sys.path:
     sys.path.insert(0, LIB)
 from _html_escape_utils import esc_text, esc_attr, safe_img_src
 # v2026-05-18: added platform/po_time params + CSS idempotent patch
+# v2026-06-07: 第37批上線（瑞祥 yaml-driven, 9生活/4房仲）— index.html 由本 script --mode yaml --yaml-dir 第37批_2026-06-07 重生
 # v2026-05-22: yaml-driven mode (--mode yaml) + rux_article_adapter
 # v2026-05-22: P1#3 html escape via _html_escape_utils
 

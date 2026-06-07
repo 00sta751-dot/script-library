@@ -385,7 +385,7 @@ def render_card(s):
     if s['po']:
         pills.append(f'<span class="pill time">{esc(s["po"])}</span>')
     if s['force'] and '釣魚部' in s['force']:
-        pills.insert(0, '<span class="pill fish">釣魚部</span>')
+        pass  # 6/7 釣魚下架：不外露「釣魚部」內部術語標籤（C-016 對齊）
 
     # hook = 第一段台詞
     hook = s['timeline'][0][1] if s['timeline'] else ''

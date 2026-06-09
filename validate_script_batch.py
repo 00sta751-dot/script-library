@@ -48,7 +48,29 @@ try:
 except Exception as _fp_err:
     _FACTION_PARSER_OK = False
     _load_l0_faction_names = None  # type: ignore
-    _parse_faction_mix = None      # type: ignore
+
+# ── CTA/Content mix 解析器（P3 比例驗證器 2026-06-08）──
+try:
+    _MP_DIR = Path(__file__).resolve().parent
+    if str(_MP_DIR) not in sys.path:
+        sys.path.insert(0, str(_MP_DIR))
+    from _mix_parser import (
+        parse_mix_block as _parse_mix_block,
+        normalize_to_count as _normalize_to_count,
+        resolve_label as _resolve_label,
+        get_label_from_yaml as _get_label_from_yaml,
+        MixParseResult as _MixParseResult,
+    )
+    _MIX_PARSER_OK = True
+except Exception as _mp_err:
+    _MIX_PARSER_OK = False
+    _parse_mix_block = None      # type: ignore
+    _normalize_to_count = None   # type: ignore
+    _resolve_label = None        # type: ignore
+    _get_label_from_yaml = None  # type: ignore
+    # ⚠️ 安全洞修正（P3 三審 2026-06-08）：
+    # _parse_faction_mix 屬於 C-011（_faction_parser），完全獨立於 _mix_parser。
+    # 禁止在此 except 覆寫 _parse_faction_mix — 否則 _mix_parser 壞掉會連累 C-011。
 
 # ── 共用雙身份解析器（第二刀 2026-06-05）──
 try:
@@ -1712,6 +1734,278 @@ def chk_v2_013_zhonghao_life_ratio(yamls: list[tuple[Path, dict]], owner: str) -
     return "PASS", f"仲豪生活/房仲字數比 {ratio:.2f} >= 3.0"
 
 
+# ════════════════════════════════════════════
+# C-cta-mix / C-content-mix（P3 比例驗證器 2026-06-08）
+# 規格來源：_P3_ledger_v3_2026-06-08.md §F / §H
+# ════════════════════════════════════════════
+
+import datetime as _cta_dt
+
+
+def _parse_batch_date_str(batch_tag: str) -> Optional[_cta_dt.date]:
+    """從 batch_tag 字串抓 YYYY-MM-DD 日期，用於 cutover gate。"""
+    m = re.search(r"(\d{4})[_\-](\d{2})[_\-](\d{2})", batch_tag)
+    if m:
+        try:
+            return _cta_dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            pass
+    return None
+
+
+def chk_c_cta_mix(
+    yamls: list[tuple[Path, dict]],
+    owner: str,
+    pref_text: Optional[str],
+    batch_tag: str = "",
+) -> tuple[str, str]:
+    """C-cta-mix（hard）— 批次 CTA 類型分佈 vs 業主 L2 cta_mix 宣告。
+
+    規格（§F §H _P3_ledger_v3_2026-06-08.md）：
+    - 讀業主偏好.md 的 ```kb-rule category: cta_mix``` block
+    - 找不到 block → WARN graceful SKIP（非 crash 非 FAIL）
+    - provisional=True / decision_status=proposed / enforcement!=hard → 降 advisory（WARN-surface 不 FAIL）
+    - cutover gate：batch_date < effective_from → WARN-waiver（legacy 批次保護）
+    - post-cutover 未知 label（aliases 無交集）→ FAIL（不放水）
+    - 缺 source field → FAIL（hard + post-cutover + confirmed）
+    - 比例超 tolerance_count → FAIL
+    - _MIX_PARSER_OK=False → WARN 不 crash
+    """
+    if not _MIX_PARSER_OK or _parse_mix_block is None:
+        return "WARN", "C-cta-mix：_mix_parser 不可用，CTA 比例驗證跳過"
+
+    if not pref_text:
+        return "WARN", f"C-cta-mix：找不到業主 '{owner}' 偏好.md，跳過"
+
+    result = _parse_mix_block(pref_text, "cta_mix")
+
+    # 找不到 block
+    if not result.found:
+        return "WARN", f"C-cta-mix：{result.warnings[0] if result.warnings else '無 cta_mix block，SKIP'}"
+
+    # enforcement=none → SKIP
+    if result.enforcement == "none":
+        return "PASS", f"C-cta-mix：enforcement=none（阿奇由 C-012 管），SKIP"
+
+    # 判斷 effective enforcement：provisional / proposed → 降 advisory
+    is_hard = (
+        result.enforcement == "hard"
+        and not result.provisional
+        and result.decision_status == "confirmed"
+    )
+
+    # cutover gate（§H-1）
+    batch_date = _parse_batch_date_str(batch_tag)
+    if result.effective_from:
+        try:
+            cutover_date = _cta_dt.date.fromisoformat(result.effective_from)
+            if batch_date is not None and batch_date < cutover_date:
+                return "WARN", (
+                    f"C-cta-mix：batch_date {batch_date} < effective_from {cutover_date} → "
+                    f"WARN-waiver（legacy 批次，CTA 比例驗證暫豁免）"
+                )
+        except ValueError:
+            pass  # effective_from 格式錯 → 繼續驗
+
+    if not result.items:
+        msg = "C-cta-mix：cta_mix block 無 mix 項目，SKIP"
+        return ("WARN", msg)
+
+    # 統計批次 CTA label
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    total = len(valid)
+    if total == 0:
+        return "WARN", "C-cta-mix：批次無有效 yaml，跳過"
+
+    actual_count: dict[str, int] = {}
+    missing_field_files: list[str] = []
+
+    for f, data in valid:
+        label = _get_label_from_yaml(data, result)
+        if label is None or not str(label).strip():
+            missing_field_files.append(f.name)
+            continue
+        canonical = _resolve_label(str(label).strip(), result.items)
+        if canonical is None:
+            # unknown label（§H-2）
+            key = f"[UNKNOWN]{label}"
+        else:
+            key = canonical
+        actual_count[key] = actual_count.get(key, 0) + 1
+
+    # 缺 source field 處理（§H-2）
+    if missing_field_files:
+        msg = (
+            f"C-cta-mix：{len(missing_field_files)} 支腳本缺 CTA 類型欄位"
+            f"（{missing_field_files[:3]}{'...' if len(missing_field_files) > 3 else ''}）"
+        )
+        if is_hard:
+            return "FAIL", msg
+        return "WARN", msg + "（advisory/provisional，WARN）"
+
+    # unknown label 處理（§H-2）
+    unknown_labels = {k: v for k, v in actual_count.items() if k.startswith("[UNKNOWN]")}
+    if unknown_labels:
+        ul_desc = ", ".join(f"{k.replace('[UNKNOWN]','')}×{v}" for k, v in unknown_labels.items())
+        msg = f"C-cta-mix：未知 CTA 標籤（aliases 無交集）：{ul_desc}"
+        if is_hard:
+            return "FAIL", msg + f"（confirmed hard post-cutover → FAIL）"
+        return "WARN", msg + "（advisory/provisional → WARN-waiver）"
+
+    # 比例偏差檢查（§H-3，count-based ±tolerance_count）
+    tol = result.tolerance_count
+    over_tol = []
+    for item in result.items:
+        expected = item.range_min, item.range_max
+        if item.range_min is None or item.range_max is None:
+            # 無 range：用 target_count ± tol
+            tc = item.target_count or 0
+            exp_lo, exp_hi = max(0, tc - tol), tc + tol
+        else:
+            exp_lo, exp_hi = item.range_min, item.range_max
+        actual = actual_count.get(item.name, 0)
+        if not (exp_lo <= actual <= exp_hi):
+            over_tol.append(
+                f"{item.name} 預期 [{exp_lo},{exp_hi}] 實際 {actual}"
+            )
+
+    if over_tol:
+        msg = f"C-cta-mix 比例超出 ±{tol}：" + "；".join(over_tol) + f"  （實際：{dict(actual_count)}）"
+        if is_hard:
+            return "FAIL", msg
+        return "WARN", msg + "（advisory/provisional → WARN-surface）"
+
+    return "PASS", (
+        f"C-cta-mix 對齊（±{tol} 內）：{dict(actual_count)}"
+        f"{'（advisory）' if not is_hard else ''}"
+    )
+
+
+def chk_c_content_mix(
+    yamls: list[tuple[Path, dict]],
+    owner: str,
+    pref_text: Optional[str],
+    batch_tag: str = "",
+) -> tuple[str, str]:
+    """C-content-mix — 批次內容軸分佈 vs 業主 L2 content_mix 宣告。
+
+    規格（§F §H _P3_ledger_v3_2026-06-08.md §D）：
+    - 溫蒂：enforcement=hard（讀 `內容軸` 欄，可驗）
+    - 阿奇：enforcement=none（mirrors C-012，**不讀雙身份分類**）→ SKIP
+    - 其餘：advisory（parse + surface 印宣告 vs 實際，不 FAIL）
+    - 找不到 block → WARN graceful SKIP
+    - cutover / provisional / proposed 同 C-cta-mix 降 advisory
+    """
+    if not _MIX_PARSER_OK or _parse_mix_block is None:
+        return "WARN", "C-content-mix：_mix_parser 不可用，內容軸比例驗證跳過"
+
+    if not pref_text:
+        return "WARN", f"C-content-mix：找不到業主 '{owner}' 偏好.md，跳過"
+
+    result = _parse_mix_block(pref_text, "content_mix")
+
+    # 找不到 block
+    if not result.found:
+        return "WARN", f"C-content-mix：{result.warnings[0] if result.warnings else '無 content_mix block，SKIP'}"
+
+    # enforcement=none → SKIP（阿奇 C-012 管）
+    if result.enforcement == "none":
+        return "PASS", f"C-content-mix：enforcement=none（{owner} 由其他 check 管），SKIP"
+
+    # 判斷 effective enforcement
+    is_hard = (
+        result.enforcement == "hard"
+        and not result.provisional
+        and result.decision_status == "confirmed"
+    )
+
+    # cutover gate
+    batch_date = _parse_batch_date_str(batch_tag)
+    if result.effective_from:
+        try:
+            cutover_date = _cta_dt.date.fromisoformat(result.effective_from)
+            if batch_date is not None and batch_date < cutover_date:
+                return "WARN", (
+                    f"C-content-mix：batch_date {batch_date} < effective_from {cutover_date} → "
+                    f"WARN-waiver（legacy 批次保護）"
+                )
+        except ValueError:
+            pass
+
+    if not result.items:
+        return "WARN", "C-content-mix：content_mix block 無 mix 項目，SKIP"
+
+    # 統計批次內容軸 label
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    total = len(valid)
+    if total == 0:
+        return "WARN", "C-content-mix：批次無有效 yaml，跳過"
+
+    actual_count: dict[str, int] = {}
+    missing_field_files: list[str] = []
+
+    for f, data in valid:
+        label = _get_label_from_yaml(data, result)
+        if label is None or not str(label).strip():
+            missing_field_files.append(f.name)
+            continue
+        canonical = _resolve_label(str(label).strip(), result.items)
+        if canonical is None:
+            key = f"[UNKNOWN]{label}"
+        else:
+            key = canonical
+        actual_count[key] = actual_count.get(key, 0) + 1
+
+    # 缺 source field
+    if missing_field_files:
+        msg = (
+            f"C-content-mix：{len(missing_field_files)} 支腳本缺內容軸欄位"
+            f"（{missing_field_files[:3]}{'...' if len(missing_field_files) > 3 else ''}）"
+        )
+        if is_hard:
+            return "FAIL", msg
+        return "WARN", msg + "（advisory，WARN）"
+
+    # unknown label
+    unknown_labels = {k: v for k, v in actual_count.items() if k.startswith("[UNKNOWN]")}
+    if unknown_labels:
+        ul_desc = ", ".join(f"{k.replace('[UNKNOWN]','')}×{v}" for k, v in unknown_labels.items())
+        msg = f"C-content-mix：未知內容軸標籤：{ul_desc}"
+        if is_hard:
+            return "FAIL", msg + "（confirmed hard → FAIL）"
+        return "WARN", msg + "（advisory → WARN-waiver）"
+
+    # 比例偏差（advisory 只 surface，不 FAIL）
+    tol = result.tolerance_count
+    over_tol = []
+    for item in result.items:
+        if item.range_min is not None and item.range_max is not None:
+            exp_lo, exp_hi = item.range_min, item.range_max
+        elif item.target_count is not None:
+            exp_lo, exp_hi = max(0, item.target_count - tol), item.target_count + tol
+        else:
+            continue
+        actual = actual_count.get(item.name, 0)
+        if not (exp_lo <= actual <= exp_hi):
+            over_tol.append(
+                f"{item.name} 預期 [{exp_lo},{exp_hi}] 實際 {actual}"
+            )
+
+    if over_tol:
+        msg = (
+            f"C-content-mix 比例偏差：" + "；".join(over_tol)
+            + f"  （實際：{dict(actual_count)}）"
+        )
+        if is_hard:
+            return "FAIL", msg
+        return "WARN", msg + "（advisory，WARN-surface）"
+
+    return "PASS", (
+        f"C-content-mix 對齊（±{tol} 內）：{dict(actual_count)}"
+        f"{'（advisory）' if not is_hard else ''}"
+    )
+
+
 def chk_v2_014_bappu_taboo(data: dict, fname: str, owner: str) -> tuple[str, str]:
     """V2-014：叭噗禁忌題材驗 — per-file（叭噗 特化）
     Codex R1 盲點 11 修法：用 schema_check 欄位（不 grep 上下文避誤殺）
@@ -2522,6 +2816,9 @@ def main():
         ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
         ("V2-010", chk_v2_010_batch_summary(batch_dir)),
         ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
+        # P3 比例驗證器（2026-06-08）
+        ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
+        ("C-content-mix", chk_c_content_mix(valid_yamls, owner, pref_text, batch_tag)),
     ]
     print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:

@@ -668,6 +668,51 @@ def chk_c010_翠文_non_empty(data: dict, fname: str) -> tuple[str, str]:
         return "WARN", "翠文疑似混入畫面描述（字幕 ≠ 畫面說明）：" + "；".join(warns[:3])
     return "PASS", f"全 {len(scenes)} 段翠文非空，無畫面描述 keyword"
 
+CONCRETE_KNOWLEDGE_SCHOOLS = {"拆解派", "結構分析派", "老前輩權威派", "直球派", "市場觀察派", "時事追擊派"}
+_CONCRETE_SIGNAL_RE = re.compile(
+    r"[0-9０-９]+|[一二三四五六七八九十百千]+[年月天週個成倍折坪元萬]|今天|昨天|上週|上個月|去年|那天|當時"
+)
+
+def chk_c017_concreteness(data: dict, fname: str) -> tuple[str, str]:
+    """C-017：具體化密度（WARN-only — 2026-06-11 課程導入 W3）
+    知識型骨架（主推派系屬 CONCRETE_KNOWLEDGE_SCHOOLS）逐篇驗主體段具體化信號
+    （數字/時間/具體量詞）< 2 → WARN。雞湯/感性/共鳴型豁免（非知識派系一律 PASS）。
+    分類欄位填錯防護：欄位缺/型別錯/解析異常 → 一律豁免不誤傷（永不 FAIL，fail-open）。
+    對齊 L0 §1.2.1 優化「具體化」+ scripter.md §20 自檢 17 條。"""
+    try:
+        school = str(data.get("主推派系", "") or data.get("派系", "") or "").strip()
+        cta_type = ""
+        sc = data.get("schema_check")
+        if isinstance(sc, dict):
+            cta_type = str(sc.get("CTA類型", "") or "")
+        if "雞湯" in cta_type:
+            return "PASS", f"純雞湯 CTA 豁免具體化密度（主推={school or '未填'}）"
+        if school not in CONCRETE_KNOWLEDGE_SCHOOLS:
+            return "PASS", f"非知識型骨架（主推={school or '未填'}），具體化密度豁免"
+        scenes = get_scenes(data)
+        if not isinstance(scenes, list) or not scenes:
+            return "PASS", "C-017 防護：無 scenes 可解析，豁免不誤傷"
+        body_text = ""
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                continue
+            ts = str(scene.get("timestamp", "") or scene.get("時間", ""))
+            if ("12-25" in ts) or ("25-40" in ts):
+                for k, v in scene.items():
+                    # 排除非內容欄位（timestamp 自帶數字會假性灌分 — F23a 抓到的 bug）
+                    if str(k) in ("timestamp", "時間", "type"):
+                        continue
+                    if isinstance(v, str):
+                        body_text += v
+        if not body_text.strip():
+            return "PASS", "C-017 防護：主體段尚未填台詞（骨架階段），豁免"
+        hits = _CONCRETE_SIGNAL_RE.findall(body_text)
+        if len(hits) < 2:
+            return "WARN", f"知識型腳本主體段具體化信號僅 {len(hits)} 個（<2）— 建議加數字/時間/人事物細節（L0 §1.2.1「一具體就深刻」）"
+        return "PASS", f"具體化信號 {len(hits)} 個（≥2）"
+    except Exception as e:  # fail-open：WARN 級品質提示不可炸 validator
+        return "PASS", f"C-017 防護：解析異常豁免（{type(e).__name__}）"
+
 def chk_c011_派系_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text: Optional[str]) -> tuple[str, str]:
     """
     C-011：派系比例對齊業主偏好.md（±5% 容許）
@@ -2705,6 +2750,7 @@ def run_per_file_checks(f: Path, data: dict, owner: str, is_skeleton: bool = Fal
         ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
         ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
+        ("C-017",  chk_c017_concreteness(data, f.name)),
         # v2 新增 5 件（V2-001 ~ V2-005）
         ("V2-001",  chk_v2_001_voice_lock(data, f.name, owner)),
         ("V2-001b", chk_v2_001b_banned_phrases(data, _fname_with_dir, owner)),
@@ -3763,6 +3809,57 @@ if __name__ == "__main__":
         }
         _r10 = chk_c013_dm_card(_fish10_yaml, "f10.yaml", "瑞祥", _f10_policy)
         fcheck("F-FISH10 opt_in 只掃 dm_card → caption 放水封堵（FAIL）", _r10[0] == "FAIL", _r10[1])
+
+        # ── F23 C-017 具體化密度（2026-06-11 課程導入 W3 — 含分類欄位填錯負向案例）──
+        print("\n[F23] C-017 具體化密度 WARN-only + 分類欄位填錯防護")
+        # F23a：知識型（拆解派）主體段無具體信號 → WARN
+        _f23a = {
+            "主推派系": "拆解派",
+            "scenes": [
+                {"timestamp": "0-3s", "台詞_測": "你知道嗎"},
+                {"timestamp": "12-25s", "台詞_測": "這件事其實有方法可以處理，重點是觀念要對"},
+                {"timestamp": "25-40s", "台詞_測": "把心態調整好，事情自然就會順"},
+            ],
+        }
+        _r23a = chk_c017_concreteness(_f23a, "f23a.yaml")
+        fcheck("F23a 知識型無具體信號 → WARN", _r23a[0] == "WARN", _r23a[1])
+        # F23b：知識型主體段有數字/時間 → PASS
+        _f23b = {
+            "主推派系": "拆解派",
+            "scenes": [
+                {"timestamp": "12-25s", "台詞_測": "上個月一位客戶多付了 80 萬，因為他不知道這 3 件事"},
+            ],
+        }
+        _r23b = chk_c017_concreteness(_f23b, "f23b.yaml")
+        fcheck("F23b 知識型具體信號 ≥2 → PASS", _r23b[0] == "PASS", _r23b[1])
+        # F23c：雞湯/感性型 → 豁免 PASS（不轟炸）
+        _f23c = {
+            "主推派系": "人間觀察派",
+            "schema_check": {"CTA類型": "純雞湯"},
+            "scenes": [{"timestamp": "12-25s", "台詞_測": "慢慢來，比較快"}],
+        }
+        _r23c = chk_c017_concreteness(_f23c, "f23c.yaml")
+        fcheck("F23c 雞湯型豁免 → PASS", _r23c[0] == "PASS", _r23c[1])
+        # F23d：分類欄位填錯（schema_check 是字串非 dict、派系亂填）→ 豁免不誤傷（御史 M6 負向案例）
+        _f23d = {
+            "主推派系": "不存在的派",
+            "schema_check": "我填錯了不是dict",
+            "scenes": [{"timestamp": "12-25s", "台詞_測": "隨便"}],
+        }
+        _r23d = chk_c017_concreteness(_f23d, "f23d.yaml")
+        fcheck("F23d 分類欄位填錯 → 豁免 PASS 不誤傷", _r23d[0] == "PASS", _r23d[1])
+        # F23e：scenes 整個壞型別 → fail-open PASS（永不炸 validator）
+        _f23e = {"主推派系": "拆解派", "scenes": "不是list"}
+        _r23e = chk_c017_concreteness(_f23e, "f23e.yaml")
+        fcheck("F23e scenes 壞型別 → fail-open PASS", _r23e[0] == "PASS", _r23e[1])
+        # F23f（Codex r6 P2）：非知識型骨架（非雞湯 CTA）→ PASS 且訊息走「非知識型骨架」分支
+        _f23f = {
+            "主推派系": "人間觀察派",
+            "schema_check": {"CTA類型": "個人化諮詢型"},
+            "scenes": [{"timestamp": "12-25s", "台詞_測": "隨便講講"}],
+        }
+        _r23f = chk_c017_concreteness(_f23f, "f23f.yaml")
+        fcheck("F23f 非知識型訊息分支 → PASS 含「非知識型骨架」", _r23f[0] == "PASS" and "非知識型骨架" in _r23f[1], _r23f[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

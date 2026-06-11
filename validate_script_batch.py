@@ -1666,40 +1666,98 @@ def chk_v2_007b_standalone_threads(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", f"threads={threads_enabled} / standalone={standalone}"
 
 
-def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
-    """V2-008：已用題目去重驗 — batch-level
-    fuzzy match ratio >= 0.65（Codex R1 surface 從 80% 降到 65% — 撞題實證）
-    """
-    pref_path = OWNER_PREF_PATHS.get(owner)
-    if not pref_path:
-        return "WARN", f"找不到 owner={owner} 的偏好路徑"
-    used_titles_path = pref_path.parent / f"_{owner}已用題目.md"
-    if not used_titles_path.exists():
-        return "WARN", f"找不到 {used_titles_path.name}"
-    used_text = used_titles_path.read_text(encoding='utf-8')
-    used_titles = []
-    for line in used_text.split('\n'):
-        m = re.match(r'^-\s*#?\d*\s*\[[^\]]+\]\s*(.+?)$', line.strip())
-        if m:
-            used_titles.append(m.group(1).strip())
-    if not used_titles:
-        return "WARN", f"{used_titles_path.name} 沒抽到任何已用題目（解析錯）"
-    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+def _v2008_dialogue_text(data: dict) -> str:
+    """V2-008 v2 helper：腳本全文台詞串接（拍板 2026-06-11：雷同判定只看台詞內容）"""
+    parts = []
+    for scene in get_scenes(data):
+        parts.extend(_get_all_dialogue(scene))
+    return "".join(str(p) for p in parts)
+
+
+def _v2008_content_dup_hits(cur: list, others: list, threshold: float = 0.85) -> list:
+    """V2-008 v2 helper：全文雷同互比（長度差 >30% 預過濾省時）。cur/others = [(label, text)]"""
     hits = []
-    THRESHOLD = 0.65
+    for i, (la, ta) in enumerate(cur):
+        if not ta:
+            continue
+        for lb, tb in list(cur[i + 1:]) + list(others):
+            if not tb:
+                continue
+            if min(len(ta), len(tb)) / max(len(ta), len(tb), 1) < 0.7:
+                continue
+            r = difflib.SequenceMatcher(None, ta, tb).ratio()
+            if r >= threshold:
+                hits.append((la, lb, round(r, 2)))
+    return hits
+
+
+def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
+    """V2-008 v2（2026-06-11 澤君拍板 TG 9755：同題開放——可以講一樣的東西，但腳本全文內容不得雷同）
+    A) 標題 fuzzy ≥0.65 對已用題目 → WARN（原 FAIL 降級；同題請換切角/講法；附錄閱讀義務不變）
+    B) 全文台詞雷同 ratio ≥0.85 → FAIL：批內互比 + 對全業主歷史批次 script_*.yaml 互比
+       （跨業主複製同樣禁止 — 保鏢 R1-hard 2026-06-11；排除當前批次目錄防自比假炸；
+        歷史單檔讀取失敗跳過 fail-open、真雷同 fail-closed）
+    """
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    # ── A) 標題同題 → WARN ──
+    title_hits = []
+    used_titles = []
+    pref_path = OWNER_PREF_PATHS.get(owner)
+    if pref_path:
+        used_titles_path = pref_path.parent / f"_{owner}已用題目.md"
+        if used_titles_path.exists():
+            used_text = used_titles_path.read_text(encoding='utf-8')
+            for line in used_text.split('\n'):
+                m = re.match(r'^-\s*#?\d*\s*\[[^\]]+\]\s*(.+?)$', line.strip())
+                if m:
+                    used_titles.append(m.group(1).strip())
+    THRESHOLD_TITLE = 0.65
     for f, data in valid:
         title = str(data.get('title', '')).strip()
         if not title:
             continue
         for used in used_titles:
             ratio = difflib.SequenceMatcher(None, title, used).ratio()
-            if ratio >= THRESHOLD:
-                hits.append((f.name, title, used, round(ratio, 2)))
+            if ratio >= THRESHOLD_TITLE:
+                title_hits.append((f.name, title, used, round(ratio, 2)))
                 break
-    if hits:
-        first = hits[0]
-        return "FAIL", f"{len(hits)} 件撞題（fuzzy ≥ {THRESHOLD}）：{first[0]} '{first[1][:30]}' vs 已用 '{first[2][:30]}' ratio={first[3]}"
-    return "PASS", f"已用題目 {len(used_titles)} 條，全 yaml 0 撞題（threshold={THRESHOLD}）"
+    # ── B) 全文台詞雷同 → FAIL ──
+    cur = [(f.name, _v2008_dialogue_text(d)) for f, d in valid]
+    others = []
+    try:
+        cur_dir = valid[0][0].parent.resolve() if valid else None
+        if cur_dir is not None:
+            l2_root = None
+            for p in cur_dir.parents:
+                if p.name == "L2_業主層":
+                    l2_root = p
+                    break
+            if l2_root is not None:
+                for pat in ("*/01_腳本生產/*/script_*.yaml", "*/01_腳本批次/*/script_*.yaml"):
+                    for hist in l2_root.glob(pat):
+                        try:
+                            if hist.parent.resolve() == cur_dir:
+                                continue  # 排除當前批次自比（防重驗已上線批假炸）
+                            # 批次 yaml 為 frontmatter 多段格式（--- 分隔）— 照主 loader 同法取 frontmatter 段
+                            _raw = hist.read_text(encoding='utf-8', errors='replace')
+                            _txt = re.sub(r"^---\s*\n", "", _raw, count=1)
+                            _fm = re.split(r"\n---\s*\n", _txt, maxsplit=1)[0]
+                            _fm = re.sub(r"\n---\s*$", "", _fm)
+                            hd = yaml.safe_load(_fm)
+                            if isinstance(hd, dict):
+                                others.append((f"{hist.parent.parent.parent.name}/{hist.parent.name}/{hist.name}", _v2008_dialogue_text(hd)))
+                        except Exception:
+                            continue  # 單檔壞掉跳過（fail-open 於 IO）
+    except Exception:
+        pass
+    dup_hits = _v2008_content_dup_hits(cur, others, 0.85)
+    if dup_hits:
+        a, b, r = dup_hits[0]
+        return "FAIL", f"{len(dup_hits)} 對全文台詞雷同（ratio ≥ 0.85；2026-06-11 拍板：同題可、全文雷同禁）：{a} vs {b} ratio={r}"
+    if title_hits:
+        first = title_hits[0]
+        return "WARN", f"{len(title_hits)} 件標題同題（fuzzy ≥ {THRESHOLD_TITLE}；2026-06-11 拍板開放同題——請確認已換切角/講法）：{first[0]} '{first[1][:30]}' vs 已用 '{first[2][:30]}' ratio={first[3]}；全文對歷史 {len(others)} 支 0 雷同"
+    return "PASS", f"已用題目 {len(used_titles)} 條標題 0 撞；全文對批內+歷史 {len(others)} 支 0 雷同（content-dup ≥0.85 擋；同題開放 2026-06-11 拍板）"
 
 
 def chk_v2_009_auditor_report(batch_dir: Path, owner: str) -> tuple[str, str]:
@@ -3860,6 +3918,19 @@ if __name__ == "__main__":
         }
         _r23f = chk_c017_concreteness(_f23f, "f23f.yaml")
         fcheck("F23f 非知識型訊息分支 → PASS 含「非知識型骨架」", _r23f[0] == "PASS" and "非知識型骨架" in _r23f[1], _r23f[1])
+
+        # ── F24 V2-008 v2 同題開放（2026-06-11 澤君拍板 TG 9755）──
+        print("\n[F24] V2-008 v2 同題開放：標題同題 WARN / 全文雷同 FAIL")
+        _f24_used = ["頭期款不夠怎麼辦"]
+        _f24_hit = difflib.SequenceMatcher(None, "頭期款不夠怎麼辦", _f24_used[0]).ratio() >= 0.65
+        _f24_dup_a = _v2008_content_dup_hits([("a.yaml", "今天講頭期款，重點是自備款比例和銀行眼中的還款能力，這兩件先弄懂"), ("b.yaml", "頭期款這題我用另一個角度講：先看你家庭現金流，再回推能扛的月付")], [], 0.85)
+        fcheck("F24a 同題異文 → 標題命中但全文 0 雷同（WARN 級非 FAIL）", _f24_hit and not _f24_dup_a, f"title_hit={_f24_hit} dup={_f24_dup_a}")
+        _f24_txt = "今天講頭期款，重點是自備款比例和銀行眼中的還款能力，這兩件先弄懂，最後記得問問不用錢"
+        _f24_dup_b = _v2008_content_dup_hits([("a.yaml", _f24_txt), ("b.yaml", _f24_txt)], [], 0.85)
+        fcheck("F24b 批內全文一模一樣 → 雷同 FAIL 級", len(_f24_dup_b) == 1 and _f24_dup_b[0][2] >= 0.85, str(_f24_dup_b))
+        _f24_dup_c = _v2008_content_dup_hits([("new.yaml", _f24_txt)], [("房仲_仲豪/第12批/script_x.yaml", _f24_txt)], 0.85)
+        fcheck("F24c 跨業主歷史全文雷同 → FAIL 級（R1-hard）", len(_f24_dup_c) == 1, str(_f24_dup_c))
+        fcheck("F24d 長度差 >30% 預過濾不誤殺", _v2008_content_dup_hits([("a", "短句")], [("b", _f24_txt)], 0.85) == [], "prefilter ok")
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

@@ -41,6 +41,10 @@ _parser.add_argument('--num-start', dest='num_start', type=int, default=1,
                      help='article 編號起點')
 _parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
                      help='預期 yaml 數量（驗證用）')
+_parser.add_argument('--threads-md', dest='threads_md', default='',
+                     help='脆文 .md 檔案絕對路徑（必填；歷史重建第01批用 --allow-legacy-threads — 2026-06-11）')
+_parser.add_argument('--allow-legacy-threads', dest='allow_legacy_threads', action='store_true',
+                     help='顯式允許使用第01批硬編脆文路徑（歷史重建專用）')
 _args, _unknown = _parser.parse_known_args()
 
 # ============================================================
@@ -392,11 +396,18 @@ else:
 # script-library 位於 Claude/Projects/短影音系統/L4_工具腳本/_部署系統/script-library
 # 往上 5 層到達 Claude root → Claude/Projects/...
 _claude_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..'))
-_threads_md = os.path.normpath(os.path.join(
-    _claude_root, 'Projects',
-    '短影音系統', 'L2_業主層', '餐飲_阿奇',
-    '01_腳本生產', '第01批_2026-05-22', 'threads_achi_01.md'
-))
+if _args.threads_md:
+    _threads_md = os.path.normpath(_args.threads_md)
+elif _args.allow_legacy_threads:
+    _threads_md = os.path.normpath(os.path.join(
+        _claude_root, 'Projects',
+        '短影音系統', 'L2_業主層', '餐飲_阿奇',
+        '01_腳本生產', '第01批_2026-05-22', 'threads_achi_01.md'
+    ))
+    print('WARNING: --allow-legacy-threads 顯式啟用，脆文使用第01批硬編路徑')
+else:
+    print('ERROR: 必須帶 --threads-md <本批脆文.md>（或顯式 --allow-legacy-threads 重建第01批）— 2026-06-11 GPT 終驗：默默 fallback 舊批脆文＝footgun，已禁')
+    sys.exit(2)
 threads_html = build_threads_section(_threads_md)
 
 nc = c[:placeholder_pos] + all_sections + '\n\n' + threads_html + '\n' + tail

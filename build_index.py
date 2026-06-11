@@ -13,8 +13,8 @@ from _html_escape_utils import esc_text, esc_attr, safe_img_src
 # CLI mode 解析
 # ============================================================
 _parser = argparse.ArgumentParser(description='build_index.py — 瑞祥腳本庫 build script')
-_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
-                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default=None,
+                     help='yaml=新批標準模式 / legacy=顯式歷史重建（會用舊批硬編碼蓋頁面）；不指定直接拒跑 — 2026-06-11')
 _parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
                      help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
 _parser.add_argument('--batch-label', dest='batch_label', default='',
@@ -27,6 +27,8 @@ _parser.add_argument('--threads-md', dest='threads_md', default='',
                      help='脆文 .md 檔案絕對路徑（--mode yaml 時可選；若提供則新批脆文取代舊批）')
 _args, _unknown = _parser.parse_known_args()
 MODE = _args.mode
+if MODE is None:
+    _parser.error('必須顯式指定 --mode yaml（上新批）或 --mode legacy（重生歷史硬編碼批，會用舊批內容蓋掉線上最新批）— 2026-06-11 裸跑防護')
 
 
 # ============================================================

@@ -14,8 +14,8 @@ from _html_escape_utils import esc_text, esc_attr, safe_img_src
 # CLI mode 解析
 # ============================================================
 _parser = argparse.ArgumentParser(description='build_all.py — 仲豪 kenny 腳本庫 build script')
-_parser.add_argument('--mode', choices=['legacy', 'yaml'], default='legacy',
-                     help='legacy=既有硬編碼（預設）/ yaml=yaml-driven 新批次')
+_parser.add_argument('--mode', choices=['legacy', 'yaml'], default=None,
+                     help='yaml=新批標準模式 / legacy=顯式歷史重建（會用舊批硬編碼蓋頁面）；不指定直接拒跑 — 2026-06-11')
 _parser.add_argument('--yaml-dir', dest='yaml_dir', default='',
                      help='yaml 批次資料夾絕對路徑（--mode yaml 時必填）')
 _parser.add_argument('--batch-label', dest='batch_label', default='',
@@ -26,6 +26,8 @@ _parser.add_argument('--expected-count', dest='expected_count', type=int, defaul
                      help='預期 yaml 數量（驗證用）')
 _args, _unknown = _parser.parse_known_args()
 MODE = _args.mode
+if MODE is None:
+    _parser.error('必須顯式指定 --mode yaml（上新批）或 --mode legacy（重生歷史硬編碼批，會用舊批內容蓋掉線上最新批）— 2026-06-11 裸跑防護')
 
 BATCH_05 = '第 05 批 · 2026-05-21'
 

@@ -3,6 +3,13 @@
 """
 validate_trend_report.py — 潮汐週報品管員（9 欄自動擋）
 
+⚠️ DEPRECATED（2026-06-12 零留尾戰役 WP-D — F-16 死閘門根治）：
+  本驗證器驗的 report_v2.md / report.md 格式自 2026-05-23 Cyborg 化後不再產出，
+  對現行資料 0 標的、批次模式空集合恆 PASS = 守門功能已死（6/11 夜 + 6/12 雙掃描證實）。
+  現役守門已遷移：trend-daily\\validate_cyborg_yaml.py（dispatch_to_shortform_system.py
+  落地前 fail-closed 驗 cyborg_*.yaml，fail 不落地；fixtures 13/13）。
+  pre-commit Part 4 觸發段已同日摘除。本檔保留供歷史 report_v2.md 重驗用，勿掛新流程。
+
 對齊 _知識管理SOP.md §12.2 潮汐 → 編劇銜接 SOP（6 步流程從 Step 1 frontmatter 開始）
 參考架構：validate_script_batch.py（15 件自動擋）
 
@@ -158,8 +165,13 @@ def validate_batch(batch_dir: Path) -> bool:
     """掃批次資料夾下所有 report_v2.md / report.md，全 PASS 回 True。"""
     report_files = list(batch_dir.rglob('report_v2.md')) + list(batch_dir.rglob('report.md'))
     if not report_files:
-        print(f'[WARN] {batch_dir} 下找不到 report_v2.md / report.md')
-        return True  # 空目錄不算失敗
+        import sys
+        print(
+            f'⚠️  validate_trend_report: 0 個 report_v2.md/report.md 標的'
+            f' — 此格式 Cyborg 流程後已退役（現產 cyborg_*.yaml），本驗證器目前空轉、非真 PASS',
+            file=sys.stderr
+        )
+        return True  # 空目錄不算失敗（pre-commit exit 語意不變）
 
     all_pass = True
     for f in sorted(set(report_files)):

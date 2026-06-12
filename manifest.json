@@ -1,7 +1,7 @@
 {
   "name": "北高雄房產短影音腳本庫",
   "short_name": "腳本庫",
-  "description": "北高雄房產短影音腳本庫 - 16支腳本隨時查閱",
+  "description": "北高雄短影音腳本庫 - 多業主腳本隨時查閱",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1e272e",

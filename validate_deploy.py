@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_deploy.py — 短影音腳本上線前驗證腳本 (14 件檢查)
+validate_deploy.py — 短影音腳本上線前驗證腳本 (15 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-14 件檢查（v1 5 件 + v2 新增 5 件 + v3 新增 1 件 + v4 新增 1 件 + v5 新增 1 件 + v6 新增 1 件）：
+15 件檢查（v1 5 件 + v2 新增 5 件 + v3/v4/v5/v6/v7 各新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
@@ -18,9 +18,10 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (14 件檢查)
 9. 圖卡部 group 不與「釣魚部」字串並存（命名混淆防呆）
 10. caption 禁用詞清零（應該/大概/可能/差不多/基本上/我猜）
 --- v3 新增（2026-05-20 藏鏡人獨立泡泡）---
-11. 藏鏡人獨立泡泡 <div class="mirror"> 計數 HARD BLOCK
-    — 每個 html 的 mirror count 必須 >= 該 html 的 article/card 數量
-    — 確保 mirror 渲染邏輯正確，不混入台詞字串
+11. 藏鏡人獨立泡泡 <div class="mirror"> 計數 + 內容品質
+    — HARD BLOCK：mirror count == 0（沒渲染）/ 內文空 / 內文 ≤5 字 / 命中 placeholder 黑名單
+    — WARN：0 < mirror count < article count（部分缺藏鏡人 — 需人工確認來源批次是否本來缺欄；
+      2026-06-12 F-8 修正：舊文誤寫「count 必須 >= article 數量 HARD BLOCK」比實碼嚴）
 --- v4 新增（2026-06-02 日期分組紅線）---
 12. group head 不得含派系名（中文/英文副名）HARD BLOCK
     — 白名單：圖卡部/Card Library/脆文/Threads 放行
@@ -40,6 +41,11 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (14 件檢查)
     — 全 hard-fail：validator 不存在 / exit 非 0 且非乾淨命中 / owner_id 對應缺 → FAIL
     — 該業主 KB 無 forbidden_terms hard_gate → PASS with info（不報錯）
     — 有 forbidden_terms 但 HTML 命中 → FAIL（block 並列出命中詞位置）
+--- v7 新增（2026-06-12 零留尾戰役 — PWA 三件驗證）---
+15. PWA 三件（manifest / sw.js / icons）驗證 HARD BLOCK
+    — 獨立 validate_pwa_assets.py（6 件：manifest 可解析/欄齊/icon 檔在/sw 在/
+      index.html 雙引用/description 禁硬編「N支」過期計數）
+    — fail-closed：驗證器缺檔 = FAIL
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -48,6 +54,7 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (14 件檢查)
 v2 升級：2026-05-18 SOP v2 9 件功能邏輯對齊
 v3 升級：2026-05-20 加第 11 件藏鏡人獨立泡泡 HARD BLOCK
 v6 升級：2026-06-07 加第 14 件 owner-scoped 成品禁詞掃描
+v7 升級：2026-06-12 加第 15 件 PWA 三件驗證（零留尾戰役 WP-D）+ 第 11 件描述對齊實碼（F-8）
 """
 
 import os
@@ -676,10 +683,12 @@ def check_11_mirror_dom_count():
             fails.append(msg)
             continue  # 無 mirror 就不必跑品質驗
 
-        # WARN（部分缺藏鏡人）
+        # WARN（部分缺藏鏡人）— 2026-06-12 F-8/Codex D1：補人工確認語意，避免被當 PASS。
+        # 兩種情境：來源批次本來就部分未填藏鏡人欄（正常）vs 每支都有填但 builder 掉欄（資料遺失）。
         if mirror_count < article_count:
             log(f'  ⚠ {html_rel}: mirror={mirror_count} < article={article_count}'
-                f' — 部分 article 缺藏鏡人（WARN，未填藏鏡人欄的舊批次正常）')
+                f' — 部分 article 缺藏鏡人（WARN ≠ PASS：需人工確認來源批次是否本來缺欄；'
+                f'若 yaml 每支都有藏鏡人欄則屬 builder 掉欄資料遺失，必須修）')
 
         # (B/C/D) 內容品質驗證 — 用 html.parser 解析實際內文
         # shihting.html 用 shihting-mirror class；其他業主頁用 mirror class
@@ -1264,6 +1273,25 @@ def check_14_owner_forbidden_terms():
     return fails
 
 
+def check_15_pwa_assets():
+    """check 15（v7 2026-06-12 零留尾戰役 WP-D）：PWA 三件（manifest/sw/icons）部署驗證。
+    邏輯在獨立 validate_pwa_assets.py（6 件：manifest 可解析/欄齊/icon 檔在/sw 在/
+    index 雙引用/description 禁硬編計數）。fail-closed：驗證器缺檔 = FAIL（比照 check_14）。"""
+    log('[check 15] PWA 三件驗證（manifest / sw / icons）')
+    try:
+        from validate_pwa_assets import run_pwa_checks
+    except Exception as e:
+        msg = f'❌ check 15: validate_pwa_assets.py 載入失敗（fail-closed）：{e}'
+        log(f'  {msg}')
+        return [msg]
+    fails = [f'❌ check 15: {m}' for m in run_pwa_checks(LIB)]
+    for m in fails:
+        log(f'  {m}')
+    if not fails:
+        log('  ✅ Check 15 PWA 三件 6/6 通過')
+    return fails
+
+
 # === main ===
 
 def main():
@@ -1312,6 +1340,9 @@ def main():
     # v6 新增（2026-06-07 owner-scoped 成品禁詞掃描）
     all_fails += check_14_owner_forbidden_terms()
     log('')
+    # v7 新增（2026-06-12 零留尾戰役 — PWA 三件驗證）
+    all_fails += check_15_pwa_assets()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -1323,7 +1354,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 14 件齊')
+        log('✅ 全部通過 — 15 件齊')
         sys.exit(0)
 
 

@@ -325,7 +325,9 @@ def parse_threads_new_fmt(md_text: str) -> list:
         if not m_head:
             continue
         tid = m_head.group(1).strip()
-        src = m_head.group(2).strip()
+        # 2026-06-12 零留尾戰役 WP-D：括號內容本身已含「衍生自 」前綴（## Threads 1（衍生自 script_...）），
+        # render_thread 模板又補一次 → 線上出現「衍生自 衍生自」。解析端剝前綴，模板端統一補。
+        src = re.sub(r'^衍生自\s*', '', m_head.group(2).strip())
 
         lines = blk.splitlines()
         body_lines = []
@@ -677,8 +679,10 @@ def main():
     section = (
         f'<section class="group collapsed" id="{esc(batch_id)}">'
         f'<div class="grp-head" onclick="toggleGroup(\'{esc_attr(batch_id)}\')">'
+        # 2026-06-12 WP-D：tag 徽章已含「第 NN 批」，ttl 只放日期段（舊版 ttl 重放整個
+        # batch_label → 線上 head 顯示「第 02 批第 02 批 · 2026-06-03」+ 空 <small>）
         f'<span class="tag">{esc(batch_label.split("·")[0].strip())}</span>'
-        f'<span class="ttl">{esc(batch_label)} <small></small></span>'
+        f'<span class="ttl">{esc(batch_label.split("·", 1)[1].strip() if "·" in batch_label else batch_label)}</span>'
         f'<span class="cnt">{len(scripts)} 支</span></div>'
         f'<div class="cards">{cards}</div></section>'
     )

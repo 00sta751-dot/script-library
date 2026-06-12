@@ -2845,7 +2845,7 @@ def run_per_file_checks(f: Path, data: dict, owner: str, is_skeleton: bool = Fal
 # ────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="腳本批次品管員（含 V2 schema + voice_lock 守門）")
-    parser.add_argument("--owner",     help="業主名（瑞祥/仲豪/昀臻/叭噗_小C/阿奇）")
+    parser.add_argument("--owner",     help="業主名（以 owner_projection.generated.json 為準，不傳則從首個 yaml 的 owner 欄自動偵測）")
     parser.add_argument("--batch-dir", required=True, help="第 N 批 yaml 資料夾絕對路徑")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
     args = parser.parse_args()

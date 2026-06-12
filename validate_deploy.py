@@ -276,7 +276,7 @@ def check_3_build_html_dual_change():
         # 2026-06-11 保鏢核可：純工具變更通道（仿 OWNER_PROJECTION_VERIFIER_OPTIONAL 前例）
         # 只改 build_*.py 的 argparse/守門邏輯、零渲染輸出變更時，顯式宣告降 WARN + 稽核留痕
         if os.environ.get('DEPLOY_TOOL_CHANGE_ONLY') == '1':
-            msg = f'⚠️ [CHECK_1 DOWNGRADED — WARN_ALLOWANCE] TOOL_CHANGE_ONLY: build_*.py ({py_modified}) 宣告為純工具變更（零渲染輸出變更），降 WARN 放行；其餘 13 件照常'
+            msg = f'⚠️ [CHECK_1 DOWNGRADED — WARN_ALLOWANCE] TOOL_CHANGE_ONLY: build_*.py ({py_modified}) 宣告為純工具變更（零渲染輸出變更），降 WARN 放行；其餘 14 件照常'
             log(f'  {msg}')
             write_skip_log(f'WARN_ALLOWANCE TOOL_CHANGE_ONLY check_1 py_modified={py_modified}')
         else:

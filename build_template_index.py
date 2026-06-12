@@ -44,7 +44,78 @@ except Exception:
     pass
 
 # ── 路徑 ──
-CYBORG_DIR = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告")
+# 潮汐批次 C Step 1：多 root 掃描（不 import trend-daily，跨 repo）
+# 與 trend-daily/topic_intel_paths.py 同源（compare gate 驗等值）
+_TI_CONFIG_PATH = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
+
+# DEFAULTS 值必須與 trend-daily/topic_intel_paths.py DEFAULTS 完全一致
+_TI_DEFAULTS: dict = {
+    "active_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池",
+    "old_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告",
+    "legacy_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_legacy_backlog",
+    "quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_隔離待補",
+    "old_quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告\_隔離待補",
+    "collision_quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_collision_quarantine",
+    "migration_lock": r"C:\Users\00sta\claude-state\flags\topic_intel_migration.lock",
+}
+
+
+def _load_ti_config() -> dict:
+    """小型 loader：讀同一個 topic_intel_paths.json（fail-open）"""
+    # 沙盒縱深防禦：與 trend-daily resolver 同步支援 env 覆蓋（測試不得碰真池）
+    _env_cfg = os.environ.get("TOPIC_INTEL_CONFIG_PATH", "").strip()
+    if _env_cfg:
+        p = Path(_env_cfg)
+        if not p.exists():
+            raise FileNotFoundError(f"[build-index] TOPIC_INTEL_CONFIG_PATH 指定的 config 不存在: {p}")
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+        for k, v in _TI_DEFAULTS.items():
+            cfg.setdefault(k, v)
+        print(f"[build-index] config 來源=env override: {p}", file=sys.stderr)
+        return cfg
+    if _TI_CONFIG_PATH.exists():
+        try:
+            raw = _TI_CONFIG_PATH.read_text(encoding="utf-8")
+            cfg = json.loads(raw)
+            # 補缺 key
+            for k, v in _TI_DEFAULTS.items():
+                if k not in cfg:
+                    print(f"[build-index] WARN: config 缺 key={k}，補 DEFAULTS", file=sys.stderr)
+                    cfg[k] = v
+            return cfg
+        except Exception as e:
+            print(f"[build-index] WARN: config 解析失敗 {_TI_CONFIG_PATH}: {e}，使用 DEFAULTS", file=sys.stderr)
+    else:
+        print(f"[build-index] WARN: config 不存在 {_TI_CONFIG_PATH}，使用 DEFAULTS", file=sys.stderr)
+    return dict(_TI_DEFAULTS)
+
+
+def _get_scan_roots() -> list[tuple[str, Path]]:
+    """掃描順序：old -> legacy -> active（後掃優先；legacy 只收 processed）"""
+    cfg = _load_ti_config()
+    return [
+        ("old", Path(cfg["old_root"])),
+        ("legacy", Path(cfg["legacy_root"])),
+        ("active", Path(cfg["active_root"])),
+    ]
+
+
+def _get_quarantine_roots() -> list[Path]:
+    """隔離目錄清單（old + active 兩處，不進 index）"""
+    cfg = _load_ti_config()
+    return [
+        Path(cfg["old_quarantine_dir"]),
+        Path(cfg["quarantine_dir"]),
+        Path(cfg["collision_quarantine_dir"]),
+    ]
+
+
+def _is_migration_locked() -> bool:
+    cfg = _load_ti_config()
+    return Path(cfg["migration_lock"]).exists()
+
+
+CYBORG_DIR = Path(_TI_DEFAULTS["old_root"])  # fallback 向下相容（build_index 內部以 scan_roots 為準）
 DISSECT_DIR = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_爆款拆解庫")
 DEFAULT_OUT = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L4_工具腳本\_部署系統\script-library\template_index.jsonl")
 
@@ -388,41 +459,114 @@ def parse_cyborg_yaml(path: Path, include_rejected: bool = False) -> Optional[di
     return card
 
 
-def scan_cyborg_dir(cyborg_dir: Path, include_rejected: bool = False) -> list[dict]:
-    """遞迴掃 cyborg_dir（不進 _隔離待補 子目錄）"""
+def scan_cyborg_dir(cyborg_dir: Path, include_rejected: bool = False,
+                    legacy_mode: bool = False) -> list[dict]:
+    """掃 cyborg_dir（不進隔離子目錄）
+    legacy_mode=True：只收 status=processed（legacy_backlog 用）
+    """
+    # 取隔離目錄集合（跳過）
+    _quar_roots = set()
+    for qp in _get_quarantine_roots():
+        _quar_roots.add(qp.resolve())
+
     cards = []
     yaml_files = sorted(cyborg_dir.glob("cyborg_*.yaml"))
     for f in yaml_files:
+        # 跳過在任何隔離子目錄下的檔
+        try:
+            if f.resolve().parent.resolve() in _quar_roots:
+                continue
+        except Exception:
+            pass
         card = parse_cyborg_yaml(f, include_rejected=include_rejected)
-        if card:
-            cards.append(card)
+        if card is None:
+            continue
+        # legacy_mode：只收 processed
+        if legacy_mode and card.get("status") != "processed":
+            continue
+        cards.append(card)
     return cards
 
 
 def build_index(out_path: Path, include_rejected: bool = False) -> int:
-    """主程式：掃來源 → 建 jsonl → 回傳寫入筆數"""
+    """主程式：掃多 root 來源 → 建 jsonl → 回傳寫入筆數
+    掃描順序：old -> legacy -> active（後掃勝；legacy 只收 processed）
+    同 template_id 衝突：sha256 相同=取 active（最後）；不同=列 stderr + exit 3
+    """
+    scan_roots = _get_scan_roots()
+
     print(f"\n{'='*60}")
     print(f"  build_template_index.py — 爆款範本卡索引建立")
     print(f"{'='*60}")
-    print(f"  cyborg 來源：{CYBORG_DIR}")
+    for tag, root in scan_roots:
+        print(f"  [{tag}] {root}")
     print(f"  輸出：{out_path}\n")
 
-    all_cards = []
+    # 主源：多 root cyborg yaml（先 per-root 去重，再跨 root sha256 碰撞檢測）
+    print("── 掃 cyborg_*.yaml（multi-root）──")
 
-    # 主源：cyborg yaml
-    print("── 掃 cyborg_*.yaml ──")
-    cyborg_cards = scan_cyborg_dir(CYBORG_DIR, include_rejected=include_rejected)
-    print(f"  → 找到 {len(cyborg_cards)} 張範本卡（已過濾 rejected/stale/隔離）")
-    all_cards.extend(cyborg_cards)
+    import hashlib as _hlib
 
-    # 去重（同 video_id 只留一筆，後掃的勝）
-    seen_ids = {}
-    for card in all_cards:
-        seen_ids[card['template_id']] = card
-    deduped = list(seen_ids.values())
-    removed = len(all_cards) - len(deduped)
+    def _sha_card(card: dict) -> str:
+        try:
+            return _hlib.sha256(Path(card["source_path"]).read_bytes()).hexdigest()
+        except Exception:
+            return ""
+
+    # per-root 先去重（維持改前「同 root 同 template_id 後掃覆蓋」語意）
+    # root_deduped: list of (tag, {tid: card})
+    root_deduped: list[tuple[str, dict[str, dict]]] = []
+    for tag, root in scan_roots:
+        if not root.exists():
+            print(f"  [{tag}] 目錄不存在，跳過", file=sys.stderr)
+            continue
+        is_legacy = (tag == "legacy")
+        root_cards = scan_cyborg_dir(root, include_rejected=include_rejected, legacy_mode=is_legacy)
+        print(f"  [{tag}] → {len(root_cards)} 張（per-root 去重前）")
+        per_root: dict[str, dict] = {}
+        for card in root_cards:
+            per_root[card["template_id"]] = card  # 後掃覆蓋 = root 內後日期勝
+        print(f"  [{tag}] → {len(per_root)} 張（per-root 去重後）")
+        root_deduped.append((tag, per_root))
+
+    # 跨 root 合併：同 template_id 出現在多 root
+    # sha256 相同（同檔重複）→ 後 root 覆蓋；sha256 不同 → 真 collision exit 3
+    merged: dict[str, tuple[str, dict]] = {}  # tid -> (root_tag, card)
+    collision_ids: list[str] = []
+    for tag, per_root in root_deduped:
+        for tid, card in per_root.items():
+            if tid not in merged:
+                merged[tid] = (tag, card)
+            else:
+                prev_tag, prev_card = merged[tid]
+                sha_new = _sha_card(card)
+                sha_old = _sha_card(prev_card)
+                if sha_new and sha_old and sha_new != sha_old:
+                    print(
+                        f"[build-index] COLLISION: template_id={tid} "
+                        f"root_a={prev_tag}(sha={sha_old[:8]}) "
+                        f"root_b={tag}(sha={sha_new[:8]}) 內容不同",
+                        file=sys.stderr,
+                    )
+                    collision_ids.append(tid)
+                else:
+                    # sha 相同或讀不到：後 root 覆蓋（active 優先）
+                    merged[tid] = (tag, card)
+
+    if collision_ids:
+        print(
+            f"[build-index] FAIL: {len(set(collision_ids))} 個 template_id 跨 root sha256 衝突，"
+            "不自動合併，請人工裁決後再跑。",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+    all_cards = [card for (_tag, card) in merged.values()]
+    deduped = all_cards  # 已去重
+    total_pre = sum(len(pr) for _, pr in root_deduped)
+    removed = total_pre - len(deduped)
     if removed > 0:
-        print(f"  → 去重移除 {removed} 筆（同 template_id 重複）")
+        print(f"  → 跨 root 去重移除 {removed} 筆（同 template_id，後 root 覆蓋）")
 
     # 寫 jsonl
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -456,7 +600,27 @@ def main():
     parser = argparse.ArgumentParser(description="爆款範本卡索引建立工具")
     parser.add_argument('--out', default=str(DEFAULT_OUT), help='輸出路徑（絕對路徑 jsonl）')
     parser.add_argument('--include-rejected', action='store_true', help='含 rejected/stale 範本（預設跳過）')
+    parser.add_argument('--print-roots', action='store_true',
+                        help='印 resolved roots json 後 exit 0（給 compare gate 用）')
     args = parser.parse_args()
+
+    # --print-roots：印 resolved roots json 後 exit 0（compare gate 用）
+    if args.print_roots:
+        roots = _get_scan_roots()
+        print(json.dumps(
+            {"roots": {tag: str(root) for tag, root in roots}},
+            ensure_ascii=False,
+        ))
+        sys.exit(0)
+
+    # migration lock 擋（非 dry-run）
+    if _is_migration_locked():
+        print(
+            "[build-index] migration lock 在，拒跑。請等遷移完成後再跑。",
+            file=sys.stderr,
+        )
+        sys.exit(6)
+
     count = build_index(Path(args.out), include_rejected=args.include_rejected)
     # count <= 0 → 空索引或失敗，exit 1 讓呼叫者（pre-commit / CI）知道沒有可用範本卡
     sys.exit(0 if count > 0 else 1)

@@ -357,7 +357,8 @@ def parse_cyborg_yaml(path: Path, include_rejected: bool = False) -> Optional[di
         "video_id": video_id,
         "status": status,
         "industry_tags": industry_tags,
-        "topic_tags": list(set(topic_tags)),
+        # 保序去重（不可用 set：hash 隨機化會讓重建 byte 不穩，破壞遷移 byte-gate — 批次 C Step 0）
+        "topic_tags": list(dict.fromkeys(topic_tags)),
         "hook_type": hook_type,
         "hook_psychology": _hook_psychology(hook_type),
         # first_3_sec_abstract：只存抽象描述，不存完整台詞

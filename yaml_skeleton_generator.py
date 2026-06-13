@@ -284,6 +284,24 @@ def build_yaml_skeleton(item: dict) -> str:
     lines.append("  forbidden_copy_check: pending  # 編劇確認無直接複製範本 → 改為 PASS")
     lines.append("")
 
+    # ── WP-B source_topic_intel block（只有 assign on + plan item 有此欄才輸出）──
+    # 零足跡鐵律：off 時 item 無 source_topic_intel → 不輸出任何 block/空行/註解
+    sti = item.get("source_topic_intel")
+    if sti and isinstance(sti, dict):
+        lines.append("# 選題情報來源（topic_distributor.py WP-B assign 寫入，編劇填 adopted_topic_statement）")
+        lines.append("source_topic_intel:")
+        lines.append(f"  topic_id: \"{sti.get('topic_id', '')}\"")
+        lines.append(f"  source_kind: {sti.get('source_kind', 'cyborg_yaml')}")
+        ev_path = sti.get("evidence_path", "") or ""
+        lines.append(f"  evidence_path: \"{ev_path}\"")
+        lines.append(f"  evidence_sha256: \"{sti.get('evidence_sha256', '')}\"")
+        # adopted_topic_statement：編劇填（validator skeleton 階段 SKIP，成稿驗關鍵詞交集）
+        adopted = sti.get("adopted_topic_statement", "") or ""
+        lines.append(f"  adopted_topic_statement: \"{adopted}\"  # [編劇填] 本支採用的題材一句話（≥12 中文字）")
+        lines.append(f"  assigned_by: {sti.get('assigned_by', 'topic_distributor')}")
+        lines.append(f"  assignment_mode: {sti.get('assignment_mode', 'off')}")
+        lines.append("")
+
     # ── schema_check ──
     lines.append("schema_check:")
     lines.append("  禁虛構: true")

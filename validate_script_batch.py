@@ -2783,16 +2783,349 @@ def chk_v2_026_template_adaptation_required(data: dict, fname: str) -> tuple[str
 
 
 # ────────────────────────────────────────────
+# WP-B V3-001 provenance check（topic_intel 選題情報池來源驗）
+# ────────────────────────────────────────────
+
+def _normalize_and_tokenize(text: str) -> set:
+    """
+    正規化 + 分詞 → token set（供 shared_content_tokens 計算）。
+
+    正規化順序（規格 §9.2）：
+    1. Unicode NFKC
+    2. 英文轉小寫
+    3. 全形→半形（由 NFKC 完成）
+    4. 移除 URL
+    5. 移除所有標點 / 符號 / emoji
+    6. 阿拉伯數字保留；百分號移除但數字保留
+    7. 空白壓成單一空白
+    8. 中文連續字串切 2-gram + 3-gram
+    9. 英文 / 數字連續字串切 word token
+    10. 移除 STOPLIST
+    11. token 去重（回 set）
+    """
+    import unicodedata
+    import re as _re
+
+    # 1+2+3: NFKC + lower（全形半形由 NFKC 完成）
+    s = unicodedata.normalize("NFKC", text).lower()
+
+    # 4: 移除 URL
+    s = _re.sub(r"https?://\S+|www\.\S+", " ", s)
+
+    # 5+6: 移除標點/符號/emoji，保留中文、英數、空白
+    # 百分號移除（符號類），但數字已保留（先移標點後才動數字）
+    # 用 category：保留 letter / number，其餘移除（含 emoji）
+    def _keep_char(c: str) -> str:
+        cat = unicodedata.category(c)
+        if cat.startswith("L"):   # Letter
+            return c
+        if cat.startswith("N"):   # Number
+            return c
+        if c in " \t\n":          # 空白
+            return " "
+        return " "                # 標點/符號/emoji → 空格
+
+    s = "".join(_keep_char(c) for c in s)
+
+    # 7: 空白壓成單一
+    s = _re.sub(r"\s+", " ", s).strip()
+
+    # 切分 token
+    tokens: set = set()
+
+    # 逐段掃：連續中文 vs 其他（英數）
+    segments = _re.split(r"(\s+)", s)
+    for seg in segments:
+        seg = seg.strip()
+        if not seg:
+            continue
+
+        # 判斷是否純中文
+        cjk_chars = [c for c in seg if "一" <= c <= "鿿"]
+        non_cjk = [c for c in seg if c not in cjk_chars and c.strip()]
+
+        if cjk_chars:
+            # 8: 中文 2-gram + 3-gram
+            cjk_str = "".join(cjk_chars)
+            for n in (2, 3):
+                for i in range(len(cjk_str) - n + 1):
+                    tokens.add(cjk_str[i:i+n])
+
+        if non_cjk:
+            # 9: 英數 word token（連續非空白字元）
+            for word in _re.findall(r"[a-z0-9]+", seg):
+                tokens.add(word)
+
+    # 10: 移除 STOPLIST
+    try:
+        from topic_intel_adapter import STOPLIST as _STOPLIST
+    except ImportError:
+        _STOPLIST = set()
+    tokens -= _STOPLIST
+
+    return tokens
+
+
+def _count_chinese_chars(text: str) -> int:
+    """計算字串中的中文字數（Unicode CJK 基本漢字區塊）"""
+    return sum(1 for c in text if "一" <= c <= "鿿")
+
+
+def _extract_script_body_text(data: dict) -> str:
+    """
+    從 yaml data 提取比對用文字：title + Hook 段台詞 + 第 2-5 段主體台詞。
+    台詞欄位名由業主偏好決定（常見：台詞/口白/旁白/文案），此處直接掃 scenes 所有字串值。
+    """
+    parts = []
+
+    # title
+    title = str(data.get("title", "") or "")
+    if title:
+        parts.append(title)
+
+    # scenes
+    scenes = data.get("scenes") or []
+    if not isinstance(scenes, list):
+        scenes = []
+
+    seg_idx = 0
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        seg_idx += 1
+        seg_type = str(scene.get("type", "") or "").strip()
+        # 取 Hook 段 + 第 2-5 段主體
+        is_hook = (seg_type == "Hook" or seg_idx == 1)
+        is_body = (2 <= seg_idx <= 5)
+        if not (is_hook or is_body):
+            continue
+        # 掃所有字串值欄位（台詞欄位名不固定）
+        for k, v in scene.items():
+            if k in ("timestamp", "type") or not isinstance(v, str):
+                continue
+            v_stripped = v.strip()
+            if v_stripped and not v_stripped.startswith("#") and not _is_placeholder(v_stripped):
+                parts.append(v_stripped)
+
+    return " ".join(parts)
+
+
+def _load_projection_candidate_index(owner: str) -> Optional[dict]:
+    """
+    Fix G：載入 owner 對應的 projection active.json，
+    回傳 {topic_id: source_sha256} 索引（用於 provenance 比對）。
+    檔不存在回 None（首批 / 尚未生成 projection）。
+    解析失敗 raise（呼叫端捕捉後記 WARN）。
+    """
+    import json as _j
+    _op_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+    if not _op_path.exists():
+        return None
+    _op = _j.loads(_op_path.read_text(encoding="utf-8"))
+    _owner_info = _op.get("owners", {}).get(owner, {})
+    _owner_code = str(_owner_info.get("owner_code", "") or "")
+    if not _owner_code:
+        return None
+    _cfg_path = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
+    if not _cfg_path.exists():
+        return None
+    _cfg = _j.loads(_cfg_path.read_text(encoding="utf-8"))
+    _proj_dir = _cfg.get("topic_intel_projection_dir", "")
+    if not _proj_dir:
+        return None
+    _active = Path(_proj_dir) / "by_owner" / _owner_code / "active.json"
+    if not _active.exists():
+        return None
+    _proj_data = _j.loads(_active.read_text(encoding="utf-8"))
+    return {
+        str(c.get("topic_id", "")): str(c.get("source_sha256", ""))
+        for c in _proj_data.get("candidates", [])
+        if c.get("topic_id")
+    }
+
+
+def chk_topic_intel_provenance(
+    data: dict,
+    fname: str,
+    topic_intel_policy: dict,
+    is_skeleton: bool,
+    owner: str = "",
+) -> tuple[str, str]:
+    """
+    V3-001：選題情報池來源驗（WP-B provenance check）—— per-file 層。
+
+    驗欄位：
+      1. evidence_sha256 非空。
+      2. Fix G：evidence_path 非空（assign 端必填 canonical path）。
+      3. adopted_topic_statement 中文字數 >= 12。
+      4. shared_content_tokens >= 5（adopted_topic_statement ↔ 腳本台詞）。
+      5. Fix G：topic_id + evidence_sha256 在 owner projection cache 中命中（防假 id）。
+
+    policy disabled / off → SKIP（零足跡）。
+    is_skeleton=True → SKIP。
+    shadow=WARN / enforce=FAIL。
+    """
+    mode = topic_intel_policy.get("mode", "off") if topic_intel_policy else "off"
+    enabled = topic_intel_policy.get("enabled", False) if topic_intel_policy else False
+
+    if not enabled:
+        return "SKIP", f"V3-001 WP-B policy off/disabled（{mode}），跳過 provenance check"
+
+    if is_skeleton:
+        return "SKIP", "V3-001 骨架階段跳過（adopted_topic_statement 尚未填，等編劇填完後再驗）"
+
+    sti = data.get("source_topic_intel")
+    if not sti or not isinstance(sti, dict):
+        return "SKIP", "V3-001 此腳本無 source_topic_intel（未被 WP-B assign 綁 slot）"
+
+    issues = []
+    is_fail = False
+
+    # 1. evidence_sha256 非空
+    sha = str(sti.get("evidence_sha256", "") or "").strip()
+    if not sha:
+        issues.append("evidence_sha256 為空")
+        is_fail = True
+
+    # 2. Fix G：evidence_path 非空
+    ev_path = str(sti.get("evidence_path", "") or "").strip()
+    if not ev_path:
+        issues.append("evidence_path 為空（assign 端必填 canonical resolved path）")
+        is_fail = True
+
+    # 3. adopted_topic_statement 驗
+    adopted = str(sti.get("adopted_topic_statement", "") or "").strip()
+    if not adopted or _is_placeholder(adopted):
+        issues.append("adopted_topic_statement 尚未填寫（仍為 placeholder）")
+        is_fail = True
+    else:
+        zh_count = _count_chinese_chars(adopted)
+        if zh_count < 12:
+            issues.append(f"adopted_topic_statement 中文字數 {zh_count} < 12（需 >=12）")
+            is_fail = True
+
+        body_text = _extract_script_body_text(data)
+        adopted_tokens = _normalize_and_tokenize(adopted)
+        body_tokens = _normalize_and_tokenize(body_text)
+        shared = adopted_tokens & body_tokens
+        if len(shared) < 5:
+            issues.append(
+                f"題材關鍵詞交集 {len(shared)} < 5（交集詞：{sorted(shared)[:5]}）"
+            )
+            is_fail = True
+
+    # 4. Fix G：projection cache 比對（驗真來源）
+    topic_id = str(sti.get("topic_id", "") or "")
+    if topic_id and sha:
+        try:
+            _proj_index = _load_projection_candidate_index(owner) if owner else None
+            if _proj_index is not None:
+                _proj_sha = _proj_index.get(topic_id)
+                if _proj_sha is None:
+                    issues.append(
+                        f"topic_id={topic_id!r} 不在 owner={owner!r} projection cache 中（未投影或已失效）"
+                    )
+                    is_fail = True
+                elif _proj_sha != sha:
+                    issues.append(
+                        f"evidence_sha256 與 projection cache 不符（yaml={sha!r}, proj={_proj_sha!r}）"
+                    )
+                    is_fail = True
+            # Fix 4：_proj_index is None（projection cache 缺）→ enforce FAIL，shadow WARN
+            if _proj_index is None:
+                _proj_miss_msg = f"projection cache 不存在（owner={owner!r}）；enforce 模式須 cache 在場才可驗真來源"
+                issues.append(_proj_miss_msg)
+                if mode == "enforce":
+                    is_fail = True
+        except Exception as _proj_err:
+            # projection 讀取出現例外 → enforce fail-closed；shadow WARN（環境問題）
+            issues.append(f"projection cache 讀取出現例外：{_proj_err}")
+            if mode == "enforce":
+                is_fail = True
+
+    if not issues:
+        adopted_tokens = _normalize_and_tokenize(adopted)
+        body_text = _extract_script_body_text(data)
+        body_tokens = _normalize_and_tokenize(body_text)
+        shared_count = len(adopted_tokens & body_tokens)
+        zh_count = _count_chinese_chars(adopted)
+        return "PASS", (
+            f"V3-001 provenance OK: topic_id={topic_id!r}, "
+            f"zh={zh_count}>=12, shared_tokens={shared_count}>=5, proj=matched"
+        )
+
+    if mode == "enforce" and is_fail:
+        return "FAIL", f"V3-001 provenance FAIL（enforce）：{'；'.join(issues)}"
+    return "WARN", f"V3-001 provenance WARN（{mode}）：{'；'.join(issues)}"
+
+
+def chk_v3_002_batch_slot_count(
+    valid_yamls: list[tuple],
+    topic_intel_policy: dict,
+) -> tuple[str, str]:
+    """
+    V3-002：批次級 source_topic_intel 總數 min/max 硬驗。
+
+    policy disabled / off / invalid → SKIP（零足跡，不讀 yaml）。
+    policy enabled（shadow/enforce）：
+      統計整批有 source_topic_intel 的 yaml 數量。
+      < min_slots → FAIL
+      > max_slots → FAIL
+      in [min_slots, max_slots] → PASS
+    shadow / enforce 皆為 FAIL（批次結構問題，非單篇）。
+    """
+    if not topic_intel_policy or not topic_intel_policy.get("enabled", False):
+        # off / disabled / invalid → 零足跡 SKIP
+        return "SKIP", "V3-002 WP-B policy off/disabled，跳過批次 slot 數驗"
+
+    mode = topic_intel_policy.get("mode", "off")
+    min_slots = topic_intel_policy.get("min_slots") or 2
+    max_slots = topic_intel_policy.get("max_slots") or 4
+
+    # 統計有 source_topic_intel 的 yaml 數量（skeleton 也驗 —— assign 後已應存在 block）
+    sti_count = sum(
+        1 for _, data in valid_yamls
+        if isinstance(data.get("source_topic_intel"), dict)
+    )
+    total = len(valid_yamls)
+
+    # Fix F【P1】shadow=WARN / enforce=FAIL（shadow 觀察期不被擋死）
+    _v3002_severity = "FAIL" if mode == "enforce" else "WARN"
+
+    if sti_count < min_slots:
+        return _v3002_severity, (
+            f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total} < min_slots={min_slots}（{mode}）"
+        )
+    if sti_count > max_slots:
+        return _v3002_severity, (
+            f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total} > max_slots={max_slots}（{mode}）"
+        )
+    return "PASS", (
+        f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total}（min={min_slots}, max={max_slots}, mode={mode}）"
+    )
+
+
+# ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
-def run_per_file_checks(f: Path, data: dict, owner: str, is_skeleton: bool = False, fishing_policy: Optional[dict] = None) -> list[tuple[str, str, str, str]]:
+def run_per_file_checks(
+    f: Path,
+    data: dict,
+    owner: str,
+    is_skeleton: bool = False,
+    fishing_policy: Optional[dict] = None,
+    topic_intel_policy: Optional[dict] = None,
+) -> list[tuple[str, str, str, str]]:
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
     is_skeleton：由 _is_skeleton_mode(yamls) 傳入，骨架階段跳過 V2-025/026
     fishing_policy：由 load_fishing_policy() 算出後傳入，讓 C-013 知道模式
+    topic_intel_policy：由 load_topic_intel_policy() 算出後傳入，讓 V3-001 知道模式（off=SKIP）
     """
     if fishing_policy is None:
         fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
+    if topic_intel_policy is None:
+        topic_intel_policy = {"mode": "off", "enabled": False, "detail": "未傳入 topic_intel_policy"}
     # P1-1：傳入「批次目錄名/檔名」讓 _extract_batch_date 能從目錄名（如第34批_試水批_2026-05-23）抓日期
     _fname_with_dir = f"{f.parent.name}/{f.name}"
     results = []
@@ -2836,6 +3169,13 @@ def run_per_file_checks(f: Path, data: dict, owner: str, is_skeleton: bool = Fal
         # P1-1：V2-025 改傳 _fname_with_dir 讓日期解析能吃批次目錄名
         checks.append(("V2-025", chk_v2_025_template_source_required(data, _fname_with_dir)))
         checks.append(("V2-026", chk_v2_026_template_adaptation_required(data, _fname_with_dir)))
+
+    # WP-B V3-001：topic_intel provenance（off 時函式自己回 SKIP，零足跡；policy on 才訂冊）
+    if topic_intel_policy.get("enabled"):
+        checks.append(("V3-001", chk_topic_intel_provenance(
+            data, _fname_with_dir, topic_intel_policy, is_skeleton, owner=owner
+        )))
+
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
     return results
@@ -2902,6 +3242,20 @@ def main():
     fishing_policy = load_fishing_policy(batch_dir, valid_yamls)
     print(f"[INFO] 釣魚部模式：{fishing_policy['mode']}（{fishing_policy['detail']}）\n")
 
+    # ── WP-B topic_intel policy（off 時零足跡：不 import、不讀、不印 topic-intel 行）──
+    _topic_intel_policy: dict = {"mode": "off", "enabled": False, "detail": "WP-B not loaded"}
+    try:
+        from topic_intel_policy import load_topic_intel_policy as _load_ti_policy  # type: ignore[import]
+        _topic_intel_policy = _load_ti_policy(batch_dir)
+    except ImportError:
+        pass  # topic_intel_policy.py 未部署 → 保持 disabled
+    if _topic_intel_policy.get("enabled"):
+        print(f"[INFO] WP-B 選題情報模式：{_topic_intel_policy['mode']}（{_topic_intel_policy.get('detail','')}）\n")
+    elif _topic_intel_policy.get("mode") == "invalid":
+        # Fix P0-2：invalid policy（有寫 topic_intel_closure 但設定不合法）→ fail-closed
+        # 只有「無 _batch_flags.yml」或明確 mode=off 才 disabled 零足跡；invalid ≠ off
+        print(f"[ERROR] WP-B topic_intel_closure 設定不合法（invalid），fail-closed 擋批：{_topic_intel_policy.get('detail','')}\n")
+
     all_results: list[tuple[str, str, str, str]] = []
 
     # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014 + C-013B + v3 新 6 件）──
@@ -2924,6 +3278,18 @@ def main():
         ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
         ("C-content-mix", chk_c_content_mix(valid_yamls, owner, pref_text, batch_tag)),
     ]
+    # Fix A【P0】V3-002 gated：只有 policy enabled 才 append，off 時完全不註冊（零足跡）
+    # off → 不 append V3-002 → batch_checks 件數、len 印出維持原值；無 SKIP 行
+    # Fix P0-2：invalid → fail-closed，加 V3-000-policy FAIL（invalid ≠ off）
+    if _topic_intel_policy.get("mode") == "invalid":
+        batch_checks.append((
+            "V3-000-policy",
+            ("FAIL", f"topic_intel_closure 設定不合法（invalid），fail-closed 擋批：{_topic_intel_policy.get('detail','')}"),
+        ))
+    elif _topic_intel_policy.get("enabled"):
+        batch_checks.append(
+            ("V3-002", chk_v3_002_batch_slot_count(valid_yamls, _topic_intel_policy))
+        )
     print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:
         icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
@@ -2941,7 +3307,12 @@ def main():
     for f, data in valid_yamls:
         title = data.get("title", f.name)
         print(f"\n  [{f.name}] {title}")
-        per_results = run_per_file_checks(f, data, owner, is_skeleton=_skeleton_mode, fishing_policy=fishing_policy)
+        per_results = run_per_file_checks(
+            f, data, owner,
+            is_skeleton=_skeleton_mode,
+            fishing_policy=fishing_policy,
+            topic_intel_policy=_topic_intel_policy,
+        )
         for cid, status, fname, detail in per_results:
             icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
             print(f"    {icon} [{cid}] {status}: {detail}")
@@ -2967,6 +3338,79 @@ def main():
             if status == "FAIL":
                 print(f"    ❌ [{cid}] {fname}: {detail}")
     print(f"{'='*60}\n")
+
+    # ── WP-B PASS report（machine-readable，供 reconciler 吃）──
+    # Fix B【P0】條件：policy enabled + 非骨架 + 無 FAIL；骨架不產 PASS report 防 reconciler 提前記 used
+    # off 時零足跡不輸出任何 topic-intel 報告
+    if _topic_intel_policy.get("enabled") and not _skeleton_mode and fail_count == 0:
+        import hashlib as _hashlib
+        import datetime as _datetime
+
+        # 收集所有 V3-001 PASS 的 topic_intel 資料
+        v3_pass_items = []
+        batch_id_from_yaml = valid_yamls[0][1].get("batch_tag", batch_dir.name) if valid_yamls else batch_dir.name
+        for f, data in valid_yamls:
+            sti = data.get("source_topic_intel")
+            if not sti or not isinstance(sti, dict):
+                continue
+            script_id = data.get("script_id", f.stem)
+            v3_pass_items.append({
+                "topic_id": sti.get("topic_id", ""),
+                "script_id": script_id,
+                "batch_id": batch_id_from_yaml,
+                "evidence_sha256": sti.get("evidence_sha256", ""),
+                "assignment_mode": sti.get("assignment_mode", _topic_intel_policy.get("mode", "off")),
+            })
+
+        # Fix C【P0】反查 owner_code（全鏈統一用 owner_code 當 key）
+        _owner_code_for_report: str = ""
+        try:
+            _op_path = Path(__file__).resolve().parent / "owner_projection.generated.json"
+            if _op_path.exists():
+                _op_data = json.loads(_op_path.read_text(encoding="utf-8"))
+                _op_owners = _op_data.get("owners", {})
+                _owner_info = _op_owners.get(owner, {})
+                _owner_code_for_report = str(_owner_info.get("owner_code", "") or "")
+        except Exception:
+            pass
+
+        # Fix 2b【P0】owner_code 反查空 → enforce 視為缺證據，不產 report
+        if v3_pass_items and not _owner_code_for_report:
+            print(
+                f"[WP-B] WARN: owner_code 反查失敗（owner={owner!r}），"
+                "enforce 視為缺 owner_code 證據，不產 PASS report（fail-loud）",
+                file=sys.stderr,
+            )
+            v3_pass_items = []  # 清空，跳過下方 report 產出
+
+        if v3_pass_items:
+            report_body = {
+                "schema_version": 1,
+                "generated_at": _datetime.datetime.now(_datetime.timezone.utc).isoformat(),
+                "batch_dir": str(batch_dir),
+                "owner": owner,
+                "owner_code": _owner_code_for_report,  # Fix C+Fix2b：全鏈統一用 owner_code 當 key
+                "owner_name": owner,                   # Fix C：中文名另存，供顯示
+                "is_skeleton": False,                  # Fix B：骨架不產此 report，故必然 False
+                "batch_id": batch_id_from_yaml,
+                "topic_intel_mode": _topic_intel_policy.get("mode"),
+                "items": v3_pass_items,
+            }
+            # validator_report_sha256（reconciler 用冪等鍵）
+            _report_canonical = json.dumps(report_body, ensure_ascii=False, sort_keys=True)
+            _report_sha = _hashlib.sha256(_report_canonical.encode("utf-8")).hexdigest()
+            report_body["validator_report_sha256"] = _report_sha
+
+            _report_path = batch_dir / "_topic_intel_validator_report.json"
+            try:
+                _report_path.write_text(
+                    json.dumps(report_body, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                print(f"[WP-B] PASS report 已輸出：{_report_path}（{len(v3_pass_items)} 項）")
+                print(f"[WP-B] validator_report_sha256: {_report_sha}")
+            except Exception as _re:
+                print(f"[WP-B] WARN: PASS report 寫入失敗（{_re}），繼續不擋部署")
 
     if args.strict and fail_count > 0:
         sys.exit(1)

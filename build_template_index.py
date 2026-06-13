@@ -50,7 +50,7 @@ _TI_CONFIG_PATH = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
 
 # DEFAULTS 值必須與 trend-daily/topic_intel_paths.py DEFAULTS 完全一致
 _TI_DEFAULTS: dict = {
-    "schema_version": 2,  # Codex r2-P2#4：與 topic_intel_paths.py DEFAULTS 完全一致（含 schema metadata）
+    "schema_version": 3,  # WP-B Step 2（2026-06-13）：config v3 + 3 新 key（projection/events）
     "active_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池",
     "old_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告",
     "legacy_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_legacy_backlog",
@@ -60,6 +60,10 @@ _TI_DEFAULTS: dict = {
     # WP-A 爆款拆解 md 庫落點（與 topic_intel_paths.py DEFAULTS 同步）。Step 6 已切新池（2026-06-13，md 已遷出 L0）
     "dissect_lib_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_爆款拆解庫",
     "migration_lock": r"C:\Users\00sta\claude-state\flags\topic_intel_migration.lock",
+    # WP-B Step 2（2026-06-13）：schema_version 3 新增 key（鏡像同 topic_intel_paths.py DEFAULTS）
+    "topic_intel_projection_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_projections",
+    "topic_intel_events_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_events",
+    "topic_intel_events_file": "topic_intel_events.jsonl",
 }
 
 

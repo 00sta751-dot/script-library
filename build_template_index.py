@@ -6,8 +6,8 @@ build_template_index.py — 爆款範本卡索引建立工具
 
 設計原則：
   - 範本卡只存「骨架/抽象」，不存逐字台詞（防抄）
-  - 主源：cyborg_*.yaml（L0 趨勢報告）
-  - 補源：_爆款拆解庫/*.md（非結構化，解析失敗靜默跳過）
+  - 主源：cyborg_*.yaml（選題情報池，多 root 含 legacy；批次 C 已遷出 L0）
+  - （歷史規格「補源人類可讀拆解 md」從未實作，md 不進 index；WP-A 後該庫亦遷出 L0）
   - status=rejected / 隔離待補目錄 → 跳過
   - 缺值一律填預設，不拋出 exception
 
@@ -50,12 +50,15 @@ _TI_CONFIG_PATH = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
 
 # DEFAULTS 值必須與 trend-daily/topic_intel_paths.py DEFAULTS 完全一致
 _TI_DEFAULTS: dict = {
+    "schema_version": 2,  # Codex r2-P2#4：與 topic_intel_paths.py DEFAULTS 完全一致（含 schema metadata）
     "active_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池",
     "old_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告",
     "legacy_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_legacy_backlog",
     "quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_隔離待補",
     "old_quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_趨勢報告\_隔離待補",
     "collision_quarantine_dir": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_collision_quarantine",
+    # WP-A 爆款拆解 md 庫落點（與 topic_intel_paths.py DEFAULTS 同步）。Step 6 已切新池（2026-06-13，md 已遷出 L0）
+    "dissect_lib_root": r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_選題情報池\_爆款拆解庫",
     "migration_lock": r"C:\Users\00sta\claude-state\flags\topic_intel_migration.lock",
 }
 
@@ -116,7 +119,9 @@ def _is_migration_locked() -> bool:
 
 
 CYBORG_DIR = Path(_TI_DEFAULTS["old_root"])  # fallback 向下相容（build_index 內部以 scan_roots 為準）
-DISSECT_DIR = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_爆款拆解庫")
+# DISSECT_DIR（爆款拆解 md 庫死常數）已移除 — WP-A 2026-06-13：本工具從不 iterate 此庫
+# （template_index 零依賴 md，歷史 docstring「補源 md」從未實作）。md 庫落點現由
+# trend-daily/topic_intel_paths.py 的 dissect_lib_root() 統一管理。
 DEFAULT_OUT = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L4_工具腳本\_部署系統\script-library\template_index.jsonl")
 
 # ── Hook 心理學映射（type → psychology）──
@@ -607,8 +612,13 @@ def main():
     # --print-roots：印 resolved roots json 後 exit 0（compare gate 用）
     if args.print_roots:
         roots = _get_scan_roots()
+        _cfg = _load_ti_config()
         print(json.dumps(
-            {"roots": {tag: str(root) for tag, root in roots}},
+            {
+                "roots": {tag: str(root) for tag, root in roots},
+                "dissect_lib_root": str(Path(_cfg["dissect_lib_root"])),  # WP-A：與 resolver 比對一致
+                "schema_version": _cfg.get("schema_version", _TI_DEFAULTS.get("schema_version")),  # Codex r2-P2#4
+            },
             ensure_ascii=False,
         ))
         sys.exit(0)

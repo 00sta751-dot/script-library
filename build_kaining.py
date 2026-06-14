@@ -37,6 +37,8 @@ _parser.add_argument('--num-start', dest='num_start', type=int, default=1,
                      help='article 編號起點')
 _parser.add_argument('--expected-count', dest='expected_count', type=int, default=None,
                      help='預期 yaml 數量（驗證用）')
+_parser.add_argument('--threads-md', dest='threads_md', default='',
+                     help='脆文 .md 檔案絕對路徑；未提供時自動偵測 yaml-dir 下 threads_*.md')
 _args, _unknown = _parser.parse_known_args()
 
 # ============================================================
@@ -205,6 +207,82 @@ def section(roman, label, en, sect_id, cards, count):
 
 
 # ============================================================
+# 脆文 Threads 渲染（B-3 — parse/卡片對齊 build_index.py，section-head + threads-grid 群組式）
+# ============================================================
+def parse_threads_md(md_path):
+    """解析脆文 .md → [(tid, label, body, hashtag), ...]。
+    支援瑞祥格式（## Threads NN（衍生自…）\n主題：…\n\n<body>\n\n#tags）。
+    label 取主題行 × 前段（派系不顯示）；hashtag 取 # 開頭行。對齊 build_index.parse_threads_md。
+    """
+    with open(md_path, 'r', encoding='utf-8') as _f:
+        raw = _f.read()
+    blocks = _re_module.split(r'\n---\n', raw.strip())
+    results = []
+    for blk in blocks:
+        blk = blk.strip()
+        m_head = _re_module.search(r'##\s+Threads\s+(\d+)', blk)
+        if not m_head:
+            continue
+        tid = 'T' + str(int(m_head.group(1))).zfill(2)
+        m_theme = _re_module.search(r'主題：(.+)', blk)
+        label = m_theme.group(1).strip().split('×')[0].strip() if m_theme else '觀點型'
+        body_lines = []
+        hashtag = ''
+        in_frontmatter = False
+        for ln in blk.splitlines():
+            if ln.strip() == '---':
+                in_frontmatter = not in_frontmatter
+                continue
+            if in_frontmatter:
+                continue
+            if _re_module.match(r'##\s+Threads\s+\d+', ln):
+                continue
+            if _re_module.match(r'主題：', ln):
+                continue
+            if ln.strip().startswith('#') and not ln.strip().startswith('##'):
+                hashtag = ln.strip()
+                continue
+            if ln.strip().startswith('>'):
+                continue
+            if _re_module.match(r'^#\s+Threads', ln):
+                continue
+            body_lines.append(ln)
+        body = '\n'.join(body_lines).strip()
+        if body or hashtag:
+            results.append((tid, label, body, hashtag))
+    return results
+
+
+def thread_card_owner(tid, label, body, hashtag):
+    """渲染單篇脆文 .thread-card（複製鍵用 .copy-btn + copyThread()，沿用既有 CSS/JS）"""
+    return (
+        '<div class="thread-card">\n'
+        '  <div class="thread-meta"><span class="thread-id">' + _esc_text(tid) + '</span>'
+        '<span class="thread-label">' + _esc_text(label) + '</span></div>\n'
+        '  <div class="thread-text">' + _esc_text(body) + '</div>\n' +
+        (('  <div class="thread-hash">' + _esc_text(hashtag) + '</div>\n') if hashtag else '') +
+        '  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>\n'
+        '</div>'
+    )
+
+
+def sect_threads_owner(threads_data, batch_label):
+    """渲染脆文 section（section-head + threads-grid，對齊本業主 shell 分組/收合 JS）"""
+    count = len(threads_data)
+    return (
+        '<header class="section-head" id="sect-threads">\n'
+        '  <span class="roman">✦</span>\n'
+        '  <span class="label">脆文 Threads<span class="en">' + _esc_text(batch_label) + ' · ' + _esc_text(str(count)) + ' 篇</span></span>\n'
+        '  <span class="rule"></span>\n'
+        '  <span class="count">' + _esc_text(str(count)) + ' posts</span>\n'
+        '</header>\n'
+        '<div class="threads-grid">\n' +
+        '\n'.join(thread_card_owner(t[0], t[1], t[2], t[3]) for t in threads_data) +
+        '\n</div>'
+    )
+
+
+# ============================================================
 # 楷甯 article adapter（yaml_to_sc_kwargs → owner_article）
 # ============================================================
 def owner_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
@@ -288,6 +366,33 @@ all_sections = '\n\n'.join(_all_sections_list)
 print(f'Sections assembled: {len(_all_sections_list)} 個（日期分組，無派系 group head）')
 
 # ============================================================
+# 脆文 Threads 偵測 + 渲染（B-3）
+# ============================================================
+_threads_html = ''
+if _args.threads_md:
+    if not os.path.isfile(_args.threads_md):
+        print(f'ERROR: --threads-md 檔案不存在：{_args.threads_md}', file=sys.stderr)
+        sys.exit(1)
+    _threads_sources = [_args.threads_md]
+else:
+    _threads_sources = sorted(
+        os.path.join(_args.yaml_dir, _tf)
+        for _tf in os.listdir(_args.yaml_dir)
+        if _tf.startswith('threads_') and _tf.endswith('.md')
+    )
+if _threads_sources:
+    _threads_data = []
+    for _tm in _threads_sources:
+        _threads_data.extend(parse_threads_md(_tm))
+    if _threads_data:
+        _threads_html = sect_threads_owner(_threads_data, batch_label)
+        print(f'脆文 Threads 渲染 OK（{len(_threads_data)} 篇）：{[os.path.basename(_t) for _t in _threads_sources]}')
+    else:
+        print(f'WARNING: 脆文檔解析為空：{_threads_sources}', file=sys.stderr)
+else:
+    print('脆文 Threads：本批無 threads_*.md，略過')
+
+# ============================================================
 # 寫入 HTML 檔案
 # ============================================================
 if not os.path.exists(HTML_FILE):
@@ -298,23 +403,54 @@ if not os.path.exists(HTML_FILE):
 with open(HTML_FILE, 'r', encoding='utf-8') as f:
     c = f.read()
 
-# 找 SECTIONS_PLACEHOLDER 標記
-PLACEHOLDER = '<!-- SECTIONS_PLACEHOLDER — build_' + OWNER_SLUG + '.py 負責替換此區塊 -->'
-PLACEHOLDER_ALT = '<!-- SECTIONS_PLACEHOLDER'
+# 冪等 dual-marker splice（B-2 可重跑 + B-3 脆文注入）
+# 保留 SECTIONS_PLACEHOLDER / THREADS_PLACEHOLDER 兩行標記，讓每次 build 都找得到；
+# sections 覆蓋 SECTIONS_PH 行後 → THREADS_PH 行前；threads 覆蓋 THREADS_PH 行後 → lightbox anchor 前。
+SECTIONS_PH = '<!-- SECTIONS_PLACEHOLDER — build_' + OWNER_SLUG + '.py 負責替換此區塊 -->'
+THREADS_PH  = '<!-- THREADS_PLACEHOLDER — build_' + OWNER_SLUG + '.py 負責替換此區塊 -->'
+LIGHTBOX_ANCHOR = '<div class="lightbox-overlay" id="lightboxOverlay">'
 
-placeholder_pos = c.find(PLACEHOLDER)
-if placeholder_pos < 0:
-    # 嘗試通用 placeholder
-    placeholder_pos = c.find(PLACEHOLDER_ALT)
-    if placeholder_pos < 0:
-        print('ERROR: 找不到 SECTIONS_PLACEHOLDER 標記', file=sys.stderr)
-        sys.exit(1)
-    # 找到行尾
-    placeholder_end = c.find('\n', placeholder_pos) + 1
-else:
-    placeholder_end = placeholder_pos + len(PLACEHOLDER) + 1
 
-nc = c[:placeholder_pos] + all_sections + '\n\n' + c[placeholder_end:]
+def _find_ph_end(content, exact, fallback_prefix):
+    pos = content.find(exact)
+    if pos < 0:
+        pos = content.find(fallback_prefix)
+    if pos < 0:
+        return -1, -1
+    line_end = content.find('\n', pos)
+    if line_end < 0:
+        line_end = len(content)
+    return pos, line_end + 1
+
+
+sec_pos, sec_line_end = _find_ph_end(c, SECTIONS_PH, '<!-- SECTIONS_PLACEHOLDER')
+if sec_pos < 0:
+    print('ERROR: 找不到 SECTIONS_PLACEHOLDER 標記', file=sys.stderr)
+    sys.exit(1)
+
+thr_pos, thr_line_end = _find_ph_end(c, THREADS_PH, '<!-- THREADS_PLACEHOLDER')
+if thr_pos < 0:
+    print('ERROR: 找不到 THREADS_PLACEHOLDER 標記（請確認 HTML 殼已含此標記）', file=sys.stderr)
+    sys.exit(1)
+if thr_pos < sec_pos:
+    print('ERROR: THREADS_PLACEHOLDER 出現在 SECTIONS_PLACEHOLDER 之前，HTML 結構異常', file=sys.stderr)
+    sys.exit(1)
+
+lightbox_pos = c.find(LIGHTBOX_ANCHOR, thr_line_end)
+if lightbox_pos < 0:
+    print('ERROR: 找不到 lightboxOverlay anchor，無法定位 threads 區塊結尾', file=sys.stderr)
+    sys.exit(1)
+
+sections_block = '\n' + all_sections + '\n\n' if all_sections else '\n'
+threads_block = '\n' + _threads_html + '\n\n' if _threads_html else '\n'
+
+nc = (
+    c[:sec_line_end]
+    + sections_block
+    + THREADS_PH + '\n'
+    + threads_block
+    + c[lightbox_pos:]
+)
 
 with open(HTML_FILE, 'w', encoding='utf-8') as f:
     f.write(nc)

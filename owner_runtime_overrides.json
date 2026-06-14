@@ -69,5 +69,13 @@
     "card_prefix": "wendi-",
     "platform": "IG Reels",
     "dialogue_key": "台詞_溫蒂"
+  },
+  "楷甯": {
+    "owner_code": "kaining",
+    "html_file": "kaining.html",
+    "build_script": "build_kaining.py",
+    "card_prefix": "kaining-",
+    "platform": "FB Reels",
+    "dialogue_key": "台詞_楷甯"
   }
 }

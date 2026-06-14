@@ -3,13 +3,13 @@
     "generated": true,
     "do_not_edit": true,
     "generator": "gen_owner_projection_cache.py",
-    "generated_at": "2026-06-07T14:24:52Z",
+    "generated_at": "2026-06-14T15:26:55Z",
     "owner_discovery_py_sha256": "21006bdaa7ae35d53c6771740984a41fb6a384182b9ef52cb9c04bf70921d01b",
     "kb_rule_parser_py_sha256": "8834e224f6efc1b630f423e826e958ed33e71f5e085b4041dbf12070421c2fb6",
     "generator_py_sha256": "5b14a35e15fde620e47a916585d297d610dfd3f88d38c5953196de9c42b7c857",
-    "runtime_overrides_sha256": "790d5969a8f95498957839698669ac54c9fdf9403feaf420a2a45055d0d62444",
-    "discovery_fingerprint": "1b336d2a72a315b84ad2e1fc075138c7946ddaff653d59355cc1a0162ce83e6e",
-    "projection_fingerprint": "ab8fbf90544149b721de77361abda9bed068612bec6dbaf0314c780c31e763a5"
+    "runtime_overrides_sha256": "012158fa9c7cb9ddd88d60990ed71be4c3a31ce3e3a0a264a18099f4b2b31964",
+    "discovery_fingerprint": "13739498468e143038ccde07f1d0033a44dc36ebd69c1f0ae554bd1483ddf10c",
+    "projection_fingerprint": "ecc4f05f4706cc15fbe8478670d587f6648cc2f61120ca1f2bb0558d8ace7656"
   },
   "runtime_aliases": {
     "叭噗": "叭噗_小C"
@@ -62,6 +62,22 @@
       "card_prefix": "yunzhen-",
       "platform": "IG Reels",
       "dialogue_key": "台詞_昀臻"
+    },
+    "楷甯": {
+      "owner_id": "KAINING",
+      "owner_name": "楷甯",
+      "industry_id": "房仲",
+      "industries": [
+        "房仲"
+      ],
+      "owner_dir": "房仲_楷甯",
+      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_楷甯/00_業主核心檔/source_overlay/_楷甯偏好.md",
+      "owner_code": "kaining",
+      "html_file": "kaining.html",
+      "build_script": "build_kaining.py",
+      "card_prefix": "kaining-",
+      "platform": "FB Reels",
+      "dialogue_key": "台詞_楷甯"
     },
     "溫蒂": {
       "owner_id": "WENDI",

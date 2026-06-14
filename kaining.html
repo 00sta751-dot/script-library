@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#B0764F">
+<meta property="og:title" content="楷甯 · 短影音腳本庫">
+<meta property="og:image" content="./og-image.png">
+<link rel="apple-touch-icon" href="./favicon.ico">
+<title>楷甯 · 短影音腳本庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* 楷甯 redesign v2 — 全 sans / 左對齊 hero / 卡片 grid｜結構性區隔瑞祥等所有業主｜原創 */
+
+/* ===== 業主主題色 ===== */
+:root{
+  --owner-primary:#B0764F;
+  --bg:#F7F5F3;
+  --bg-2:#FFFFFF;
+  --ink:#2B2723;
+  --ink-2:#4A4540;
+  --ink-3:#7A736C;
+  --ink-4:#B2A99F;
+  --line:#E4DDD5;
+  --line-soft:#EDE8E2;
+  --clay:#B0764F;
+  --clay-light:#F2EAE3;
+  --clay-dim:#8A5A3A;
+  --warm:#6B5A4E;
+  --sans-en:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;line-height:1.75;
+  letter-spacing:.012em;
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"palt";
+  padding-bottom:80px;
+}
+img{display:block;max-width:100%}
+
+/* ========== HEADER — 左對齊不對稱現代式 ========== */
+/* 結構：整頁 2 欄（左 clay bar 4px | 右全部內容），最大寬限制 */
+.masthead{
+  position:relative;z-index:2;
+  border-bottom:1px solid var(--line);
+  background:var(--bg-2);
+  animation:fadeIn .5s ease both;
+}
+.masthead-inner{
+  max-width:1080px;margin:0 auto;
+  padding:0 0 0 28px;
+  display:flex;
+  align-items:stretch;
+  min-height:auto;
+}
+/* 左側陶土色垂直 accent bar — 楷甯專屬結構元素 */
+.masthead-bar{
+  width:4px;
+  flex-shrink:0;
+  background:var(--clay);
+  border-radius:2px;
+  margin:24px 28px 24px 0;
+  align-self:stretch;
+}
+.masthead-content{
+  flex:1;
+  padding:28px 24px 24px 0;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+.masthead-eyebrow{
+  font-family:var(--sans-en);
+  font-size:10px;letter-spacing:.26em;
+  color:var(--ink-4);
+  text-transform:uppercase;
+  margin-bottom:10px;
+}
+.masthead h1{
+  font-family:var(--sans);
+  font-weight:900;
+  font-size:clamp(26px,5.5vw,44px);
+  line-height:1.1;
+  letter-spacing:-.01em;
+  color:var(--ink);
+  margin:0 0 8px;
+}
+.masthead-intro{
+  font-family:var(--sans);
+  font-size:clamp(13px,1.8vw,15px);
+  color:var(--ink-3);
+  line-height:1.65;
+  max-width:540px;
+  margin-bottom:12px;
+}
+.masthead-tagline{
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  color:var(--clay);
+  letter-spacing:.04em;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.masthead-tagline::before{
+  content:'';
+  display:inline-block;
+  width:18px;height:1.5px;
+  background:var(--clay);
+  flex-shrink:0;
+}
+/* stats: inline chip 行 — 低調呈現，不搶視覺 */
+.masthead-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 16px;
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid var(--line-soft);
+}
+.chip{
+  font-family:var(--sans-en);
+  font-size:11px;letter-spacing:.08em;
+  color:var(--ink-4);
+  display:flex;align-items:center;gap:5px;
+}
+.chip b{font-weight:700;color:var(--ink-2);font-size:12px}
+
+/* ========== ANIMATIONS ========== */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ========== STICKY FILTER ========== */
+.filter{
+  position:sticky;top:0;z-index:50;
+  background:rgba(247,245,243,.96);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+  padding:10px 0;
+}
+.filter-inner{
+  max-width:1080px;margin:0 auto;
+  padding:0 28px;
+}
+.search-wrap{
+  position:relative;width:100%;max-width:440px;
+}
+.search{
+  display:block;width:100%;
+  padding:9px 48px 9px 14px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  background:var(--bg-2);
+  font-family:var(--sans);font-size:14px;
+  color:var(--ink);
+  outline:none;
+  letter-spacing:.03em;
+  transition:border-color .15s, box-shadow .15s;
+}
+.search:focus{border-color:var(--clay);box-shadow:0 0 0 3px rgba(176,118,79,.1)}
+.search::placeholder{color:var(--ink-4)}
+.search-hint{
+  position:absolute;top:50%;right:10px;transform:translateY(-50%);
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.1em;
+  padding:2px 6px;border:1px solid var(--line);border-radius:3px;
+  color:var(--ink-4);background:var(--bg);
+  pointer-events:none;
+}
+.search-wrap.is-focused .search-hint{display:none}
+
+/* ========== GROUP WRAPPER ========== */
+.group{
+  max-width:1080px;margin:0 auto;
+  border-bottom:1px solid var(--line-soft);
+  position:relative;z-index:1;
+}
+.group-head{
+  padding:18px 28px;
+  display:flex;align-items:center;gap:14px;
+  cursor:pointer;user-select:none;
+  transition:background .15s;
+}
+.group-head:hover{background:var(--clay-light)}
+.gh-roman{
+  /* 原有的 roman 數字不刪 — 但楷甯版用無裝飾小方塊代替斜體 */
+  display:none;
+}
+.gh-label{
+  font-family:var(--sans);
+  font-weight:700;font-size:15px;
+  color:var(--ink);flex:1;
+  letter-spacing:.02em;
+}
+.gh-count{
+  font-family:var(--sans-en);font-size:11px;
+  letter-spacing:.14em;color:var(--ink-4);
+  text-transform:uppercase;
+}
+.gh-icon{font-size:11px;color:var(--ink-4);transition:transform .2s}
+.group.collapsed .gh-icon{transform:rotate(-90deg)}
+.group.collapsed .section-head{display:none}
+.group.collapsed .cards{display:none}
+.group.collapsed > .threads-grid{display:none}
+
+/* ========== SECTION HEAD ========== */
+.section-head{
+  padding:20px 28px 0;
+  display:flex;align-items:flex-end;gap:12px;
+}
+.section-head .roman{
+  /* 原結構保留，楷甯版隱藏 */
+  display:none;
+}
+.section-head .label{
+  font-family:var(--sans);
+  font-weight:700;font-size:17px;
+  color:var(--ink);line-height:1.2;
+  padding-bottom:4px;
+}
+.section-head .label .en{
+  display:block;
+  font-family:var(--sans-en);
+  font-weight:500;font-size:10px;
+  letter-spacing:.18em;color:var(--ink-4);
+  text-transform:uppercase;margin-top:3px;
+}
+.section-head .rule{flex:1;height:1px;background:var(--line);margin-bottom:5px}
+.section-head .count{
+  font-family:var(--sans-en);font-size:11px;
+  letter-spacing:.14em;color:var(--ink-4);
+  text-transform:uppercase;padding-bottom:5px;
+}
+
+/* ========== CARDS GRID — 2欄桌機 / 1欄手機 ========== */
+.cards{
+  max-width:1080px;margin:0 auto;
+  padding:16px 24px 28px;
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
+}
+article.card{
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  border-radius:10px;
+  overflow:hidden;
+  transition:box-shadow .2s, transform .2s;
+  box-shadow:0 1px 4px rgba(43,39,35,.06);
+}
+article.card:hover{
+  box-shadow:0 6px 24px rgba(43,39,35,.12);
+  transform:translateY(-2px);
+}
+article.card.open .card-body{display:block}
+.card-head{
+  padding:16px 16px 14px;
+  cursor:pointer;
+  border-left:3px solid var(--pie,var(--clay));
+}
+.card-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:8px}
+.card-meta .pie{
+  font-family:var(--sans);font-size:11px;font-weight:600;
+  letter-spacing:.04em;color:var(--ink-3);
+  background:var(--bg);border:1px solid var(--line);
+  border-radius:4px;padding:2px 8px;
+}
+.card-meta .num{font-family:var(--sans-en);font-size:10px;letter-spacing:.1em;color:var(--ink-4)}
+.card-meta .batch{font-family:var(--sans-en);font-size:10px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase}
+.card-meta-extra{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.platform{
+  font-family:var(--sans);font-size:11px;font-weight:600;
+  letter-spacing:.04em;color:var(--ink-3);
+  background:var(--bg);border:1px solid var(--line);
+  border-radius:4px;padding:2px 7px;
+}
+.po-time{font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ink-4)}
+.title{
+  font-family:var(--sans);font-weight:700;
+  font-size:15.5px;line-height:1.45;
+  color:var(--ink);margin-bottom:5px;
+}
+.insight{font-size:13px;color:var(--ink-3);line-height:1.6}
+.card-body{display:none;padding:14px 16px 16px;border-top:1px solid var(--line-soft)}
+.scene{font-size:12.5px;color:var(--ink-4);margin-bottom:12px;padding-left:8px;border-left:2px solid var(--line)}
+.ref-link{margin-bottom:12px}
+.card-thumb{width:100%;border-radius:6px;cursor:pointer;transition:opacity .15s}
+.card-thumb:hover{opacity:.85}
+.timeline{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.timeline .row{display:grid;grid-template-columns:70px 1fr;gap:4px 10px;align-items:start}
+.timeline .time{font-family:var(--sans-en);font-size:11px;letter-spacing:.06em;color:var(--ink-4);padding-top:2px}
+.timeline .say{font-size:13.5px;line-height:1.65;color:var(--ink)}
+.timeline .sub{grid-column:2;font-size:11.5px;color:var(--ink-3);font-style:italic}
+.timeline .mirror{grid-column:1/-1;background:rgba(43,39,35,.04);border-radius:4px;padding:6px 10px;font-size:12.5px;color:var(--ink-2)}
+.cta{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);font-weight:600;margin-bottom:8px}
+.cta-arrow{color:var(--clay);font-size:15px}
+.hashtag-pool{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;margin-bottom:4px}
+.hashtag{background:var(--clay-light);color:var(--clay-dim);padding:3px 9px;border-radius:20px;font-size:12px;font-family:var(--sans-en)}
+.copy-btn{
+  display:block;width:100%;
+  margin-top:12px;padding:10px;
+  background:var(--ink);color:var(--bg);
+  font-family:var(--sans);font-size:13px;font-weight:600;
+  border:none;border-radius:6px;
+  cursor:pointer;transition:background .15s;letter-spacing:.04em;
+}
+.copy-btn:hover{background:var(--warm)}
+.copy-btn.copied{background:var(--clay)}
+.shot-toggle{
+  font-size:10px;color:var(--ink-4);
+  background:transparent;border:1px solid var(--line);
+  border-radius:4px;padding:2px 6px;
+  cursor:pointer;font-family:var(--sans);
+  transition:all .15s;
+}
+article.card.shot .shot-toggle{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* ========== THREADS ========== */
+.threads-grid{
+  max-width:1080px;margin:0 auto;
+  padding:16px 24px 28px;
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
+}
+.thread-card{
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:16px;
+  transition:box-shadow .2s, transform .2s;
+  box-shadow:0 1px 4px rgba(43,39,35,.06);
+}
+.thread-card:hover{
+  box-shadow:0 6px 24px rgba(43,39,35,.12);
+  transform:translateY(-2px);
+}
+.thread-meta{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.thread-id{font-family:var(--sans-en);font-size:11px;color:var(--ink-4);letter-spacing:.1em}
+.thread-label{font-size:12px;color:var(--ink-3);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+.thread-text{font-size:13.5px;line-height:1.75;color:var(--ink);white-space:pre-wrap;margin-bottom:8px}
+.thread-hash{font-size:12px;color:var(--ink-4);margin-bottom:10px}
+
+/* ========== LIGHTBOX ========== */
+.lightbox-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.88);
+  align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.lightbox-overlay.open{display:flex}
+.lightbox-overlay img{
+  max-width:90vw;max-height:90vh;
+  object-fit:contain;
+  border-radius:6px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+
+/* ========== EMPTY / FOOTER ========== */
+.empty{display:none;text-align:center;padding:60px 24px;color:var(--ink-4);font-size:15px}
+.empty.show{display:block}
+footer{
+  border-top:1px solid var(--line);
+  padding:36px 28px 28px;
+  max-width:1080px;margin:48px auto 0;
+  display:flex;
+  align-items:flex-start;
+  gap:16px;
+}
+.footer-bar{
+  width:3px;flex-shrink:0;
+  background:var(--clay);
+  border-radius:2px;
+  align-self:stretch;
+  min-height:48px;
+}
+.footer-content{}
+.footer-tagline{
+  font-family:var(--sans);
+  font-size:14px;font-weight:600;
+  color:var(--clay);
+  margin-bottom:6px;
+}
+.colophon{font-family:var(--sans);font-size:13px;color:var(--ink-3);margin-bottom:4px}
+.lines{font-family:var(--sans);font-size:12px;color:var(--ink-4)}
+.bagao-sig{font-family:var(--sans-en);font-size:10px;letter-spacing:.18em;color:var(--ink-4);text-transform:uppercase;margin-top:6px}
+
+/* ========== RWD ========== */
+@media(max-width:768px){
+  .cards{grid-template-columns:1fr;padding:12px 16px 20px}
+  .threads-grid{grid-template-columns:1fr;padding:12px 16px 20px}
+  .masthead-inner{padding:0 0 0 16px}
+  .masthead-bar{margin:18px 16px 18px 0}
+  .masthead-content{padding:20px 16px 18px 0}
+  .filter-inner{padding:0 16px}
+  .group-head{padding:14px 16px}
+  .section-head{padding:16px 16px 0}
+  footer{padding:28px 16px 20px;margin-top:32px}
+}
+@media(max-width:640px){
+  .card-meta-extra{gap:5px}
+  .platform,.po-time,.batch{font-size:9px}
+  .title{font-size:14px}
+  .masthead h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="masthead-bar"></div>
+    <div class="masthead-content">
+      <div class="masthead-eyebrow">House · Story · Real Estate · Kaohsiung</div>
+      <h1>楷甯的房產日常</h1>
+      <div class="masthead-intro">前行政轉業房仲 · 用真誠說清楚每一件事<br>高雄鼓山美術園區 · 左營高鐵特區</div>
+      <div class="masthead-tagline">不靠話術，楷甯陪你找對房</div>
+      <div class="masthead-chips">
+        <span class="chip">共 <b id="totalCount">0</b> 部</span>
+        <span class="chip"><b id="sectionCount">0</b> 主題</span>
+        <span class="chip">更新 <b>2026-06-14</b></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="filter" aria-label="篩選">
+  <div class="filter-inner">
+    <div class="search-wrap" id="searchWrap">
+      <input type="text" class="search" id="searchInput" placeholder="搜尋腳本標題..." oninput="filterCards()">
+      <span class="search-hint" id="searchHint">⌘ K</span>
+    </div>
+  </div>
+</nav>
+
+<header class="section-head" id="sect-b_new">
+  <span class="roman"></span>
+  <span class="label">第 01 批 · 2026-06-14<span class="en">第 01 批 · 2026-06-14</span></span>
+  <span class="rule"></span>
+  <span class="count">13 scripts</span>
+</header>
+<div class="cards">
+<article class="card" data-cat="故事戲劇派" id="kai1" data-caption="進房仲第一年，被屋主罵了一頓，打電話偷偷希望對方不接。不是天生業務型，但不想回到重複的工作。這段時間告訴我，耐心陪跑比話術管用。有需要的人，慢慢找也沒關係。" data-hashtags="#楷甯的房產日常 #轉行心得 #房仲真實心境 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #第一年房仲 #真誠找房 #不靠話術 #耐心陪跑">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">故事戲劇派</span>
+      <span class="num">No. 01</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">行政轉房仲，第一年我被屋主罵了</h3>
+    <div class="insight">楷甯直視鏡頭，公司場景，乾淨日常感穿著，表情平實帶點自嘲</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，公司場景，乾淨日常感穿著，表情平實帶點自嘲</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：我進房仲第一年，被屋主當場罵了。原來真的會被屋主罵。 （楷甯直視鏡頭，公司場景，乾淨日常感穿著，表情平實帶點自嘲）</div><div class="mirror">藏鏡人　'（字幕）被屋主罵？這也太慘了吧'</div><div class="sub">楷甯直視鏡頭，公司場景，乾淨日常感穿著，表情平實帶點自嘲</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：我以前做行政，重複工作，薪水固定。某天我決定跨行做房仲。大家說，房仲不就帶人看房、收佣金？我那時候也這樣想。結果第一次去敲陌生門，屋主一開門就說：你知道禮義廉恥嗎？ （楷甯略帶苦笑，公司場景，回憶式敘述）</div><div class="sub">楷甯略帶苦笑，公司場景，回憶式敘述</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：那段時間打陌開發，每次按門鈴之前，我內心都偷偷希望他不要接電話。這樣說很誠實，但這是真的。我不是天生業務型，我也怕被拒絕。但我不想回去做重複的工作，所以我繼續撐。 （楷甯表情誠懇，直視鏡頭，公司背景，平靜訴說）</div><div class="sub">楷甯表情誠懇，直視鏡頭，公司背景，平靜訴說</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：後來，有客戶一直跟著我找房，追了快一年。我沒有催他，因為買房不是小事。他說你都不逼我，我反而比較放心。我想，那就是我跟別人不一樣的地方。不是話術，是真的耐心。[需楷甯確認] （楷甯微微點頭，帶著感受說，略帶溫和的表情，公司場景）</div><div class="mirror">藏鏡人　'（字幕）這種耐心等真的少見，難得'</div><div class="sub">楷甯微微點頭，帶著感受說，略帶溫和的表情，公司場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：我沒辦法告訴你轉行很容易，真的不容易。我只知道，有些事你撐過去，就是你自己的。不靠話術，楷甯陪你找對房。 （楷甯直視鏡頭，語氣平實誠懇，輕微微笑收束）</div><div class="sub">楷甯直視鏡頭，語氣平實誠懇，輕微微笑收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你也在考慮跨行，或是想問鼓山這區的房子，私訊楷甯就好。真的有需求，再來找我就好。 （楷甯輕鬆自然，指向鏡頭方向，親和感收尾）</div><div class="sub">楷甯輕鬆自然，指向鏡頭方向，親和感收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也在考慮跨行，或是想問鼓山這區的房子，私訊楷甯就好。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#轉行心得</span>
+      <span class="hashtag">#房仲真實心境</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#第一年房仲</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#耐心陪跑</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="故事戲劇派" id="kai2" data-caption="做房仲那段時間，每次打陌生電話都偷偷希望對方不接。不是天生業務型，但後來發現：被拒絕不是最壞的結果，被遺忘才是。撐過去的那段，成了現在的底氣。" data-hashtags="#楷甯的房產日常 #房仲真實日常 #轉行日記 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #陌生開發 #真誠找房 #不靠話術 #業務心態">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">故事戲劇派</span>
+      <span class="num">No. 02</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">我打電話，偷偷希望對方不接</h3>
+    <div class="insight">楷甯直視鏡頭，表情帶一點自嘲的微笑，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，表情帶一點自嘲的微笑，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：我做房仲那段時間，每次打陌生電話，我都偷偷希望他不要接。 （楷甯直視鏡頭，表情帶一點自嘲的微笑，公司場景）</div><div class="mirror">藏鏡人　'（字幕）希望對方不接？房仲也怕被拒絕？'</div><div class="sub">楷甯直視鏡頭，表情帶一點自嘲的微笑，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：很多人覺得，做業務的就是很愛跟人講話。我從行政轉行，不是天生業務型，那段打電話的時間，老實說每天都有點緊張。 （楷甯表情誠懇，略帶回憶感，坐在公司辦公桌前）</div><div class="sub">楷甯表情誠懇，略帶回憶感，坐在公司辦公桌前</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：但我發現一件事：每個被我打到的人，就算掛我電話，他記住了我。後來有客戶說，當時雖然不需要，但楷甯有印象。這讓我想到，被拒絕不是最壞的結果，被遺忘才是。[需楷甯確認] （楷甯靠在椅背，看著前方，分享觀點語氣）</div><div class="sub">楷甯靠在椅背，看著前方，分享觀點語氣</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：撐過那段時間之後，我開始習慣被拒絕，也開始繼續打。慢慢地，有客戶留下來了。他說，你聽起來不像在催我，所以就選你了。這句話我記到現在。[需楷甯確認] （楷甯語氣變輕鬆，帶著溫和的感受說，場景公司）</div><div class="mirror">藏鏡人　'（字幕）對啊，誰剛開始不是這樣，很正常的'</div><div class="sub">楷甯語氣變輕鬆，帶著溫和的感受說，場景公司</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：怕被拒絕是很正常的，你不需要假裝自己不怕。你只要繼續打，繼續出現。不靠話術，楷甯陪你找對房。 （楷甯語氣平靜，直視鏡頭，輕微點頭收束）</div><div class="sub">楷甯語氣平靜，直視鏡頭，輕微點頭收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你也在跨行，或是想問我找房的問題，私訊楷甯就好。真的有需求，再來找我就好。 （楷甯自然微笑，指向鏡頭方向）</div><div class="sub">楷甯自然微笑，指向鏡頭方向</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也在跨行，或是想問我找房的問題，私訊楷甯就好。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#房仲真實日常</span>
+      <span class="hashtag">#轉行日記</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#陌生開發</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#業務心態</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="故事戲劇派" id="kai3" data-caption="轉行最低潮那段，讓我撐下來的是家人那句：你去試試，我們在。後來我也把這個精神帶給找房的客戶——不催、不逼，你慢慢找，我在旁邊。有需要的人，慢慢來也沒關係。" data-hashtags="#楷甯的房產日常 #轉行日記 #房仲真實心境 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #家人支持 #真誠找房 #不靠話術 #耐心陪跑">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">故事戲劇派</span>
+      <span class="num">No. 03</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">撐過那段最低潮的，是他們</h3>
+    <div class="insight">楷甯直視鏡頭，平靜而誠懇，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，平靜而誠懇，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：轉行最低潮的那段，讓我撐下來的，其實不是我自己。 （楷甯直視鏡頭，平靜而誠懇，公司場景）</div><div class="mirror">藏鏡人　'（字幕）是誰？家人？還是客戶？'</div><div class="sub">楷甯直視鏡頭，平靜而誠懇，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：進房仲之前，我做行政做了幾年。轉行的決定說出口的時候，我其實有點擔心家人的反應。但他們沒有叫我不要做，而是說：你去試試看，我們在。 （楷甯回憶式表情，語氣平靜，公司場景）</div><div class="sub">楷甯回憶式表情，語氣平靜，公司場景</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：初期很難，被拒絕、被罵、接不到客。主管和同事也一直在旁邊教我。不是叫我加油，而是告訴我哪裡可以做得更好。這種陪伴跟鼓勵是不一樣的。 （楷甯表情溫和，分享真實感受，辦公場景）</div><div class="sub">楷甯表情溫和，分享真實感受，辦公場景</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：現在每次感覺快撐不住的時候，我就想到那句「你去試試，我們在」。那句話讓我在最難的時候，知道自己不是一個人在扛。所以我也想對我的客戶說一樣的話：你慢慢找，我在。 （楷甯語氣輕柔，帶著感受，接近於對鏡頭傾訴）</div><div class="mirror">藏鏡人　'（字幕）這樣的人在旁邊，才撐得過去'</div><div class="sub">楷甯語氣輕柔，帶著感受，接近於對鏡頭傾訴</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：有人在旁邊陪著，才知道自己走得動。不靠話術，楷甯陪你找對房。 （楷甯微笑，誠懇收束，直視鏡頭）</div><div class="sub">楷甯微笑，誠懇收束，直視鏡頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你也在轉行路上，或是想問高雄這邊找房的問題，私訊楷甯就好。真的有需求，再來找我就好。 （楷甯自然微笑，溫和語氣收尾）</div><div class="sub">楷甯自然微笑，溫和語氣收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也在轉行路上，或是想問高雄這邊找房的問題，私訊楷甯就好。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#轉行日記</span>
+      <span class="hashtag">#房仲真實心境</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#家人支持</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#耐心陪跑</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="故事戲劇派" id="kai4" data-caption="行政做了幾年，某天突然覺得這樣不行了。不是工作有問題，是自己想要不一樣的事。跨行做房仲不是因為最擅長，是因為願意去學去撐。想要改變不是錯，只是改變需要時間。" data-hashtags="#楷甯的房產日常 #轉行日記 #行政轉房仲 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #想要改變 #真誠找房 #不靠話術 #職涯轉換">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">故事戲劇派</span>
+      <span class="num">No. 04</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週四晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">我為什麼不想再做重複的工作</h3>
+    <div class="insight">楷甯直視鏡頭，表情平靜帶一點自我審視，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，表情平靜帶一點自我審視，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：我在行政做了幾年，某天突然覺得：這樣不行了。不是工作有問題，是我自己有問題。 （楷甯直視鏡頭，表情平靜帶一點自我審視，公司場景）</div><div class="mirror">藏鏡人　'（字幕）重複的工作怎麼了？不是很穩定嗎？'</div><div class="sub">楷甯直視鏡頭，表情平靜帶一點自我審視，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：行政工作很穩定，流程清楚，每天照著來。但我發現我愈做愈沒動力，不是因為工作不好，是因為我想看看不一樣的事情，想要收入有更多改變的空間。 （楷甯坐在辦公桌前，回憶式表情，語氣誠實）</div><div class="sub">楷甯坐在辦公桌前，回憶式表情，語氣誠實</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：我跨行選房仲，不是因為我很適合，而是因為這是我覺得可以試的選項。你選的那條路，不需要是「你最擅長的」，是你願意去學、去撐的那條。 （楷甯看向前方，分享觀點，語氣誠懇平實）</div><div class="sub">楷甯看向前方，分享觀點，語氣誠懇平實</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：現在我還在學，還在適應。有時候覺得自己進步了，有時候又覺得還差很遠。但我知道至少這段路不是重複的，每次帶看、每個客戶，都不太一樣。 （楷甯語氣輕鬆帶一點感受，自然說話，公司場景）</div><div class="mirror">藏鏡人　'（字幕）對啊，想改變的感覺誰都有過'</div><div class="sub">楷甯語氣輕鬆帶一點感受，自然說話，公司場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：想要改變不是錯，只是改變需要時間。不靠話術，楷甯陪你找對房。 （楷甯直視鏡頭，平靜收束，微微點頭）</div><div class="sub">楷甯直視鏡頭，平靜收束，微微點頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你也在考慮轉行，或是想問鼓山高雄這邊找房的事，私訊楷甯就好。真的有需求，再來找我就好。 （楷甯輕鬆自然，微笑收尾）</div><div class="sub">楷甯輕鬆自然，微笑收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也在考慮轉行，或是想問鼓山高雄這邊找房的事，私訊楷甯就好。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#轉行日記</span>
+      <span class="hashtag">#行政轉房仲</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#想要改變</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#職涯轉換</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="故事戲劇派" id="kai5" data-caption="有人說做業務不逼客戶哪行。我試了，結果客戶跟了我快一年，最後說：就是因為你不催，我才一直回來找你。耐心不是浪費時間，是在建立信任。這才是我真正學到的業務課。" data-hashtags="#楷甯的房產日常 #房仲真實日常 #耐心陪跑 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #不逼單 #真誠找房 #不靠話術 #信任服務">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">故事戲劇派</span>
+      <span class="num">No. 05</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週五晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">不逼客戶，反而讓他們留下來了</h3>
+    <div class="insight">楷甯直視鏡頭，語氣平實帶一點反問的味道，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣平實帶一點反問的味道，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：有人說，做業務不逼客戶哪行。我想說，你試試看不逼看看效果怎樣。 （楷甯直視鏡頭，語氣平實帶一點反問的味道，公司場景）</div><div class="mirror">藏鏡人　'（字幕）不逼客戶？那不就等很久？'</div><div class="sub">楷甯直視鏡頭，語氣平實帶一點反問的味道，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：我進房仲之後就發現，那種打了就催、見面就逼的方式，我做不到。不是因為我厲害，是因為我自己也不喜歡被逼的感覺。如果我不喜歡，客戶通常也不喜歡。 （楷甯表情誠懇，自然說話，坐在辦公桌前）</div><div class="sub">楷甯表情誠懇，自然說話，坐在辦公桌前</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：所以我的方式就是：你需要我在，我就在。你不急，我也不急。你看了十間還沒決定，我繼續帶你看。反正買房不是急事，急的話反而容易後悔。 （楷甯語氣從容，平實分享觀點，直視鏡頭）</div><div class="sub">楷甯語氣從容，平實分享觀點，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：後來真的有客戶跟了我快一年，沒成交過，但他一直在。後來他說，就是因為你不催我，我才一直找你。這一句話讓我覺得，耐心不是在浪費時間，是在建立信任。[需楷甯確認] （楷甯輕微點頭，帶著感受說話，語氣平靜）</div><div class="mirror">藏鏡人　'（字幕）所以耐心才是真正的本事'</div><div class="sub">楷甯輕微點頭，帶著感受說話，語氣平靜</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：用逼的今天成交一次，但用耐心的可以讓他一直找你回來。不靠話術，楷甯陪你找對房。 （楷甯語氣平穩有力，直視鏡頭，輕微收束微笑）</div><div class="sub">楷甯語氣平穩有力，直視鏡頭，輕微收束微笑</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：有想看鼓山或左營這區的，真的有需求再來找我就好。不用怕，問問不用錢。 （楷甯自然語氣，直視鏡頭收尾）</div><div class="sub">楷甯自然語氣，直視鏡頭收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有想看鼓山或左營這區的，真的有需求再來找我就好。不用怕，問問不用錢。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#房仲真實日常</span>
+      <span class="hashtag">#耐心陪跑</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#不逼單</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#信任服務</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="自嘲反差派" id="kai6" data-caption="行政跑去做房仲，沒想到那些技能一個都沒浪費。客戶說你安排得很細很可靠，那是行政時代練的。轉行不是放棄以前的自己，是把學到的全帶過來。" data-hashtags="#楷甯的房產日常 #轉行心得 #行政轉房仲 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #職場技能 #真誠找房 #不靠話術 #轉行故事">
+  <div class="card-head" style="--pie:#4A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">自嘲反差派</span>
+      <span class="num">No. 06</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">行政幾年的技能全帶進來了</h3>
+    <div class="insight">楷甯直視鏡頭，帶點驚喜的自嘲表情，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，帶點驚喜的自嘲表情，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：行政做幾年，跑去做房仲，沒想到以前那些技能，現在全用上了。 （楷甯直視鏡頭，帶點驚喜的自嘲表情，公司場景）</div><div class="mirror">藏鏡人　'（字幕）行政跟房仲有什麼關係？'</div><div class="sub">楷甯直視鏡頭，帶點驚喜的自嘲表情，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：做行政那時候，文件整理、預約安排、客戶聯絡，每件事都要細心，不能出錯。當時覺得很瑣碎，現在帶客戶看房，安排行程、整理資料，才發現行政訓練出來的習慣，一個都沒有浪費。 （楷甯表情帶點驚覺，誠懇說話，辦公室場景）</div><div class="sub">楷甯表情帶點驚覺，誠懇說話，辦公室場景</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：不是說行政比房仲好，是說每個工作都在訓練你某種能力。你以為在做重複的事，其實你在練習細心、練習耐心。這些帶進下一份工作，就是你的底氣。 （楷甯平靜分享觀點，語氣誠懇，直視鏡頭）</div><div class="sub">楷甯平靜分享觀點，語氣誠懇，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：有客戶說，你安排看房的行程很細，感覺很可靠。我想說，這個「細」是行政做來的。我轉行了，但那段時間沒有白費。[需楷甯確認] （楷甯帶著輕鬆自嘲笑意，語氣輕快，公司場景）</div><div class="mirror">藏鏡人　'（字幕）這樣的意外優勢很厲害耶'</div><div class="sub">楷甯帶著輕鬆自嘲笑意，語氣輕快，公司場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：轉行不是放棄之前的自己，是把你學到的全部帶過來。不靠話術，楷甯陪你找對房。 （楷甯語氣平穩，直視鏡頭，微笑收束）</div><div class="sub">楷甯語氣平穩，直視鏡頭，微笑收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你也在想轉行，或是想在鼓山左營這區找房，私訊楷甯就好。真的有需求，再來找我就好。 （楷甯自然微笑，輕鬆收尾）</div><div class="sub">楷甯自然微笑，輕鬆收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也在想轉行，或是想在鼓山左營這區找房，私訊楷甯就好。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#轉行心得</span>
+      <span class="hashtag">#行政轉房仲</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#職場技能</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#轉行故事</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="自嘲反差派" id="kai7" data-caption="第一次帶看，照印象回答社區附近有什麼，後來才發現沒確認過。那次教會我：不知道就說不知道，說錯了客戶才記住。新手都會踩坑，重要的是踩完做了什麼。" data-hashtags="#楷甯的房產日常 #新手房仲 #踩坑日記 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #帶看日常 #真誠找房 #不靠話術 #轉行成長">
+  <div class="card-head" style="--pie:#4A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">自嘲反差派</span>
+      <span class="num">No. 07</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">新手日記：第一次帶看我做錯了</h3>
+    <div class="insight">楷甯表情帶點窘迫的自嘲微笑，直視鏡頭，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯表情帶點窘迫的自嘲微笑，直視鏡頭，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：我第一次帶客戶看房，做了一個現在想起來還覺得尷尬的事。 （楷甯表情帶點窘迫的自嘲微笑，直視鏡頭，公司場景）</div><div class="mirror">藏鏡人　'（字幕）第一次帶看做錯？想聽想聽'</div><div class="sub">楷甯表情帶點窘迫的自嘲微笑，直視鏡頭，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：那時候客戶問我這個社區旁邊有什麼，我回答得很流暢，後來才發現，有幾個地方我根本沒去確認過，是照自己印象說的。那個客戶後來沒成交，我覺得那個原因一定有一部分是我說了不確定的事。[需楷甯確認] （楷甯略帶懊惱，誠實說話，辦公室場景）</div><div class="sub">楷甯略帶懊惱，誠實說話，辦公室場景</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：那次之後我學到，不知道的就說不知道，或是說我去幫你確認。客戶不會因為你不知道就不信任你，但如果你說錯了，他會記住。 （楷甯語氣誠懇，分享教訓，直視鏡頭）</div><div class="sub">楷甯語氣誠懇，分享教訓，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：現在我帶看之前，一定先去走一遍，把附近的地圖在腦子裡先過一次。不是說我現在很厲害了，是因為那次踩坑，讓我養成了一個習慣。 （楷甯帶著自嘲的輕鬆語氣，稍微點頭，公司場景）</div><div class="mirror">藏鏡人　'（字幕）這樣的新手真的很有勇氣繼續'</div><div class="sub">楷甯帶著自嘲的輕鬆語氣，稍微點頭，公司場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：新手都會踩坑，重要的是踩完之後做了什麼。不靠話術，楷甯陪你找對房。 （楷甯平靜微笑，語氣輕鬆收束）</div><div class="sub">楷甯平靜微笑，語氣輕鬆收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：想在鼓山美術這區找房，或是有想問的問題，私訊楷甯就好。不用怕，問問不用錢。 （楷甯自然語氣，微笑收尾）</div><div class="sub">楷甯自然語氣，微笑收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想在鼓山美術這區找房，或是有想問的問題，私訊楷甯就好。不用怕，問問不用錢。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#新手房仲</span>
+      <span class="hashtag">#踩坑日記</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#帶看日常</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#轉行成長</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="自嘲反差派" id="kai8" data-caption="大家對房仲印象：很會說話、很會逼。我不走這條路。進來之後選擇不催不逼，讓客戶自己決定步調。客戶說找楷甯才第一次覺得是自己在主導。不靠話術，才是真的找對房。" data-hashtags="#楷甯的房產日常 #房仲差異化 #不逼單 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #真誠找房 #不靠話術 #左營高鐵 #耐心陪跑">
+  <div class="card-head" style="--pie:#4A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">自嘲反差派</span>
+      <span class="num">No. 08</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">我跟其他房仲哪裡不一樣</h3>
+    <div class="insight">楷甯直視鏡頭，語氣平實帶點自嘲，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣平實帶點自嘲，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：我知道大家對房仲有印象，很會說話、很會催、很會逼。我就是那個不走這條路的。 （楷甯直視鏡頭，語氣平實帶點自嘲，公司場景）</div><div class="mirror">藏鏡人　'（字幕）什麼不一樣？我來聽聽'</div><div class="sub">楷甯直視鏡頭，語氣平實帶點自嘲，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：我從行政轉行，不是天生業務型。我自己不適合用那種讓人覺得很急、不買就虧的方式，我試不來、也不想試。因為那種被催的感覺，我自己當客戶的時候也不喜歡。 （楷甯誠懇說話，坐在辦公桌前，語氣直接不做作）</div><div class="sub">楷甯誠懇說話，坐在辦公桌前，語氣直接不做作</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：所以我選擇不催、不逼，讓客戶自己決定步調。我的工作是把資訊給到你，把看過的房子的感覺說給你聽，然後等你準備好。不是幫你決定，是陪你找到答案。 （楷甯平靜分享，語氣誠懇直白，直視鏡頭）</div><div class="sub">楷甯平靜分享，語氣誠懇直白，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：有客戶說，之前找過別的房仲，感覺整個被推著走。找楷甯才第一次覺得，好像是我在主導，不是被帶著跑。我想這就是我最想給的感覺。[需楷甯確認] （楷甯帶著溫和的笑意，語氣輕鬆，公司場景）</div><div class="mirror">藏鏡人　'（字幕）這樣的房仲真的少見'</div><div class="sub">楷甯帶著溫和的笑意，語氣輕鬆，公司場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：不靠話術找到的房子，才是真的找對。不靠話術，楷甯陪你找對房。 （楷甯語氣平穩，直視鏡頭，輕微點頭收束）</div><div class="sub">楷甯語氣平穩，直視鏡頭，輕微點頭收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：有想在鼓山或左營高鐵特區找房的，真的有需求再來找我就好。 （楷甯自然微笑，直視鏡頭，輕鬆收尾）</div><div class="sub">楷甯自然微笑，直視鏡頭，輕鬆收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有想在鼓山或左營高鐵特區找房的，真的有需求再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#房仲差異化</span>
+      <span class="hashtag">#不逼單</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#左營高鐵</span>
+      <span class="hashtag">#耐心陪跑</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="kai9" data-caption="很多人問哪間房比較好，我都想反問：你知道你要的是什麼嗎？找房最常見的情況是看了很多間卻不知道自己在選什麼。先把需求問清楚，再去找房，才是真的找對方向。" data-hashtags="#楷甯的房產日常 #找房攻略 #買房前準備 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #真誠找房 #不靠話術 #左營高鐵 #首購族">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">人間觀察派</span>
+      <span class="num">No. 09</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">你問的不是哪間好，是哪間適合你</h3>
+    <div class="insight">楷甯直視鏡頭，帶點誠懇的反問語氣，公司或帶看場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，帶點誠懇的反問語氣，公司或帶看場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：很多人問我：楷甯你覺得哪間比較好？我都想反問他：你知道你要的是什麼嗎？ （楷甯直視鏡頭，帶點誠懇的反問語氣，公司或帶看場景）</div><div class="mirror">藏鏡人　'（字幕）哪間好？這個問題怎麼回答'</div><div class="sub">楷甯直視鏡頭，帶點誠懇的反問語氣，公司或帶看場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：找房有一個很常見的情況：看了很多間，但不知道自己在選什麼。其實問題不是在房子，是在你還沒有想清楚自己需要什麼條件。 （楷甯坐在辦公室或帶看現場，語氣誠懇）</div><div class="sub">楷甯坐在辦公室或帶看現場，語氣誠懇</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：我每次帶客戶看房之前，都會先問幾件事：你通勤到哪裡、家裡有幾個人、有沒有用車、對樓層有沒有感覺。這些答案，比你說喜歡什麼風格、幾坪更有用。 （楷甯分享觀點，自然說話，辦公室場景）</div><div class="sub">楷甯分享觀點，自然說話，辦公室場景</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：有客戶說想要大一點的，後來問清楚才知道他需要的不是大，是格局方正可以放桌子工作。結果找到一間中等大小但格局很好的，他非常滿意。[需楷甯確認] （楷甯帶著溫和感受說，語氣平實，辦公室場景）</div><div class="mirror">藏鏡人　'（字幕）這樣問才是問到重點了'</div><div class="sub">楷甯帶著溫和感受說，語氣平實，辦公室場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：找對的房，是先找對自己的需求。不靠話術，楷甯陪你找對房。 （楷甯直視鏡頭，平靜收束，輕微點頭）</div><div class="sub">楷甯直視鏡頭，平靜收束，輕微點頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：有想在鼓山美術或左營這邊找房，真的有需求再來找我就好。慢慢找也沒關係。 （楷甯自然微笑，輕鬆收尾）</div><div class="sub">楷甯自然微笑，輕鬆收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有想在鼓山美術或左營這邊找房，真的有需求再來找我就好。慢慢找也沒關係。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#找房攻略</span>
+      <span class="hashtag">#買房前準備</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#左營高鐵</span>
+      <span class="hashtag">#首購族</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="kai10" data-caption="買房最難的不是錢，是那個「決定」本身。自備款夠了、貸款問過了，就是按不下去。謹慎沒錯，把要的跟可以妥協的列清楚，你自己會知道答案。找到了要相信自己。" data-hashtags="#楷甯的房產日常 #買房心理 #買房觀察 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #首購族 #真誠找房 #不靠話術 #買房決定">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">人間觀察派</span>
+      <span class="num">No. 10</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM（FB Reels 平日晚間 7-9 點主力時段）</span>
+    </div>
+    <h3 class="title">買房最難的不是錢，是那個「決定」本身</h3>
+    <div class="insight">楷甯直視鏡頭，語氣平實觀察者口吻，辦公室場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣平實觀察者口吻，辦公室場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：跟很多客戶聊過，買房他們說最難的不是錢，是那個「決定」本身。 （楷甯直視鏡頭，語氣平實觀察者口吻，辦公室場景）</div><div class="mirror">藏鏡人　'（字幕）等等，買房難在哪？'</div><div class="sub">楷甯直視鏡頭，語氣平實觀察者口吻，辦公室場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：錢有了，自備款存夠了，貸款也問過了，可是就是遲遲沒辦法按下去。我觀察到，那個卡住的地方，常常是「選了這間，會不會後悔」。 （楷甯語氣誠懇分析，坐在辦公桌前自然說話）</div><div class="sub">楷甯語氣誠懇分析，坐在辦公桌前自然說話</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：這不是優柔寡斷，這是正常的。買房是生活裡少數幾個真的很大的決定，你要謹慎。我會建議客戶把「一定要的」跟「可以妥協的」分開列清楚，看清楚了，你自己就會知道答案。 （楷甯平靜分享觀點，語氣誠懇有分量，直視鏡頭）</div><div class="sub">楷甯平靜分享觀點，語氣誠懇有分量，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：我陪過客戶看了很多間，他最大的卡點不是哪間不好，是怕自己選錯。後來我們一起把「一定要的」跟「可以妥協的」分開列，他說這樣心裡踏實多了，要決定的時候也沒那麼怕。[需楷甯確認] （楷甯帶著感受說，語氣輕柔有重量，辦公室場景）</div><div class="mirror">藏鏡人　'（字幕）對，那個決定才是最難的'</div><div class="sub">楷甯帶著感受說，語氣輕柔有重量，辦公室場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：買房不急，但喜歡的要勇敢。慢慢找也沒關係，找到了要相信自己。不靠話術，楷甯陪你找對房。 （楷甯語氣溫和有力，輕微點頭，直視鏡頭）</div><div class="sub">楷甯語氣溫和有力，輕微點頭，直視鏡頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：想在鼓山美術或左營找房，或是卡在決定這個關口，私訊楷甯，一起想想看。 （楷甯自然微笑，輕鬆收尾）</div><div class="sub">楷甯自然微笑，輕鬆收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想在鼓山美術或左營找房，或是卡在決定這個關口，私訊楷甯，一起想想看。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#買房心理</span>
+      <span class="hashtag">#買房觀察</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#首購族</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#買房決定</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="人間觀察派" id="kai11" data-caption="鼓山美術館這帶的在地觀察：機能比想像完整，道路較窄但安靜。老公寓電梯大樓都有，先確認樓梯電梯需求再篩省時間。在地的感覺地圖查不出來，要來走才知道。" data-hashtags="#楷甯的房產日常 #鼓山美術 #高雄鼓山 #高雄房仲 #鼓山買房 #買屋賣房找楷甯 #在地觀察 #真誠找房 #不靠話術 #高雄生活">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">人間觀察派</span>
+      <span class="num">No. 11</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週六上午 10AM（FB Reels 週末上午社群活躍高峰）</span>
+    </div>
+    <h3 class="title">在地房仲看鼓山美術這一帶</h3>
+    <div class="insight">楷甯直視鏡頭，語氣平實有信賴感，室內辦公或鼓山街景場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣平實有信賴感，室內辦公或鼓山街景場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：鼓山美術這一帶到底適不適合住？我天天在這區跑，用在地房仲的眼睛，老實跟你說。 （楷甯直視鏡頭，語氣平實有信賴感，室內辦公或鼓山街景場景）</div><div class="mirror">藏鏡人　'（字幕）在地房仲看到什麼？想聽'</div><div class="sub">楷甯直視鏡頭，語氣平實有信賴感，室內辦公或鼓山街景場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：你知道大家看這區最在意什麼嗎？我最常聽客戶說兩件事：一是這邊的生活機能比想像中完整，全聯、診所、小吃都有，不用跑很遠。二是道路比較窄，但反過來想，大馬路的噪音比較少，住起來反而安靜。 （楷甯自然說話，辦公室或室內場景，語氣像在跟朋友分享）</div><div class="sub">楷甯自然說話，辦公室或室內場景，語氣像在跟朋友分享</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：這區的房子以老公寓和電梯大樓都有，屋齡分布比較廣。帶客戶看的時候，我都會先問他們對樓梯或電梯有沒有需求，因為這裡的選擇差滿多的，先確認再篩，省很多時間。 （楷甯平靜分享專業觀察，直視鏡頭，語氣像在給建議）</div><div class="sub">楷甯平靜分享專業觀察，直視鏡頭，語氣像在給建議</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：你會不會也以為鼓山就是鹽埕那一帶？我曾有客戶就是這樣，後來來看了才發現，原來美術館這邊更安靜，離市區也不遠。他說早點來看就好了，不用在別區繞那麼久。[需楷甯確認] （楷甯帶著輕鬆語氣說，稍微點頭，辦公室場景）</div><div class="mirror">藏鏡人　'（字幕）這樣才是真的了解這區'</div><div class="sub">楷甯帶著輕鬆語氣說，稍微點頭，辦公室場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：在地的感覺是地圖查不出來的，要來走才知道。你如果也想在這區找，我帶你走一圈你自己感覺。不靠話術，楷甯陪你找對房。 （楷甯語氣平穩，直視鏡頭，輕微點頭收束）</div><div class="sub">楷甯語氣平穩，直視鏡頭，輕微點頭收束</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：有想在鼓山美術這邊找房的，真的有需求再來找我就好。我帶你走一圈，你自己感覺。 （楷甯自然微笑，輕鬆收尾）</div><div class="sub">楷甯自然微笑，輕鬆收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>有想在鼓山美術這邊找房的，真的有需求再來找我就好。我帶你走一圈，你自己感覺。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#高雄鼓山</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山買房</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#在地觀察</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#高雄生活</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="家人朋友模擬派" id="kai12" data-caption="鼓山美術館這帶適合哪種人住？喜歡安靜、有車代步、附近上班或有小孩的很適合。主要靠公車通勤的要先想清楚。找房不是找最好的，是找最適合自己的。" data-hashtags="#楷甯的房產日常 #鼓山美術 #高雄鼓山 #高雄房仲 #鼓山買房 #買屋賣房找楷甯 #買房選區 #真誠找房 #不靠話術 #高雄生活">
+  <div class="card-head" style="--pie:#444">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">家人朋友模擬派</span>
+      <span class="num">No. 12</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週日上午 10AM（FB Reels 週末上午社群活躍高峰）</span>
+    </div>
+    <h3 class="title">你問鼓山適合哪種人住，我老實說</h3>
+    <div class="insight">楷甯直視鏡頭，語氣像朋友聊天，輕鬆誠懇，公司場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣像朋友聊天，輕鬆誠懇，公司場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：你問我鼓山這區適合哪種人住，我老實說，不是每個人都適合，但適合的人會很喜歡。 （楷甯直視鏡頭，語氣像朋友聊天，輕鬆誠懇，公司場景）</div><div class="mirror">藏鏡人　'（字幕）適合哪種人？我想知道'</div><div class="sub">楷甯直視鏡頭，語氣像朋友聊天，輕鬆誠懇，公司場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：鼓山美術這一帶，交通靠機車或自用車比較方便，公車班次不是很密。如果你習慣騎車或有車，這個問題不大。但如果你主要靠大眾運輸，要先想清楚。 （楷甯語氣直白，像在給朋友建議，坐在辦公室）</div><div class="sub">楷甯語氣直白，像在給朋友建議，坐在辦公室</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：適合在這區住的人：生活步調不趕、喜歡安靜環境、在附近或左營高鐵特區上班、或是有小孩想找相對安靜的地方。不適合的：需要走路就能到捷運、或是喜歡那種很熱鬧商圈的生活感。 （楷甯語氣直接清楚，像在列清單給朋友聽，自然說話）</div><div class="sub">楷甯語氣直接清楚，像在列清單給朋友聽，自然說話</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：有客戶一開始說想住這區，但聊完才發現他每天要搭公車通勤到鳳山，那樣真的不方便。我幫他換了區域，他後來找到一個更合適的地方。[需楷甯確認] （楷甯帶著輕鬆認真的語氣說，稍微點頭，辦公室場景）</div><div class="mirror">藏鏡人　'（字幕）對，這樣說比較實在'</div><div class="sub">楷甯帶著輕鬆認真的語氣說，稍微點頭，辦公室場景</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：找房不是找最好的，是找最適合自己的。不靠話術，楷甯陪你找對房。 （楷甯語氣平穩真誠，直視鏡頭輕微點頭）</div><div class="sub">楷甯語氣平穩真誠，直視鏡頭輕微點頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：想知道鼓山這區是不是適合你，或是想看看其他區域，私訊楷甯，我幫你想想。真的有需求，再來找我就好。 （楷甯自然微笑，輕鬆友善收尾）</div><div class="sub">楷甯自然微笑，輕鬆友善收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>想知道鼓山這區是不是適合你，或是想看看其他區域，私訊楷甯，我幫你想想。真的有需求，再來找我就好。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#高雄鼓山</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山買房</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#買房選區</span>
+      <span class="hashtag">#真誠找房</span>
+      <span class="hashtag">#不靠話術</span>
+      <span class="hashtag">#高雄生活</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" data-cat="家人朋友模擬派" id="kai13" data-caption="找房沒有時間表，不用跟別人比。有人很快就遇到，有人找了很久才定，都沒關係。重要的是你住的地方是真心想住的，不是因為急。有需要的人，慢慢找也沒關係。" data-hashtags="#楷甯的房產日常 #買房心情 #找房路上 #高雄房仲 #鼓山美術 #買屋賣房找楷甯 #首購族 #慢慢找也沒關係 #找房加油 #真誠找房">
+  <div class="card-head" style="--pie:#444">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="pie">家人朋友模擬派</span>
+      <span class="num">No. 13</span>
+      <span class="batch">第 01 批 · 2026-06-14</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ FB Reels</span>
+      <span class="po-time">⏰ 週日晚 8PM（FB Reels 週末晚間情緒流量高峰）</span>
+    </div>
+    <h3 class="title">有需要的人，慢慢找也沒關係</h3>
+    <div class="insight">楷甯直視鏡頭，語氣溫柔誠懇，像是在跟好朋友說話，辦公室或自然光場景</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　楷甯直視鏡頭，語氣溫柔誠懇，像是在跟好朋友說話，辦公室或自然光場景</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">楷甯：如果你現在在找房，但一直沒找到，這段話給你聽。 （楷甯直視鏡頭，語氣溫柔誠懇，像是在跟好朋友說話，辦公室或自然光場景）</div><div class="mirror">藏鏡人　'（字幕）這句話我需要聽到'</div><div class="sub">楷甯直視鏡頭，語氣溫柔誠懇，像是在跟好朋友說話，辦公室或自然光場景</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">楷甯：找房真的很累。你看了很多間，喜歡的買不起，買得起的不喜歡，或是家人意見不一，或是貸款有點卡。每個問題都不小，但每個問題也都可以一步一步處理。 （楷甯語氣溫和，自然說話，帶著理解的表情）</div><div class="sub">楷甯語氣溫和，自然說話，帶著理解的表情</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">楷甯：找房沒有時間表，你不用跟別人比。有人很快就遇到，有人找了很久才定，都沒關係。重要的是你最後住的地方，是你真的想住的。不是因為急，不是因為被人說了什麼，是因為你自己決定的。 （楷甯平靜溫柔說話，語氣像家人，直視鏡頭）</div><div class="sub">楷甯平靜溫柔說話，語氣像家人，直視鏡頭</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">楷甯：我陪過找了很久的客戶，有時候他們會說，是不是我太難搞了。我說，不是你難搞，是你認真。認真才會慢慢挑，認真才不容易後悔。你有沒有這種感覺，找了好久卻還是找不到那個「對」的感覺？[需楷甯確認] （楷甯帶著溫暖的語氣說，稍微點頭，語氣輕柔有力）</div><div class="mirror">藏鏡人　'（字幕）謝謝你這樣說'</div><div class="sub">楷甯帶著溫暖的語氣說，稍微點頭，語氣輕柔有力</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">楷甯：有需要的人，慢慢找也沒關係。你準備好了，房子就會在那裡。 （楷甯平靜微笑，直視鏡頭，輕輕點頭，語氣溫柔有力）</div><div class="sub">楷甯平靜微笑，直視鏡頭，輕輕點頭，語氣溫柔有力</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">楷甯：你最近也在慢慢找什麼嗎？留言跟我說。 （楷甯保持溫柔微笑，直視鏡頭，輕柔音樂淡出）</div><div class="sub">楷甯保持溫柔微笑，直視鏡頭，輕柔音樂淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你最近也在慢慢找什麼嗎？留言跟我說。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#楷甯的房產日常</span>
+      <span class="hashtag">#買房心情</span>
+      <span class="hashtag">#找房路上</span>
+      <span class="hashtag">#高雄房仲</span>
+      <span class="hashtag">#鼓山美術</span>
+      <span class="hashtag">#買屋賣房找楷甯</span>
+      <span class="hashtag">#首購族</span>
+      <span class="hashtag">#慢慢找也沒關係</span>
+      <span class="hashtag">#找房加油</span>
+      <span class="hashtag">#真誠找房</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+</div>
+
+
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<div class="empty" id="empty">沒有符合條件的腳本</div>
+
+<footer>
+  <div class="footer-bar"></div>
+  <div class="footer-content">
+    <div class="footer-tagline">不靠話術，楷甯陪你找對房</div>
+    <div class="colophon">楷甯的房產日常 · 短影音腳本庫</div>
+    <div class="lines">高雄鼓山 · 美術東路 · 陳澤君監製</div>
+    <div class="bagao-sig">maskbago produced</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+
+// ====== 1. 主題分組 DOM 殼子（從 section-head DOM 讀，不 hardcode）======
+var sectionHeads = document.querySelectorAll('.section-head');
+sectionHeads.forEach(function(sh){
+  var next = sh.nextElementSibling;
+  if (!next || (!next.classList.contains('cards') && !next.classList.contains('threads-grid'))) return;
+  var romanEl = sh.querySelector('.roman');
+  var labelEl = sh.querySelector('.label');
+  var roman = romanEl ? romanEl.textContent.trim() : '';
+  var labelText = '';
+  if (labelEl) {
+    labelEl.childNodes.forEach(function(node){
+      if (node.nodeType === 3) labelText += node.textContent;
+    });
+    labelText = labelText.trim();
+  }
+  var count = next.querySelectorAll('.card, .thread-card').length;
+  var unit = next.classList.contains('threads-grid') ? ' posts' : ' scripts';
+  var group = document.createElement('div');
+  group.className = 'group';
+  group.innerHTML =
+    '<div class="group-head">' +
+      '<span class="gh-roman">' + roman + '</span>' +
+      '<span class="gh-label">' + labelText + '</span>' +
+      '<span class="gh-count">' + count + unit + '</span>' +
+      '<span class="gh-icon">▼</span>' +
+    '</div>';
+  sh.parentNode.insertBefore(group, sh);
+  group.appendChild(sh);
+  group.appendChild(next);
+  group.querySelector('.group-head').addEventListener('click', function(){
+    group.classList.toggle('collapsed');
+  });
+});
+
+// ====== 2. 全部主題預設折疊 ======
+document.querySelectorAll('.group').forEach(function(g){
+  g.classList.add('collapsed');
+});
+
+// ====== 3. Stats 動態計算 ======
+var totalScripts = document.querySelectorAll('article.card:not([data-clone])').length;
+var totalSections = document.querySelectorAll('.group').length;
+var totalCount = document.getElementById('totalCount');
+var sectionCount = document.getElementById('sectionCount');
+if (totalCount) totalCount.textContent = totalScripts;
+if (sectionCount) sectionCount.textContent = totalSections;
+
+// ====== 4. 卡片展開 (card-head click) ======
+document.querySelectorAll('.card').forEach(function(card){
+  var head = card.querySelector('.card-head');
+  if (!head) return;
+  head.addEventListener('click', function(){
+    card.classList.toggle('open');
+  });
+});
+
+// ====== 5. 搜尋 ======
+var search = document.getElementById('searchInput');
+var empty = document.getElementById('empty');
+var searchWrap = document.getElementById('searchWrap');
+var searchHint = document.getElementById('searchHint');
+
+function filterCards(){
+  var q = (search ? search.value : '').toLowerCase().trim();
+  var any = false;
+  document.querySelectorAll('article.card:not([data-clone])').forEach(function(c){
+    var ok = !q || c.textContent.toLowerCase().indexOf(q) >= 0;
+    c.style.display = ok ? '' : 'none';
+    if (ok) any = true;
+  });
+  document.querySelectorAll('.group').forEach(function(g){
+    if (q) g.classList.remove('collapsed');
+  });
+  document.querySelectorAll('.group').forEach(function(g){
+    var cards = g.querySelectorAll('article.card:not([data-clone])');
+    var anyVisible = false;
+    cards.forEach(function(c){ if(c.style.display !== 'none') anyVisible = true; });
+    g.style.display = anyVisible || !q ? '' : 'none';
+  });
+  if (empty) empty.classList.toggle('show', !any);
+}
+
+window.filterCards = filterCards;
+
+if (search) search.addEventListener('input', filterCards);
+
+// ====== 6. cmd+K / ctrl+K / '/' 捷徑 ======
+var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+if (searchHint) searchHint.textContent = isMac ? '⌘ K' : 'Ctrl K';
+document.addEventListener('keydown', function(e){
+  var isMod = (isMac && e.metaKey) || (!isMac && e.ctrlKey);
+  var inField = ['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement ? document.activeElement.tagName : '') >= 0;
+  if (isMod && (e.key === 'k' || e.key === 'K')){
+    e.preventDefault();
+    if (search){ search.focus(); search.select(); }
+  } else if (e.key === '/' && !inField){
+    e.preventDefault();
+    if (search) search.focus();
+  } else if (e.key === 'Escape' && document.activeElement === search){
+    search.blur();
+  }
+});
+if (search){
+  search.addEventListener('focus', function(){ if(searchWrap) searchWrap.classList.add('is-focused'); });
+  search.addEventListener('blur', function(){ if(searchWrap) searchWrap.classList.remove('is-focused'); });
+}
+
+// ====== 7. 已拍過 toggle（localStorage）======
+var SHOT_KEY = 'kaining.shot.v1';
+var shotData = {};
+try {
+  var raw = localStorage.getItem(SHOT_KEY);
+  shotData = raw ? JSON.parse(raw) : {};
+} catch(e){ shotData = {}; }
+
+function saveShot(){ try{ localStorage.setItem(SHOT_KEY, JSON.stringify(shotData)); }catch(e){} }
+
+function initShotToggle(card){
+  var id = card.id;
+  if (!id) return;
+  var realId = card.dataset.clone || id;
+  if (shotData[realId]) card.classList.add('shot');
+  var btn = card.querySelector('.shot-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (shotData[realId]){
+      delete shotData[realId];
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.remove('shot'); });
+    } else {
+      shotData[realId] = true;
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.add('shot'); });
+    }
+    saveShot();
+  });
+}
+document.querySelectorAll('article.card').forEach(initShotToggle);
+
+// ====== 8. Lightbox ======
+var overlay = document.getElementById('lightboxOverlay');
+var lbImg = document.getElementById('lightboxImg');
+
+function openLightbox(img){
+  if (!overlay || !lbImg) return;
+  lbImg.src = img.src;
+  lbImg.alt = img.alt;
+  overlay.classList.add('open');
+}
+if (overlay){
+  overlay.addEventListener('click', function(){
+    overlay.classList.remove('open');
+  });
+}
+window.openLightbox = openLightbox;
+
+// ====== 9. 複製文案（caption + hashtag，iOS fallback）======
+function copyScript(btn){
+  var article = btn.closest('article.card');
+  if (!article) return;
+  var caption = article.dataset.caption;
+  var hashtagsRaw = article.dataset.hashtags || '';
+  var hashtags = hashtagsRaw.trim() ? hashtagsRaw.trim() : '';
+  var originalLabel = btn.textContent;
+  var text;
+  if (caption) {
+    text = caption;
+    if (hashtags) text = text + '\n\n' + hashtags;
+  } else {
+    var title = article.querySelector('.title');
+    var rows = article.querySelectorAll('.timeline .row');
+    var cta = article.querySelector('.cta span:last-child');
+    var lines = [];
+    if (title) lines.push('【' + title.textContent.trim() + '】\n');
+    rows.forEach(function(row){
+      var say = row.querySelector('.say');
+      if (say) lines.push(say.textContent.trim());
+    });
+    if (cta) lines.push('\nCTA：' + cta.textContent.trim());
+    text = lines.join('\n');
+    if (hashtags) text = text + '\n\n' + hashtags;
+  }
+  function doCopy(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopy(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = originalLabel; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = originalLabel; }, 2000);
+  });
+}
+window.copyScript = copyScript;
+
+// ====== 10. 複製脆文 ======
+function copyThread(btn){
+  var card = btn.closest('.thread-card');
+  if (!card) return;
+  var textEl = card.querySelector('.thread-text');
+  var hashEl = card.querySelector('.thread-hash');
+  var text = (textEl ? textEl.textContent.trim() : '') +
+             (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+  function doCopyThread(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopyThread(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = '複製脆文'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = '複製脆文'; }, 2000);
+  });
+}
+window.copyThread = copyThread;
+
+})();
+</script>
+
+</body>
+</html>

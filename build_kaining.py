@@ -160,11 +160,11 @@ def owner_article(num, title, pie, insight, scene, timeline, cta,
 
     # article 組裝（P1#2 fix：title/insight/scene/cta/pie/batch 走 _esc_text）
     return (
-        '<article class="card" data-cat="' + _esc_attr(pie) + '" id="' + _esc_attr(pid) + '"' + cap_attr + hashtag_attr + '>\n'
+        '<article class="card" id="' + _esc_attr(pid) + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + _esc_attr(color) + '">\n'
         '    <div class="card-meta">\n'
         '      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>\n'
-        '      <span class="pie">' + _esc_text(pie) + '</span>\n'
+        ''  # 派系名為內部標籤、不對外露；派系色仍由 card-head 左邊框 var(--pie) 呈現
         '      <span class="num">No. ' + _esc_text(str(num).zfill(2)) + '</span>\n'
         '      <span class="batch">' + _esc_text(batch) + '</span>\n'
         '    </div>\n' +

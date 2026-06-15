@@ -3180,15 +3180,45 @@ def run_per_file_checks(
         results.append((cid, status, f.name, detail))
     return results
 
+
+def run_c016_all(lib_dir):
+    """B-1（2026-06-15 WP2）：對 owner_projection 內所有 owner 的公開 HTML 跑 C-016 派系名洩漏掃描。
+    取代 pre-commit Part 3.5 hardcoded 7-業主清單（漏新業主、楷甯被跳過導致派系名洩漏 production 的根因）。
+    owner 清單 = _OWNER_HTML_MAP.keys()（projection-derived，新業主登記後自動納入）。
+    WARN（HTML 缺失/讀取失敗/未知業主）對 projection-listed owner 視為 FAIL（防 silent-skip class）。
+    """
+    owners = list(_OWNER_HTML_MAP.keys())
+    print(f"[C-016-ALL] 掃描 projection {len(owners)} 業主公開 HTML 派系名洩漏")
+    failed = False
+    for owner in owners:
+        status, msg = chk_c016_no_faction_leak_in_html(owner, lib_dir)
+        print(f"  {owner}: {status}: {msg}")
+        if status != "PASS":
+            failed = True
+    if failed:
+        print("❌ C-016-ALL：有業主派系名洩漏、HTML 缺失或讀取失敗（WARN 亦視為 FAIL）")
+    else:
+        print(f"✅ C-016-ALL：{len(owners)} 業主公開 HTML 全無派系名洩漏")
+    return 1 if failed else 0
+
+
 # ────────────────────────────────────────────
 # 主程式
 # ────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="腳本批次品管員（含 V2 schema + voice_lock 守門）")
     parser.add_argument("--owner",     help="業主名（以 owner_projection.generated.json 為準，不傳則從首個 yaml 的 owner 欄自動偵測）")
-    parser.add_argument("--batch-dir", required=True, help="第 N 批 yaml 資料夾絕對路徑")
+    parser.add_argument("--batch-dir", required=False, help="第 N 批 yaml 資料夾絕對路徑（--c016-all 模式不需）")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
+    parser.add_argument("--c016-all",  action="store_true", help="B-1：掃描 owner_projection 全業主公開 HTML 的 C-016 派系名洩漏（取代 pre-commit hardcoded 清單）")
     args = parser.parse_args()
+
+    # B-1（WP2）：C-016 全業主掃描模式（projection-derived，新業主自動納入；不需 --batch-dir）
+    if args.c016_all:
+        sys.exit(run_c016_all(Path(__file__).resolve().parent))
+
+    if not args.batch_dir:
+        parser.error("--batch-dir 為必填（除非使用 --c016-all）")
 
     # P1-3：設模組旗標讓 check fn 知道是否 strict
     global _STRICT_MODE

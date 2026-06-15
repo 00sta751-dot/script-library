@@ -1292,6 +1292,183 @@ def check_15_pwa_assets():
     return fails
 
 
+# === check 16 / 17（2026-06-15 WP2 守門員補強）===
+# check 16：脆文 source → 對外頁脆文卡數一致性（第10洞——脆文沒上去就擋）
+# check 17：pre-commit C-016 anti-regression（B-9——守門涵蓋新業主）
+THREAD_SOURCE_GLOBS = ("threads_*.md", "*脆文*.md")
+THREAD_HEADING_RE = re.compile(r'^##\s*(?:Threads|脆文)\s*(?:#?T)?\d+', re.MULTILINE)
+
+
+def _load_owner_projection_records_for_deploy():
+    proj_path = LIB / 'owner_projection.generated.json'
+    if not proj_path.exists():
+        raise RuntimeError(f'owner_projection.generated.json 不存在：{proj_path}')
+    with open(proj_path, encoding='utf-8') as f:
+        proj = json.load(f)
+    owners = proj.get('owners')
+    if not isinstance(owners, dict) or not owners:
+        raise RuntimeError('owner_projection.generated.json 缺 owners 欄位或為空')
+    return owners
+
+
+def _owner_root_from_projection_record(owner, rec):
+    owner_dir = rec.get('owner_dir')
+    l2_path = rec.get('l2_path')
+    if not owner_dir or not l2_path:
+        raise RuntimeError(f'{owner}: owner_projection 缺 owner_dir/l2_path')
+    p = Path(l2_path)
+    for candidate in (p, *p.parents):
+        if candidate.name == owner_dir:
+            return candidate
+    raise RuntimeError(f'{owner}: 無法從 l2_path 推回 owner root：{l2_path}')
+
+
+def _batch_number(batch_dir):
+    m = re.search(r'第\s*(\d+)\s*批', batch_dir.name)
+    return int(m.group(1)) if m else None
+
+
+def _thread_source_files(batch_dir):
+    files = []
+    for pattern in THREAD_SOURCE_GLOBS:
+        files.extend(batch_dir.glob(pattern))
+    cleaned = []
+    seen = set()
+    for p in files:
+        if not p.is_file():
+            continue
+        if re.search(r'(摘要|覆核|報告|README|draft|草稿|wip|未採用)', p.name, re.IGNORECASE):
+            continue
+        key = str(p.resolve())
+        if key not in seen:
+            seen.add(key)
+            cleaned.append(p)
+    return cleaned
+
+
+def _latest_batch_with_threads(owner_root):
+    prod_dir = owner_root / '01_腳本生產'
+    if not prod_dir.exists():
+        return None, []
+    candidates = []
+    for batch_dir in prod_dir.iterdir():
+        if not batch_dir.is_dir() or batch_dir.name.startswith('_'):
+            continue
+        n = _batch_number(batch_dir)
+        if n is None:
+            continue
+        files = _thread_source_files(batch_dir)
+        if files:
+            candidates.append((n, batch_dir.stat().st_mtime, batch_dir.name, batch_dir, files))
+    if not candidates:
+        return None, []
+    _, _, _, batch_dir, files = max(candidates, key=lambda x: (x[0], x[1], x[2]))
+    return batch_dir, files
+
+
+def _pick_thread_source(files):
+    return max(files, key=lambda p: (1 if re.search(r'(^|[_-])v2([_-]|\.|$)', p.name.lower()) else 0, p.stat().st_mtime, p.name))
+
+
+def _count_html_class(html, class_name):
+    count = 0
+    for m in re.finditer(r'class=["\']([^"\']+)["\']', html, re.IGNORECASE):
+        if class_name in m.group(1).split():
+            count += 1
+    return count
+
+
+def check_16_threads_presence_matches_latest_batch():
+    """check 16（2026-06-15 WP2 第10洞）：業主最新批若有脆文 source，對外頁必須渲染相同數量脆文卡。
+    最新批無脆文 source → SKIP（不誤判仲豪等舊卡無新 source 的業主）。
+    rendered = thread-card 或 th-card（溫蒂變體）；expected = 脆文 source `## Threads/脆文 NN` heading 數
+    （叭噗 `## 脆文 #T01` 亦計）。source 有但 rendered==0 或 !=expected → FAIL。"""
+    log('[check 16] 脆文 source → 對外頁脆文卡數一致性')
+    fails = []
+    try:
+        owners = _load_owner_projection_records_for_deploy()
+    except Exception as e:
+        msg = f'❌ check 16: owner_projection 讀取失敗：{e}'
+        log(f'  {msg}')
+        return [msg]
+
+    for owner, rec in owners.items():
+        html_rel = rec.get('html_file')
+        if not html_rel:
+            msg = f'❌ check 16 [{owner}]: owner_projection 缺 html_file'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+        try:
+            owner_root = _owner_root_from_projection_record(owner, rec)
+            batch_dir, sources = _latest_batch_with_threads(owner_root)
+        except Exception as e:
+            msg = f'❌ check 16 [{owner}]: latest threads batch 解析失敗：{e}'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+        if not batch_dir or not sources:
+            log(f'  ⏭️ {owner}: 最新批無脆文 source，SKIP')
+            continue
+        source = _pick_thread_source(sources)
+        try:
+            text = source.read_text(encoding='utf-8-sig', errors='replace')
+        except Exception as e:
+            msg = f'❌ check 16 [{owner}]: 脆文 source 讀取失敗：{source} / {e}'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+        expected = len(THREAD_HEADING_RE.findall(text))
+        if expected <= 0:
+            msg = f'❌ check 16 [{owner}]: 脆文 source 有檔但找不到 thread heading：{source}'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+        html_path = LIB / html_rel
+        try:
+            html = html_path.read_text(encoding='utf-8', errors='replace')
+        except Exception as e:
+            msg = f'❌ check 16 [{owner}]: HTML 讀取失敗：{html_rel} / {e}'
+            log(f'  {msg}')
+            fails.append(msg)
+            continue
+        tc = _count_html_class(html, 'thread-card')
+        thc = _count_html_class(html, 'th-card')
+        rendered = tc if tc else thc
+        if rendered == 0 or rendered != expected:
+            msg = (f'❌ check 16 [{owner}] {html_rel}: 脆文 source={source.name} '
+                   f'expected={expected}, rendered={rendered}（thread-card={tc}, th-card={thc}）'
+                   f' — 脆文沒上頁或數量不符')
+            log(f'  {msg}')
+            fails.append(msg)
+        else:
+            log(f'  ✅ {owner}: {batch_dir.name}/{source.name} expected={expected} rendered={rendered}')
+    return fails
+
+
+def check_17_gate_owner_coverage():
+    """check 17（2026-06-15 WP2 B-9）：anti-regression——本地 pre-commit C-016 守門必須
+    projection-driven（含 --c016-all），不得用 hardcoded 業主 loop（漏新業主的根因）。"""
+    log('[check 17] pre-commit C-016 守門涵蓋（anti-regression）')
+    fails = []
+    hook_path = LIB / '.git' / 'hooks' / 'pre-commit'
+    if not hook_path.exists():
+        log('  ⏭️ pre-commit hook 不存在（非 git 工作樹），SKIP')
+        return []
+    text = hook_path.read_text(encoding='utf-8', errors='replace')
+    if re.search(r'for\s+owner\s+in\s+瑞祥\s+仲豪\s+昀臻\s+阿奇\s+叭噗_小C\s+溫蒂\s+詩婷', text):
+        msg = '❌ check 17: pre-commit Part 3.5 仍用 hardcoded 7-業主 C-016 loop（漏新業主）'
+        log(f'  {msg}')
+        fails.append(msg)
+    if '--c016-all' not in text:
+        msg = '❌ check 17: pre-commit Part 3.5 未呼叫 validate_script_batch.py --c016-all'
+        log(f'  {msg}')
+        fails.append(msg)
+    if not fails:
+        log('  ✅ pre-commit Part 3.5 C-016 使用 --c016-all（projection-driven，新業主自動涵蓋）')
+    return fails
+
+
 # === main ===
 
 def main():
@@ -1343,6 +1520,12 @@ def main():
     # v7 新增（2026-06-12 零留尾戰役 — PWA 三件驗證）
     all_fails += check_15_pwa_assets()
     log('')
+    # v8 新增（2026-06-15 WP2 第10洞 — 脆文 source→對外頁數量一致性）
+    all_fails += check_16_threads_presence_matches_latest_batch()
+    log('')
+    # v9 新增（2026-06-15 WP2 B-9 — pre-commit C-016 守門涵蓋 anti-regression）
+    all_fails += check_17_gate_owner_coverage()
+    log('')
 
     log('=' * 60)
     if all_fails:
@@ -1354,7 +1537,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 15 件齊')
+        log('✅ 全部通過 — 17 件齊')
         sys.exit(0)
 
 

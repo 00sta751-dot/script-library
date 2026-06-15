@@ -269,9 +269,18 @@ def check_3_build_html_dual_change():
     py_added = [p for st, p in entries if p.endswith('.py') and ('build_' in p or 'update_' in p) and st == 'A']
 
     if html_modified and not py_modified:
-        msg = f'❌ Modified .html ({html_modified}) 但沒 Modified build_*.py — 手 patch html 沒同步原始碼'
-        log(f'  {msg}')
-        fails.append(msg)
+        # 2026-06-15 新增：yaml-driven 內容重建通道（仿 DEPLOY_TOOL_CHANGE_ONLY 已核准前例）
+        # 情境：改 L2 source data（腳本 yaml，不在本 repo）→ 重跑 build_*.py → html 為乾淨重建輸出，
+        # 但 build 程式碼本身未變。舊 check_3 假設「html 變⟺build 程式變」對 yaml-driven 內容重建誤判。
+        # 顯式宣告 DEPLOY_CONTENT_REBUILD=1 → 降 WARN + 稽核留痕；其餘 16 件照常 hard。
+        if os.environ.get('DEPLOY_CONTENT_REBUILD') == '1':
+            msg = f'⚠️ [CHECK_3 DOWNGRADED — WARN_ALLOWANCE] DEPLOY_CONTENT_REBUILD: html ({html_modified}) 為 yaml-driven 內容重建（L2 source 變更不在本 repo、build 程式未變），降 WARN 放行；其餘 16 件照常'
+            log(f'  {msg}')
+            write_skip_log(f'WARN_ALLOWANCE DEPLOY_CONTENT_REBUILD check_3 html_modified={html_modified}')
+        else:
+            msg = f'❌ Modified .html ({html_modified}) 但沒 Modified build_*.py — 手 patch html 沒同步原始碼（yaml-driven 內容重建請用 DEPLOY_CONTENT_REBUILD=1 顯式宣告，見 SOP v2 §7-B）'
+            log(f'  {msg}')
+            fails.append(msg)
     elif py_modified and not html_modified:
         # 2026-06-11 保鏢核可：純工具變更通道（仿 OWNER_PROJECTION_VERIFIER_OPTIONAL 前例）
         # 只改 build_*.py 的 argparse/守門邏輯、零渲染輸出變更時，顯式宣告降 WARN + 稽核留痕

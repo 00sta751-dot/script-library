@@ -26,15 +26,17 @@ LIB = os.path.dirname(os.path.abspath(__file__))
 if LIB not in sys.path:
     sys.path.insert(0, LIB)
 
-_p = argparse.ArgumentParser(description='build_wendi.py — 溫蒂腳本庫 build script（yaml-driven）')
+_p = argparse.ArgumentParser(description='build_wendi.py — 溫蒂腳本庫 build script（yaml-driven，累積式）')
 _p.add_argument('--mode', choices=['yaml'], default='yaml',
                 help='yaml=yaml-driven（標準模式）')
 _p.add_argument('--yaml-dir', dest='yaml_dir', default='',
-                help='yaml 批次資料夾絕對路徑（必填）')
+                help='yaml 批次資料夾絕對路徑；多批次用逗號分隔「dir1,dir2」（必填）')
 _p.add_argument('--batch-label', dest='batch_label', default='',
-                help='批次顯示名稱，如「第 02 批 · 2026-06-03」')
+                help='批次顯示名稱，如「第 02 批 · 2026-06-03」；多批次逗號分隔')
 _p.add_argument('--expected-count', dest='expected_count', type=int, default=None,
-                help='預期 yaml 數量（驗證用）')
+                help='預期 yaml 數量（驗證用，單批時有效）')
+_p.add_argument('--allow-drop-batches', dest='allow_drop_batches', action='store_true', default=False,
+                help='允許本次 build 讓已上線批次消失（⚠危險，需澤君明確授權）')
 _p.add_argument('--out', dest='out', default=os.path.join(LIB, 'wendi.html'))
 _args, _ = _p.parse_known_args()
 
@@ -615,77 +617,164 @@ function copyThread(btn){var c=btn.closest('.th-card');var tx=c.querySelector('.
 # ============================================================
 # main
 # ============================================================
-def main():
-    # ==== yaml-driven 模式（標準，唯一支援路徑）====
-    if not _args.yaml_dir:
-        print('ERROR: --yaml-dir 必填（新業主標準模式：--mode yaml --yaml-dir <路徑>）', file=sys.stderr)
-        sys.exit(1)
-
-    yaml_dir = os.path.abspath(_args.yaml_dir)
-    if not os.path.isdir(yaml_dir):
-        print(f'ERROR: yaml-dir 不存在：{yaml_dir}', file=sys.stderr)
-        sys.exit(1)
-
-    from yaml_to_sc import load_yaml_articles
-    yaml_articles = load_yaml_articles(yaml_dir, expected_count=_args.expected_count)
-
-    if not yaml_articles:
-        print('ERROR: yaml-dir 內沒有找到任何 script_*.yaml，中止出貨', file=sys.stderr)
-        sys.exit(1)
-
-    batch_label = _args.batch_label or os.path.basename(yaml_dir)
-    print(f'build_wendi.py loaded OK（yaml-driven）')
-    print(f'yaml-dir: {yaml_dir}')
-    print(f'batch-label: {batch_label}')
-    print(f'yaml 數量: {len(yaml_articles)}')
-
-    scripts = []
-    for idx, ydata in enumerate(yaml_articles, start=1):
-        s = wendi_yaml_adapter(ydata, num=idx)
-        scripts.append(s)
-
-    print(f'parsed: {len(scripts)} 腳本（yaml-driven）')
-
-    if len(scripts) != 13:
-        print(f'WARNING: 腳本數 {len(scripts)} != 13（非標準批次，請確認）', file=sys.stderr)
-
-    # 藏鏡人完整性（SOP §2.5 / L0 §9 每支 >=2；S 級不出貨缺藏鏡人的頁）
-    miss = [s['no'] for s in scripts if len(s['mirrors']) < 2]
-    if miss:
-        print(f'ERROR: 以下腳本藏鏡人 <2，中止出貨：{miss}', file=sys.stderr)
-        sys.exit(1)
-
-    # 脆文（yaml-dir 下的 threads_*.md，若存在；走新格式解析器）
-    threads = []
-    import glob as _glob
-    for threads_md_path in sorted(_glob.glob(os.path.join(yaml_dir, 'threads_*.md'))):
-        with open(threads_md_path, 'r', encoding='utf-8') as f:
-            threads_md = f.read()
-        parsed = parse_threads_new_fmt(threads_md)
-        if parsed:
-            threads.extend(parsed)
-        else:
-            # fallback：舊格式（## 7 篇 Threads 大標）
-            threads.extend(parse_threads(threads_md))
-    print(f'脆文: {len(threads)} 篇')
-
+def _build_section(batch_label, scripts):
+    """產一個批次 section HTML（便當格 wendi 版型）。
+    section id 用 sect-wendi-NN（從 batch_label 取批次號）。
+    """
     cards = '\n'.join(render_card(s) for s in scripts)
-    threads_html = '\n'.join(render_thread(t) for t in threads)
-
-    # batch_id：從 batch_label 取第一個「第 XX 批」供 id 用
     batch_id_m = re.search(r'第\s*(\d+)\s*批', batch_label)
-    batch_id = 'b' + batch_id_m.group(1).zfill(2) if batch_id_m else 'bnew'
-
-    section = (
-        f'<section class="group collapsed" id="{esc(batch_id)}">'
-        f'<div class="grp-head" onclick="toggleGroup(\'{esc_attr(batch_id)}\')">'
-        # 2026-06-12 WP-D：tag 徽章已含「第 NN 批」，ttl 只放日期段（舊版 ttl 重放整個
-        # batch_label → 線上 head 顯示「第 02 批第 02 批 · 2026-06-03」+ 空 <small>）
-        f'<span class="tag">{esc(batch_label.split("·")[0].strip())}</span>'
-        f'<span class="ttl">{esc(batch_label.split("·", 1)[1].strip() if "·" in batch_label else batch_label)}</span>'
+    batch_num = batch_id_m.group(1) if batch_id_m else 'new'
+    sect_id = f'sect-wendi-{batch_num.zfill(2)}'
+    tag_text = batch_label.split('\xb7')[0].strip()
+    ttl_text = batch_label.split('\xb7', 1)[1].strip() if '\xb7' in batch_label else batch_label
+    return (
+        f'<section class="group collapsed" id="{esc(sect_id)}">'
+        f'<div class="grp-head" onclick="toggleGroup(\'{esc_attr(sect_id)}\')">'
+        f'<span class="tag">{esc(tag_text)}</span>'
+        f'<span class="ttl">{esc(ttl_text)}</span>'
         f'<span class="cnt">{len(scripts)} 支</span></div>'
         f'<div class="cards">{cards}</div></section>'
     )
+
+
+def _parse_existing_batch_nums(html):
+    """從現有 wendi.html 取得已渲染批次號（set of str）。
+    認識舊格式 id="b02" 以及新格式 id="sect-wendi-02"。
+    """
+    nums = set()
+    for m in re.finditer(r'<section[^>]+id="sect-wendi-(\d+)"', html):
+        nums.add(m.group(1))
+    for m in re.finditer(r'<section[^>]+id="b(\d+)"', html):
+        nums.add(m.group(1))
+    return nums
+
+
+def main():
+    # ==== yaml-driven 累積模式（標準，唯一支援路徑）====
+    if not _args.yaml_dir:
+        print('ERROR: --yaml-dir 必填（--mode yaml --yaml-dir <路徑>）', file=sys.stderr)
+        sys.exit(1)
+
+    import glob as _glob
+
+    # 解析多 dir / 多 label（逗號分隔）
+    _yaml_dirs = [d.strip() for d in _args.yaml_dir.split(',') if d.strip()]
+    _batch_labels_raw = [lb.strip() for lb in (_args.batch_label or '').split(',') if lb.strip()]
+
+    from yaml_to_sc import load_yaml_articles
+
+    # 防 label > dir 早期報錯（bug #2：從實際 batches 取，不從 raw label 取）
+    if len(_batch_labels_raw) > len(_yaml_dirs):
+        print(
+            f'ERROR: --batch-label 數量（{len(_batch_labels_raw)}）> --yaml-dir 數量（{len(_yaml_dirs)}）'
+            f'，多餘的 label 無法映射到真實 dir，拒絕繼續',
+            file=sys.stderr
+        )
+        sys.exit(2)
+
+    # 載入各批次
+    _yaml_batches = []  # list of (batch_label, scripts_list)
+    _num_cursor = 1     # 跨批次卡片編號（連續累加）
+    _single_expected = _args.expected_count if len(_yaml_dirs) == 1 else None
+
+    for _dir_i, _yaml_dir_path in enumerate(_yaml_dirs):
+        yaml_dir = os.path.abspath(_yaml_dir_path)
+        if not os.path.isdir(yaml_dir):
+            print(f'ERROR: yaml-dir 不存在：{yaml_dir}', file=sys.stderr)
+            sys.exit(1)
+
+        _this_label = (
+            _batch_labels_raw[_dir_i]
+            if _dir_i < len(_batch_labels_raw)
+            else os.path.basename(yaml_dir)
+        )
+        _this_expected = _single_expected if _dir_i == 0 else None
+
+        print(f'\n載入 batch {_dir_i + 1}/{len(_yaml_dirs)}: {os.path.basename(yaml_dir)} [{_this_label}]')
+        yaml_articles = load_yaml_articles(yaml_dir, expected_count=_this_expected)
+        if not yaml_articles:
+            print(f'ERROR: yaml-dir 內沒有找到任何 script_*.yaml：{yaml_dir}', file=sys.stderr)
+            sys.exit(1)
+
+        scripts = []
+        for idx, ydata in enumerate(yaml_articles, start=0):
+            s = wendi_yaml_adapter(ydata, num=_num_cursor + idx)
+            scripts.append(s)
+        _num_cursor += len(yaml_articles)
+
+        if len(scripts) != 13:
+            print(f'WARNING: 腳本數 {len(scripts)} != 13（非標準批次，請確認）', file=sys.stderr)
+
+        # 藏鏡人完整性（SOP §2.5 / L0 §9 每支 >=2）
+        miss = [s['no'] for s in scripts if len(s['mirrors']) < 2]
+        if miss:
+            print(f'ERROR: 以下腳本藏鏡人 <2，中止出貨：{miss}', file=sys.stderr)
+            sys.exit(1)
+
+        print(f'  解析 {len(scripts)} 腳本 OK')
+        _yaml_batches.append((_this_label, scripts))
+
+    _yaml_total = sum(len(s) for _, s in _yaml_batches)
+    print(f'\nyaml articles total OK（{_yaml_total} 支，{len(_yaml_batches)} 批次）')
+
+    # ==== 讀現有 wendi.html（累積式注入基礎）====
+    out_path = _args.out
+    if os.path.isfile(out_path):
+        with open(out_path, 'r', encoding='utf-8') as f:
+            c = f.read()
+        print(f'讀取現有 HTML：{out_path}（{len(c)} chars）')
+        _is_first_build = False
+    else:
+        c = ''
+        _is_first_build = True
+        print('wendi.html 不存在，首次建立（全新生成）')
+
+    # ==== 防下架鎖（yaml 模式）====
+    # 從舊 html 抓現有批次號（同時認識舊格式 b02 + 新格式 sect-wendi-02）
+    _existing_batch_nums = _parse_existing_batch_nums(c)
+    # 本次 build 實際批次號（從 _yaml_batches label 取，非 raw CLI input）
+    _new_batch_nums = set()
+    for _lbl, _ in _yaml_batches:
+        _m = re.search(r'第\s*(\d+)\s*批', _lbl)
+        if _m:
+            _new_batch_nums.add(_m.group(1))
+
+    _dropped = _existing_batch_nums - _new_batch_nums
+    if _dropped and not _args.allow_drop_batches:
+        _dropped_names = ', '.join(f'第{n}批' for n in sorted(_dropped, key=lambda x: int(x)))
+        print(f'ERROR: 防下架鎖觸發！本次 build 會讓以下批次從首頁消失：{_dropped_names}')
+        print(f'  現有批次（wendi.html）: {sorted(_existing_batch_nums, key=lambda x: int(x))}')
+        print(f'  本次 build 批次：{sorted(_new_batch_nums, key=lambda x: int(x))}')
+        print('  若確實要清空舊批，請加 --allow-drop-batches（危險，需澤君明確授權）')
+        sys.exit(2)
+    elif _dropped and _args.allow_drop_batches:
+        _dropped_names = ', '.join(f'第{n}批' for n in sorted(_dropped, key=lambda x: int(x)))
+        print(f'WARNING: --allow-drop-batches 已開啟，以下批次將從首頁移除：{_dropped_names}')
+    elif not _existing_batch_nums:
+        print('防下架鎖：wendi.html 無現有批次（首次建立），跳過檢查')
+    else:
+        print(f'防下架鎖 PASS：現有批次 {sorted(_existing_batch_nums, key=lambda x: int(x))} ⊆ 本次批次 {sorted(_new_batch_nums, key=lambda x: int(x))}')
+
+    # ==== 組裝 sections（最新批最上）====
+    _new_sections_html = []
+    for _lbl, _scs in reversed(_yaml_batches):
+        _new_sections_html.append(_build_section(_lbl, _scs))
+        print(f'  section 組裝: {_lbl} ({len(_scs)} 支)')
+
+    # ==== 脆文 section（只取最新批 threads_*.md）====
+    threads = []
+    _latest_yaml_dir = os.path.abspath(_yaml_dirs[-1])
+    for threads_md_path in sorted(_glob.glob(os.path.join(_latest_yaml_dir, 'threads_*.md'))):
+        with open(threads_md_path, 'r', encoding='utf-8') as f:
+            threads_md_content = f.read()
+        parsed = parse_threads_new_fmt(threads_md_content)
+        if parsed:
+            threads.extend(parsed)
+        else:
+            threads.extend(parse_threads(threads_md_content))
+    print(f'脆文: {len(threads)} 篇（最新批 {os.path.basename(_latest_yaml_dir)}）')
+
+    threads_html = '\n'.join(render_thread(t) for t in threads)
     thr_section = (
         f'<section class="thread-sec collapsed" id="threadsec">'
         f'<div class="sec-ttl" onclick="toggleThreads()"><span class="ico">🧵</span>'
@@ -694,60 +783,143 @@ def main():
         f'<div class="threads">{threads_html}</div></section>'
     ) if threads else ''
 
-    page = f'''<!DOCTYPE html>
-<html lang="zh-Hant-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FBFAF5">
-<meta property="og:title" content="溫蒂的腳本｜24歲・嘉義人在高雄">
-<meta property="og:image" content="{QVER}">
-<title>溫蒂的腳本 ｜ 24歲・嘉義人在高雄 🌿</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<!-- 此頁由 build_wendi.py 機械化讀腳本生成；勿手改，改 build_wendi.py 重跑 -->
-<style>
-{CSS}
-</style>
-</head>
-<body>
-<div class="wrap">
-<header class="hero"><div class="bento">
-<div class="cell id"><div class="qv"><img src="{QVER}" alt="溫蒂"></div>
-<div class="who"><div class="name">溫蒂<span class="en">WENDY · SKIN</span></div>
-<div class="slo">24歲嘉義人，一個人在高雄開工作室。<br><b>不完美，但敢走自己的路。</b></div></div></div>
-<div class="cell role"><div class="k">WHO I AM</div>
-<div class="v">高雄左營 · 油痘肌調理師<small>體內 + 體外同時調理，不只清粉刺</small></div></div>
-<div class="cell links">
-<a href="https://www.instagram.com/_yu0812_" target="_blank" rel="noopener">📸 IG</a>
-<a href="https://www.tiktok.com/@_yu0812_" target="_blank" rel="noopener">🎵 TikTok</a>
-<a href="https://www.threads.net/@_yu0812_" target="_blank" rel="noopener">🧵 Threads</a>
-<a class="line" href="https://page.line.me/162vpemu" target="_blank" rel="noopener">💬 LINE 預約</a></div>
-<div class="cell stat"><div class="big">{len(scripts)}</div><div class="lb">支腳本 · {esc(batch_label)}</div></div>
-</div></header>
-{section}
-{thr_section}
-<footer class="foot"><div class="by">溫蒂的腳本庫 · WENDY</div>
-<div>高雄左營 · 油痘肌調理師 ｜ 體內 + 體外同時調理</div></footer>
-</div>
-<script>
-{JS}
-</script>
-</body>
-</html>'''
+    _latest_label = _yaml_batches[-1][0]
 
-    with open(_args.out, 'w', encoding='utf-8') as f:
-        f.write(page)
-    size = os.path.getsize(_args.out)
-    print(f'HTML 已生成：{_args.out}  ({size} bytes)')
-    print(f'Total articles: {len(scripts)}')
+    # ==== 首次建立 → 全新生成 ====
+    if _is_first_build:
+        sections_block = '\n'.join(_new_sections_html)
+        page = (
+            '<!DOCTYPE html>\n'
+            '<html lang="zh-Hant-TW">\n'
+            '<head>\n'
+            '<meta charset="UTF-8">\n'
+            '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
+            '<meta name="theme-color" content="#FBFAF5">\n'
+            '<meta property="og:title" content="溫蒂的腳本（24歲・嘉義人在高雄">\n'
+            f'<meta property="og:image" content="{QVER}">\n'
+            '<title>溫蒂的腳本 ｜ 24歲・嘉義人在高雄 \U0001f33f</title>\n'
+            '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+            '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+            '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">\n'
+            '<!-- 此頁由 build_wendi.py 機械化讀腳本生成；勿手改，改 build_wendi.py 重跑 -->\n'
+            '<style>\n'
+            f'{CSS}\n'
+            '</style>\n'
+            '</head>\n'
+            '<body>\n'
+            '<div class="wrap">\n'
+            '<header class="hero"><div class="bento">\n'
+            f'<div class="cell id"><div class="qv"><img src="{QVER}" alt="溫蒂"></div>\n'
+            '<div class="who"><div class="name">溫蒂<span class="en">WENDY \xb7 SKIN</span></div>\n'
+            '<div class="slo">24歲嘉義人，一個人在高雄開工作室。<br><b>不完美，但敢走自己的路。</b></div></div></div>\n'
+            '<div class="cell role"><div class="k">WHO I AM</div>\n'
+            '<div class="v">高雄左營 \xb7 油痘肌調理師<small>體內 + 體外同時調理，不只清粉刺</small></div></div>\n'
+            '<div class="cell links">\n'
+            '<a href="https://www.instagram.com/_yu0812_" target="_blank" rel="noopener">\U0001f4f8 IG</a>\n'
+            '<a href="https://www.tiktok.com/@_yu0812_" target="_blank" rel="noopener">\U0001f3b5 TikTok</a>\n'
+            '<a href="https://www.threads.net/@_yu0812_" target="_blank" rel="noopener">\U0001f9f5 Threads</a>\n'
+            '<a class="line" href="https://page.line.me/162vpemu" target="_blank" rel="noopener">\U0001f4ac LINE 預約</a></div>\n'
+            f'<div class="cell stat"><div class="big">{_yaml_total}</div>'
+            f'<div class="lb">支腳本 \xb7 {esc(_latest_label)}</div></div>\n'
+            '</div></header>\n'
+            f'{sections_block}\n'
+            f'{thr_section}\n'
+            '<footer class="foot"><div class="by">溫蒂的腳本庫 \xb7 WENDY</div>\n'
+            '<div>高雄左營 \xb7 油痘肌調理師 ｜ 體內 + 體外同時調理</div></footer>\n'
+            '</div>\n'
+            '<script>\n'
+            f'{JS}\n'
+            '</script>\n'
+            '</body>\n'
+            '</html>'
+        )
+        nc = page
+        print('首次建立：全新生成 HTML')
+
+    else:
+        # ==== 累積式注入：把新 sections 注入到現有 html ====
+        nc = c
+
+        # 步驟1：移除同批次的舊 section（重建時替換）
+        for _lbl, _scs in _yaml_batches:
+            _m = re.search(r'第\s*(\d+)\s*批', _lbl)
+            if not _m:
+                continue
+            _bnum = _m.group(1)
+            for _old_id in ('b' + _bnum.zfill(2), f'sect-wendi-{_bnum.zfill(2)}'):
+                _pat = re.compile(
+                    r'<section[^>]+id="' + re.escape(_old_id) + r'"[^>]*>.*?</section>',
+                    re.DOTALL
+                )
+                if _pat.search(nc):
+                    nc = _pat.sub('', nc)
+                    print(f'  移除舊 section id="{_old_id}"（重建）')
+
+        # 步驟2：插入新 sections 到 </header> 之後
+        new_block = '\n'.join(_new_sections_html)
+        _ins_m = re.search(r'</header>', nc)
+        if _ins_m:
+            _ins_pos = _ins_m.end()
+            # 移除舊脆文 section（重新注入最新批）
+            nc = re.sub(
+                r'<section class="thread-sec[^>]*>.*?</section>',
+                '', nc, flags=re.DOTALL
+            )
+            insert_html = '\n' + new_block + ('\n' + thr_section if thr_section else '') + '\n'
+            nc = nc[:_ins_pos] + insert_html + nc[_ins_pos:]
+            print(f'累積注入：{len(_yaml_batches)} 個新 section 插入 </header> 之後')
+        else:
+            print('WARNING: 找不到 </header> 插入點，保留原 HTML 不改動', file=sys.stderr)
+            nc = c
+
+        # 步驟3：stats patch（big 數字 + lb 文字）
+        nc = re.sub(
+            r'(<div class="cell stat"><div class="big">)\d+(</div>)',
+            rf'\g<1>{_yaml_total}\g<2>',
+            nc
+        )
+        _lb_repl = r'\g<1>' + str(_yaml_total) + '支腳本 · ' + esc(_latest_label) + r'\g<2>'
+        nc = re.sub(
+            r'(<div class="lb">)\d+[^<]*(</div>)',
+            _lb_repl,
+            nc
+        )
+        print(f'Stats patch: total={_yaml_total}, batches={len(_yaml_batches)}, label={_latest_label}')
+
+    # ==== 寫出 ====
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(nc)
+    size = os.path.getsize(out_path)
+    print(f'\nHTML 已生成：{out_path}  ({size} bytes)')
+
+    # ==== assertions ====
+    arts = re.findall(r'<article\b', nc)
+    print(f'Total articles: {len(arts)}')
+    assert len(arts) >= _yaml_total, f'Expected >= {_yaml_total} articles, got {len(arts)}'
+    print(f'Articles assertion PASS: {len(arts)} >= {_yaml_total}')
+    if threads:
+        th_cards = re.findall(r'class="th-card"', nc)
+        assert len(th_cards) >= len(threads), f'Thread cards {len(th_cards)} < {len(threads)}'
+        print(f'Thread cards assertion PASS: {len(th_cards)} >= {len(threads)}')
+        _threads_hdr_m = re.search(
+            r'<section class="thread-sec[^>]*>.*?</section>', nc, re.DOTALL
+        )
+        if _threads_hdr_m:
+            _thr_batch_m = re.search(r'第\s*(\d+)\s*批', _threads_hdr_m.group(0))
+            _exp_batch_m = re.search(r'第\s*(\d+)\s*批', _latest_label)
+            if _thr_batch_m and _exp_batch_m:
+                assert _thr_batch_m.group(1) == _exp_batch_m.group(1), (
+                    f'Threads label 不一致！渲染第{_thr_batch_m.group(1)}批脃文'
+                    f'，但最新批應為第{_exp_batch_m.group(1)}批。'
+                )
+                print(f'Threads-label assertion PASS: 渲染第{_thr_batch_m.group(1)}批 == 最新批')
+    print('All assertions PASS')
     print()
     print('next step:')
-    print(f'  1. python validate_deploy.py')
-    print(f'  2. git add wendi.html build_wendi.py')
-    print(f'  3. git commit + push（霸告親手）')
-    print(f'  4. Playwright drive 線上自驗 9 件（SOP §8）')
+    print('  1. python validate_deploy.py')
+    print('  2. git add wendi.html build_wendi.py')
+    print('  3. git commit + push（霸告親手）')
+    print('  4. Playwright drive 線上自驗 9 件（SOP \xa78）')
 
 
 if __name__ == '__main__':

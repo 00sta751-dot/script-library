@@ -6,12 +6,15 @@ build_achi.py — 阿奇 腳本庫 build script
   - SOP_腳本上線_統一版_v2.md §5.2 新業主 build script 必含 9 件
   - yaml-driven（§6.5）：所有批次讀 yaml → 翻譯機 → 渲染
 
-用法：
-  python build_achi.py --mode yaml --yaml-dir <yaml資料夾路徑> --batch-label "第 01 批 · 2026-XX-XX"
+用法（單批）：
+  python build_achi.py --mode yaml --yaml-dir <yaml資料夾路徑> --batch-label "第 01 批 · 2026-XX-XX" --threads-md <脆文.md>
+用法（多批累積）：
+  python build_achi.py --mode yaml --yaml-dir "<dir1>,<dir2>" --batch-label "第 01 批 · 2026-XX-XX,第 02 批 · 2026-YY-YY" --threads-md "<md2>"
 
 更新日誌：
   2026-05-22：yaml_to_sc.py sub_desc 改從 '畫面' 欄位取值，修 .sub 字幕渲染（75 個）
   2026-05-22：加 Threads 脆文段（build_threads_section），每次 rebuild 自動帶入 7 篇
+  2026-06-16：累積式 multi-batch + 防下架鎖（對齊 build_index.py）
 """
 
 import os
@@ -45,6 +48,8 @@ _parser.add_argument('--threads-md', dest='threads_md', default='',
                      help='脆文 .md 檔案絕對路徑（必填；歷史重建第01批用 --allow-legacy-threads — 2026-06-11）')
 _parser.add_argument('--allow-legacy-threads', dest='allow_legacy_threads', action='store_true',
                      help='顯式允許使用第01批硬編脆文路徑（歷史重建專用）')
+_parser.add_argument('--allow-drop-batches', dest='allow_drop_batches', action='store_true',
+                     help='⚠危險：允許讓舊批次從首頁消失（需澤君明確授權）')
 _args, _unknown = _parser.parse_known_args()
 
 # ============================================================
@@ -324,29 +329,71 @@ if not _args.yaml_dir:
     print('ERROR: --yaml-dir 必填（新業主只支援 yaml-driven）', file=sys.stderr)
     sys.exit(1)
 
-if not os.path.isdir(_args.yaml_dir):
-    print(f'ERROR: yaml-dir 不存在：{_args.yaml_dir}', file=sys.stderr)
-    sys.exit(1)
-
 from yaml_to_sc import load_yaml_articles
+import re
 
-batch_label = _args.batch_label or f'yaml-driven · {os.path.basename(_args.yaml_dir)}'
-yaml_articles = load_yaml_articles(_args.yaml_dir, expected_count=_args.expected_count)
-num_start = _args.num_start
+# 解析多 dir / 多 label（逗號分隔；單 dir 向後相容）
+_yaml_dirs = [d.strip() for d in _args.yaml_dir.split(',') if d.strip()]
+_batch_labels_raw = [lb.strip() for lb in _args.batch_label.split(',') if lb.strip()]
 
-# 日期分組（C-016）：所有批次卡片按順序放進單一 date_group，不分派系
-# 派系色保留在 article card-head --pie 變數，視覺不變
-_all_arts = []
-for _idx, _ydata in enumerate(yaml_articles, start=0):
-    _art = owner_article_adapter(_ydata, num=num_start + _idx, batch_label=batch_label)
-    _all_arts.append(_art)
+for _d in _yaml_dirs:
+    if not os.path.isdir(_d):
+        print(f'ERROR: yaml-dir 不存在：{_d}', file=sys.stderr)
+        sys.exit(1)
 
-_yaml_total = len(_all_arts)
-print(f'yaml articles built OK ({_yaml_total} 部)')
+# ---- 防下架鎖：label 數不得超過 dir 數 ----
+if len(_batch_labels_raw) > len(_yaml_dirs):
+    print(f'ERROR: --batch-label 數量（{len(_batch_labels_raw)}）> --yaml-dir 數量（{len(_yaml_dirs)}），多餘的 label 無法映射到真實 dir，拒絕繼續')
+    print(f'  labels: {_batch_labels_raw}')
+    print(f'  dirs:   {_yaml_dirs}')
+    sys.exit(2)
 
-# 建單一批次 group（group head 只含批次日期，check_12 通過）
-all_sections = date_group(batch_label, 'b01', _all_arts)
-print(f'Date group assembled: {_yaml_total} 部，group head={batch_label!r}')
+_num_cursor = _args.num_start
+_single_expected = _args.expected_count if len(_yaml_dirs) == 1 else None
+
+# _yaml_batches: list of (batch_label, flat_arts_list)，順序舊→新
+_yaml_batches = []
+for _dir_i, _yaml_dir_path in enumerate(_yaml_dirs):
+    _this_batch_label = (
+        _batch_labels_raw[_dir_i]
+        if _dir_i < len(_batch_labels_raw)
+        else f'yaml-driven · {os.path.basename(_yaml_dir_path)}'
+    )
+    _this_expected = _single_expected if _dir_i == 0 else None
+    print(f'\n  載入 batch {_dir_i+1}/{len(_yaml_dirs)}: {os.path.basename(_yaml_dir_path)} [{_this_batch_label}]')
+    _this_yaml_articles = load_yaml_articles(_yaml_dir_path, expected_count=_this_expected)
+    _this_flat = []
+    for _idx, _ydata in enumerate(_this_yaml_articles, start=0):
+        _art = owner_article_adapter(_ydata, num=_num_cursor + _idx, batch_label=_this_batch_label)
+        _this_flat.append(_art)
+    _num_cursor += len(_this_yaml_articles)
+    _yaml_batches.append((_this_batch_label, _this_flat))
+    print(f'    {len(_this_yaml_articles)} 部 → num_start={_num_cursor - len(_this_yaml_articles)}')
+
+_yaml_total = sum(len(arts) for _, arts in _yaml_batches)
+print(f'\nyaml articles total OK ({_yaml_total} 部 across {len(_yaml_batches)} 批次)')
+
+# 每批產一個「★ 批次 section」（最新批最上，id="sect-new-N"）
+_yaml_batch_sections = []
+for _b_i, (_b_label, _b_arts) in enumerate(reversed(_yaml_batches)):
+    _grp_id = f'new-{len(_yaml_batches) - _b_i}'
+    _b_sect = (
+        '<header class="section-head" id="sect-' + _grp_id + '">\n'
+        '  <span class="roman">★</span>\n'
+        '  <span class="label">' + _b_label + ' 更新<span class="en">批次腳本</span></span>\n'
+        '  <span class="rule"></span>\n'
+        '  <span class="count">' + str(len(_b_arts)) + ' scripts</span>\n'
+        '</header>\n'
+        '<div class="cards">\n' +
+        '\n'.join(_b_arts) + '\n'
+        '</div>'
+    )
+    _yaml_batch_sections.append(_b_sect)
+    print(f'  yaml section 組裝: {_b_label} ({len(_b_arts)} 部)')
+
+# 本次用最新批脆文（_yaml_batches 最後一個）
+_latest_batch_label = _yaml_batches[-1][0] if _yaml_batches else ''
+print(f'\nyaml-driven all_sections assembled: {len(_yaml_batches)} yaml批 sections')
 
 # ============================================================
 # 寫入 HTML 檔案
@@ -359,45 +406,35 @@ if not os.path.exists(HTML_FILE):
 with open(HTML_FILE, 'r', encoding='utf-8') as f:
     c = f.read()
 
-# 找 SECTIONS_PLACEHOLDER 標記
-PLACEHOLDER = '<!-- SECTIONS_PLACEHOLDER — build_' + OWNER_SLUG + '.py 負責替換此區塊 -->'
-PLACEHOLDER_ALT = '<!-- SECTIONS_PLACEHOLDER'
+# ---- 找 stats section 結束位置（所有 articles/sections 的起點）----
+# 策略：找 <section class="stats"> 的結束 </section> → 到 <footer 之間整段替換
+# 這樣不管舊 html 裡有多少 group/section/article 殘留都能完整清掉（修重複 bug 2026-06-16）
+_stats_section_end = c.find('</section>', c.find('<section class="stats"'))
+if _stats_section_end < 0:
+    print('ERROR: 找不到 <section class="stats"> 結尾 </section>，無法定位 sections 插入點', file=sys.stderr)
+    sys.exit(1)
+_insert_start = _stats_section_end + len('</section>')
+print(f'[sections] insert_start at char {_insert_start}（stats section 結尾後）')
 
-placeholder_pos = c.find(PLACEHOLDER)
-if placeholder_pos < 0:
-    # 嘗試通用 placeholder
-    placeholder_pos = c.find(PLACEHOLDER_ALT)
-    if placeholder_pos < 0:
-        # fallback：找第一個 section-head 作為 sections 起點
-        _sh_fallback = c.find('<header class="section-head"')
-        if _sh_fallback > 0:
-            placeholder_pos = _sh_fallback
-            placeholder_end = placeholder_pos  # 不跳過任何前綴文字
-            print('[sections] 找不到 SECTIONS_PLACEHOLDER，使用 section-head fallback', file=sys.stderr)
-        else:
-            print('ERROR: 找不到 SECTIONS_PLACEHOLDER 標記，也找不到 section-head fallback', file=sys.stderr)
-            sys.exit(1)
-    else:
-        # 找到行尾
-        placeholder_end = c.find('\n', placeholder_pos) + 1
-else:
-    placeholder_end = placeholder_pos + len(PLACEHOLDER) + 1
+# 找 <footer（所有 sections 的結束邊界）
+footer_pos = c.find('<footer', _insert_start)
+if footer_pos < _insert_start:
+    print('ERROR: 找不到 <footer，無法確定 sections 結束邊界', file=sys.stderr)
+    sys.exit(1)
+tail = c[footer_pos:]
+print(f'[sections] footer_pos at char {footer_pos}，tail 從此截斷')
 
-# 找 <footer（舊 sections 結束標誌，含舊 threads section）
-footer_pos = c.find('<footer', max(placeholder_end, placeholder_pos))
-if footer_pos > placeholder_pos:
-    # 跳過舊 sections（含舊 threads section），直接接 <footer
-    tail = c[footer_pos:]
-else:
-    # 沒有 footer 或 footer 在前面，用原邏輯
-    tail = c[placeholder_end:]
-
-# Threads 脆文段（每次 rebuild 帶入）
+# Threads 脆文段（每次 rebuild 帶入最新批脆文）
 # script-library 位於 Claude/Projects/短影音系統/L4_工具腳本/_部署系統/script-library
 # 往上 5 層到達 Claude root → Claude/Projects/...
 _claude_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..'))
+
+# --threads-md 支援逗號分隔（多批），取最後一個（最新批）
 if _args.threads_md:
-    _threads_md = os.path.normpath(_args.threads_md)
+    _threads_md_list_raw = [t.strip() for t in _args.threads_md.split(',') if t.strip()]
+    _threads_md = os.path.normpath(_threads_md_list_raw[-1])  # 只用最新批脆文
+    if len(_threads_md_list_raw) > 1:
+        print(f'NOTE: 共 {len(_threads_md_list_raw)} 批脆文 md，只渲染最新批（check 16 限制）')
 elif _args.allow_legacy_threads:
     _threads_md = os.path.normpath(os.path.join(
         _claude_root, 'Projects',
@@ -410,7 +447,11 @@ else:
     sys.exit(2)
 threads_html = build_threads_section(_threads_md)
 
-nc = c[:placeholder_pos] + all_sections + '\n\n' + threads_html + '\n' + tail
+# 組裝 all_sections：yaml 批次 sections（最新→最舊）+ threads
+all_sections_html = '\n\n'.join(_yaml_batch_sections) + '\n\n' + threads_html
+
+# 整段替換：stats section 結尾 → footer 之間，換成乾淨的新 sections（修重複 bug）
+nc = c[:_insert_start] + '\n\n' + all_sections_html + '\n' + tail
 
 # CSS patch：補 .group.collapsed > .threads-grid（子選擇器，check_6 通過）
 # achi.html 原有後代選擇器版本，改為同時含子選擇器版讓 validate check_6 通過
@@ -420,15 +461,118 @@ if _OLD_CSS in nc and '.group.collapsed > .threads-grid' not in nc:
     nc = nc.replace(_OLD_CSS, _NEW_CSS)
     print('[css-patch] 補 .group.collapsed > .threads-grid CSS rule OK')
 elif '.group.collapsed > .threads-grid' in nc:
-    print('[css-patch] .group.collapsed > .threads-grid 已存在，跳過')
+    print('[css-patch] .group.collapsed > .threads-grid 已存在，不重複加')
 else:
-    print('[css-patch] WARNING: 找不到原有 CSS rule，跳過 patch', file=sys.stderr)
+    print('[css-patch] WARNING: 找不到原有 CSS rule，無法 patch', file=sys.stderr)
+
+# ---- Dynamic stats patch ----
+_total_scripts = len(re.findall(r'<article\b', nc))
+_sections_count = len(_yaml_batches)  # yaml-driven：每批一個 section
+
+# 取最新批 label 作為日期來源
+_batch_source = _batch_labels_raw[-1] if _batch_labels_raw else ''
+_batch_date_m = re.search(r'(\d{4})-(\d{2})-(\d{2})', _batch_source)
+if _batch_date_m:
+    _date_str = f'{_batch_date_m.group(1)}・{_batch_date_m.group(2)}・{_batch_date_m.group(3)}'
+else:
+    _date_str = None
+
+nc = re.sub(r'共 <b>\d+</b> 部', f'共 <b>{_total_scripts}</b> 部', nc)
+nc = re.sub(
+    r'<span>\d+ 主題</span>',
+    f'<span>{_sections_count} 批次</span>',
+    nc
+)
+nc = re.sub(
+    r'(<div class="stat"><div class="n">)\d+(</div><div class="l">Total scripts</div></div>)',
+    rf'\g<1>{_total_scripts}\g<2>',
+    nc
+)
+# 替換 Sections/Batches stats 方塊（idempotent）
+nc = re.sub(
+    r'(<div class="stat"><div class="n">)\d+(</div><div class="l">)Sections(</div></div>)',
+    rf'\g<1>{_sections_count}\g<2>批次\g<3>',
+    nc
+)
+nc = re.sub(
+    r'(<div class="stat"><div class="n">)\d+(</div><div class="l">批次</div></div>)',
+    rf'\g<1>{_sections_count}\g<2>',
+    nc
+)
+if _date_str:
+    nc = re.sub(r'\d{4}・\d{2}・\d{2} 更新', f'{_date_str} 更新', nc)
+print(f'Stats patch: total={_total_scripts}, sections={_sections_count}, date={_date_str}')
+
+# ---- Fail-closed 防下架鎖（yaml 模式）----
+# 從舊 html（c）抓已上線的批次號（sect-new / sect-new-N header）
+_existing_batch_labels = set()
+for _hdr in re.findall(
+    r'<header class="section-head" id="sect-new(?:-\d+)?">.*?</header>', c, re.DOTALL
+):
+    _hm = re.search(r'第\s*(\d+)\s*批', _hdr)
+    if _hm:
+        _existing_batch_labels.add(_hm.group(1))
+
+# 本次 build 要寫入的批次（從實際渲染的 _yaml_batches 取）
+_new_batch_nums = set()
+for _actual_label, _ in _yaml_batches:
+    _m = re.search(r'第\s*(\d+)\s*批', _actual_label)
+    if _m:
+        _new_batch_nums.add(_m.group(1))
+
+_dropped = _existing_batch_labels - _new_batch_nums
+if _dropped and not getattr(_args, 'allow_drop_batches', False):
+    _dropped_names = ', '.join(f'第{n}批' for n in sorted(_dropped, key=lambda x: int(x)))
+    print(f'ERROR: 防下架鎖觸發！本次 build 會讓以下批次從首頁消失：{_dropped_names}')
+    print(f'  現有批次（achi.html）: {sorted(_existing_batch_labels, key=lambda x: int(x))}')
+    print(f'  本次 build 批次：{sorted(_new_batch_nums, key=lambda x: int(x))}')
+    print('  若確實要清空舊批，請加 --allow-drop-batches（危險，需澤君明確授權）')
+    sys.exit(2)
+elif _dropped and getattr(_args, 'allow_drop_batches', False):
+    _dropped_names = ', '.join(f'第{n}批' for n in sorted(_dropped, key=lambda x: int(x)))
+    print(f'WARNING: --allow-drop-batches 已開啟，以下批次將從首頁移除：{_dropped_names}')
+elif not _existing_batch_labels:
+    print('防下架鎖：achi.html 無現有批次（首次建立），不需要檢查')
+else:
+    print(f'防下架鎖 PASS：現有批次 {sorted(_existing_batch_labels, key=lambda x: int(x))} 均在本次批次 {sorted(_new_batch_nums, key=lambda x: int(x))} 中')
 
 with open(HTML_FILE, 'w', encoding='utf-8') as f:
     f.write(nc)
 
 print(f'HTML 已更新：{HTML_FILE}')
-print(f'Total articles: {_yaml_total}')
+print(f'Total articles: {_total_scripts}')
+
+# ---- Assertions ----
+arts = re.findall(r'<article\b', nc)
+print('Total articles (re-verify):', len(arts))
+_yaml_total_verify = sum(len(arts_b) for _, arts_b in _yaml_batches)
+assert len(arts) >= _yaml_total_verify, f'Expected >= {_yaml_total_verify} articles (yaml batches total), got {len(arts)}'
+print(f'yaml mode articles assertion OK: {len(arts)} >= {_yaml_total_verify}')
+
+thread_cards = re.findall(r'class="thread-card"', nc)
+print(f'Thread cards: {len(thread_cards)}')
+assert len(thread_cards) >= 1, f'Expected thread cards, got {len(thread_cards)}'
+print('Thread cards assertion OK')
+
+# Threads-label 一致性 assertion：確保渲染的是最新批脆文
+_threads_hdr_m = re.search(
+    r'<header class="section-head" id="sect-threads">.*?</header>', nc, re.DOTALL
+)
+if _threads_hdr_m and _yaml_batches:
+    _expected_threads_label = _yaml_batches[-1][0]  # 最新批 label（_yaml_batches 按舊→新排列）
+    _rendered_threads_label_m = re.search(r'第\s*(\d+)\s*批', _threads_hdr_m.group(0))
+    _expected_label_m = re.search(r'第\s*(\d+)\s*批', _expected_threads_label)
+    if _rendered_threads_label_m and _expected_label_m:
+        _rendered_n = _rendered_threads_label_m.group(1)
+        _expected_n = _expected_label_m.group(1)
+        assert _rendered_n == _expected_n, (
+            f'Threads label 不一致！渲染了第{_rendered_n}批脆文，但最新批應為第{_expected_n}批。'
+            f' 請確認 --threads-md 指向最新批脆文 md。'
+        )
+        print(f'Threads label assertion OK: 第{_rendered_n}批')
+    else:
+        print('Threads label: 無第N批格式，略過批號比對')
+
 print()
 print('next step:')
 print(f'  1. python validate_deploy.py（驗 SOP §2 9 件）')

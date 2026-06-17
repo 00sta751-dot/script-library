@@ -2179,6 +2179,132 @@ _STRICT_MODE: bool = False
 # 釣魚部下架 cutoff（2026-06-06 起新批預設 OFF）
 _FISHING_CUTOFF = _dt.date(2026, 6, 6)
 
+# ════════════════════════════════════════════
+# §21 腳本品質公式 check 常數（2026-06-17 機器化 §21 落地）
+# 對齊 scripter.md §21 v1.2（§21.1 破套路 / §21.2 CTA 多樣 / §21.6 整稿閘報告 / §21.7 誠實天花板）
+# ════════════════════════════════════════════
+# 生效日 = 上線日 2026-06-17 + 7 天 WARN 窗（涵蓋 shadow 觀察期）：
+#   batch_date < _S21_EFFECTIVE_FROM  → §21 全部 check 回 WARN-waiver（不 FAIL）
+#   batch_date >= 該日 且非 legacy    → C-21.1 / C-21.2 / C-21.7 走 FAIL 路徑
+# C-21.6 另受 _S21_6_REPORT_ENFORCE 控（見下），現恆 WARN-only。
+_S21_EFFECTIVE_FROM = _dt.date(2026, 6, 24)
+
+# C-21.6 整稿閘報告存在性：先 WARN-only（澤君未拍板「高規格定義」）。
+# 待澤君拍板高規格判定 + shadow 過後，霸告才翻 True 改 FAIL。
+_S21_6_REPORT_ENFORCE = False
+
+# C-21.1 破套路門檻：一批 N 支裡 >= 此數同一 exact 骨架型 → 觸發
+# （計算口徑 Codex 三審 P1-1 釘死：13 支 ≥7 同 exact 骨架才「改」）
+_S21_1_SAME_SKELETON_THRESHOLD = 7
+
+# C-21.2 CTA 真多樣門檻（Codex 三審 P2-1）：
+#   一批至少 _S21_2_MIN_DISTINCT 種不同 cta_effect，
+#   單一最大類別 <= _S21_2_MAX_SINGLE / 13。
+_S21_2_MIN_DISTINCT = 3
+_S21_2_MAX_SINGLE = 6
+
+# C-21.2 P2-B（Codex 第 2 輪退回修；Codex 第 3 輪 P1 放寬到剛好）：
+# validator 自有的 CTA「效果」canonical 詞彙。
+# 對齊 scripter.md §21.2 line 572（個人化諮詢 / 互動問句留言回答 / 分享引導 / 無強CTA）
+# + L0 §1.10 CTA 類型表（個人化諮詢型 / 招生課程 / 純雞湯無CTA）。
+# 用途：計 distinct 多樣性前，把逐支 CTA 標籤 canonical 化；**無法解析到 canonical 的標籤
+# 不計入多樣性 + 出 WARN 列出**（防 garbage 標籤 foo×5/bar×4/baz×4 灌水充多樣）。
+# 機制（與 L2 cta_mix alias 互補）：先試 L2 cta_mix items（_resolve_label），再試本表；
+# 兩者皆 None → unresolvable（不計 + WARN）。
+# key = canonical 效果名，value = 該效果的 alias 字面（含 L0/L2 常見寫法）。
+#
+# === Codex 第 3 輪 P1 修正（2026-06-17） ===
+# 問題：上輪 P2-B canonical 表只認 5 bucket、漏掉大量**真實在用**的合法 CTA 標籤
+#   （釣魚型 / 私訊型 / 私域引流型 / 追蹤型 / 收藏型 / 二選一互動型 / 留言互動型 …），
+#   且不認帶括號變體（釣魚型（…）），導致合法批被誤 FAIL。
+# 修法：① grep 全 7 業主真實 schema_check.CTA類型 值 + L2 cta_mix aliases + 骨架機推薦，
+#   EXHAUSTIVE 補全成可解析；② 加括號正規化（剝 （...）/(...)後比 base 標籤），
+#   讓「釣魚型（留言「幕後」…）」歸到「釣魚型」。
+# 不回退 garbage filter：foo/bar/baz 等真正解析不到任何 base 標籤的仍 None（不計 + WARN）。
+_S21_CTA_EFFECT_CANONICAL: dict[str, list[str]] = {
+    # 個人化諮詢（私訊我幫你看一下 / 一對一）
+    "個人化諮詢": [
+        "個人化諮詢型", "個人化諮詢", "諮詢型", "個人諮詢", "私訊諮詢", "一對一諮詢",
+        "雙身份CTA", "引留言", "引分享",
+    ],
+    # 互動問句（留言互動 / 二選一 / 軟互動）
+    "互動問句": [
+        "互動留言型", "互動問句", "互動型", "留言互動", "留言互動型", "留言回答",
+        "提問互動", "二選一互動型", "互動留言",
+    ],
+    # 分享引導（轉發 / tag / 收藏）
+    "分享引導": [
+        "分享引導型", "分享引導", "分享型", "轉發引導", "tag引導", "標記引導", "收藏型",
+    ],
+    # 追蹤引導（請追蹤 / 限動追蹤）
+    "追蹤引導": [
+        "追蹤型", "追蹤引導", "追蹤引導型", "請追蹤",
+    ],
+    # 釣魚（留言關鍵字 → 私訊解答圖卡 / 私訊引流 / 私域引流）
+    "釣魚引流": [
+        "釣魚型", "釣魚部", "私訊型", "私訊引流型", "私域引流型", "私訊引流", "私域引流",
+    ],
+    # 招生課程（B2B / +1 型）
+    "招生課程": [
+        "招生型", "招生課程", "課程型", "報名引導", "B2B招生", "B2B招生型",
+        "招生課程B2B", "+1型",
+    ],
+    # 無強 CTA（純雞湯 / 語錄金句 / 故事支）
+    "無強CTA": [
+        "無強CTA", "無強 CTA", "無CTA", "純雞湯", "純雞湯無CTA", "雞湯型",
+        "故事支", "語錄金句", "無", "無（純雞湯強制）",
+    ],
+}
+
+
+def _s21_strip_paren_suffix(s: str) -> str:
+    """剝掉標籤尾端的括號註解，回 base 標籤。
+    支援全形（…）與半形(...)，剝完再 strip。
+    e.g. 「釣魚型（留言「幕後」→ 私訊解答圖卡）」 → 「釣魚型」；
+         「純雞湯（無CTA）」 → 「純雞湯」；「追蹤型（IG 限動）」 → 「追蹤型」。
+    無括號則原樣回傳。只剝第一個出現的開括號之後全部（含巢狀，因 base 標籤一律在最前）。
+    """
+    if not s:
+        return s
+    # 找最早出現的全形「（」或半形「(」，從那裡截斷
+    idx_full = s.find("（")
+    idx_half = s.find("(")
+    idxs = [i for i in (idx_full, idx_half) if i >= 0]
+    if not idxs:
+        return s.strip()
+    cut = min(idxs)
+    return s[:cut].strip()
+
+
+def _s21_canonical_cta_effect(raw_label: str) -> Optional[str]:
+    """C-21.2 P2-B / Codex 第 3 輪 P1：把單一 CTA 標籤對應到 validator 自有 canonical 效果名；
+    無法解析回 None。
+    比對順序：① 精確比對 canonical name 與 alias（strip 後）→ ② 剝括號取 base 標籤再比對一次。
+    第 2 步讓「釣魚型（…）」「純雞湯（無CTA）」等帶註解的合法標籤歸到對應 base，
+    同時 garbage（foo/bar/baz，剝括號後仍不在表）仍回 None（不放水）。
+    """
+    s = (raw_label or "").strip()
+    if not s:
+        return None
+
+    def _lookup(token: str) -> Optional[str]:
+        for canon, aliases in _S21_CTA_EFFECT_CANONICAL.items():
+            if token == canon or token in aliases:
+                return canon
+        return None
+
+    # ① 原樣比對
+    hit = _lookup(s)
+    if hit is not None:
+        return hit
+    # ② 剝括號後比 base 標籤（避免帶註解變體解析不到）
+    base = _s21_strip_paren_suffix(s)
+    if base and base != s:
+        hit = _lookup(base)
+        if hit is not None:
+            return hit
+    return None
+
 
 def _fishing_signals(data: dict, legacy: bool = False) -> list:
     """偵測 yaml 是否含有釣魚部相關信號，回傳信號描述清單（空 list = 無信號）。
@@ -2702,9 +2828,27 @@ def _is_placeholder(val) -> bool:
     比對前先 strip + lower。
     另外：skeleton 產出的值常帶行內 comment（e.g. '[編劇填]  # 說明'），
     只要字串以 placeholder 關鍵字為「前半段」（空白/# 之前）即視為 placeholder。
+
+    Codex 第 3 輪 P2（2026-06-17）防呆：骨架機未引號的 `title: [編劇填]` 會被 YAML 解析成
+    list ['編劇填']（骨架機 line 222/224 現有引號，本支為手寫/舊骨架雙保險）。
+    一般 str(["編劇填"]) = "['編劇填']" 首 token 非 '[編劇填]' → 過去誤判「已填」。
+    修法（對齊 _s21_get_skeleton_type 對 pattern 的 list 處理）：list 型值 →
+    任一元素本身判定為 placeholder（含「編劇填」字樣）即視為 placeholder。
     """
     if val is None:
         return True
+    # list 型（YAML 把未引號 [編劇填] 解析成 list）：任一元素是 placeholder → True
+    if isinstance(val, list):
+        if not val:
+            return True
+        for elem in val:
+            es = str(elem).strip()
+            if not es:
+                continue
+            etoken = re.split(r'[\s#]', es)[0].lower()
+            if etoken in ('[編劇填]', '編劇填', 'pending', 'todo', '待填'):
+                return True
+        return False
     s = str(val).strip()
     if not s:
         return True
@@ -3105,6 +3249,526 @@ def chk_v3_002_batch_slot_count(
     )
 
 
+# ════════════════════════════════════════════
+# §21 腳本品質公式 check（2026-06-17 機器化 §21 落地）
+# 對齊 scripter.md §21 v1.2 — validator 內零 LLM、純結構性機驗
+# ════════════════════════════════════════════
+
+def _s21_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
+    """取批次日期（批內取最大值，沿用 _extract_batch_date 逐支邏輯）。
+    回傳 None = 無法判斷日期（保守：當作過渡期/WARN）。"""
+    dates: list[_dt.date] = []
+    for f, data in yamls:
+        if not isinstance(data, dict):
+            continue
+        if "__parse_error__" in data or "__schema_error__" in data:
+            continue
+        d = _extract_batch_date(data, f"{f.parent.name}/{f.name}")
+        if d:
+            dates.append(d)
+    return max(dates) if dates else None
+
+
+def _s21_in_warn_window(batch_date: Optional[_dt.date], has_legacy_marker: bool = False) -> bool:
+    """§21 過渡期判定（P1-C，Codex 第 2 輪退回修，fail-open → fail-closed）：
+
+    - 明確解析到的 batch_date < _S21_EFFECTIVE_FROM → True（過渡期 WARN-waiver）
+    - 有明確 legacy 標記（legacy_allowed_until >= today）→ True（WARN-waiver）
+    - batch_date is None / 無法解析 → **False（post-cutover / enforce 側，FAIL 路徑）**
+
+    根因（原碼）：batch_date is None 時回 True → post-cutover 一個沒日期的資料夾 + yaml 無
+    batch_date → §21 違規一律降 WARN，逃過 FAIL。與既有 fail-closed 慣例（V2-025
+    _is_v2025_legacy：batch_date is None → return False 當新批 FAIL）相反。
+
+    修法：對齊 V2-025 fail-closed——None / 無法解析當 post-cutover（enforce 側），
+    除非有明確 legacy 標記（legacy_allowed_until）。真實既有批都有資料夾名/batch_tag 日期、
+    不受影響；只有真的沒日期的才落 enforce 側＝正確 fail-closed。
+    """
+    if batch_date is not None and batch_date < _S21_EFFECTIVE_FROM:
+        return True
+    if has_legacy_marker:
+        return True
+    return False
+
+
+def _s21_get_skeleton_type(data: dict) -> Optional[str]:
+    """取單支「骨架型」。復用既有 `pattern` 欄（骨架機 line 224 已輸出
+    `pattern: [編劇填] # e.g. 創業故事型/觀點分享型`，語義 = 結構/骨架型，不另立新欄）。
+    placeholder / 空 → 回 None（由呼叫端判 skeleton SKIP）。
+
+    防呆：骨架機未引號的 `pattern: [編劇填]` 會被 YAML 解析成 list ['編劇填']，
+    一般 _is_placeholder（只認 str/None）抓不到 → 此處 list 取首元素再判 placeholder。
+    """
+    val = data.get("pattern")
+    if val is None:
+        return None
+    # list（YAML 把骨架機未引號的 `pattern: [編劇填]` 解析成 list ['編劇填']）→ 視為骨架未填。
+    # 骨架機真實填好的 pattern 一律是字串（e.g. 創業故事型）；只有未填的 placeholder 會變 list，
+    # 故 list 型 pattern 一律當 placeholder（回 None → 由呼叫端 SKIP）。
+    if isinstance(val, list):
+        return None
+    if _is_placeholder(val):
+        return None
+    # 取行內 comment 前的有效部份（pattern 欄值含 '#' 註解時切掉）
+    s = str(val).split("#")[0].strip()
+    # 額外保險：骨架機 bare token「編劇填」（去括號後）也當 placeholder
+    if s in ("編劇填", "[編劇填]", "pending", "todo", "待填"):
+        return None
+    return s or None
+
+
+def chk_c21_1_break_pattern(
+    yamls: list[tuple[Path, dict]],
+    fishing_policy: Optional[dict] = None,
+) -> tuple[str, str]:
+    """C-21.1 破套路（batch-level）— 一批裡 >= _S21_1_SAME_SKELETON_THRESHOLD 支同一 exact 骨架型 → 觸發。
+
+    對齊 scripter.md §21.1（計算口徑 Codex 三審 P1-1）：
+    - 骨架型欄位 = 復用既有 `pattern` 欄（語義即結構/骨架型，編劇不另填新欄）。
+    - required_slot（毒舌正能量/純雞湯/專業位）= 位置角色、不算骨架型、不納統計。
+    - 系列例外：批內凡 yaml 同時有 series_id + episode → 該支豁免主公式統計，但回 WARN
+      提醒 hook/案例/轉折/CTA/收束需 ≥2 項差異（人工查；只豁免 top-level 主公式）。
+    - 過渡期（batch_date < _S21_EFFECTIVE_FROM）→ WARN-waiver。
+    - 骨架階段（>50% title placeholder）由 main 端的 _skeleton_mode 控；本函式另對
+      「缺骨架型欄」自行 SKIP（>50% 支取不到 pattern → SKIP，比照 V2-025/026 骨架放行）。
+    """
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    if not valid:
+        return "WARN", "C-21.1：批次無有效 yaml，跳過"
+
+    batch_date = _s21_batch_date(valid)
+    # P1-C：legacy 標記 = 批內任一 yaml 有 legacy_allowed_until >= today
+    _legacy = any(_is_legacy_yaml(d) for _, d in valid)
+    in_warn = _s21_in_warn_window(batch_date, has_legacy_marker=_legacy)
+
+    # 系列批次偵測（series_id + episode 同時存在的支）
+    series_files = [
+        f.name for f, d in valid
+        if str(d.get("series_id", "")).strip() and str(d.get("episode", "")).strip()
+    ]
+
+    # 統計骨架型（排除系列支與缺欄支）
+    skeleton_counts: dict[str, int] = {}
+    missing_skeleton = 0
+    counted = 0
+    for f, d in valid:
+        if f.name in series_files:
+            continue
+        st = _s21_get_skeleton_type(d)
+        if st is None:
+            missing_skeleton += 1
+            continue
+        skeleton_counts[st] = skeleton_counts.get(st, 0) + 1
+        counted += 1
+
+    # 骨架階段 SKIP：>50% 支缺骨架型欄（編劇尚未填 pattern）
+    if valid and (missing_skeleton / len(valid)) > 0.5:
+        return "SKIP", (
+            f"C-21.1：>50% 支缺骨架型（pattern 欄 placeholder/空，{missing_skeleton}/{len(valid)}）"
+            f"— 骨架階段跳過，等編劇填完再驗"
+        )
+
+    if counted == 0:
+        return "SKIP", "C-21.1：無可統計骨架型（全為系列支或缺欄），跳過"
+
+    # 系列批 WARN 提醒（不擋，但提醒人工查差異）
+    series_note = ""
+    if series_files:
+        series_note = (
+            f"；系列批 {len(series_files)} 支（series_id+episode）已豁免主公式統計，"
+            f"但 hook/案例/轉折/CTA/收束仍需 ≥2 項差異（人工查）：{sorted(series_files)}"
+        )
+
+    max_type, max_n = ("", 0)
+    if skeleton_counts:
+        max_type, max_n = max(skeleton_counts.items(), key=lambda kv: kv[1])
+
+    triggered = max_n >= _S21_1_SAME_SKELETON_THRESHOLD
+    detail_counts = dict(sorted(skeleton_counts.items(), key=lambda kv: -kv[1]))
+
+    if triggered:
+        msg = (
+            f"C-21.1 破套路觸發：「{max_type}」骨架型 {max_n} 支（門檻 ≥{_S21_1_SAME_SKELETON_THRESHOLD}）"
+            f"，批內骨架同模子。請 spread 骨架型（陳修平七主題各公式輪用 + 錯誤示範/單案例深拆/"
+            f"反直覺測驗/對比戲劇）。實際分佈：{detail_counts}{series_note}"
+        )
+        if in_warn:
+            return "WARN", msg + f"（過渡期 batch_date={batch_date} < {_S21_EFFECTIVE_FROM}，WARN-waiver）"
+        return "FAIL", msg
+
+    base = f"C-21.1 破套路 PASS：最大同骨架型「{max_type}」{max_n} 支 < {_S21_1_SAME_SKELETON_THRESHOLD}（分佈 {detail_counts}）{series_note}"
+    if series_note:
+        return "WARN", base  # 有系列支 → 留 WARN 提醒人工查差異
+    return "PASS", base
+
+
+def _s21_raw_cta_mix_enforcement_is_hard(pref_text: Optional[str]) -> bool:
+    """C-21.2 P1-A（Codex 第 2 輪退回修）：直接從 raw pref_text 的 cta_mix kb-rule
+    區塊原文判定是否「明寫 enforcement: hard」——**不信 _mix_parser 的 default 值**。
+
+    根因：_mix_parser line 138-140 對缺值 default 成 decision_status=confirmed /
+    approval_status=owner_signed。原 _s21_2_l2_hard_cta_mix 用「confirmed/owner_signed
+    任一」判 hard → 一個只寫 enforcement:advisory（沒寫 decision_status/approval_status）
+    的軟塊，被 default 充成 confirmed/owner_signed → 誤判硬性 → 誤 defer → 13/13 同一種
+    CTA 的偷懶批被誤放行（重開 §21.2 要堵的洞）。
+
+    修法：只認該業主 cta_mix kb-rule 區塊原文裡**明寫的** `enforcement: hard`
+    （不靠 parser default、不認 confirmed/owner_signed 充數）。
+    advisory / proposed / 沒寫 / 只靠 default → 一律 not-hard（不 defer）。
+    """
+    if not pref_text:
+        return False
+    # 找所有 ```kb-rule ... ``` block，定位 category: cta_mix 的那塊，讀其原文 enforcement 行
+    blocks = re.findall(r"```kb-rule\n(.*?)```", pref_text, re.DOTALL)
+    for raw in blocks:
+        # 判斷此 block 是否 category: cta_mix（原文 line 比對，不用 yaml load 以免被旁的解析影響）
+        m_cat = re.search(r"^\s*category\s*:\s*([^\s#]+)", raw, re.MULTILINE)
+        if not m_cat or m_cat.group(1).strip() != "cta_mix":
+            continue
+        # 在這塊 cta_mix 原文裡找明寫的 enforcement 行
+        m_enf = re.search(r"^\s*enforcement\s*:\s*([^\s#]+)", raw, re.MULTILINE)
+        if m_enf and m_enf.group(1).strip().strip('"').strip("'") == "hard":
+            return True
+        # 找到 cta_mix block 但沒明寫 enforcement: hard → not hard（不繼續找別的 cta_mix block）
+        return False
+    return False
+
+
+def _s21_2_l2_hard_cta_mix(pref_text: Optional[str]):
+    """C-21.2 P1-1 / P1-A：偵測 L2 是否宣告「硬性 cta_mix」。
+
+    回傳 MixParseResult（found=True 且**原文明寫 enforcement: hard**）或 None。
+
+    **P1-A（Codex 第 2 輪退回修）**：硬性「只認 raw pref_text cta_mix 區塊原文裡明寫的
+    `enforcement: hard`」——不信 _mix_parser 對缺值 default 成 confirmed/owner_signed 的值。
+    advisory / proposed / 沒寫 / 只靠 default 的 confirmed/owner_signed → 一律 not-hard、不 defer，
+    照套 ≥3 種 + ≤6/13 多樣性規則。瑞祥原文有明寫 enforcement: hard → 仍正確 defer。
+
+    對齊 scripter.md §21.2 line 573「L2 有 cta_mix 時話術配比以 L2 為準」+
+    派工 P1-A：瑞祥 L2 cta_mix 業主本人明寫 enforcement:hard 簽核「個人化諮詢型 92%／12 支」
+    的集中是刻意，多樣性配比歸 C-cta-mix；但軟塊不能靠 parser default 蒙混 defer。
+    """
+    if not _MIX_PARSER_OK or _parse_mix_block is None:
+        return None
+    if not pref_text:
+        return None
+    # P1-A：先用 raw 原文判 enforcement: hard（不信 parser default）
+    if not _s21_raw_cta_mix_enforcement_is_hard(pref_text):
+        return None
+    try:
+        result = _parse_mix_block(pref_text, "cta_mix")
+    except Exception:
+        return None
+    if not result.found:
+        return None
+    return result
+
+
+def chk_c21_2_cta_diversity(
+    yamls: list[tuple[Path, dict]],
+    owner: str,
+    pref_text: Optional[str] = None,
+    batch_tag: str = "",
+) -> tuple[str, str]:
+    """C-21.2 CTA 真多樣（batch-level）— 批內 cta_effect ≥_S21_2_MIN_DISTINCT 種 + 單一最大 ≤_S21_2_MAX_SINGLE/13。
+
+    對齊 scripter.md §21.2（Codex 三審 P2-1 + 派工 P1-1/P1-2）：
+    - cta_effect 來源 = 復用既有逐支 CTA 類別欄 `schema_check.CTA類型`（與 C-cta-mix 同源，
+      由 L2 cta_mix block source_fields 宣告 [["schema_check","CTA類型"]]；編劇不另填第二個欄）。
+    - 與 C-cta-mix **正交、不重複計**：C-cta-mix 驗「vs L2 cta_mix 配比」；C-21.2 驗「種類多樣性」。
+    - **P1-1（L2 owner-signed 硬性 cta_mix 優先）**：若 L2 宣告硬性 cta_mix
+      （enforcement:hard / decision_status:confirmed / approval_status:owner_signed 任一）→
+      C-21.2 不對「單一 ≤6/13」FAIL，回 PASS+註記「多樣性配比歸 C-cta-mix」（業主簽核的集中是刻意）。
+      只有 L2 沒宣告硬性 cta_mix（無 cta_mix / soft / proposed）→ 才套 ≥3 種 + ≤6/13 多樣性規則。
+    - **P1-2（alias 正規化）**：計算 distinct 種類前先用 _resolve_label 把
+      「諮詢型／個人化諮詢型／個人諮詢」等正規化到 canonical label（與 C-cta-mix 同套 alias map），
+      避免同義不同字面被當不同種類灌水多樣性或誤殺。
+    - 缺欄 / 骨架階段 → SKIP（>50% 支取不到 CTA 類別）。
+    - 過渡期（batch_date < _S21_EFFECTIVE_FROM）→ WARN-waiver。
+    """
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    if not valid:
+        return "WARN", "C-21.2：批次無有效 yaml，跳過"
+
+    batch_date = _s21_batch_date(valid)
+    # P1-C：legacy 標記 = 批內任一 yaml 有 legacy_allowed_until >= today
+    _legacy = any(_is_legacy_yaml(d) for _, d in valid)
+    in_warn = _s21_in_warn_window(batch_date, has_legacy_marker=_legacy)
+
+    # P1-1：L2 宣告硬性 cta_mix → defer 給 C-cta-mix（業主簽核的集中是刻意，多樣性不在此擋）
+    l2_hard = _s21_2_l2_hard_cta_mix(pref_text)
+    if l2_hard is not None:
+        return "PASS", (
+            f"C-21.2：L2 owner-signed/confirmed 硬性 cta_mix 優先"
+            f"（enforcement={getattr(l2_hard, 'enforcement', '')}, "
+            f"decision_status={getattr(l2_hard, 'decision_status', '')}, "
+            f"approval_status={getattr(l2_hard, 'approval_status', '')}）"
+            f"，多樣性配比歸 C-cta-mix，C-21.2 不擋集中"
+        )
+
+    # P1-2：alias 正規化用的 cta_mix items（即使非硬性也可有 items 供 _resolve_label canonical）
+    _norm_items = None
+    if _MIX_PARSER_OK and _parse_mix_block is not None and pref_text:
+        try:
+            _soft_result = _parse_mix_block(pref_text, "cta_mix")
+            if _soft_result.found and _soft_result.items:
+                _norm_items = _soft_result.items
+        except Exception:
+            _norm_items = None
+
+    # 逐支讀 CTA 類別 = schema_check.CTA類型（與 C-cta-mix 共用欄位、不另立）
+    # P2-B（Codex 第 2 輪退回修）：只認可解析到 canonical 的標籤計 distinct；
+    # 無法解析的 garbage 標籤（foo×5/bar×4/baz×4）不計入多樣性 + 收集出 WARN，防灌水充多樣。
+    cta_counts: dict[str, int] = {}
+    missing = 0
+    unresolved: dict[str, int] = {}   # P2-B：無法解析到 canonical 的 raw 標籤 → 計數供 WARN
+    for f, d in valid:
+        sc = d.get("schema_check")
+        label = None
+        if isinstance(sc, dict):
+            label = sc.get("CTA類型")
+        if label is None or _is_placeholder(label) or not str(label).strip():
+            missing += 1
+            continue
+        raw_label = str(label).split("#")[0].strip()
+        # P1-2 + P2-B 兩段 canonical：① L2 cta_mix items（_resolve_label）② validator 自有效果詞彙。
+        canon = None
+        if _norm_items is not None and _resolve_label is not None:
+            canon = _resolve_label(raw_label, _norm_items)
+        if canon is None:
+            canon = _s21_canonical_cta_effect(raw_label)
+        if canon is None:
+            # P2-B：無法解析 → 不計入多樣性，收集供 WARN（提示編劇用正規類別）
+            unresolved[raw_label] = unresolved.get(raw_label, 0) + 1
+            continue
+        cta_counts[canon] = cta_counts.get(canon, 0) + 1
+
+    # 骨架階段 SKIP：>50% 支缺 CTA 類別欄（缺欄；unresolved 不算缺欄，另走 WARN）
+    if (missing / len(valid)) > 0.5:
+        return "SKIP", (
+            f"C-21.2：>50% 支缺 CTA 類別欄（schema_check.CTA類型 placeholder/空，{missing}/{len(valid)}）"
+            f"— 骨架階段跳過，等編劇填完再驗"
+        )
+
+    distinct = len(cta_counts)
+    max_label, max_n = ("", 0)
+    if cta_counts:
+        max_label, max_n = max(cta_counts.items(), key=lambda kv: kv[1])
+    detail = dict(sorted(cta_counts.items(), key=lambda kv: -kv[1]))
+
+    # P2-B：unresolved garbage 標籤註記（不計多樣性，提示編劇用正規類別）
+    unresolved_note = ""
+    if unresolved:
+        unresolved_note = (
+            f"；⚠ {sum(unresolved.values())} 支 CTA 標籤無法解析到正規效果類別、不計入多樣性"
+            f"（{dict(sorted(unresolved.items(), key=lambda kv: -kv[1]))}）"
+            f"，請改用正規類別（個人化諮詢/互動問句/分享引導/招生課程/無強CTA 或 L2 cta_mix 宣告的別名）"
+        )
+
+    problems = []
+    if distinct < _S21_2_MIN_DISTINCT:
+        problems.append(f"只有 {distinct} 種 cta_effect（需 ≥{_S21_2_MIN_DISTINCT} 種）")
+    if max_n > _S21_2_MAX_SINGLE:
+        problems.append(f"單一最大類別「{max_label}」{max_n} 支（需 ≤{_S21_2_MAX_SINGLE}/13）")
+
+    if problems:
+        msg = "C-21.2 CTA 多樣不足：" + "；".join(problems) + f"（分佈 {detail}）" + unresolved_note
+        if in_warn:
+            return "WARN", msg + f"（過渡期 batch_date={batch_date} < {_S21_EFFECTIVE_FROM}，WARN-waiver）"
+        return "FAIL", msg
+
+    # 多樣性達標但有 garbage 標籤 → WARN 提示（不擋，但要編劇看見）
+    if unresolved:
+        return "WARN", (
+            f"C-21.2 CTA 多樣達標（{distinct} 種 / 單一最大 {max_n}，分佈 {detail}）"
+            + unresolved_note
+        )
+
+    return "PASS", f"C-21.2 CTA 多樣 PASS：{distinct} 種 / 單一最大 {max_n}（分佈 {detail}）"
+
+
+def _s21_6_batch_exempt(batch_dir: Path) -> tuple[str, str]:
+    """C-21.6 P1-4：讀**批次級** _batch_flags.yml 的 quality_gate 段判豁免。
+
+    回傳 (state, detail)：
+      state ∈ {"exempt"（有效豁免）, "exempt_no_reason"（標 exempt 但缺 reason）, "none"（無豁免）}
+
+    對齊既有 fishing_dm_card / topic_intel_closure 同檔同機制（_batch_flags.yml）：
+      quality_gate:
+        exempt: true
+        reason: "B 級批，非高規格無需整稿閘"
+    - exempt 須 boolean True（不認字串 "true"）+ 須有 reason。
+    - **不再認單支 yaml 的 quality_gate_exempt**（派工 P1-4：改 batch-level 旗標）。
+    - 檔不存在 / 解析失敗 / 段缺 → none（fail-closed：無豁免 = 須有報告）。
+    """
+    flag_path = batch_dir / "_batch_flags.yml"
+    if not flag_path.exists():
+        return "none", "無 _batch_flags.yml → 無 quality_gate 豁免"
+    try:
+        import yaml as _yaml_mod
+        raw = _yaml_mod.safe_load(flag_path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        return "none", f"_batch_flags.yml 解析失敗（{e}）→ 無豁免（fail-closed）"
+    if not isinstance(raw, dict):
+        return "none", "_batch_flags.yml top-level 非 mapping → 無豁免（fail-closed）"
+    qg = raw.get("quality_gate", {}) or {}
+    if not isinstance(qg, dict):
+        return "none", f"_batch_flags.yml quality_gate 非 mapping（{type(qg).__name__}）→ 無豁免（fail-closed）"
+    if qg.get("exempt") is not True:
+        return "none", f"_batch_flags.yml quality_gate.exempt 非 boolean true（{qg.get('exempt')!r}）→ 無豁免"
+    reason = str(qg.get("reason", "") or "").strip()
+    if not reason:
+        return "exempt_no_reason", "_batch_flags.yml quality_gate.exempt=true 但 reason 為空"
+    return "exempt", f"_batch_flags.yml quality_gate 豁免有效（reason={reason!r}）"
+
+
+def chk_c21_6_quality_gate_report(
+    yamls: list[tuple[Path, dict]],
+    batch_dir: Path,
+) -> tuple[str, str]:
+    """C-21.6 整稿閘報告存在（batch-level）— 批次資料夾須有 _quality_gate_report.md（且 bytes>0）。
+
+    對齊 scripter.md §21.6（Codex 三審 P1-2 + 派工 P1-4）：
+    - **P1-4①豁免改 batch-level 旗標**：讀 _batch_flags.yml 的 quality_gate 段
+      （與 fishing_dm_card / topic_intel_closure 同檔同機制），exempt: true 且須有 reason →
+      豁免 PASS。**不再認單支 yaml 的 quality_gate_exempt**。
+    - **P1-4②報告須 bytes>0**：_quality_gate_report.md 須存在「且非空」（0 bytes 不算 PASS）。
+    - 現 WARN-only（_S21_6_REPORT_ENFORCE=False）；待澤君拍板高規格判定 + shadow 過後翻 True 改 FAIL。
+    - 過渡期同樣 WARN（與 enforce 旗標雙重保護）。
+    """
+    # P1-4①：批次級豁免偵測（_batch_flags.yml quality_gate 段）
+    ex_state, ex_detail = _s21_6_batch_exempt(batch_dir)
+    if ex_state == "exempt":
+        return "PASS", f"C-21.6：批次豁免整稿閘報告（{ex_detail}）"
+    if ex_state == "exempt_no_reason":
+        # 標豁免但缺 reason → WARN 提醒（不擋）
+        return "WARN", f"C-21.6：{ex_detail} — 豁免須補 reason 才成立，請於 _batch_flags.yml quality_gate.reason 補理由"
+
+    report = batch_dir / "_quality_gate_report.md"
+    if report.exists():
+        try:
+            sz = report.stat().st_size
+        except Exception:
+            sz = -1
+        # P1-4②：0 bytes（或讀不到 size）→ 不算 PASS
+        if sz > 0:
+            return "PASS", f"C-21.6：找到整稿閘報告 _quality_gate_report.md（{sz} bytes）"
+        # 報告存在但空 → 視同缺報告
+        msg_empty = (
+            f"C-21.6：整稿閘報告 _quality_gate_report.md 存在但為空（{sz} bytes）— 不算有效報告"
+            "（須附逐支 R10-R20 命中 / R14·R15 hard fail / 例外清單 / GPT 打分 + prompt log）"
+        )
+        if _S21_6_REPORT_ENFORCE:
+            return "FAIL", msg_empty
+        return "WARN", msg_empty + "（現 WARN-only：待澤君拍板高規格判定後改 FAIL）"
+
+    # 缺報告且非豁免
+    msg = (
+        "C-21.6：批次缺整稿閘報告 _quality_gate_report.md（高規格批次須附逐支 R10-R20 命中"
+        "/ R14·R15 hard fail / 例外清單 / GPT 打分 + prompt log）；如非 S 級批請於 _batch_flags.yml "
+        "標 quality_gate: {exempt: true, reason: ...}"
+    )
+    if _S21_6_REPORT_ENFORCE:
+        return "FAIL", msg
+    return "WARN", msg + "（現 WARN-only：待澤君拍板高規格判定後改 FAIL）"
+
+
+def chk_c21_7_honest_ceiling(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
+    """C-21.7 誠實天花板欄位（per-file）— score_type / true_material_source / claim_allowed 三欄。
+
+    對齊 scripter.md §21.7（Codex 三審 P1-3 + 派工 P1-3 反向漏洞修補）：
+    - score_type enum：angle / script / finished_video
+    - true_material_source enum：none / transcript / video（transcript/video 須帶路徑）
+    - claim_allowed：須填（非 placeholder）
+    - 規則：true_material_source == none 時，腳本「整個 yaml 序列化全文」（含 caption / 收束 /
+      claim_allowed / 任何自由欄位）禁出現「成片 90」「成片90」字樣
+      （grep；只准「角度/腳本估分 X、成片待真語料」）。
+    - **P1-3 反向漏洞修補**：分清「骨架階段」vs「已填完腳本」——
+        · is_skeleton=True（整批骨架未填，由 _is_skeleton_mode 判定）+ 三欄全缺/placeholder → SKIP（合法）。
+        · is_skeleton=False（已填完腳本）+ 三欄全缺（含整批不填）→ **FAIL**（過渡期 WARN）；
+          誠實 gate 生效後，編劇整批不填不得反而過。
+      只缺部分欄 / 非法值 → 照常驗（不論骨架）。
+    - 過渡期（batch_date < _S21_EFFECTIVE_FROM，逐支 _extract_batch_date）→ WARN-waiver。
+    """
+    score_type = data.get("score_type")
+    tms = data.get("true_material_source")
+    claim = data.get("claim_allowed")
+
+    # 骨架階段 / 缺欄判定
+    def _missing(v):
+        return v is None or _is_placeholder(v)
+
+    all_missing = _missing(score_type) and _missing(tms) and _missing(claim)
+
+    batch_date = _extract_batch_date(data, fname)
+    # P1-C：legacy 標記 = 該支有 legacy_allowed_until >= today
+    in_warn = _s21_in_warn_window(batch_date, has_legacy_marker=_is_legacy_yaml(data))
+
+    if all_missing:
+        # P1-3：只有「真骨架階段」才合法 SKIP；已填完腳本三欄全缺 → FAIL（誠實 gate 不放水）
+        if is_skeleton:
+            return "SKIP", "C-21.7：誠實天花板三欄全缺/placeholder（骨架階段 is_skeleton=True），跳過"
+        msg = (
+            "C-21.7 誠實天花板：已填完腳本（非骨架階段）卻三欄全缺"
+            "（score_type / true_material_source / claim_allowed）— 誠實 gate 生效後必填，不得整批不填繞過"
+        )
+        if in_warn:
+            return "WARN", msg + f"（過渡期 batch_date={batch_date} < {_S21_EFFECTIVE_FROM}，WARN-waiver）"
+        return "FAIL", msg
+
+    fails = []
+
+    # score_type enum
+    ST_ENUM = {"angle", "script", "finished_video"}
+    st_val = None if _missing(score_type) else str(score_type).split("#")[0].strip()
+    if st_val is None:
+        fails.append("缺 score_type（enum: angle/script/finished_video）")
+    elif st_val not in ST_ENUM:
+        fails.append(f"score_type 非法值「{st_val}」（須為 angle/script/finished_video）")
+
+    # true_material_source enum + 路徑
+    TMS_ENUM = {"none", "transcript", "video"}
+    tms_val = None if _missing(tms) else str(tms).split("#")[0].strip()
+    if tms_val is None:
+        fails.append("缺 true_material_source（enum: none/transcript/video）")
+    elif tms_val not in TMS_ENUM:
+        fails.append(f"true_material_source 非法值「{tms_val}」（須為 none/transcript/video）")
+    elif tms_val in {"transcript", "video"}:
+        # 須帶路徑：接受 true_material_path 欄位，或值內含路徑樣態
+        path_val = str(data.get("true_material_path", "") or "").strip()
+        inline_has_path = bool(re.search(r"[\\/].+", str(tms))) or bool(re.search(r"\.(txt|md|mp4|mov|srt|vtt)", str(tms), re.I))
+        if not path_val and not inline_has_path:
+            fails.append(f"true_material_source={tms_val} 須帶路徑（true_material_path 欄或值內路徑）")
+
+    # claim_allowed 須填
+    if _missing(claim):
+        fails.append("缺 claim_allowed（須填本支允許的宣稱，e.g. 角度到位、成片估分X待真語料）")
+
+    # 「成片 90」禁字（true_material_source == none 時）
+    if tms_val == "none":
+        # 順手硬化②：掃「整個 yaml 序列化全文」（不只列舉欄位），防自由欄位漏網。
+        # 先取 get_all_text（台詞/翠文/title/caption），再疊整個 dict 的 YAML dump 全文。
+        full_text = get_all_text(data)
+        try:
+            import yaml as _yaml_dump_mod
+            serialized = _yaml_dump_mod.safe_dump(data, allow_unicode=True, default_flow_style=False)
+        except Exception:
+            # dump 失敗（含不可序列化值）→ fallback 字串化整個 dict（仍涵蓋自由欄位）
+            serialized = repr(data)
+        scan_text = full_text + " " + serialized
+        # 容忍空白：成片 90 / 成片90
+        if re.search(r"成片\s*90", scan_text):
+            fails.append("true_material_source=none 卻出現「成片 90」字樣（無真語料禁謊報成片 90，只准「角度/腳本估分 X、成片待真語料」）")
+
+    if fails:
+        msg = "C-21.7 誠實天花板：" + "；".join(fails)
+        if in_warn:
+            return "WARN", msg + f"（過渡期 batch_date={batch_date} < {_S21_EFFECTIVE_FROM}，WARN-waiver）"
+        return "FAIL", msg
+
+    return "PASS", f"C-21.7 誠實天花板 PASS：score_type={st_val} / true_material_source={tms_val}"
+
+
 # ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
@@ -3142,6 +3806,13 @@ def run_per_file_checks(
         ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
         ("C-017",  chk_c017_concreteness(data, f.name)),
+        # §21 誠實天花板（per-file，2026-06-17 機器化 §21 落地；P1-3：傳 is_skeleton 區分骨架/已填完）
+        # P1-B（Codex 第 2 輪退回修）：C-21.7 skeleton 判定改**逐檔自身**，不用批次全域 bool。
+        # 根因：混合批（7 支 title placeholder + 6 支已填但缺誠實欄）→ 批次全域 _is_skeleton_mode=True
+        # 會把那 6 支已填的也當骨架 SKIP，違反 spec「已填缺欄必 FAIL」。
+        # 修法：某支只有「它自己的 title 是 placeholder」時才算骨架階段；title 已填（真標題）
+        # 但誠實欄缺 → FAIL（過渡 WARN）。
+        ("C-21.7", chk_c21_7_honest_ceiling(data, _fname_with_dir, _is_placeholder(data.get("title")))),
         # v2 新增 5 件（V2-001 ~ V2-005）
         ("V2-001",  chk_v2_001_voice_lock(data, f.name, owner)),
         ("V2-001b", chk_v2_001b_banned_phrases(data, _fname_with_dir, owner)),
@@ -3307,6 +3978,10 @@ def main():
         # P3 比例驗證器（2026-06-08）
         ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
         ("C-content-mix", chk_c_content_mix(valid_yamls, owner, pref_text, batch_tag)),
+        # §21 腳本品質公式 batch-level（2026-06-17 機器化 §21 落地）
+        ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
+        ("C-21.2", chk_c21_2_cta_diversity(valid_yamls, owner, pref_text, batch_tag)),
+        ("C-21.6", chk_c21_6_quality_gate_report(valid_yamls, batch_dir)),
     ]
     # Fix A【P0】V3-002 gated：只有 policy enabled 才 append，off 時完全不註冊（零足跡）
     # off → 不 append V3-002 → batch_checks 件數、len 印出維持原值；無 SKIP 行
@@ -3322,7 +3997,7 @@ def main():
         )
     print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:
-        icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
+        icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))
         print(f"  {icon} [{cid}] {status}: {detail}")
         all_results.append((cid, status, "batch", detail))
     print()
@@ -3344,7 +4019,7 @@ def main():
             topic_intel_policy=_topic_intel_policy,
         )
         for cid, status, fname, detail in per_results:
-            icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else "❌")
+            icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))
             print(f"    {icon} [{cid}] {status}: {detail}")
             all_results.append((cid, status, fname, detail))
 
@@ -4405,6 +5080,460 @@ if __name__ == "__main__":
         _f24_dup_c = _v2008_content_dup_hits([("new.yaml", _f24_txt)], [("房仲_仲豪/第12批/script_x.yaml", _f24_txt)], 0.85)
         fcheck("F24c 跨業主歷史全文雷同 → FAIL 級（R1-hard）", len(_f24_dup_c) == 1, str(_f24_dup_c))
         fcheck("F24d 長度差 >30% 預過濾不誤殺", _v2008_content_dup_hits([("a", "短句")], [("b", _f24_txt)], 0.85) == [], "prefilter ok")
+
+        # ── F-21 §21 腳本品質公式 check（2026-06-17 機器化 §21）──
+        print("\n[F-21] §21 腳本品質公式：破套路 / CTA 多樣 / 誠實天花板 / 過渡期 WARN")
+        import datetime as _f21_dt
+        _POST = "2026-06-25"   # >= _S21_EFFECTIVE_FROM(2026-06-24) → FAIL 路徑
+        _PRE = "2026-06-20"    # < _S21_EFFECTIVE_FROM → WARN-waiver
+
+        def _mk(seq, pattern, cta, date_str, **extra):
+            """造一支 §21 測試 yaml（含 batch_date + pattern + schema_check.CTA類型 + title 已填）"""
+            d = {
+                "title": f"已填標題{seq}",
+                "batch_date": date_str,
+                "pattern": pattern,
+                "schema_check": {"CTA類型": cta},
+            }
+            d.update(extra)
+            return (Path(f"f21_{seq:02d}.yaml"), d)
+
+        # F-21a：破套路觸發（post-cutover，13 支 7 支同骨架 → FAIL）
+        print("[F-21a] C-21.1 破套路：7/13 同骨架 post-cutover → FAIL")
+        _f21a = [_mk(i, "創業故事型", "互動留言型", _POST) for i in range(1, 8)]   # 7 支同
+        _f21a += [_mk(i, f"骨架{i}", f"CTA{i}", _POST) for i in range(8, 14)]       # 6 支各異
+        _r21a = chk_c21_1_break_pattern(_f21a)
+        fcheck("F-21a 破套路觸發 → FAIL", _r21a[0] == "FAIL", _r21a[1])
+
+        # F-21a2：未觸發（最多 6 支同 < 7）→ PASS
+        print("[F-21a2] C-21.1 破套路：最多 6/13 同骨架 → PASS")
+        _f21a2 = [_mk(i, "創業故事型", "互動留言型", _POST) for i in range(1, 7)]  # 6 支同
+        _f21a2 += [_mk(i, f"骨架{i}", f"CTA{i}", _POST) for i in range(7, 14)]      # 7 支各異
+        _r21a2 = chk_c21_1_break_pattern(_f21a2)
+        fcheck("F-21a2 破套路未觸發 → PASS", _r21a2[0] == "PASS", _r21a2[1])
+
+        # F-21a3：系列批（series_id+episode）→ WARN（豁免主公式但提醒人工查）
+        print("[F-21a3] C-21.1 系列批 series_id+episode → WARN 提醒")
+        _f21a3 = [_mk(i, "PREP型", "互動留言型", _POST, series_id="總督", episode=i) for i in range(1, 14)]
+        _r21a3 = chk_c21_1_break_pattern(_f21a3)
+        fcheck("F-21a3 系列批 → 不 FAIL（WARN/SKIP）", _r21a3[0] in ("WARN", "SKIP"), _r21a3[1])
+
+        # F-21b：CTA 不足 3 種（post-cutover）→ FAIL
+        print("[F-21b] C-21.2 CTA 只 2 種 post-cutover → FAIL")
+        _f21b = [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(1, 8)]       # 7 支同 CTA
+        _f21b += [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(8, 14)]   # 6 支同 CTA（只 2 種）
+        _r21b = chk_c21_2_cta_diversity(_f21b, "測試業主")
+        fcheck("F-21b CTA <3 種 → FAIL", _r21b[0] == "FAIL", _r21b[1])
+
+        # F-21b2：CTA 單一最大 > 6（post-cutover）→ FAIL（即使 3 種）
+        print("[F-21b2] C-21.2 CTA 3 種但單一最大 7 支 → FAIL")
+        _f21b2 = [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(1, 8)]       # 7 支（>6）
+        _f21b2 += [_mk(8, "骨架8", "個人化諮詢型", _POST)]
+        _f21b2 += [_mk(i, f"骨架{i}", "分享引導型", _POST) for i in range(9, 14)]
+        _r21b2 = chk_c21_2_cta_diversity(_f21b2, "測試業主")
+        fcheck("F-21b2 CTA 單一最大 >6 → FAIL", _r21b2[0] == "FAIL", _r21b2[1])
+
+        # F-21b3：CTA 3 種 + 單一最大 ≤6（post-cutover）→ PASS
+        print("[F-21b3] C-21.2 CTA 3 種 + 單一 ≤6 → PASS")
+        _f21b3 = [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(1, 6)]       # 5 支
+        _f21b3 += [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(6, 11)]   # 5 支
+        _f21b3 += [_mk(i, f"骨架{i}", "分享引導型", _POST) for i in range(11, 14)]    # 3 支
+        _r21b3 = chk_c21_2_cta_diversity(_f21b3, "測試業主")
+        fcheck("F-21b3 CTA 多樣達標 → PASS", _r21b3[0] == "PASS", _r21b3[1])
+
+        # F-21c：誠實天花板缺欄（post-cutover）→ FAIL
+        print("[F-21c] C-21.7 缺 true_material_source post-cutover → FAIL")
+        _f21c = {"title": "已填", "batch_date": _POST, "score_type": "angle", "claim_allowed": "角度到位"}
+        _r21c = chk_c21_7_honest_ceiling(_f21c, "f21c.yaml")
+        fcheck("F-21c 缺誠實欄位 → FAIL", _r21c[0] == "FAIL", _r21c[1])
+
+        # F-21c2：true_material_source=none 卻寫「成片 90」（post-cutover）→ FAIL
+        print("[F-21c2] C-21.7 none 卻寫「成片 90」→ FAIL")
+        _f21c2 = {
+            "title": "已填", "batch_date": _POST,
+            "score_type": "script", "true_material_source": "none",
+            "claim_allowed": "角度到位，成片 90 穩過",  # 違規：none 卻講成片 90
+        }
+        _r21c2 = chk_c21_7_honest_ceiling(_f21c2, "f21c2.yaml")
+        fcheck("F-21c2 none + 成片90 → FAIL", _r21c2[0] == "FAIL", _r21c2[1])
+
+        # F-21c3：誠實欄位齊全合法（post-cutover）→ PASS
+        print("[F-21c3] C-21.7 三欄齊全合法 → PASS")
+        _f21c3 = {
+            "title": "已填", "batch_date": _POST,
+            "score_type": "angle", "true_material_source": "none",
+            "claim_allowed": "角度到位、成片估分 88 待真語料",
+        }
+        _r21c3 = chk_c21_7_honest_ceiling(_f21c3, "f21c3.yaml")
+        fcheck("F-21c3 誠實欄位合法 → PASS", _r21c3[0] == "PASS", _r21c3[1])
+
+        # F-21c4：三欄全缺（骨架階段 is_skeleton=True）→ SKIP（P1-3：須明示骨架階段才 SKIP）
+        print("[F-21c4] C-21.7 三欄全缺骨架階段（is_skeleton=True）→ SKIP")
+        _f21c4 = {"title": "[編劇填]", "batch_date": _POST}
+        _r21c4 = chk_c21_7_honest_ceiling(_f21c4, "f21c4.yaml", is_skeleton=True)
+        fcheck("F-21c4 三欄全缺骨架階段 → SKIP", _r21c4[0] == "SKIP", _r21c4[1])
+
+        # F-21d：legacy/過渡期（batch_date < 2026-06-24）→ WARN 不 FAIL
+        print("[F-21d] §21 過渡期 batch_date < 2026-06-24 → WARN-waiver")
+        _f21d_break = [_mk(i, "創業故事型", "互動留言型", _PRE) for i in range(1, 14)]  # 13 支全同 = 必觸發
+        _r21d_1 = chk_c21_1_break_pattern(_f21d_break)
+        fcheck("F-21d C-21.1 過渡期觸發 → WARN（非 FAIL）", _r21d_1[0] == "WARN", _r21d_1[1])
+        _f21d_cta = [_mk(i, f"骨架{i}", "互動留言型", _PRE) for i in range(1, 14)]  # 全同 CTA = 必觸發
+        _r21d_2 = chk_c21_2_cta_diversity(_f21d_cta, "測試業主")
+        fcheck("F-21d C-21.2 過渡期觸發 → WARN（非 FAIL）", _r21d_2[0] == "WARN", _r21d_2[1])
+        _f21d_honest = {"title": "已填", "batch_date": _PRE, "score_type": "angle"}  # 缺欄但過渡期
+        _r21d_3 = chk_c21_7_honest_ceiling(_f21d_honest, "f21d.yaml")
+        fcheck("F-21d C-21.7 過渡期缺欄 → WARN（非 FAIL）", _r21d_3[0] == "WARN", _r21d_3[1])
+
+        # F-21e：C-21.1 骨架階段（>50% 缺 pattern，字串 placeholder）→ SKIP
+        print("[F-21e] C-21.1 >50% 缺 pattern → SKIP")
+        _f21e = [(_p, {"title": "[編劇填]", "batch_date": _POST, "pattern": "[編劇填]", "schema_check": {"CTA類型": "[編劇填]"}}) for _p in [Path(f"f21e_{i}.yaml") for i in range(1, 14)]]
+        _r21e = chk_c21_1_break_pattern(_f21e)
+        fcheck("F-21e C-21.1 骨架階段 → SKIP", _r21e[0] == "SKIP", _r21e[1])
+        _r21e2 = chk_c21_2_cta_diversity(_f21e, "測試業主")
+        fcheck("F-21e2 C-21.2 骨架階段 → SKIP", _r21e2[0] == "SKIP", _r21e2[1])
+
+        # F-21e3：骨架機未引號 pattern: [編劇填] → YAML 解析成 list ['編劇填']
+        #   （這是骨架機真實輸出樣態，list 一律當 placeholder，否則純骨架批會誤觸發 C-21.1）
+        print("[F-21e3] C-21.1 pattern 被 YAML 解析成 list ['編劇填'] → SKIP（防純骨架誤觸發）")
+        _f21e3 = [(Path(f"f21e3_{i}.yaml"), {"title": "[編劇填]", "batch_date": _POST, "pattern": ["編劇填"], "schema_check": {"CTA類型": "[編劇填]"}}) for i in range(1, 14)]
+        _r21e3 = chk_c21_1_break_pattern(_f21e3)
+        fcheck("F-21e3 C-21.1 list-parse 骨架 → SKIP（非 FAIL）", _r21e3[0] == "SKIP", _r21e3[1])
+
+        # F-21f：C-21.6 整稿閘報告 — 缺報告 WARN-only（現 _S21_6_REPORT_ENFORCE=False）
+        print("[F-21f] C-21.6 缺整稿閘報告 → WARN-only / 豁免 → PASS")
+        import tempfile as _f21_tmp
+        with _f21_tmp.TemporaryDirectory() as _td:
+            _tdp = Path(_td)
+            _r21f = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp)
+            fcheck("F-21f 缺報告 → WARN-only", _r21f[0] == "WARN", _r21f[1])
+            # 有報告 → PASS
+            (_tdp / "_quality_gate_report.md").write_text("R10-R20 報告", encoding="utf-8")
+            _r21f2 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp)
+            fcheck("F-21f2 有報告 → PASS", _r21f2[0] == "PASS", _r21f2[1])
+        # F-21f3：P1-4 — 單支 yaml quality_gate_exempt 不再被認（須走 batch flag）
+        print("[F-21f3] C-21.6 P1-4：單支 yaml exempt 不再認 → 走缺報告 WARN（非 PASS）")
+        with _f21_tmp.TemporaryDirectory() as _td3:
+            _tdp3 = Path(_td3)
+            _r21f3 = chk_c21_6_quality_gate_report(
+                [(Path("x.yaml"), {"title": "已填", "quality_gate_exempt": True, "quality_gate_exempt_reason": "B 級批"})],
+                _tdp3,
+            )
+            fcheck("F-21f3 單支 yaml exempt 不再豁免 → WARN（缺報告）", _r21f3[0] == "WARN", _r21f3[1])
+
+        # ── 派工 P1 修正子步新 fixtures（2026-06-17 御史/Codex 退回修） ──
+        print("\n[F-21 P1] 派工 4 P1 修正驗證")
+
+        # ① P1-1：owner-signed 硬性 cta_mix 集中 → C-21.2 PASS（defer 給 C-cta-mix）
+        print("[F-21-P1-1] C-21.2：L2 owner-signed 硬 cta_mix 集中 → PASS/defer（不擋集中）")
+        _pref_hard = (
+            "## cta\n```kb-rule\n"
+            "category: cta_mix\nenforcement: hard\ndecision_status: confirmed\n"
+            "approval_status: owner_signed\neffective_from: 2026-06-01\ntolerance_count: 1\n"
+            "source_fields:\n  - [schema_check, CTA類型]\n"
+            "mix:\n  - name: 個人化諮詢型\n    target_count: 12\n    aliases: [諮詢型, 個人諮詢]\n"
+            "  - name: 互動留言型\n    target_count: 1\n    aliases: [互動型]\n"
+            "```\n"
+        )
+        # 12 支同 CTA（集中）+ 1 支互動 → 若無 L2 hard 會 FAIL（單一 12>6），有 hard 應 PASS
+        _f21p1 = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 13)]
+        _f21p1 += [_mk(13, "骨架13", "互動留言型", _POST)]
+        _r21p1 = chk_c21_2_cta_diversity(_f21p1, "瑞祥", pref_text=_pref_hard, batch_tag="2026-06-25")
+        fcheck("F-21-P1-1 owner-signed 硬 cta_mix 集中 → PASS（defer）", _r21p1[0] == "PASS", _r21p1[1])
+
+        # ② P1-1 反向：無 L2 cta_mix + 只 2 種 → C-21.2 FAIL
+        print("[F-21-P1-2neg] C-21.2：無 L2 cta_mix + 只 2 種 → FAIL")
+        _f21p2 = [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(1, 8)]
+        _f21p2 += [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(8, 14)]
+        _r21p2 = chk_c21_2_cta_diversity(_f21p2, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        fcheck("F-21-P1-2neg 無 L2 cta_mix + 2 種 → FAIL", _r21p2[0] == "FAIL", _r21p2[1])
+
+        # ③ P1-2：alias「諮詢型/個人化諮詢型」正規化後算 1 種
+        print("[F-21-P1-2alias] C-21.2：諮詢型/個人化諮詢型 alias 正規化 → 算同 1 種")
+        # soft cta_mix（非硬性，但有 items 供 alias 正規化）：諮詢型 與 個人化諮詢型 為同 canonical
+        _pref_soft = (
+            "## cta\n```kb-rule\n"
+            "category: cta_mix\nenforcement: advisory\ndecision_status: proposed\n"
+            "approval_status: pending_owner\ntolerance_count: 1\n"
+            "source_fields:\n  - [schema_check, CTA類型]\n"
+            "mix:\n  - name: 個人化諮詢型\n    target_count: 7\n    aliases: [諮詢型, 個人諮詢]\n"
+            "  - name: 互動留言型\n    target_count: 6\n    aliases: [互動型]\n"
+            "```\n"
+        )
+        # 7 支「諮詢型」+ 6 支「個人化諮詢型」→ 正規化後同 canonical = 1 種（distinct=1 < 3 → FAIL）
+        # 證明 alias 被正規化算 1 種（否則會被誤算 2 種）
+        _f21p3 = [_mk(i, f"骨架{i}", "諮詢型", _POST) for i in range(1, 8)]
+        _f21p3 += [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(8, 14)]
+        _r21p3 = chk_c21_2_cta_diversity(_f21p3, "測試業主", pref_text=_pref_soft, batch_tag="2026-06-25")
+        # 正規化後 distinct=1（同 canonical），<3 種 → FAIL；detail 應只見 1 個 canonical key
+        _p3_ok = (_r21p3[0] == "FAIL") and ("個人化諮詢型" in _r21p3[1]) and ("只有 1 種" in _r21p3[1])
+        fcheck("F-21-P1-2alias 諮詢型 alias 正規化算 1 種 → distinct=1 FAIL", _p3_ok, _r21p3[1])
+
+        # ④ P1-3：已填完整批缺三誠實欄（is_skeleton=False）→ FAIL
+        print("[F-21-P1-3a] C-21.7：已填完腳本三欄全缺 → FAIL（誠實 gate 不放水）")
+        _f21p4 = {"title": "已填完整標題", "batch_date": _POST}  # 三誠實欄全缺
+        _r21p4 = chk_c21_7_honest_ceiling(_f21p4, "f21p4.yaml", is_skeleton=False)
+        fcheck("F-21-P1-3a 已填完缺三欄 → FAIL", _r21p4[0] == "FAIL", _r21p4[1])
+
+        # ⑤ P1-3：骨架階段缺三欄（is_skeleton=True）→ SKIP
+        print("[F-21-P1-3b] C-21.7：骨架階段三欄全缺 → SKIP（合法）")
+        _f21p5 = {"title": "[編劇填]", "batch_date": _POST}
+        _r21p5 = chk_c21_7_honest_ceiling(_f21p5, "f21p5.yaml", is_skeleton=True)
+        fcheck("F-21-P1-3b 骨架階段缺三欄 → SKIP", _r21p5[0] == "SKIP", _r21p5[1])
+
+        # ⑤b P1-3 過渡期：已填完缺三欄但 batch_date<生效日 → WARN（非 FAIL）
+        print("[F-21-P1-3c] C-21.7：已填完缺三欄但過渡期 → WARN")
+        _f21p5c = {"title": "已填完", "batch_date": _PRE}
+        _r21p5c = chk_c21_7_honest_ceiling(_f21p5c, "f21p5c.yaml", is_skeleton=False)
+        fcheck("F-21-P1-3c 已填完缺三欄過渡期 → WARN", _r21p5c[0] == "WARN", _r21p5c[1])
+
+        # ⑥ P1-4：report 0 bytes → 不算 PASS（WARN-only 現階段）
+        print("[F-21-P1-4a] C-21.6：報告 0 bytes → 不算 PASS（WARN）")
+        with _f21_tmp.TemporaryDirectory() as _td6:
+            _tdp6 = Path(_td6)
+            (_tdp6 / "_quality_gate_report.md").write_text("", encoding="utf-8")  # 0 bytes
+            _r21p6 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp6)
+            fcheck("F-21-P1-4a 0 bytes 報告 → WARN（非 PASS）", _r21p6[0] == "WARN", _r21p6[1])
+            # 對照：非空報告 → PASS
+            (_tdp6 / "_quality_gate_report.md").write_text("R10-R20 逐支命中表 + GPT 打分", encoding="utf-8")
+            _r21p6b = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp6)
+            fcheck("F-21-P1-4a2 非空報告 → PASS", _r21p6b[0] == "PASS", _r21p6b[1])
+
+        # ⑦ P1-4：exempt 走 batch flag（_batch_flags.yml quality_gate）
+        print("[F-21-P1-4b] C-21.6：batch flag quality_gate.exempt+reason → PASS")
+        with _f21_tmp.TemporaryDirectory() as _td7:
+            _tdp7 = Path(_td7)
+            (_tdp7 / "_batch_flags.yml").write_text(
+                "quality_gate:\n  exempt: true\n  reason: \"B 級批，非高規格無需整稿閘\"\n",
+                encoding="utf-8",
+            )
+            _r21p7 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
+            fcheck("F-21-P1-4b batch flag exempt+reason → PASS", _r21p7[0] == "PASS", _r21p7[1])
+            # exempt 但缺 reason → WARN（豁免不成立）
+            (_tdp7 / "_batch_flags.yml").write_text(
+                "quality_gate:\n  exempt: true\n",
+                encoding="utf-8",
+            )
+            _r21p7b = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
+            fcheck("F-21-P1-4b2 batch flag exempt 缺 reason → WARN", _r21p7b[0] == "WARN", _r21p7b[1])
+            # exempt 非 boolean true（字串 "true"）→ 不豁免（缺報告 WARN）
+            (_tdp7 / "_batch_flags.yml").write_text(
+                "quality_gate:\n  exempt: \"true\"\n  reason: \"x\"\n",
+                encoding="utf-8",
+            )
+            _r21p7c = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
+            fcheck("F-21-P1-4b3 exempt 字串 'true' 不認 → WARN", _r21p7c[0] == "WARN", _r21p7c[1])
+
+        # ⑧ P1-3 順手硬化②：C-21.7 成片90 掃整 yaml 序列化全文（自由欄位漏網防護）
+        print("[F-21-P1-3d] C-21.7：成片90 藏自由欄位 → grep 整 yaml 全文抓到 FAIL")
+        _f21p8 = {
+            "title": "已填", "batch_date": _POST,
+            "score_type": "script", "true_material_source": "none",
+            "claim_allowed": "角度到位",
+            "自由備註欄": "這支其實成片90 沒問題",  # 藏在非列舉欄位
+        }
+        _r21p8 = chk_c21_7_honest_ceiling(_f21p8, "f21p8.yaml", is_skeleton=False)
+        fcheck("F-21-P1-3d 成片90 藏自由欄位 → FAIL", _r21p8[0] == "FAIL", _r21p8[1])
+
+        # ══════════════════════════════════════════════════════════════
+        # [F-21 R2] Codex 第 2 輪對抗驗退回的 5 修正（P1-A/B/C + P2-A 註解 + P2-B）
+        # ══════════════════════════════════════════════════════════════
+        print("\n[F-21 R2] Codex 第 2 輪退回 5 修正驗證")
+
+        # ── R2-1（P1-A）：軟性 advisory cta_mix（沒寫 decision_status/approval_status，靠 parser
+        #    default 充 confirmed/owner_signed）+ 13/13 同種 → C-21.2 FAIL（不誤 defer）──
+        print("[F-21-R2-1] P1-A：軟塊靠 default 充 confirmed/owner_signed → 不 defer → 13/13 同種 FAIL")
+        _pref_soft_default = (
+            "## cta\n```kb-rule\n"
+            "category: cta_mix\nenforcement: advisory\n"   # 只寫 advisory，沒寫 decision_status/approval_status
+            "source_fields:\n  - [schema_check, CTA類型]\n"
+            "mix:\n  - name: 個人化諮詢型\n    target_count: 13\n    aliases: [諮詢型, 個人諮詢]\n"
+            "```\n"
+        )
+        # 確認 parser 對此軟塊確實 default 成 confirmed/owner_signed（這正是 P1-A 根因）
+        _r2_1_parsed = _parse_mix_block(_pref_soft_default, "cta_mix")
+        fcheck(
+            "F-21-R2-1a parser 對軟塊缺值確實 default 成 confirmed/owner_signed（根因確證）",
+            _r2_1_parsed.decision_status == "confirmed" and _r2_1_parsed.approval_status == "owner_signed",
+            f"decision_status={_r2_1_parsed.decision_status} approval_status={_r2_1_parsed.approval_status}",
+        )
+        # 但 _s21_2_l2_hard_cta_mix 不該因 default 值 defer（只認原文 enforcement: hard）
+        fcheck(
+            "F-21-R2-1b 軟塊不被當硬性 defer（_s21_2_l2_hard_cta_mix 回 None）",
+            _s21_2_l2_hard_cta_mix(_pref_soft_default) is None,
+            f"_s21_2_l2_hard_cta_mix={_s21_2_l2_hard_cta_mix(_pref_soft_default)!r}",
+        )
+        # 端到端：13 支同 CTA + 軟塊 → C-21.2 FAIL（修前會被誤 defer 成 PASS）
+        _f21r2_1 = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 14)]
+        _r21r2_1 = chk_c21_2_cta_diversity(_f21r2_1, "測試業主", pref_text=_pref_soft_default, batch_tag="2026-06-25")
+        fcheck("F-21-R2-1c 軟塊 13/13 同種 → C-21.2 FAIL（不誤放行）", _r21r2_1[0] == "FAIL", _r21r2_1[1])
+
+        # ── R2-2（P1-A 正向）：明寫 enforcement: hard → 仍正確 defer PASS ──
+        print("[F-21-R2-2] P1-A 正向：明寫 enforcement: hard 集中 → 仍 defer PASS")
+        # 復用前面 _pref_hard（明寫 enforcement: hard）；12 支諮詢 + 1 互動（集中）
+        _f21r2_2 = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 13)]
+        _f21r2_2 += [_mk(13, "骨架13", "互動留言型", _POST)]
+        _r21r2_2 = chk_c21_2_cta_diversity(_f21r2_2, "瑞祥", pref_text=_pref_hard, batch_tag="2026-06-25")
+        fcheck("F-21-R2-2 明寫 enforcement:hard 集中 → defer PASS", _r21r2_2[0] == "PASS", _r21r2_2[1])
+
+        # ── R2-3（P1-B）：混合批 per-file skeleton——7 支 title placeholder + 6 支已填但缺誠實欄。
+        #    那 6 支已填的不該因批次全域 skeleton 被當骨架 SKIP，須走 FAIL（post-cutover）──
+        print("[F-21-R2-3] P1-B：混合批 per-file skeleton——已填缺誠實欄支 → FAIL（非批次全域 SKIP）")
+        # 已填腳本（真標題）+ 缺誠實三欄 → _is_placeholder(title)=False → 非骨架 → FAIL
+        _f21r2_3_filled = {"title": "已填完整真標題", "batch_date": _POST}
+        _r2_3_filled = chk_c21_7_honest_ceiling(
+            _f21r2_3_filled, "f21r2_3_filled.yaml", _is_placeholder(_f21r2_3_filled.get("title"))
+        )
+        fcheck(
+            "F-21-R2-3a 混合批中『title 已填+缺誠實欄』支 → FAIL（per-file 不被批次 skeleton SKIP）",
+            _r2_3_filled[0] == "FAIL",
+            _r2_3_filled[1],
+        )
+        # 同批的骨架支（title placeholder）+ 缺三欄 → per-file skeleton=True → SKIP（合法）
+        _f21r2_3_skel = {"title": "[編劇填]", "batch_date": _POST}
+        _r2_3_skel = chk_c21_7_honest_ceiling(
+            _f21r2_3_skel, "f21r2_3_skel.yaml", _is_placeholder(_f21r2_3_skel.get("title"))
+        )
+        fcheck(
+            "F-21-R2-3b 同批骨架支（title placeholder）缺三欄 → SKIP（per-file 正確判骨架）",
+            _r2_3_skel[0] == "SKIP",
+            _r2_3_skel[1],
+        )
+
+        # ── R2-4（P1-C）：None 日期 post-cutover → fail-closed enforce 側（FAIL/不 waive）──
+        print("[F-21-R2-4] P1-C：無法解析日期 → fail-closed enforce 側（None → FAIL，不再降 WARN）")
+        # _s21_in_warn_window(None) 應回 False（enforce 側），有 legacy marker 才回 True
+        fcheck("F-21-R2-4a _s21_in_warn_window(None) → False（fail-closed）",
+               _s21_in_warn_window(None) is False, str(_s21_in_warn_window(None)))
+        fcheck("F-21-R2-4b _s21_in_warn_window(None, legacy=True) → True（明確 legacy 才豁免）",
+               _s21_in_warn_window(None, has_legacy_marker=True) is True,
+               str(_s21_in_warn_window(None, has_legacy_marker=True)))
+        # 端到端：C-21.7 已填完缺三欄 + 無 batch_date（無法解析）→ FAIL（修前 None→WARN 逃過）
+        _f21r2_4 = {"title": "已填完真標題"}   # 無 batch_date，檔名也無日期
+        _r21r2_4 = chk_c21_7_honest_ceiling(_f21r2_4, "no_date.yaml", is_skeleton=False)
+        fcheck("F-21-R2-4c 無日期已填缺三欄 → FAIL（enforce 側，不再 WARN 逃過）",
+               _r21r2_4[0] == "FAIL", _r21r2_4[1])
+        # 但有明確 legacy_allowed_until（未過期）→ WARN-waiver（不誤傷 legacy）
+        _f21r2_4b = {"title": "已填完真標題", "legacy_allowed_until": "2026-12-31"}
+        _r21r2_4b = chk_c21_7_honest_ceiling(_f21r2_4b, "legacy.yaml", is_skeleton=False)
+        fcheck("F-21-R2-4d 無日期但有 legacy_allowed_until → WARN（legacy 不誤傷）",
+               _r21r2_4b[0] == "WARN", _r21r2_4b[1])
+
+        # ── R2-5（P2-B）：garbage CTA 標籤不計多樣性 + WARN 列出 ──
+        print("[F-21-R2-5] P2-B：無法解析的 garbage CTA 標籤不計多樣性 + WARN")
+        # foo×5 / bar×4 / baz×4 全是無法解析的標籤 → distinct(canonical)=0、unresolved=13 → 不灌水成多樣
+        _f21r2_5 = [_mk(i, f"骨架{i}", "foo", _POST) for i in range(1, 6)]
+        _f21r2_5 += [_mk(i, f"骨架{i}", "bar", _POST) for i in range(6, 10)]
+        _f21r2_5 += [_mk(i, f"骨架{i}", "baz", _POST) for i in range(10, 14)]
+        _r21r2_5 = chk_c21_2_cta_diversity(_f21r2_5, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        # garbage 不計 → distinct=0 < 3 → FAIL，且訊息含「無法解析」+ garbage 標籤
+        _r2_5_ok = (_r21r2_5[0] == "FAIL") and ("無法解析" in _r21r2_5[1]) and ("foo" in _r21r2_5[1]) and ("只有 0 種" in _r21r2_5[1])
+        fcheck("F-21-R2-5a garbage 標籤不計多樣性 → distinct=0 FAIL + WARN 列出", _r2_5_ok, _r21r2_5[1])
+        # 對照：正規標籤 3 種（個人化諮詢/互動問句/分享引導）+ 1 支 garbage → 多樣達標但 WARN garbage
+        _f21r2_5b = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 6)]
+        _f21r2_5b += [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(6, 10)]
+        _f21r2_5b += [_mk(i, f"骨架{i}", "分享引導型", _POST) for i in range(10, 13)]
+        _f21r2_5b += [_mk(13, "骨架13", "亂填標籤xyz", _POST)]
+        _r21r2_5b = chk_c21_2_cta_diversity(_f21r2_5b, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        _r2_5b_ok = (_r21r2_5b[0] == "WARN") and ("無法解析" in _r21r2_5b[1]) and ("亂填標籤xyz" in _r21r2_5b[1])
+        fcheck("F-21-R2-5b 正規 3 種達標 + 1 garbage → WARN（多樣達標但提示 garbage）", _r2_5b_ok, _r21r2_5b[1])
+        # 對照：正規 3 種乾淨無 garbage → PASS（確認沒誤把乾淨批降 WARN）
+        _f21r2_5c = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 6)]
+        _f21r2_5c += [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(6, 11)]
+        _f21r2_5c += [_mk(i, f"骨架{i}", "分享引導型", _POST) for i in range(11, 14)]
+        _r21r2_5c = chk_c21_2_cta_diversity(_f21r2_5c, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        fcheck("F-21-R2-5c 正規 3 種乾淨無 garbage → PASS（不誤降 WARN）", _r21r2_5c[0] == "PASS", _r21r2_5c[1])
+
+        # ══════════════════════════════════════════════════════════════
+        # [F-21 R3] Codex 第 3 輪退回 2 修正（P1 真實 CTA 標籤放寬 + P2 list title 防呆）
+        # ══════════════════════════════════════════════════════════════
+        print("\n[F-21 R3] Codex 第 3 輪退回 2 修正驗證")
+
+        # ── R3-1（P1）：真實合法批 5×諮詢 + 4×互動留言 + 4×釣魚型 → PASS（distinct=3）──
+        # 修前「釣魚型」不在 canonical 表 → 解析不到 → distinct 只算 2 → 誤 FAIL。
+        print("[F-21-R3-1] P1：5×個人化諮詢型 + 4×互動留言型 + 4×釣魚型 → PASS（distinct=3）")
+        _f21r3_1 = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 6)]   # 5
+        _f21r3_1 += [_mk(i, f"骨架{i}", "互動留言型", _POST) for i in range(6, 10)]    # 4
+        _f21r3_1 += [_mk(i, f"骨架{i}", "釣魚型", _POST) for i in range(10, 14)]       # 4
+        _r21r3_1 = chk_c21_2_cta_diversity(_f21r3_1, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        _r3_1_ok = (_r21r3_1[0] == "PASS") and ("3 種" in _r21r3_1[1])
+        fcheck("F-21-R3-1 真實合法批 5諮詢+4互動+4釣魚 → distinct=3 PASS", _r3_1_ok, _r21r3_1[1])
+
+        # ── R3-2（P1）：帶括號變體標籤正規化──
+        # 「釣魚型（留言「幕後」→ 私訊解答圖卡）」「純雞湯（無CTA）」「追蹤型（IG 限動）」
+        #   各剝括號歸到 base → 釣魚引流 / 無強CTA / 追蹤引導 = 3 種 distinct
+        print("[F-21-R3-2] P1：帶括號真實標籤剝括號正規化 → 計入 distinct")
+        # 單元層先證 _s21_canonical_cta_effect 對帶括號標籤的歸類
+        _paren_cases = [
+            ("釣魚型（留言「幕後」→ 私訊解答圖卡）", "釣魚引流"),
+            ("純雞湯（無CTA）", "無強CTA"),
+            ("純雞湯（無商業CTA）", "無強CTA"),
+            ("追蹤型（IG 限動）", "追蹤引導"),
+            ("私域引流型（餐車限動）", "釣魚引流"),
+            ("私訊引流型（首購）", "釣魚引流"),
+            ("留言互動型（軟互動，非引流）", "互動問句"),
+            ("無（純雞湯強制）", "無強CTA"),
+            ("二選一互動型", "互動問句"),
+            ("收藏型", "分享引導"),
+            ("私訊型", "釣魚引流"),
+        ]
+        _paren_all_ok = True
+        _paren_detail = []
+        for _raw, _exp in _paren_cases:
+            _got = _s21_canonical_cta_effect(_raw)
+            _paren_detail.append(f"{_raw}→{_got}(期望{_exp})")
+            if _got != _exp:
+                _paren_all_ok = False
+        fcheck("F-21-R3-2a 11 個真實帶括號/真實標籤剝括號歸正確 base", _paren_all_ok, " | ".join(_paren_detail))
+        # 端到端：4×釣魚型（…）+ 4×純雞湯（無CTA）+ 5×個人化諮詢型 → distinct=3 PASS
+        _f21r3_2 = [_mk(i, f"骨架{i}", "個人化諮詢型", _POST) for i in range(1, 6)]                 # 5
+        _f21r3_2 += [_mk(i, f"骨架{i}", "釣魚型（留言「幕後」→ 私訊解答圖卡）", _POST) for i in range(6, 10)]  # 4
+        _f21r3_2 += [_mk(i, f"骨架{i}", "純雞湯（無CTA）", _POST) for i in range(10, 14)]          # 4
+        _r21r3_2 = chk_c21_2_cta_diversity(_f21r3_2, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        fcheck("F-21-R3-2b 帶括號真實標籤批 → distinct=3 PASS", _r21r3_2[0] == "PASS" and "3 種" in _r21r3_2[1], _r21r3_2[1])
+
+        # ── R3-3（P1 不放水）：foo/bar/baz garbage 剝括號後仍 garbage → 不計 + WARN + FAIL ──
+        print("[F-21-R3-3] P1 不放水：foo/bar/baz（含帶括號 garbage）剝括號後仍不在表 → 不計 + FAIL")
+        _f21r3_3 = [_mk(i, f"骨架{i}", "foo（亂填）", _POST) for i in range(1, 6)]
+        _f21r3_3 += [_mk(i, f"骨架{i}", "bar", _POST) for i in range(6, 10)]
+        _f21r3_3 += [_mk(i, f"骨架{i}", "baz（垃圾）", _POST) for i in range(10, 14)]
+        _r21r3_3 = chk_c21_2_cta_diversity(_f21r3_3, "測試業主", pref_text=None, batch_tag="2026-06-25")
+        _r3_3_ok = (_r21r3_3[0] == "FAIL") and ("無法解析" in _r21r3_3[1]) and ("只有 0 種" in _r21r3_3[1])
+        fcheck("F-21-R3-3 garbage（含帶括號）剝括號仍 garbage → distinct=0 FAIL + WARN", _r3_3_ok, _r21r3_3[1])
+
+        # ── R3-4（P2）：list 型未引號 title placeholder → _is_placeholder=True → C-21.7 SKIP ──
+        print("[F-21-R3-4] P2：未引號 title: [編劇填] 解析成 list → _is_placeholder=True → C-21.7 SKIP")
+        # 單元層：_is_placeholder 對各種值的判定
+        _ph_cases = [
+            (["編劇填"], True),               # 骨架機未引號 title 被 YAML 解析成 list
+            (["[編劇填]"], True),             # list 含 [編劇填]
+            (["編劇填", "說明"], True),        # list 任一元素含編劇填
+            ([], True),                       # 空 list
+            (["真實標題"], False),            # list 但元素是真標題 → 非 placeholder
+            (None, True),
+            ("", True),
+            ("[編劇填]", True),
+            ("[編劇填]  # 說明", True),
+            ("已填真標題", False),
+            ("pending", True),
+            ("待填", True),
+        ]
+        _ph_all_ok = True
+        _ph_detail = []
+        for _v, _exp in _ph_cases:
+            _got = _is_placeholder(_v)
+            _ph_detail.append(f"{_v!r}→{_got}(期望{_exp})")
+            if _got != _exp:
+                _ph_all_ok = False
+        fcheck("F-21-R3-4a _is_placeholder 對 list/None/str 各態判定正確（含 list 防呆）", _ph_all_ok, " | ".join(_ph_detail))
+        # 端到端：未引號 list title + 缺三誠實欄 → 走 skeleton SKIP（不誤 FAIL）
+        _f21r3_4 = {"title": ["編劇填"], "batch_date": _POST}
+        _r21r3_4 = chk_c21_7_honest_ceiling(_f21r3_4, "f21r3_4.yaml", is_skeleton=_is_placeholder(_f21r3_4.get("title")))
+        fcheck("F-21-R3-4b 未引號 list title 骨架支缺三欄 → SKIP（非誤 FAIL）", _r21r3_4[0] == "SKIP", _r21r3_4[1])
+        # 對照：list 型真標題（已填）+ 缺三欄 → 非骨架 → FAIL（不放水）
+        _f21r3_4c = {"title": ["真實已填標題"], "batch_date": _POST}
+        _r21r3_4c = chk_c21_7_honest_ceiling(_f21r3_4c, "f21r3_4c.yaml", is_skeleton=_is_placeholder(_f21r3_4c.get("title")))
+        fcheck("F-21-R3-4c list 型真標題已填缺三欄 → FAIL（不誤放水）", _r21r3_4c[0] == "FAIL", _r21r3_4c[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

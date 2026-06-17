@@ -2203,6 +2203,102 @@ _S21_1_SAME_SKELETON_THRESHOLD = 7
 _S21_2_MIN_DISTINCT = 3
 _S21_2_MAX_SINGLE = 6
 
+# ════════════════════════════════════════════
+# §22 選題公式 check 常數（2026-06-17 機器化 §22 落地）
+# 對齊 scripter.md §22（§22.4 一般化偵測 7 訊號可機械子集）
+# ════════════════════════════════════════════
+# 生效日 = 上線日 2026-06-17 + 7 天 WARN 窗（與 §21 同步、涵蓋 shadow 觀察期）。
+# 誠實定位（照計劃 + §22.4）：C-22 全程「只擋低級空泛、不判好題」——
+#   shadow / 全程 WARN-only（不 FAIL），語義級「好不好」留 GPT/真人。
+# _S22_EFFECTIVE_FROM 保留作「過渡窗」標示（過渡期 detail 帶 batch_date 提示），
+#   但因 _S22_ENFORCE=False，現階段 enforce 側也仍 WARN（生效日後若拍板才翻 True）。
+_S22_EFFECTIVE_FROM = _dt.date(2026, 6, 24)
+# C-22 enforce 開關：先 WARN-only（澤君未拍板「題目一般化擋死」）。
+# shadow 過 + 澤君拍板才翻 True 改 enforce 側 FAIL。
+_S22_ENFORCE = False
+# C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
+# 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
+#   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
+#   天然只有 1 個第一人稱訊號、不堆數字/地名/代價詞，永遠湊不到 3 → 好批 100% 誤 WARN、無鑑別力。
+#   降到 2 後：「第一人稱 + 1 個其他訊號」即達標（瑞祥38 好批偏一般率 100%→62%）；
+#   而真空泛題（買房要注意什麼/房貸怎麼選 …）多數 0 訊號，MIN=2 下仍 100% 偏一般 → 仍正確 WARN。
+#   ⚠️ 誠實邊界：規則對「純口語故事題」的 recall 有天花板（楷甯首批極致口語故事 MIN=2 仍 85% 偏一般），
+#      靠搭配 batch ratio=0.9 才讓楷甯批次層 PASS；真正「題目好不好」語義級判斷留 GPT/真人，
+#      C-22 只擋「整批低級空泛、幾乎零訊號」那種。
+_S22_MIN_SIGNALS = 2
+
+# === Codex 第 2 輪 precision 修（2026-06-17）：達標須「total >= MIN 且 hard >= 1」 ===
+# P1 為救 recall 把 first_person 詞庫 13→41 + 門檻 3→2，但 precision 變沒牙：弱詞可湊數繞過。
+#   繞過例：「客戶問我，房貸怎麼選」= ③客戶(身份) + ⑦問我(倒裝第一人稱) = 2 訊號 → 誤判不一般。
+#   根因 1：純弱訊號（身份泛詞 / 時效 / 弱第一人稱）湊到 2 就清關，但這類是「泛 FAQ 殼」非業主真經歷。
+#   根因 2：`客戶` 在 identity 詞庫(③) + `客戶問我` 又算第一人稱(⑦) → 同一句雙計分。
+# 修法（Codex 指定）：
+#   (a) 訊號分 hard / weak 兩類；單題達標改 `total >= _S22_MIN_SIGNALS 且 hard_count >= 1`。
+#       hard = 具體數字 / 地名在地 / 反直覺 / 受眾真代價 / 強第一人稱經歷 / 綁業主名。
+#       weak = 純身份泛詞(客戶/客人/上班族…) / 時效 / 弱第一人稱(我跟/我看/問我/找我…)。
+#   (b) first_person 拆強/弱兩庫（見 _s22_count_signals）；弱第一人稱只算 weak。
+#   (c) 防 `客戶問我` 雙計分：身份詞 ③ 與弱第一人稱 ⑦ 都是 weak，且 _s22_count_signals 以
+#       hits dict 去重（同一語義訊號只算一格），純弱訊號湊不出 hard。
+_S22_MIN_HARD_SIGNALS = 1
+# 批次第二層 backstop：若「裸偏一般 + 只靠弱訊號過關（達標但 hard=0... 但達標規則已要求 hard>=1，
+#   故此處實指：表面達標靠 weak 為主、hard 僅 1）」的題占比 >= 此比例 → 仍 WARN（即使表面 distinct 夠）。
+# 對齊 Codex 指定修法第 3 條：防「整批套弱訊號殼 → 表面 PASS」。
+#   定義「弱過關題」＝該支達標(total>=MIN 且 hard>=1)但 weak_count > hard_count（靠弱訊號撐多樣）。
+#   若 (偏一般 + 弱過關) 占比 >= 此值 → WARN。
+_S22_BATCH_WEAK_PASS_RATIO = 0.9
+# 一批「偏一般」支數 >= 此比例（向上取整）才把 batch 判 WARN（單支偶發不擾民）。
+# 2026-06-17 P2-a 調 0.5→0.9（御史/Codex 建議的治標，搭配 MIN=2；實測敏感度後選 0.9 不選 0.8）：
+#   敏感度實測（MIN=2 固定，三批偏一般率）：
+#     瑞祥38(好) 62%｜楷甯01(好) 85%｜空泛批(該WARN) 100%
+#     ratio=0.8 → 瑞祥PASS / 楷甯誤WARN / 空泛WARN
+#     ratio=0.9 → 瑞祥PASS / 楷甯PASS / 空泛WARN  ← 採此：兩好批都救回、空泛批仍正確擋住
+#     ratio=1.0 → 太鬆（整批全偏一般才 WARN，一支漏網就放行）→ 不採
+#   0.9 = 九成以上題目偏一般才提醒。好批裡只要 ≥10% 題目規則抓到 ≥2 訊號就放行；
+#   全空泛批（100% 偏一般）仍穩穩 >= 90% → 正確 WARN。鑑別力：好批 PASS、真垃圾 WARN。
+#   ⚠️ 誠實邊界：WARN 是「規則層提醒」不是「題目判死」，規則對口語故事題 recall 有上限，
+#      真正「題目好不好」的語義判斷靠 GPT/真人；C-22 只擋「整批低級空泛、幾乎零訊號」那種。
+_S22_BATCH_WARN_RATIO = 0.9
+
+# §22.4 一般化偵測 7 訊號的「可機械子集」（純 regex/詞庫，不碰 LLM）。
+# 計「非一般訊號」數：命中越多 = 越不一般。<_S22_MIN_SIGNALS → 偏一般。
+# 訊號方向：①具體數字 ②地名/在地 ③身份描述 ④時效 ⑤反直覺 ⑥受眾真代價 ⑦綁業主/第一人稱經歷
+#   （§22.4 原文訊號①「去掉業主名還成立」是反向＝一般；此處轉成正向「有綁業主/第一人稱」計分）
+
+# ① 具體數字（阿拉伯/全形數字 或 中文數字+業務量詞）
+_S22_NUM_RE = re.compile(r"[0-9０-９]|[一二三四五六七八九十百千兩]+\s*[年月天週次組件成倍折坪萬元位個人房樓家口口]")
+# ② 地名 / 在地詞（高雄常見行政區 + 在地泛詞）
+_S22_PLACE_WORDS = [
+    "高雄", "台南", "臺南", "台北", "臺北", "台中", "臺中", "新北", "桃園", "屏東", "嘉義",
+    "左營", "鳳山", "三民", "苓雅", "前鎮", "楠梓", "鼓山", "前金", "鹽埕", "新興", "小港",
+    "岡山", "橋頭", "仁武", "鳥松", "大社", "美術館", "巨蛋", "亞灣", "農16", "農十六",
+    "在地", "本地", "這一區", "這區", "我們這邊", "這附近",
+]
+# ③ 身份描述詞（存款X萬 / 剛XX的人 / 做X年 / 第一次 …，靠句型詞）
+_S22_IDENTITY_WORDS = [
+    "存款", "月薪", "年薪", "首購", "第一次", "剛出社會", "剛結婚", "新婚", "新手",
+    "單親", "退休", "斜槓", "上班族", "小資", "夫妻", "自營", "創業", "換屋", "包租",
+    "做了", "入行", "從業", "經手", "服務過", "帶看過", "客人", "客戶",
+]
+# ④ 時效詞（本月 / 本週 / 今年 / 最近 / 剛 / 2026 …）
+_S22_TIME_WORDS = [
+    "本月", "這個月", "本週", "這週", "今年", "去年", "最近", "近期", "上個月", "上週",
+    "剛剛", "今天", "昨天", "現在", "目前", "當前", "2025", "2026", "下半年", "上半年",
+    "升息", "降息", "新制", "新規", "新政策", "剛上路", "剛公布",
+]
+# ⑤ 反直覺詞（其實 / 沒人告訴你 / 大家都說…但 / 我犯過的錯 / 不是…而是 …）
+_S22_COUNTER_WORDS = [
+    "其實", "沒人告訴你", "沒人會說", "大家都說", "大家以為", "你以為", "別再", "別以為",
+    "不是", "而是", "真相", "誤會", "誤解", "搞錯", "我犯過", "踩過的雷", "踩過坑",
+    "顛覆", "反過來", "錯了", "迷思", "騙局", "盲點",
+]
+# ⑥ 受眾真代價詞（多賠 / 少付 / 被坑 / 後悔 / 錯過 / 多花 …）
+_S22_COST_WORDS = [
+    "多賠", "少賺", "少付", "多付", "多花", "白花", "被坑", "被騙", "後悔", "錯過",
+    "踩雷", "吃虧", "賠", "虧", "省下", "省了", "多繳", "白做", "白買", "買貴", "賣便宜",
+    "損失", "代價", "風險", "陷阱",
+]
+
+
 # C-21.2 P2-B（Codex 第 2 輪退回修；Codex 第 3 輪 P1 放寬到剛好）：
 # validator 自有的 CTA「效果」canonical 詞彙。
 # 對齊 scripter.md §21.2 line 572（個人化諮詢 / 互動問句留言回答 / 分享引導 / 無強CTA）
@@ -3769,6 +3865,209 @@ def chk_c21_7_honest_ceiling(data: dict, fname: str, is_skeleton: bool = False) 
     return "PASS", f"C-21.7 誠實天花板 PASS：score_type={st_val} / true_material_source={tms_val}"
 
 
+# ════════════════════════════════════════════
+# §22 選題公式 — C-22 一般化偵測（batch-level，純規則 shadow WARN）
+# ════════════════════════════════════════════
+
+def _s22_topic_text(data: dict) -> str:
+    """取單支「題目/標題/角度」文字供一般化偵測。
+    優先序：title（主）+ non_obvious_claim（§22 新欄）+ topic plan 留的 direction 註解。
+    direction 在骨架機是註解行（# direction: ...），yaml 解析吃不到 → 此處只取 yaml 欄位。
+    回合併字串（去掉行內 # 註解尾）。"""
+    parts: list[str] = []
+    for key in ("title", "non_obvious_claim", "topic", "direction", "adopted_topic_statement"):
+        v = data.get(key)
+        if isinstance(v, str):
+            parts.append(v.split("#")[0])
+        elif isinstance(v, list):
+            parts.extend(str(x).split("#")[0] for x in v)
+    # source_topic_intel.adopted_topic_statement（WP-B）也納入
+    sti = data.get("source_topic_intel")
+    if isinstance(sti, dict):
+        a = sti.get("adopted_topic_statement")
+        if isinstance(a, str):
+            parts.append(a.split("#")[0])
+    return " ".join(parts)
+
+
+# ⑦ 綁業主/第一人稱經歷詞庫 — Codex 第 2 輪 precision 修：拆強/弱兩庫（2026-06-17）。
+#   原版（P1）一庫到底、弱詞（我跟/我看/問我…）也算「不一般」→ 弱詞湊數可繞過。
+#   修法：強詞（綁真經歷、難偽造）算 hard；弱詞（泛敘述殼，泛 FAQ 也會用）算 weak。
+#   強：我經手/我服務/我帶看/我入行/我遇過/我被/我打電話/我陪/我接到/我犯/我踩/我勸/我教…
+#   弱：我跟/我看/我建議/我問/我幫/我聽/我跑/我發現/問我/找我/告訴我/罵我/謝我…（綁不出真經歷）
+_S22_FP_HARD = [
+    # 原版保留中「綁真經歷」的
+    "我經手", "我服務", "我帶看", "我入行", "我有個客", "我遇過", "我的客", "我們店", "我老闆",
+    # 強動詞（真做過/真發生在我身上）
+    "我就這樣", "我都先", "我都問", "我都會", "我被", "我打電話",
+    "我最常", "我學到", "我先問", "我遇到", "我會先",
+    "我犯", "我踩", "我接到", "我跑", "我陪", "我勸", "我教",
+]
+_S22_FP_WEAK = [
+    # 泛敘述殼（泛 FAQ / 任何人都能套）→ 弱訊號，不得單獨清關
+    "我自己", "我當", "我做", "我這", "我老實", "我為什麼", "我看", "我幫",
+    "我建議", "我聽", "我跟", "我發現", "我問",
+    # 倒裝第一人稱（受詞在前）：問我/告訴我/找我… 泛 FAQ 高頻 → 弱
+    "問我", "告訴我", "找我", "罵我", "教我", "謝我",
+]
+
+
+def _s22_count_signals(topic_text: str, owner: str) -> tuple[int, int, dict[str, bool]]:
+    """算單支題目的「非一般訊號」（純 regex/詞庫，零 LLM）。
+    回 (total 命中數, hard_count 硬訊號數, 逐訊號命中表)。
+
+    7 訊號分 hard / weak 兩類（Codex 第 2 輪 precision 修，2026-06-17）：
+      hard（具體可信、難偽造）：①具體數字 ②地名/在地 ⑤反直覺 ⑥受眾真代價 ⑦-強 強第一人稱/綁業主名
+      weak（泛敘述殼、易湊）：③身份泛詞(客戶/客人/上班族…) ④時效 ⑦-弱 弱第一人稱(我跟/問我…)
+    達標規則（caller 用）：total >= _S22_MIN_SIGNALS 且 hard_count >= _S22_MIN_HARD_SIGNALS。
+      → 純弱訊號湊數（hard=0）一律判偏一般，補上 P1 留的 precision 洞。
+    防雙計分（Codex 點名）：「客戶問我」= ③身份(weak) + ⑦弱第一人稱(weak)，兩者都歸 weak、
+      且合併成「單一弱訊號」計（_weak_soft），避免同一語義靠 weak 算成 2 個訊號達標。
+    對齊 scripter.md §22.4（原文訊號①「去掉業主名還成立」反向轉正向計分）。
+    """
+    t = topic_text or ""
+    hits: dict[str, bool] = {}
+    owner_token = str(owner or "").split("_")[-1].strip()  # 「房仲_瑞祥」→「瑞祥」；「叭噗_小C」→「小C」
+
+    # ── hard 訊號 ──
+    hits["數字"] = bool(_S22_NUM_RE.search(t))                          # ①
+    hits["地名在地"] = any(w in t for w in _S22_PLACE_WORDS)            # ②
+    hits["反直覺"] = any(w in t for w in _S22_COUNTER_WORDS)            # ⑤
+    hits["受眾真代價"] = any(w in t for w in _S22_COST_WORDS)          # ⑥
+    # ⑦-強：綁業主名 或 強第一人稱經歷（hard）
+    hits["綁業主第一人稱_強"] = (bool(owner_token) and owner_token in t) or any(w in t for w in _S22_FP_HARD)
+
+    hard_count = sum(1 for k in ("數字", "地名在地", "反直覺", "受眾真代價", "綁業主第一人稱_強") if hits[k])
+
+    # ── weak 訊號（防雙計分：身份③ + 弱第一人稱⑦-弱 合併為「單一弱訊號」）──
+    weak_identity = any(w in t for w in _S22_IDENTITY_WORDS)            # ③ 身份泛詞
+    weak_fp = any(w in t for w in _S22_FP_WEAK)                         # ⑦-弱 弱第一人稱
+    hits["身份描述"] = weak_identity
+    hits["弱第一人稱"] = weak_fp
+    # 身份 + 弱第一人稱 = 同一類「泛敘述殼」→ 合併只算 1 個弱訊號（防「客戶問我」雙計）
+    weak_soft = 1 if (weak_identity or weak_fp) else 0
+    hits["時效"] = any(w in t for w in _S22_TIME_WORDS)                 # ④ 時效（獨立弱訊號）
+    weak_count = weak_soft + (1 if hits["時效"] else 0)
+
+    total = hard_count + weak_count
+    return total, hard_count, hits
+
+
+def chk_c22_topic_generality(
+    yamls: list[tuple[Path, dict]],
+    owner: str,
+) -> tuple[str, str]:
+    """C-22 選題一般化偵測（batch-level，純規則 shadow WARN-only）—
+    一批裡「偏一般」（非一般訊號 < _S22_MIN_SIGNALS）的題目占比 >= _S22_BATCH_WARN_RATIO → WARN。
+
+    對齊 scripter.md §22.4：
+    - 誠實定位：**只擋低級空泛、不判好題**。語義級「好不好」留 GPT/真人。
+    - 全程 WARN-only（_S22_ENFORCE=False；shadow / 過渡日機制照 §21）。
+    - 骨架階段（>50% title placeholder）→ SKIP（題目未定，等填完再驗）。
+    - 與既有 check 正交不重複計：C-22=題目一般化；C-21.x=craft；C-cta-mix=CTA 配比；
+      C-017=知識型主體段具體化密度（C-017 看 scenes 主體段內容、C-22 看題目/標題/角度）。
+    """
+    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
+    if not valid:
+        return "WARN", "C-22：批次無有效 yaml，跳過"
+
+    # 骨架階段 SKIP：>50% title placeholder（題目尚未定）
+    placeholder_titles = sum(1 for _, d in valid if _is_placeholder(d.get("title")))
+    if (placeholder_titles / len(valid)) > 0.5:
+        return "SKIP", (
+            f"C-22：>50% 支 title 為 placeholder（{placeholder_titles}/{len(valid)}）"
+            f"— 骨架階段（題目未定）跳過，等編劇填完再驗"
+        )
+
+    batch_date = _s22_batch_date(valid)
+
+    # 逐支算訊號；title placeholder 的單支不納統計（題目未定不算偏一般）
+    # 達標規則（Codex 第 2 輪 precision 修）：total >= MIN 且 hard >= 1。
+    #   未達標 → 偏一般；達標但靠弱訊號撐多樣（weak > hard）→ 標「弱過關」供第二層 backstop。
+    general_files: list[tuple[str, int, list[str]]] = []   # (檔名, total 訊號數, 命中訊號名)
+    weak_pass_files: list[str] = []                        # 表面達標但 weak > hard（弱過關）
+    counted = 0
+    for f, d in valid:
+        if _is_placeholder(d.get("title")):
+            continue
+        text = _s22_topic_text(d)
+        total, hard, hits = _s22_count_signals(text, owner)
+        weak = total - hard
+        counted += 1
+        meets = (total >= _S22_MIN_SIGNALS) and (hard >= _S22_MIN_HARD_SIGNALS)
+        if not meets:
+            hit_names = [k for k, v in hits.items() if v]
+            general_files.append((f.name, total, hit_names))
+        elif weak > hard:
+            # 達標但靠弱訊號為主撐多樣 → 弱過關（第二層 backstop 計入）
+            weak_pass_files.append(f.name)
+
+    if counted == 0:
+        return "SKIP", "C-22：無可統計題目（全為骨架/缺 title），跳過"
+
+    general_n = len(general_files)
+    ratio = general_n / counted
+
+    # 第二層 backstop（Codex 指定修法第 3 條）：偏一般 + 弱過關 合占比 >= 門檻 → 仍 WARN。
+    #   防「裸偏一般 + 只靠弱訊號 bait 過關」整批套殼 → 表面 distinct 夠也放行。
+    weak_pass_n = len(weak_pass_files)
+    soft_ratio = (general_n + weak_pass_n) / counted
+
+    # 過渡期提示（shadow 觀察用；現恆 WARN）
+    in_warn = batch_date is not None and batch_date < _S22_EFFECTIVE_FROM
+    warn_note = ""
+    if in_warn:
+        warn_note = f"（過渡期 batch_date={batch_date} < {_S22_EFFECTIVE_FROM}）"
+
+    # ── 觸發條件：①偏一般占比 >= 主門檻 或 ②偏一般+弱過關占比 >= backstop 門檻 ──
+    trig_main = ratio >= _S22_BATCH_WARN_RATIO
+    trig_backstop = soft_ratio >= _S22_BATCH_WEAK_PASS_RATIO
+    if trig_main or trig_backstop:
+        detail_list = "；".join(
+            f"{name}（訊號{n}：{'/'.join(names) if names else '無'}）"
+            for name, n, names in general_files[:5]
+        )
+        more = f" 等 {general_n} 支" if general_n > 5 else ""
+        backstop_note = ""
+        if trig_backstop and not trig_main:
+            backstop_note = (
+                f"｜第二層 backstop：偏一般+弱過關 {general_n + weak_pass_n}/{counted}"
+                f"（{soft_ratio:.0%} >= {_S22_BATCH_WEAK_PASS_RATIO:.0%}）—"
+                f"多數題只靠弱訊號（身份/時效/弱第一人稱）湊數、缺業主真料 hard 訊號。"
+                f"弱過關支：{', '.join(weak_pass_files[:5])}"
+            )
+        msg = (
+            f"C-22 題目可能偏一般：{general_n}/{counted} 支未達標（total<{_S22_MIN_SIGNALS} 或 hard<{_S22_MIN_HARD_SIGNALS}）"
+            f"（占比 {ratio:.0%}）。"
+            f"建議換角度（見 §22.4：綁業主真料 proof_asset / 具體數字 / 在地 / 受眾真代價 / 反直覺）。"
+            f"偏一般支：{detail_list}{more}{backstop_note}{warn_note}"
+        )
+        # _S22_ENFORCE=False → 恆 WARN（只擋低級空泛、不判好題、不 FAIL）
+        if _S22_ENFORCE and not in_warn:
+            return "FAIL", msg
+        return "WARN", msg
+
+    return "PASS", (
+        f"C-22 題目一般化 PASS：偏一般 {general_n}/{counted} 支（占比 {ratio:.0%} < {_S22_BATCH_WARN_RATIO:.0%}）"
+        f"；弱過關 {weak_pass_n} 支（偏一般+弱過關 {soft_ratio:.0%} < {_S22_BATCH_WEAK_PASS_RATIO:.0%}）{warn_note}"
+    )
+
+
+def _s22_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
+    """取批次日期（批內取最大值，沿用 _extract_batch_date 逐支邏輯）。
+    回 None = 無法判斷日期。與 _s21_batch_date 同邏輯、獨立命名避免耦合。"""
+    dates: list[_dt.date] = []
+    for f, data in yamls:
+        if not isinstance(data, dict):
+            continue
+        if "__parse_error__" in data or "__schema_error__" in data:
+            continue
+        d = _extract_batch_date(data, f"{f.parent.name}/{f.name}")
+        if d:
+            dates.append(d)
+    return max(dates) if dates else None
+
+
 # ────────────────────────────────────────────
 # 跑單一 yaml 的 12 件 per-file checks
 # ────────────────────────────────────────────
@@ -3982,6 +4281,8 @@ def main():
         ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
         ("C-21.2", chk_c21_2_cta_diversity(valid_yamls, owner, pref_text, batch_tag)),
         ("C-21.6", chk_c21_6_quality_gate_report(valid_yamls, batch_dir)),
+        # §22 選題公式 batch-level（2026-06-17 機器化 §22 落地；shadow WARN-only）
+        ("C-22",   chk_c22_topic_generality(valid_yamls, owner)),
     ]
     # Fix A【P0】V3-002 gated：只有 policy enabled 才 append，off 時完全不註冊（零足跡）
     # off → 不 append V3-002 → batch_checks 件數、len 印出維持原值；無 SKIP 行
@@ -5534,6 +5835,370 @@ if __name__ == "__main__":
         _f21r3_4c = {"title": ["真實已填標題"], "batch_date": _POST}
         _r21r3_4c = chk_c21_7_honest_ceiling(_f21r3_4c, "f21r3_4c.yaml", is_skeleton=_is_placeholder(_f21r3_4c.get("title")))
         fcheck("F-21-R3-4c list 型真標題已填缺三欄 → FAIL（不誤放水）", _r21r3_4c[0] == "FAIL", _r21r3_4c[1])
+
+        # ══════════════════════════════════════════════════════════════
+        # [F-22] §22 選題公式 — C-22 一般化偵測（2026-06-17 機器化 §22；shadow WARN-only）
+        # ══════════════════════════════════════════════════════════════
+        print("\n[F-22] §22 選題一般化偵測：偏一般 WARN / 不一般 PASS / 骨架 SKIP / 過渡標示")
+
+        def _mk22(seq, title, date_str=_POST, owner="瑞祥", **extra):
+            """造一支 §22 測試 yaml（title 已填 + batch_date）。"""
+            d = {"title": title, "batch_date": date_str}
+            d.update(extra)
+            return (Path(f"f22_{seq:02d}.yaml"), d)
+
+        # ── F-22-S：單支訊號計分單元測試（純規則正確性）──
+        # 2026-06-17 Codex 第 2 輪 precision 修：_s22_count_signals 回 (total, hard, hits)。
+        print("[F-22-S] 單支訊號計分：hard/weak 分類 + 7 訊號逐一驗")
+        # 一般題目（誰都能講）：0-1 訊號 < MIN_SIGNALS（偏一般）
+        _n0, _hd0, _h0 = _s22_count_signals("買房要注意什麼", "瑞祥")
+        fcheck(f"F-22-Sa 「買房要注意什麼」→ 訊號 < {_S22_MIN_SIGNALS}（偏一般）", _n0 < _S22_MIN_SIGNALS, f"n={_n0} hard={_hd0} hits={[k for k,v in _h0.items() if v]}")
+        # 不一般題目（綁業主真料+數字+代價）：>= 3 訊號 且 hard >= 1
+        _n1, _hd1, _h1 = _s22_count_signals("我經手 37 組首購，多賠 80 萬的不是利率，是誤判了這件事", "瑞祥")
+        fcheck("F-22-Sb 「我經手37組首購多賠80萬」→ 訊號 >= 3 且 hard >= 1（不一般）", _n1 >= 3 and _hd1 >= 1, f"n={_n1} hard={_hd1} hits={[k for k,v in _h1.items() if v]}")
+        # 在地對比題（誠實：純規則只抓到「數字+地名」2 訊號；「差距大到不敢信」的語義代價規則抓不到
+        #   → C-22 定位「只擋低級空泛、不判好題」，語義級留 GPT/真人。此處驗「規則確實抓到數字+地名」）
+        _n2, _hd2, _h2 = _s22_count_signals("800 萬在高雄 vs 台南差距大到不敢信", "瑞祥")
+        fcheck("F-22-Sc 「800萬高雄vs台南」→ 命中數字+地名 hard 訊號（語義代價規則抓不到，誠實定位）",
+               _h2["數字"] and _h2["地名在地"] and _hd2 >= 2, f"n={_n2} hard={_hd2} hits={[k for k,v in _h2.items() if v]}")
+        # 顯式代價詞才命中「受眾真代價」訊號（規則邊界）
+        _n2b, _hd2b, _h2b = _s22_count_signals("800 萬在高雄買貴了 50 萬，多賠在這個盲點", "瑞祥")
+        fcheck("F-22-Sc2 顯式「買貴/多賠」→ 命中受眾真代價 hard 訊號 → 訊號 >= 3",
+               _h2b["受眾真代價"] and _n2b >= 3, f"n={_n2b} hard={_hd2b} hits={[k for k,v in _h2b.items() if v]}")
+        # 反直覺題
+        _n3, _hd3, _h3 = _s22_count_signals("其實大家都搞錯了，痘痘反覆不是保養品問題", "昀臻")
+        fcheck("F-22-Sd 反直覺題「其實大家都搞錯」→ 命中反直覺 hard 訊號", _h3["反直覺"], f"n={_n3} hard={_hd3} hits={[k for k,v in _h3.items() if v]}")
+        # 業主名綁定訊號（去業主名仍成立=一般 → 反向：有綁業主=hard 訊號）
+        _n4, _hd4, _h4 = _s22_count_signals("瑞祥帶看那天遇到的怪事", "瑞祥")
+        fcheck("F-22-Se 含業主名「瑞祥」→ 命中綁業主(強) hard 訊號", _h4["綁業主第一人稱_強"] and _hd4 >= 1, f"n={_n4} hard={_hd4} hits={[k for k,v in _h4.items() if v]}")
+
+        # ── F-22-Sf：第一人稱強/弱拆庫（2026-06-17 Codex 第 2 輪 precision 修）──
+        # 強第一人稱（綁真經歷）→ 命中 hard key「綁業主第一人稱_強」；
+        # 弱第一人稱（泛敘述殼）→ 命中 weak key「弱第一人稱」、不算 hard。
+        print("[F-22-Sf] 第一人稱強/弱拆庫：強→hard、弱→weak")
+        _fp_hard_samples = [
+            "戶頭只剩3萬，我就這樣進了房仲",       # 我就這樣（強）
+            "屋主問能不能賣，我都先問這一句",       # 我都先（強）
+            "行政轉房仲，第一年我被屋主罵了",       # 我被（強）
+            "我打電話，偷偷希望對方不接",           # 我打電話（強）
+            "簽約那天，我最常看的是屋主的臉",       # 我最常（強）
+            "陪屋主整理那天，我學到一件事",         # 我學到（強）
+        ]
+        _fph_ok, _fph_miss = True, []
+        for _t in _fp_hard_samples:
+            _hn, _hhd, _hh = _s22_count_signals(_t, "瑞祥")
+            if not _hh["綁業主第一人稱_強"]:
+                _fph_ok = False
+                _fph_miss.append(_t)
+        fcheck("F-22-Sf1 強第一人稱句型 6/6 命中 hard 訊號「綁業主第一人稱_強」",
+               _fph_ok, f"漏抓={_fph_miss}" if _fph_miss else "全部命中 hard")
+        _fp_weak_samples = [
+            "我跟其他房仲哪裡不一樣",               # 我跟（弱）
+            "你問鼓山適合哪種人住，我老實說",       # 我老實（弱）
+            "屋主委託前最常問我這一個問題",         # 問我倒裝（弱）
+            "美術館特區屋主最常問我的事",           # 問我倒裝（弱）
+        ]
+        _fpw_ok, _fpw_bad = True, []
+        for _t in _fp_weak_samples:
+            _hn, _hhd, _hh = _s22_count_signals(_t, "瑞祥")
+            # 弱第一人稱詞應命中弱 key、不命中強 key（除非該句另含地名/業主名等其他 hard）
+            if not _hh["弱第一人稱"]:
+                _fpw_ok = False
+                _fpw_bad.append((_t, "未命中弱 key"))
+        fcheck("F-22-Sf2 弱第一人稱句型 4/4 命中 weak 訊號「弱第一人稱」（泛敘述殼）",
+               _fpw_ok, f"異常={_fpw_bad}" if _fpw_bad else "全部命中 weak")
+
+        # ── F-22-Sg：詞庫擴充未過度放寬（反向 backstop）——真空泛題仍 0-1 訊號、< MIN_SIGNALS ──
+        # 防「為讓好批好看亂塞詞 → 什麼都 PASS」：純空泛題不含第一人稱/數字/地名 → 仍偏一般。
+        print("[F-22-Sg] 詞庫擴充未過度放寬：真空泛題仍偏一般（< MIN_SIGNALS）")
+        _junk_samples = ["買房要注意什麼", "房貸怎麼選", "保養三步驟你做對了嗎", "理財觀念", "看屋技巧分享"]
+        _junk_ok = True
+        _junk_bad = []
+        for _t in _junk_samples:
+            _jn, _jhd, _jh = _s22_count_signals(_t, "瑞祥")
+            if _jn >= _S22_MIN_SIGNALS and _jhd >= _S22_MIN_HARD_SIGNALS:  # 空泛題不該達標
+                _junk_ok = False
+                _junk_bad.append((_t, _jn, _jhd, [k for k, v in _jh.items() if v]))
+        fcheck(f"F-22-Sg 真空泛題（5 支）仍未達標（total<{_S22_MIN_SIGNALS} 或 hard<{_S22_MIN_HARD_SIGNALS}）",
+               _junk_ok, f"誤達標={_junk_bad}" if _junk_bad else "全部仍偏一般（正確）")
+
+        # ── F-22-Sh：Codex 第 2 輪 precision bait（單題）——弱詞湊數應仍偏一般 ──
+        # 繞過例 1+2：弱身份+弱第一人稱湊到 total>=2 但 hard=0 → 達標規則擋住（偏一般）。
+        print("[F-22-Sh] precision bait（單題）：弱詞湊數 hard=0 → 仍偏一般")
+        _bait_singles = [
+            "客戶問我，房貸怎麼選",          # ③客戶(weak) + ⑦問我(weak) → 雙計分本應 2、修後合併=1弱、hard=0
+            "客戶問我，買房要注意什麼",      # 同上
+            "我跟你說，今年買房要注意什麼",  # ⑦我跟(weak) + ④今年(weak) → total=2 但 hard=0
+            "客戶問我，首購要準備什麼",      # ③客戶+首購(weak) + ⑦問我(weak) → hard=0
+        ]
+        _bait_ok, _bait_bad = True, []
+        for _t in _bait_singles:
+            _bn, _bhd, _bh = _s22_count_signals(_t, "瑞祥")
+            _meets = (_bn >= _S22_MIN_SIGNALS) and (_bhd >= _S22_MIN_HARD_SIGNALS)
+            if _meets:  # 弱詞 bait 不該達標
+                _bait_bad.append((_t, _bn, _bhd, [k for k, v in _bh.items() if v]))
+                _bait_ok = False
+        fcheck("F-22-Sh 弱詞湊數 bait（4 支）hard=0 → 全部仍偏一般（precision 洞補上）",
+               _bait_ok, f"漏網={_bait_bad}" if _bait_bad else "全部正確擋住（hard<1）")
+
+        # ── F-22-Si：防雙計分（Codex 點名）——「客戶問我」身份③+弱第一人稱⑦合併算 1 弱 ──
+        print("[F-22-Si] 防雙計分：「客戶問我，房貸怎麼選」total 應 = 1（弱合併）非 2")
+        _dc_n, _dc_hd, _dc_h = _s22_count_signals("客戶問我，房貸怎麼選", "瑞祥")
+        fcheck("F-22-Si 「客戶問我，房貸怎麼選」→ total=1（身份+弱第一人稱合併）、hard=0",
+               _dc_n == 1 and _dc_hd == 0, f"total={_dc_n} hard={_dc_hd} hits={[k for k,v in _dc_h.items() if v]}")
+
+        # ── F-22a：批內多數偏一般（post-cutover）→ WARN（shadow 不 FAIL）──
+        print("[F-22a] C-22 批內多數偏一般 → WARN（shadow 不 FAIL）")
+        _f22a = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "保養三步驟你做對了嗎", "現在是買房好時機嗎", "痘痘肌怎麼改善",
+            "租屋要看什麼", "房貸怎麼選", "首購要準備什麼", "看屋技巧分享",
+            "存錢方法分享", "理財觀念", "裝潢注意事項", "驗屋要點", "家具怎麼挑",
+        ], 1)]
+        _r22a = chk_c22_topic_generality(_f22a, "瑞祥")
+        fcheck("F-22a 批內多數偏一般 → WARN（非 FAIL，shadow）", _r22a[0] == "WARN", _r22a[1])
+
+        # ── F-22b：批內多數不一般（post-cutover）→ PASS ──
+        print("[F-22b] C-22 批內多數不一般 → PASS")
+        _f22b = [_mk22(i, t) for i, t in enumerate([
+            "我經手 37 組首購，多賠 80 萬的不是利率",
+            "800 萬在高雄 vs 台南差距大到不敢信",
+            "其實升息那年我幫客人省下 30 萬",
+            "今年新制上路，首購族最容易踩的坑",
+            "左營這區 3 年漲了 2 成，但有個盲點沒人說",
+            "我帶看過 100 間，最後悔的客人都犯這個錯",
+            "存款 200 萬該買房還是租？我算給你看",
+            "鳳山這間貴了 50 萬，差在這個你看不到的地方",
+            "其實仲介不會主動告訴你的 3 件事",
+            "去年買貴的客人，問題都出在誤判了利率",
+            "高雄美術館特區，800 萬的真相",
+            "我入行 8 年，看過最扯的買房後悔故事",
+            "新婚夫妻第一次買房，多花了 40 萬冤枉錢",
+        ], 1)]
+        _r22b = chk_c22_topic_generality(_f22b, "瑞祥")
+        fcheck("F-22b 批內多數不一般 → PASS", _r22b[0] == "PASS", _r22b[1])
+
+        # ── F-22c：骨架階段（>50% title placeholder）→ SKIP ──
+        print("[F-22c] C-22 骨架階段 >50% title placeholder → SKIP")
+        _f22c = [(_p, {"title": "[編劇填]", "batch_date": _POST}) for _p in [Path(f"f22c_{i}.yaml") for i in range(1, 14)]]
+        _r22c = chk_c22_topic_generality(_f22c, "瑞祥")
+        fcheck("F-22c 骨架階段 → SKIP", _r22c[0] == "SKIP", _r22c[1])
+
+        # ── F-22d：過渡期（batch_date < 2026-06-24）→ WARN 且 detail 帶過渡標示 ──
+        print("[F-22d] C-22 過渡期 batch_date < 2026-06-24 → WARN + 過渡標示")
+        _f22d = [_mk22(i, t, date_str=_PRE) for i, t in enumerate([
+            "買房要注意什麼", "保養三步驟", "現在是買房好時機嗎", "痘痘怎麼改善",
+            "租屋要看什麼", "房貸怎麼選", "首購準備", "看屋技巧",
+            "存錢方法", "理財觀念", "裝潢注意", "驗屋要點", "家具怎麼挑",
+        ], 1)]
+        _r22d = chk_c22_topic_generality(_f22d, "瑞祥")
+        fcheck("F-22d 過渡期偏一般 → WARN + 過渡標示", _r22d[0] == "WARN" and "過渡期" in _r22d[1], _r22d[1])
+
+        # ── F-22e：邊界 — 空批 → WARN（不炸）──
+        print("[F-22e] C-22 邊界：空批 / 全 parse_error → WARN（不炸）")
+        _r22e = chk_c22_topic_generality([], "瑞祥")
+        fcheck("F-22e 空批 → WARN（不炸）", _r22e[0] == "WARN", _r22e[1])
+        _r22e2 = chk_c22_topic_generality([(Path("bad.yaml"), {"__parse_error__": True})], "瑞祥")
+        fcheck("F-22e2 全 parse_error → WARN（不炸）", _r22e2[0] == "WARN", _r22e2[1])
+
+        # ── F-22f：邊界 — 混合批（部分 placeholder + 部分已填）不算骨架（<50% placeholder）──
+        print("[F-22f] C-22 邊界：混合批 <50% placeholder → 仍統計已填支（不 SKIP）")
+        # 5 支 placeholder + 8 支已填一般題目 → placeholder 占 5/13 < 50% → 不 SKIP；只統計 8 支已填
+        _f22f = [(Path(f"f22f_ph{i}.yaml"), {"title": "[編劇填]", "batch_date": _POST}) for i in range(1, 6)]
+        _f22f += [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "首購準備",
+            "看屋技巧", "存錢方法", "理財觀念", "裝潢注意",
+        ], 1)]
+        _r22f = chk_c22_topic_generality(_f22f, "瑞祥")
+        fcheck("F-22f 混合批 <50% placeholder → 統計已填支（WARN 偏一般，非 SKIP）", _r22f[0] == "WARN", _r22f[1])
+
+        # ── F-22g：邊界 — list 型未引號 title placeholder → 視 placeholder（不誤統計）──
+        print("[F-22g] C-22 邊界：list 型 title ['編劇填'] → 視 placeholder")
+        _f22g = [(Path(f"f22g_{i}.yaml"), {"title": ["編劇填"], "batch_date": _POST}) for i in range(1, 14)]
+        _r22g = chk_c22_topic_generality(_f22g, "瑞祥")
+        fcheck("F-22g list 型 placeholder title → SKIP（>50% 骨架）", _r22g[0] == "SKIP", _r22g[1])
+
+        # ── F-22h：正交性 — C-22 看題目、C-017 看主體段，兩者不重複計（同一支不同維度）──
+        print("[F-22h] C-22 與 C-017 正交：C-22 看 title、C-017 看 scenes 主體段")
+        # 構一支：title 一般（C-22 視角偏一般）但主體段具體（C-017 視角夠具體）
+        _f22h_data = {
+            "title": "保養要注意什麼",   # 題目一般
+            "batch_date": _POST,
+            "主推派系": "拆解派",
+            "scenes": [
+                {"timestamp": "12-25s", "台詞_昀臻": "我做美容 8 年，這 3 個步驟 90% 的人第 2 步就錯了"},
+                {"timestamp": "25-40s", "台詞_昀臻": "去年有個客人花了 5 萬買產品，問題根本不在臉上"},
+            ],
+            "schema_check": {"CTA類型": "個人化諮詢型"},
+        }
+        # C-22 單支訊號：title「保養要注意什麼」應 < MIN_SIGNALS（偏一般）
+        _h_n, _h_hd, _h_hits = _s22_count_signals(_s22_topic_text(_f22h_data), "昀臻")
+        # C-017 主體段：含「8 年/3 個/90%/第 2/5 萬」具體信號 >= 2 → PASS
+        _c017_r = chk_c017_concreteness(_f22h_data, "f22h.yaml")
+        fcheck(
+            f"F-22h C-22 視角 title 偏一般（訊號<{_S22_MIN_SIGNALS}）但 C-017 視角主體段具體（PASS）→ 兩維度正交不重複",
+            _h_n < _S22_MIN_SIGNALS and _c017_r[0] == "PASS",
+            f"C-22單支訊號={_h_n}({[k for k,v in _h_hits.items() if v]}) | C-017={_c017_r[0]}:{_c017_r[1]}",
+        )
+
+        # ── F-22i：占比剛好 == 門檻（0.9）→ WARN（>= 門檻觸發）──
+        # 2026-06-17 P2-a 重構：門檻 0.5→0.9 後，原「6/12=0.5 == 門檻」case 失效（0.5 < 0.9 → PASS）。
+        # 改驗新邊界：9 偏一般 + 1 不一般 = 10 支 → 偏一般占 9/10 = 0.9 == 門檻 → WARN（>= 觸發）。
+        print(f"[F-22i] C-22 邊界：占比剛好 == 門檻（{_S22_BATCH_WARN_RATIO:.0%}）→ WARN（>= 門檻）")
+        _f22i = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "首購準備", "看屋技巧",
+            "存錢方法", "理財觀念", "裝潢注意", "驗屋要點",
+        ], 1)]  # 9 支純空泛（訊號 0-1，MIN=2 下偏一般）
+        _f22i += [_mk22(100, "我經手 37 組首購，多賠 80 萬都因為這個")]  # 1 支不一般（數字+代價+第一人稱 >= 2）
+        _r22i = chk_c22_topic_generality(_f22i, "瑞祥")
+        fcheck(f"F-22i 占比剛好 == 門檻（9/10={9/10:.0%} == {_S22_BATCH_WARN_RATIO:.0%}）→ WARN（>= 觸發）",
+               _r22i[0] == "WARN", _r22i[1])
+
+        # ── F-22i2：占比剛好低於門檻（0.8 < 0.9）→ PASS（門檻下緣）──
+        # 8 偏一般 + 2 不一般 = 10 支 → 偏一般占 8/10 = 0.8 < 0.9 → PASS。
+        print(f"[F-22i2] C-22 邊界：占比低於門檻（80% < {_S22_BATCH_WARN_RATIO:.0%}）→ PASS")
+        _f22i2 = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "首購準備",
+            "看屋技巧", "存錢方法", "理財觀念", "裝潢注意",
+        ], 1)]  # 8 支純空泛
+        _f22i2 += [_mk22(100 + i, t) for i, t in enumerate([
+            "我經手 37 組首購，多賠 80 萬都因為這個", "其實升息那年我幫客人省下 30 萬，在左營",
+        ], 1)]  # 2 支不一般
+        _r22i2 = chk_c22_topic_generality(_f22i2, "瑞祥")
+        fcheck(f"F-22i2 占比 80% < 門檻 {_S22_BATCH_WARN_RATIO:.0%} → PASS", _r22i2[0] == "PASS", _r22i2[1])
+
+        # ── F-22j：少數偏一般（占比 < 門檻）→ PASS（單支偶發不擾民）──
+        print("[F-22j] C-22 少數偏一般（占比 < 門檻）→ PASS")
+        # 4 一般（訊號 0）+ 9 不一般（每句實算訊號 >= 2，見上方 helper 驗算）= 13 支
+        # → 偏一般占 4/13 = 0.31 < 門檻 0.9 → PASS
+        _f22j = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "看屋技巧",
+        ], 1)]
+        _f22j += [_mk22(100 + i, t) for i, t in enumerate([
+            "我經手 37 組首購，多賠 80 萬都因為這個",       # 4
+            "其實升息那年我幫客人省下 30 萬",               # 5
+            "左營 3 年漲 2 成，但有個盲點沒人說",            # 3
+            "我帶看 100 間，最後悔的客人都犯這錯",           # 4
+            "我入行 8 年，看過最扯的後悔故事",               # 4
+            "今年首購多花 40 萬，其實是誤判了利率",          # 5
+            "存款 200 萬的客人後悔了，我算給你看差 50 萬",   # 3
+            "鳳山這間買貴 60 萬，其實差在這個盲點",          # 4
+            "高雄美術館特區 800 萬，多賠的客人都踩這雷",      # 4
+        ], 1)]
+        _r22j = chk_c22_topic_generality(_f22j, "瑞祥")
+        fcheck(f"F-22j 少數偏一般（占比 31% < 門檻 {_S22_BATCH_WARN_RATIO:.0%}）→ PASS", _r22j[0] == "PASS", _r22j[1])
+
+        # ══════════════════════════════════════════════════════════════
+        # [F-22-bait] Codex 第 2 輪 precision 退回修 — 批次級 bait（弱詞殼繞過）
+        # 上輪救 recall 後 precision 變沒牙，Codex 親推抓到弱詞湊數可整批繞過。修後應 WARN。
+        # ══════════════════════════════════════════════════════════════
+        print("\n[F-22-bait] Codex 第 2 輪 precision 退回修：批次級弱詞殼 bait → WARN")
+
+        # ── bait-1：11 支裸空泛 + 2 支弱訊號 bait → WARN（Codex 指定）──
+        # 修前：2 支弱 bait 各靠「客戶+問我」湊 2 訊號 → 達標 → 11/13=84.6% < 90% → 誤 PASS。
+        # 修後：弱 bait hard=0 → 不達標 → 偏一般 13/13=100% >= 90% → WARN。
+        print("[F-22-bait1] 11 裸空泛 + 2 弱訊號 bait → WARN（弱 bait 不再湊數達標）")
+        _bait1 = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "首購準備", "看屋技巧",
+            "存錢方法", "理財觀念", "裝潢注意", "驗屋要點", "家具怎麼挑", "貸款流程",
+        ], 1)]  # 11 裸空泛
+        _bait1 += [
+            _mk22(100, "我跟你說，今年買房要注意什麼"),   # 弱 bait：我跟(weak)+今年(weak) hard=0
+            _mk22(101, "客戶問我，首購要準備什麼"),       # 弱 bait：客戶(weak)+問我(weak) hard=0
+        ]
+        _rb1 = chk_c22_topic_generality(_bait1, "瑞祥")
+        fcheck("F-22-bait1 11 空泛 + 2 弱 bait → WARN（弱 bait hard=0 不達標）", _rb1[0] == "WARN", _rb1[1])
+
+        # ── bait-2：13 支「客戶問我 + 泛 FAQ」→ WARN（Codex 指定）──
+        # 整批套「客戶+問我」弱詞殼，表面 distinct（題目各異）但全 hard=0 → 100% 偏一般 → WARN。
+        print("[F-22-bait2] 13 支「客戶問我 + 泛 FAQ」殼 → WARN（整批 hard=0）")
+        _bait2 = [_mk22(i, t) for i, t in enumerate([
+            "客戶問我，房貸怎麼選", "客戶問我，買房要注意什麼", "客戶問我，首購要準備什麼",
+            "客戶問我，租屋要看什麼", "客戶問我，看屋有什麼技巧", "客戶問我，驗屋要看什麼",
+            "客戶問我，裝潢要注意什麼", "客戶問我，貸款流程怎麼跑", "客戶問我，存錢有什麼方法",
+            "客戶問我，理財觀念要怎麼建立", "客戶問我，家具要怎麼挑", "客戶問我，怎麼跟銀行談",
+            "客戶問我，什麼時候進場好",
+        ], 1)]
+        _rb2 = chk_c22_topic_generality(_bait2, "瑞祥")
+        fcheck("F-22-bait2 13 支「客戶問我+泛FAQ」殼 → WARN（整批 hard=0、靠弱詞撐 distinct）", _rb2[0] == "WARN", _rb2[1])
+
+        # ── bait-3（backstop 專測）：弱過關第二層 — 全批達標但靠弱訊號為主 → WARN ──
+        # 構：每支都有 1 hard（地名）但 weak（身份+時效）更多 → total>=2、hard>=1 達標但 weak>hard。
+        #   單支不偏一般，但「弱過關」占比 >= 90% → 第二層 backstop 觸發 WARN。
+        print("[F-22-bait3] backstop 第二層：全批達標但 weak>hard（弱過關）→ WARN")
+        _bait3 = [_mk22(i, t) for i, t in enumerate([
+            "高雄的客戶今年都在問這個", "左營的客戶最近都來問", "鳳山客戶這個月問最多",
+            "三民客戶上週都在問", "苓雅的客戶今年最常問", "前鎮客戶最近問爆",
+            "楠梓客戶這週都來問", "鼓山的客戶今年問不停", "岡山客戶上個月問最多",
+            "橋頭的客戶最近都在問", "仁武客戶今年都來問", "鳥松客戶這個月問爆",
+            "大社的客戶上週問最多",
+        ], 1)]  # 每支：地名(hard 1) + 客戶(weak) + 時效(weak) = total 3 / hard 1 → weak>hard 弱過關
+        _rb3 = chk_c22_topic_generality(_bait3, "瑞祥")
+        fcheck("F-22-bait3 全批達標但 weak>hard（弱過關 100%）→ 第二層 backstop WARN", _rb3[0] == "WARN", _rb3[1])
+
+        # ── golden-rx38：瑞祥38 風格好批（強第一人稱+數字+代價）→ PASS（recall 沒退）──
+        # 模擬瑞祥38 好題型樣本，驗 precision 修後好批仍 PASS（不為 bait 把好批弄回 WARN）。
+        print("[F-22-golden-rx38] 瑞祥38 風格好批（強第一人稱故事題）→ PASS")
+        _gold_rx = [_mk22(i, t) for i, t in enumerate([
+            "我經手 37 組首購，多賠 80 萬的不是利率",          # 強FP+數字+代價 hard3
+            "我打電話那天，偷偷希望屋主不接",                  # 強FP(我打電話)
+            "我入行 8 年，看過最扯的買房後悔故事",            # 強FP+數字+代價(後悔)
+            "其實升息那年我幫客人省下 30 萬",                  # 反直覺+數字+代價(省)
+            "左營 3 年漲 2 成，但有個盲點沒人說",              # 地名+數字+反直覺
+            "我帶看 100 間，最後悔的客人都犯這個錯",          # 強FP+數字+代價(後悔)
+            "今年首購多花 40 萬，其實是誤判了利率",            # 時效+數字+代價+反直覺
+            "鳳山這間買貴 60 萬，差在這個你看不到的地方",      # 地名+數字+代價
+            "我被屋主罵過一次，從此改掉這個習慣",              # 強FP(我被)
+            "存款 200 萬該買房還是租？我算給你看差 50 萬",      # 數字(hard)+身份(weak)
+            "高雄美術館特區 800 萬的真相，多賠的都踩這雷",      # 地名+數字+代價+反直覺
+            "我犯過的最大錯，害客人多繳 20 萬",                # 強FP(我犯)+數字+代價
+            "新婚夫妻第一次買房，多花 40 萬冤枉錢",            # 身份(weak)+數字(hard)+代價(hard)
+        ], 1)]
+        _rgold = chk_c22_topic_generality(_gold_rx, "瑞祥")
+        # 逐句分數一併印出供檢核（誠實攤每句 total/hard）。
+        _gold_detail = []
+        for _f, _d in _gold_rx:
+            _t = _s22_topic_text(_d)
+            _gt, _gh, _ghh = _s22_count_signals(_t, "瑞祥")
+            _gold_detail.append(f"{_d['title'][:14]}…(t{_gt}/h{_gh})")
+        fcheck("F-22-golden-rx38 瑞祥38 風格好批 → PASS（recall 沒退）",
+               _rgold[0] == "PASS", f"{_rgold[1]}｜逐句: {' | '.join(_gold_detail)}")
+
+        # ── golden-kn01：楷甯01 口語故事好批（強第一人稱撐 hard）→ PASS ──
+        # 楷甯01 是口語第一人稱故事題（規則 recall 有上限），靠強第一人稱 hard 撐。
+        print("[F-22-golden-kn01] 楷甯01 口語故事好批 → PASS（強第一人稱撐 hard）")
+        _gold_kn = [_mk22(i, t, owner="楷甯") for i, t in enumerate([
+            "我經手過的客戶裡，最後悔的那一個",            # 強FP+代價(後悔)
+            "我入行第一年，被客戶教了一課",                # 強FP(我入行)+身份(weak)
+            "我都先問客戶這一句，再決定接不接",            # 強FP(我都先)+身份(weak)
+            "我打電話給屋主，心裡其實很掙扎",              # 強FP(我打電話)+反直覺(其實)
+            "我帶看那次差點出事，3 個細節沒注意",          # 強FP(我帶看)+數字
+            "我被客戶罵到不敢接電話那段日子",              # 強FP(我被)+身份(weak)
+            "我學到的第一課，其實是別急著成交",            # 強FP(我學到)+反直覺(其實)
+            "我陪客戶看了 30 間，他才說出真話",            # 強FP(我陪)+數字
+            "我犯過一個錯，害客戶多等了 3 個月",            # 強FP(我犯)+數字+代價(多)
+            "我接到那通電話，3 秒內就愣住",                # 強FP(我接到)+數字
+            "我跑了 5 趟銀行，才搞懂這件事",               # 強FP(我跑)+數字
+            "我帶看 100 間後，才發現的盲點",               # 強FP(我帶看)+數字+反直覺?
+            "我經手過上百組客戶，最常卡在這一步",          # 強FP(我經手)+數字
+        ], 1)]
+        _rkn = chk_c22_topic_generality(_gold_kn, "楷甯")
+        _kn_detail = []
+        for _f, _d in _gold_kn:
+            _t = _s22_topic_text(_d)
+            _kt, _kh, _khh = _s22_count_signals(_t, "楷甯")
+            _kn_detail.append(f"{_d['title'][:12]}…(t{_kt}/h{_kh})")
+        fcheck("F-22-golden-kn01 楷甯01 口語故事好批 → PASS（強第一人稱撐 hard）",
+               _rkn[0] == "PASS", f"{_rkn[1]}｜逐句: {' | '.join(_kn_detail)}")
+
+        # ── 純空泛批 backstop 確認（沒牙反向驗）：買房要注意什麼… → WARN ──
+        print("[F-22-junkbatch] 純空泛批（無 hard）→ WARN（沒牙 backstop 確認）")
+        _junkbatch = [_mk22(i, t) for i, t in enumerate([
+            "買房要注意什麼", "房貸怎麼選", "租屋要看什麼", "看屋技巧分享", "存錢方法",
+            "理財觀念", "裝潢注意事項", "驗屋要點", "家具怎麼挑", "貸款流程介紹",
+            "保養三步驟", "防曬怎麼挑", "卸妝要注意什麼",
+        ], 1)]
+        _rjunk = chk_c22_topic_generality(_junkbatch, "瑞祥")
+        fcheck("F-22-junkbatch 純空泛批（全 hard=0）→ WARN", _rjunk[0] == "WARN", _rjunk[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

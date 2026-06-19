@@ -240,14 +240,19 @@ def build_yaml_skeleton(item: dict) -> str:
     lines.append(f"# series_id: \"\"      # 系列批才填，e.g. 總督系列")
     lines.append(f"# episode: 0          # 系列批集數，e.g. 1")
     lines.append(f"")
-    # ── §22 選題公式 6 件套（2026-06-17 機器化 §22；C-22 batch-level shadow WARN）──
+    # ── §22 選題公式（v1.1 proof_mode 三型 + 6 件套；2026-06-17 機器化 §22；C-22 + C-22b batch-level shadow WARN）──
     # 好角度 = 專屬證據→非顯主張→受眾真代價→行為改變 + 決策時刻 + 業主可信度（見 scripter.md §22.1）
-    lines.append(f"proof_asset: \"[編劇填]\"            # 業主 §0/§10.5 真料（真故事/案例/數據/服務觀察/客戶FAQ）+ source_ref；owner_story 類必先有、禁腦補")
+    lines.append(f"proof_mode: \"[編劇填]\"             # proof_first / demand_first / anchor_first（三型擇一，見 scripter.md §22.2）")
+    lines.append(f"proof_asset: \"[編劇填]\"            # 業主 §0/§10.5 真料（真故事/案例/數據/服務觀察/客戶FAQ）+ source_ref；proof_first 必先有、禁腦補（anchor_first 改走下方 anchor_ref）")
     lines.append(f"non_obvious_claim: \"[編劇填]\"      # 一句同行不會講的話（驗收：proof-removed test — 拿掉業主料若同行仍能講 → 太一般退回）")
     lines.append(f"audience_decision_cost: \"[編劇填]\"  # 連受眾哪個真代價：多花錢/延誤/踩雷/錯買/錯信/錯過（必填、無 → 案例獵奇降權）")
     lines.append(f"behavior_delta: \"[編劇填]\"          # 看完下次具體改什麼動作（非情緒、是動作，e.g.「下次看到 X 先查 Y 再回」；必填）")
     lines.append(f"audience_decision_moment: \"[編劇填]\"  # 具體處境（非「想買房的人」「想保養的人」）")
     lines.append(f"owner_credibility: \"[編劇填]\"       # 硬訊號 ≥1：親身服務案例/可追溯 source_ref/去識別客戶FAQ/獨有流程或檢查表")
+    lines.append(f"# anchor_first 專用三必填（proof_mode=anchor_first 時取消註解並填，見 scripter.md §22.8；C-22b 機械閘 shadow）")
+    lines.append(f"# anchor_ref: \"[編劇填]\"      # 指向 L2 偏好.md §9.5 voice_lock 真料（禁指向 .generated.md 退役拼接本）")
+    lines.append(f"# anchor_cost: \"[編劇填]\"     # 具體代價（禁「很努力/很辛苦/低谷/成長」空泛詞）")
+    lines.append(f"# because_bridge: \"[編劇填]\"  # 因為 X 代價 → 所以本題先看 A 不看 B（要有因果結構）")
     lines.append(f"")
     lines.append(f"# 題目方向（topic_distributor.py 分配，編劇填內文後請刪此行）")
     lines.append(f"# direction: {direction}")

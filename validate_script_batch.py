@@ -2216,6 +2216,10 @@ _S22_EFFECTIVE_FROM = _dt.date(2026, 6, 24)
 # C-22 enforce 開關：先 WARN-only（澤君未拍板「題目一般化擋死」）。
 # shadow 過 + 澤君拍板才翻 True 改 enforce 側 FAIL。
 _S22_ENFORCE = False
+# C-22b anchor_first 機械閘 enforce 開關：先 False（shadow 觀察）。
+# anchor_first 三必填（anchor_ref / anchor_cost / because_bridge）缺任一 → WARN。
+# 待 pilot 雙批驗過 + 澤君拍板才翻 True 改 FAIL。
+ANCHOR_FIRST_ENFORCE = False
 # C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
 # 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
 #   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
@@ -4053,6 +4057,96 @@ def chk_c22_topic_generality(
     )
 
 
+def chk_c22b_anchor_first(
+    data: dict,
+    fname: str,
+    yamls: list[tuple[Path, dict]],
+    owner: str = "",
+) -> tuple[str, str]:
+    """C-22b anchor_first 機械閘（Cluster A v1.1，2026-06-20）—
+    只有 proof_mode == anchor_first 的支才跑，其他直接 PASS。
+    全程受 ANCHOR_FIRST_ENFORCE 控（False=WARN-only shadow，True=FAIL）。
+    誠實邊界：空泛詞偵測是 presence-only 啟發，語義判斷留 D1 抽審/人工。"""
+    if data.get("proof_mode") != "anchor_first":
+        return "PASS", f"{fname}: C-22b 非 anchor_first，跳過"
+
+    severity = "FAIL" if ANCHOR_FIRST_ENFORCE else "WARN"
+    problems: list[str] = []
+
+    def _present(v: Any) -> bool:
+        # 非純量（list/dict）視為未填——anchor 三欄必須是字串真料，不接受結構值（防 `anchor_ref: []` 偽充填）。
+        if v is None or isinstance(v, (list, dict)):
+            return False
+        return str(v).strip() != ""
+
+    def _norm_ref(v: Any) -> str:
+        # dedup 正規化：路徑分隔 \ vs /、Windows 大小寫不敏感 → 抹平；
+        # 但保留 §章節差異（不同章節＝不同真料點，本就該分開計，不抹）。
+        return str(v).strip().replace("\\", "/").lower()
+
+    anchor_ref = data.get("anchor_ref")
+    anchor_cost = data.get("anchor_cost")
+    because_bridge = data.get("because_bridge")
+
+    # 1. anchor_ref 存在 + 不指向退役拼接本（最重要的確定性閘）
+    if not _present(anchor_ref):
+        problems.append("anchor_ref 缺填或空白（anchor_first 必填）")
+    else:
+        anchor_ref_s = str(anchor_ref).strip()
+        # 退役拼接本檔名＝ _<業主>完整公版.generated.md：業主名插在 `_` 與「完整公版」之間，
+        # 故不可用 endswith("_完整公版...")（會整批漏判）。改偵測 .generated.md 衍生標記
+        # （substring：對路徑前綴 / §章節後綴都穩）。anchor 來源只能手寫 L0/L1/L2，
+        # 不得指向任何 generated 衍生檔（含拼接本 / 小抄 / projection）。
+        if ".generated.md" in anchor_ref_s.lower():
+            problems.append(
+                "anchor_ref 指向退役拼接本（.generated.md），禁用；"
+                "請改指向 L2 偏好.md §9.5 voice_lock 或 L0/L1 真料段落"
+            )
+        # 防套路（same-batch）：同一 anchor_ref 同批 > 2 支（正規化後比對，見 _norm_ref）
+        cur_ref_norm = _norm_ref(anchor_ref_s)
+        same_batch = 0
+        for _bf, _bd in yamls:
+            if not isinstance(_bd, dict):
+                continue
+            if _bd.get("proof_mode") != "anchor_first":
+                continue
+            _br = _bd.get("anchor_ref")
+            if _present(_br) and _norm_ref(_br) == cur_ref_norm:
+                same_batch += 1
+        if same_batch > 2:
+            problems.append("同批 anchor_ref 重複 > 2 支（套路化風險）")
+
+    # 2. anchor_cost 存在 + 非純空泛詞（presence-only 啟發）
+    if not _present(anchor_cost):
+        problems.append("anchor_cost 缺填")
+    else:
+        cost_s = str(anchor_cost).strip()
+        VAPID_COST_WORDS = ["很努力", "很辛苦", "低谷", "成長", "堅持", "努力過", "撐過來"]
+        if len(cost_s) < 20 and any(w in cost_s for w in VAPID_COST_WORDS):
+            problems.append(
+                "anchor_cost 疑似空泛詞，請填具體代價"
+                "（例：戶頭剩三萬、第一次被屋主罵當場愣住）"
+            )
+
+    # 3. because_bridge 存在 + 含因果結構訊號
+    if not _present(because_bridge):
+        problems.append("because_bridge 缺填（因果橋必填）")
+    else:
+        bridge_s = str(because_bridge).strip()
+        BRIDGE_SIGNALS = ["因為", "所以", "才懂", "那次", "讓我", "先看"]
+        if not any(sig in bridge_s for sig in BRIDGE_SIGNALS):
+            problems.append("because_bridge 缺因果結構（需含『因為…所以…』或等效句型）")
+
+    # TODO(C-22b near-3-batch)：跨批 anchor_pool_exhausted（同 anchor_ref 近 3 批累計 > 4）
+    #   需 owner 層跨批 anchor 歷史來源，現 validator 只有當批 yamls。
+    #   薄料業主（< 3 批）本就只跑 same-batch ≤2、近批規則暫停，此 TODO 不影響薄料 pilot。
+    #   待跨批歷史來源接上再補；補上時輸出訊息須含 token「anchor_pool_exhausted」供 D1 觸發。
+
+    if problems:
+        return severity, f"{fname}: " + "；".join(problems)
+    return "PASS", f"{fname}: C-22b anchor_first 機械閘 PASS"
+
+
 def _s22_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
     """取批次日期（批內取最大值，沿用 _extract_batch_date 逐支邏輯）。
     回 None = 無法判斷日期。與 _s21_batch_date 同邏輯、獨立命名避免耦合。"""
@@ -4296,6 +4390,14 @@ def main():
         batch_checks.append(
             ("V3-002", chk_v3_002_batch_slot_count(valid_yamls, _topic_intel_policy))
         )
+    # C-22b anchor_first 機械閘（Cluster A v1.1；shadow WARN-only）—
+    # 只對 proof_mode == anchor_first 的支跑；無此類支則零 append（零足跡，沿用 V3-002 off 邏輯）。
+    for _c22b_f, _c22b_data in valid_yamls:
+        if isinstance(_c22b_data, dict) and _c22b_data.get("proof_mode") == "anchor_first":
+            batch_checks.append((
+                "C-22b anchor_first 機械閘",
+                chk_c22b_anchor_first(_c22b_data, _c22b_f.name, valid_yamls, owner),
+            ))
     print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:
         icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))
@@ -6199,6 +6301,29 @@ if __name__ == "__main__":
         ], 1)]
         _rjunk = chk_c22_topic_generality(_junkbatch, "瑞祥")
         fcheck("F-22-junkbatch 純空泛批（全 hard=0）→ WARN", _rjunk[0] == "WARN", _rjunk[1])
+
+        # ── F-C22B：C-22b anchor_first 機械閘（批次 2 / Cluster A v1.1；shadow WARN-only）──
+        # 注意：與既有 F-22a/F-22b（C-22 批次級一般化）不同 check，獨立命名 F-C22B 避免混淆。
+        print("[F-C22B] anchor_first 三必填 + 退役拼接本 BLOCK + 防套路（C-22b 機械閘）")
+        _af_ok = {"proof_mode": "anchor_first",
+                  "anchor_ref": "楷甯偏好.md §9.5 voice_lock #1",
+                  "anchor_cost": "第一次被屋主罵當場愣住，打電話給澤君問是否要道歉",
+                  "because_bridge": "因為被罵還撐下來，所以遇到要不要趁低點買我先看心理準備不是利率"}
+        _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": ""}, "f.yaml", [], "楷甯")
+        fcheck("F-C22B-1 anchor_ref 缺 → WARN", _rb[0] == "WARN" and "anchor_ref 缺填" in _rb[1], _rb[1])
+        _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": "_楷甯完整公版.generated.md"}, "f.yaml", [], "楷甯")
+        fcheck("F-C22B-2 退役拼接本 .generated.md → WARN（上一輪真 bug 迴歸鎖）", _rb[0] == "WARN" and "退役拼接本" in _rb[1], _rb[1])
+        _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": "_楷甯完整公版.GENERATED.MD"}, "f.yaml", [], "楷甯")
+        fcheck("F-C22B-3 .GENERATED.MD 大小寫變體 → WARN", _rb[0] == "WARN" and "退役拼接本" in _rb[1], _rb[1])
+        _rb = chk_c22b_anchor_first(dict(_af_ok), "f.yaml", [], "楷甯")
+        fcheck("F-C22B-4 三必填齊 → PASS", _rb[0] == "PASS", _rb[1])
+        _rb = chk_c22b_anchor_first({"proof_mode": "proof_first"}, "f.yaml", [], "楷甯")
+        fcheck("F-C22B-5 proof_first → 跳過 PASS（非 anchor_first 零干擾）", _rb[0] == "PASS" and "跳過" in _rb[1], _rb[1])
+        _rb = chk_c22b_anchor_first({**_af_ok, "anchor_cost": "很努力"}, "f.yaml", [], "楷甯")
+        fcheck("F-C22B-6 空泛 anchor_cost → WARN", _rb[0] == "WARN" and "空泛詞" in _rb[1], _rb[1])
+        _af_batch = [(Path(f"s{_i}.yaml"), dict(_af_ok)) for _i in range(3)]
+        _rb = chk_c22b_anchor_first(dict(_af_ok), "s0.yaml", _af_batch, "楷甯")
+        fcheck("F-C22B-7 同 anchor_ref 同批 >2 → WARN（防套路）", _rb[0] == "WARN" and "同批 anchor_ref 重複" in _rb[1], _rb[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

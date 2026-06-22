@@ -548,6 +548,27 @@ def main():
                 projection_path=_proj_path,
             )
             print(f"\n[WP-B] assign: {assign_report.get('detail', '')}")
+
+            # ── WP-C.2：offered 事件帳本（flag-gated，預設 OFF → 零足跡）──────────
+            # OFF（env TOPIC_INTEL_OFFERED_LEDGER != "1"）時：不 import offered 模組、不寫、
+            # assign_report 不新增 offered_ledger key、stdout 無 [WP-C.2] 行 → 輸出 byte-identical。
+            # 只在 enabled + 無 error + mode in {shadow,enforce} 才記（失敗的派工不記 offered）。
+            if os.environ.get("TOPIC_INTEL_OFFERED_LEDGER", "").strip() == "1" \
+                    and assign_report and assign_report.get("enabled") \
+                    and assign_report.get("error") is None \
+                    and assign_report.get("mode") in ("shadow", "enforce"):
+                try:
+                    from topic_intel_offered import emit_offered_events  # type: ignore[import]
+                    _offered_report = emit_offered_events(
+                        plan=plan,
+                        assign_report=assign_report,
+                        owner_code=owner_code_val,
+                        owner_name=owner,
+                    )
+                    assign_report["offered_ledger"] = _offered_report
+                    print(f"[WP-C.2] offered: {_offered_report.get('detail', '')}")
+                except Exception as _oe:
+                    print(f"[WARN] WP-C.2 offered emit 失敗（fail-soft，不擋）：{_oe}", file=sys.stderr)
         elif policy.get("mode") == "invalid":
             # Fix P0-2：invalid policy（有寫 topic_intel_closure 但設定不合法）→ assign error，不綁
             # 只有「無 _batch_flags.yml」或明確 mode=off 才 disabled 零足跡；invalid ≠ off
@@ -869,6 +890,39 @@ def assign_topic_sources(
     else:
         _usage_index_state = "ok"
     assign_report_base["usage_index_state"] = _usage_index_state
+
+    # P1-b round 5（御史 M2）跨業主 7 天冷卻 — flag gate TOPIC_INTEL_CROSS_OWNER_COOLDOWN
+    # 預設關（免每 build 打 reconcile API）；開時 shadow WARN，S3 enforce 才擋
+    _cross_owner_cooldown_enabled = os.environ.get('TOPIC_INTEL_CROSS_OWNER_COOLDOWN', '').strip() == '1'
+    _cross_owner_warned: list[str] = []
+    if _cross_owner_cooldown_enabled:
+        try:
+            from reconcile_topic_intel_usage import is_recently_used_by_other_owner as _iru_cross
+            _current_industry = proj_data.get("industry_id") if isinstance(proj_data, dict) else None
+            for _cand in filtered_candidates:
+                _tid = _cand.get("topic_id", "")
+                if not _tid:
+                    continue
+                try:
+                    _cross_used = _iru_cross(
+                        topic_id=_tid,
+                        current_owner=_owner_code_for_dedup or "",
+                        current_industry=_current_industry,
+                        max_days=7,
+                        same_industry_only=True,
+                    )
+                    if _cross_used:
+                        _cross_owner_warned.append(_tid)
+                except Exception:
+                    pass  # fail-soft 不擋
+        except ImportError:
+            pass  # reconcile 未部署 → skip（非 blocker）
+
+        if _cross_owner_warned:
+            warnings.append(
+                f"[WARN/industry-native] 跨業主 7 天冷卻：{len(_cross_owner_warned)} 支候選近 7 天被同行業其他業主採用過"
+                f"（shadow 觀測、S3 enforce 才擋）: {_cross_owner_warned[:5]}"
+            )
 
     qualified_count = len(filtered_candidates)
 

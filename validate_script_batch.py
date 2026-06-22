@@ -2220,6 +2220,11 @@ _S22_ENFORCE = False
 # anchor_first 三必填（anchor_ref / anchor_cost / because_bridge）缺任一 → WARN。
 # 待 pilot 雙批驗過 + 澤君拍板才翻 True 改 FAIL。
 ANCHOR_FIRST_ENFORCE = False
+# C-offpro-placeholder：台詞占位符守門（shadow=WARN-only）。
+# 待保鏢驗回歸 + 澤君拍板才翻 True 改 FAIL。
+_OFFPRO_PLACEHOLDER_ENFORCE = False
+# C-offpro-leak：off-pro 立場 lane 本業詞守門（shadow=WARN-only）。
+_OFFPRO_LEAK_ENFORCE = False
 # C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
 # 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
 #   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
@@ -4147,6 +4152,198 @@ def chk_c22b_anchor_first(
     return "PASS", f"{fname}: C-22b anchor_first 機械閘 PASS"
 
 
+# ── chk_anchor_registry_ref（平行 shadow check，2026-06-20）──
+# 說明：
+#   - proof_mode == anchor_first 且 anchor_ref 形如 registry id（<owner>_aNN）時，
+#     載入對應 owner 的 anchor registry，驗 id 存在 + owner match + anchor_first ∈ usable_for。
+#   - 非 registry id 格式（free-text）→ 不干擾，走原 chk_c22b 路徑（向後相容）。
+#   - 全 WARN-only（ANCHOR_FIRST_ENFORCE 不動）。
+#   - chk_c22b_anchor_first 本體一字不改。
+import re as _re_anchor
+
+# registry id 格式：<owner>_aNN（英數底線開頭，_aNN 結尾）
+_REGISTRY_ID_PAT = _re_anchor.compile(r'^[a-zA-Z0-9_]+_a\d+$')
+
+# L2 業主層根目錄（anchor registry 搜尋起點）
+_L2_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "L2_業主層"
+
+# sandbox registry 根目錄（fallback）
+_SANDBOX_ROOT = Path(__file__).resolve().parent.parent / "sandbox"
+
+
+def _load_owner_registry(owner: str) -> Optional[dict]:
+    """
+    搜尋 anchor registry，以 yaml 內 owner_id 欄位匹配（不靠檔名）。
+    理由：registry 檔名用業主中文名（如 _楷甯_anchor_registry.yaml），
+          anchor_ref 用英文 owner_id（如 kaining），兩者不同。
+    搜尋順序：L2_業主層 → sandbox。回 None = 找不到。
+    """
+    import yaml as _yaml_inner
+
+    def _search_dir(root: Path) -> Optional[dict]:
+        if not root.exists():
+            return None
+        for candidate in root.rglob("*_anchor_registry.yaml"):
+            # 只找 derived/ 子目錄內的
+            if "derived" not in candidate.parts:
+                continue
+            try:
+                content = candidate.read_text(encoding="utf-8", errors="replace")
+                data = _yaml_inner.safe_load(content)
+                if isinstance(data, dict) and data.get("owner_id") == owner:
+                    return data
+            except Exception:
+                pass
+        return None
+
+    result = _search_dir(_L2_ROOT)
+    if result is not None:
+        return result
+    return _search_dir(_SANDBOX_ROOT)
+
+
+def _find_owner_id_by_display(owner_display: str) -> Optional[str]:
+    """
+    透過中文業主顯示名（如「楷甯」）找對應的英文 owner_id。
+    策略：在 L2_業主層 下掃所有 *_anchor_registry.yaml，
+    找目錄名含 owner_display 字串的，取其 yaml 內 owner_id 欄位。
+    回 None = 找不到（業主尚無 registry，或中文名對不上）。
+    用途：chk_anchor_registry_ref 跨業主污染偵測——
+    將本稿 owner（中文）解析成英文 owner_id，再與 ref_owner 比對。
+    """
+    import yaml as _yaml_inner
+
+    if not owner_display or not _L2_ROOT.exists():
+        return None
+
+    for candidate in _L2_ROOT.rglob("*_anchor_registry.yaml"):
+        if "derived" not in candidate.parts:
+            continue
+        # 目錄名含 owner_display（例：「房仲_楷甯」含「楷甯」）
+        dir_names = [p.name for p in candidate.parents]
+        if not any(owner_display in d for d in dir_names):
+            continue
+        try:
+            content = candidate.read_text(encoding="utf-8", errors="replace")
+            data = _yaml_inner.safe_load(content)
+            if isinstance(data, dict) and data.get("owner_id"):
+                return str(data["owner_id"])
+        except Exception:
+            pass
+    return None
+
+
+def chk_anchor_registry_ref(
+    data: dict,
+    fname: str,
+    owner: str = "",
+) -> tuple[str, str]:
+    """
+    平行 shadow check（WARN-only）：
+    proof_mode == anchor_first 且 anchor_ref 形如 registry id（<owner>_aNN）→
+    載 registry 驗 id 存在 + owner match + anchor_first ∈ usable_for。
+
+    非 registry id 格式的 free-text anchor_ref → 直接 PASS（不干擾 chk_c22b）。
+    """
+    if data.get("proof_mode") != "anchor_first":
+        return "PASS", f"{fname}: chk_anchor_registry_ref 非 anchor_first，跳過"
+
+    anchor_ref = data.get("anchor_ref", "")
+    if not anchor_ref or not isinstance(anchor_ref, str):
+        # anchor_ref 缺失由 chk_c22b 負責，這裡不重複
+        return "PASS", f"{fname}: chk_anchor_registry_ref anchor_ref 缺失，由 C-22b 負責"
+
+    anchor_ref_s = anchor_ref.strip()
+
+    # 判斷是否為 registry id 格式
+    if not _REGISTRY_ID_PAT.match(anchor_ref_s):
+        # free-text → 不干擾，走原 chk_c22b
+        return "PASS", f"{fname}: chk_anchor_registry_ref anchor_ref 為 free-text（非 registry id），走原 C-22b 路徑"
+
+    # registry id 格式 → 取 owner 部分（去掉 _aNN 後綴）
+    m = _re_anchor.match(r'^([a-zA-Z0-9_]+)_a\d+$', anchor_ref_s)
+    if not m:
+        return "WARN", f"{fname}: chk_anchor_registry_ref anchor_ref registry id 解析失敗（{anchor_ref_s!r}）"
+
+    ref_owner = m.group(1)  # e.g. "kaining"
+
+    # ── 跨業主污染偵測 + owner_unresolved fail-closed（2026-06-20 修 3）──
+    # 本稿 owner（中文）→ 解析英文 owner_id → 比對 ref_owner。
+    # 若本稿業主有 registry（有英文 owner_id）且 ref_owner ≠ 本稿 owner_id
+    # → WARN 跨業主 anchor 污染（不載入別業主 registry 當合法素材）。
+    # 若本稿 owner 解析不到（owner_id is None，尚無 registry 或名稱不符）
+    # → WARN owner_unresolved，不放行 registry-id anchor（fail-closed 安全底座）。
+    # owner 參數為中文業主名（如「楷甯」），_find_owner_id_by_display 透過目錄名比對轉英文 id。
+    if owner:
+        script_owner_id = _find_owner_id_by_display(owner)
+        if script_owner_id is None:
+            # fail-closed：本稿 owner 解析不到 → 不採信 registry-id anchor
+            return "WARN", (
+                f"{fname}: chk_anchor_registry_ref owner_unresolved — "
+                f"本稿 owner={owner!r} 解析不到 owner_id（尚無 anchor registry 或名稱不符）；"
+                f"anchor_ref={anchor_ref_s!r} 為 registry-id 格式，不放行（fail-closed）。"
+                f"請建立 owner registry 或改用 free-text anchor_ref。"
+            )
+        if script_owner_id != ref_owner:
+            return "WARN", (
+                f"{fname}: chk_anchor_registry_ref 跨業主 anchor 污染 — "
+                f"anchor_ref owner={ref_owner!r} 不等於本稿 owner={owner!r}（owner_id={script_owner_id!r}）；"
+                f"anchor_ref={anchor_ref_s!r}。不載入別業主 registry 當合法素材。"
+            )
+
+    # 驗 anchor_ref 的 registry 存在
+    registry = _load_owner_registry(ref_owner)
+    if registry is None:
+        return "WARN", (
+            f"{fname}: chk_anchor_registry_ref needs_owner_material — "
+            f"找不到 owner={ref_owner!r} 的 anchor registry；"
+            f"anchor_ref={anchor_ref_s!r}"
+        )
+
+    # 從 registry 建 id → anchor 快查
+    anchors = registry.get("anchors", [])
+    if not isinstance(anchors, list):
+        return "WARN", f"{fname}: chk_anchor_registry_ref registry anchors 格式錯誤（owner={ref_owner}）"
+
+    anchor_map = {
+        str(a.get("anchor_id", "")): a
+        for a in anchors
+        if isinstance(a, dict)
+    }
+
+    if anchor_ref_s not in anchor_map:
+        return "WARN", (
+            f"{fname}: chk_anchor_registry_ref needs_owner_material — "
+            f"anchor_id {anchor_ref_s!r} 在 registry 中不存在（owner={ref_owner}，"
+            f"現有 id: {sorted(anchor_map.keys())}）"
+        )
+
+    anchor_entry = anchor_map[anchor_ref_s]
+
+    # 驗 owner match（registry 內的 owner_id）
+    entry_owner_id = anchor_entry.get("owner_id", "")
+    if entry_owner_id and entry_owner_id != ref_owner:
+        return "WARN", (
+            f"{fname}: chk_anchor_registry_ref anchor owner_id 不一致 — "
+            f"anchor.owner_id={entry_owner_id!r} 但 anchor_ref prefix={ref_owner!r}"
+        )
+
+    # 驗 anchor_first ∈ usable_for
+    usable_for = anchor_entry.get("usable_for", [])
+    if not isinstance(usable_for, list):
+        usable_for = [usable_for] if usable_for else []
+    if "anchor_first" not in usable_for:
+        return "WARN", (
+            f"{fname}: chk_anchor_registry_ref anchor_id {anchor_ref_s!r} 的 usable_for "
+            f"不含 anchor_first（usable_for={usable_for}）；不適合作 anchor_first 素材"
+        )
+
+    return "PASS", (
+        f"{fname}: chk_anchor_registry_ref PASS — "
+        f"anchor_id={anchor_ref_s!r} 存在，owner={ref_owner!r}，anchor_first ∈ usable_for"
+    )
+
+
 def _s22_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
     """取批次日期（批內取最大值，沿用 _extract_batch_date 逐支邏輯）。
     回 None = 無法判斷日期。與 _s21_batch_date 同邏輯、獨立命名避免耦合。"""
@@ -4160,6 +4357,100 @@ def _s22_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
         if d:
             dates.append(d)
     return max(dates) if dates else None
+
+
+# ── C-offpro-placeholder（2026-06-21）──
+# 台詞占位符守門：台詞欄含 [需確認]/[需提供]/[需XX確認] → WARN。
+# 豁免：只掃台詞欄位（台詞 / 台詞_*），不掃 source_ref/claim_ledger/metadata。
+# 全程 shadow=WARN-only（_OFFPRO_PLACEHOLDER_ENFORCE=False）。
+import re as _re_placeholder
+_PLACEHOLDER_PAT = _re_placeholder.compile(r'\[需[^\]]*(?:確認|提供)[^\]]*\]')
+
+
+def chk_offpro_placeholder(data: dict, fname: str) -> tuple[str, str]:
+    """C-offpro-placeholder：台詞占位符守門（shadow WARN-only，2026-06-21）。
+    台詞欄（台詞 / 台詞_*）含 [需確認]/[需提供]/[需XX確認] → WARN「台詞須可拍、不留占位」。
+    豁免：非台詞欄（source_ref/claim_ledger/metadata/翠文/畫面）不掃。
+    """
+    severity = "FAIL" if _OFFPRO_PLACEHOLDER_ENFORCE else "WARN"
+    hits: list[str] = []
+    for scene in data.get("scenes", []):
+        if not isinstance(scene, dict):
+            continue
+        for key, val in scene.items():
+            # 只掃台詞欄位：台詞 / 台詞_<業主>（排除翠文/畫面/藏鏡人等）
+            if key != "台詞" and not str(key).startswith("台詞_"):
+                continue
+            if not val:
+                continue
+            text = str(val)
+            found = _PLACEHOLDER_PAT.findall(text)
+            for ph in found:
+                hits.append(f"{key}:{ph}")
+    if hits:
+        return severity, f"{fname}: C-offpro-placeholder 台詞須可拍、不留占位 — {'; '.join(hits[:5])}"
+    return "PASS", f"{fname}: C-offpro-placeholder PASS（無占位符）"
+
+
+def _is_offpro_marker(data: dict) -> bool:
+    """目標5（2026-06-22）：off-pro 立場稿偵測單一真理源（防 4 處偵測式漂移）。
+    🔁 PARITY（Codex R6）：規則須與 taste_panel.derive_gate_context 的 is_offpro **完全一致**
+       （lane=="stance" OR proof_mode=="voice_first"，皆 strip/lower）；跨 process 無法共用 import，
+       靠 _目標5_verify_unit.py 的 parity 測 + 本註解守。改一邊必改另一邊 + 跑 parity 測。
+    偵測 = lane=="stance"（結構標記、目標4 lane 權威、向後相容）
+         OR proof_mode=="voice_first"（目標5 正式第 4 型 proof_mode）。
+    OR 語意 fail-safe：任一標記在即認 off-pro；皆無 → 非 off-pro、走較嚴舊路徑（不錯放）。
+    normalize 大小寫/空白。本業稿無 lane 也無 voice_first → False（byte 不變保證）。
+    ⚠️ shadow：本 helper 只供 off-pro WARN-only check 分流；不參與任何 enforce 放行判斷
+       （provenance/gate_profile 簽章驗證留 6/24 enforce flip，見 目標5 設計 §8）。
+    """
+    lane = str(data.get("lane", "") or "").strip().lower()
+    proof_mode = str(data.get("proof_mode", "") or "").strip().lower()
+    return lane == "stance" or proof_mode == "voice_first"
+
+
+# ── C-offpro-leak（2026-06-21；目標5 2026-06-22 改用 _is_offpro_marker 收斂偵測）──
+# off-pro 本業詞守門：off-pro 立場稿（lane=stance / proof_mode=voice_first）台詞含高度本業詞 → WARN。
+# off-pro-aware：非 off-pro 直接 PASS 跳過，防誤殺本業稿。
+# 詞庫精縮（高度本業 + 低誤殺，禁收泛用中性詞如「客人/業務」）。
+_OFFPRO_LEAK_WORDS: dict[str, list[str]] = {
+    "房仲": ["成交", "屋主", "帶看", "陌生開發", "陌生電話", "簽約", "買房"],
+    "美容": ["膚況", "做臉", "療程", "醫美"],
+}
+# 合併全詞庫供掃描（不分業主 — 都是本業詞，off-pro 稿不應出現）
+_ALL_LEAK_WORDS: list[str] = sum(_OFFPRO_LEAK_WORDS.values(), [])
+
+
+def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
+    """C-offpro-leak：off-pro 立場稿本業詞守門（shadow WARN-only，2026-06-21；目標5 2026-06-22）。
+    off-pro-aware：只對 off-pro 立場稿掃（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
+    非 off-pro → PASS 跳過（不誤殺本業稿）。
+    詞庫：房仲（成交/屋主/帶看/陌生開發/陌生電話/簽約/買房）+ 美容（膚況/做臉/療程/醫美）。
+    掃台詞欄位（台詞 / 台詞_*）；命中 → WARN「off-pro 偷渡本業詞：X」。
+    """
+    if not _is_offpro_marker(data):
+        return "PASS", (f"{fname}: C-offpro-leak 非 off-pro"
+                        f"（lane={data.get('lane','')!r}/proof_mode={data.get('proof_mode','')!r}），跳過")
+
+    severity = "FAIL" if _OFFPRO_LEAK_ENFORCE else "WARN"
+    hits: list[str] = []
+    for scene in data.get("scenes", []):
+        if not isinstance(scene, dict):
+            continue
+        for key, val in scene.items():
+            if key != "台詞" and not str(key).startswith("台詞_"):
+                continue
+            if not val:
+                continue
+            text = str(val)
+            for word in _ALL_LEAK_WORDS:
+                if word in text:
+                    entry = f"{key}:「{word}」"
+                    if entry not in hits:
+                        hits.append(entry)
+    if hits:
+        return severity, f"{fname}: C-offpro-leak off-pro 偷渡本業詞 — {'; '.join(hits[:5])}"
+    return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，無本業詞洩漏）"
 
 
 # ────────────────────────────────────────────
@@ -4239,6 +4530,10 @@ def run_per_file_checks(
         checks.append(("V3-001", chk_topic_intel_provenance(
             data, _fname_with_dir, topic_intel_policy, is_skeleton, owner=owner
         )))
+
+    # off-pro 品質閘（2026-06-21，shadow WARN-only）
+    checks.append(("C-offpro-placeholder", chk_offpro_placeholder(data, f.name)))
+    checks.append(("C-offpro-leak",        chk_offpro_leak(data, f.name)))
 
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -4397,6 +4692,15 @@ def main():
             batch_checks.append((
                 "C-22b anchor_first 機械閘",
                 chk_c22b_anchor_first(_c22b_data, _c22b_f.name, valid_yamls, owner),
+            ))
+    # chk_anchor_registry_ref（平行 shadow check，2026-06-20）—
+    # 只對 proof_mode == anchor_first 且 anchor_ref 形如 registry id 的支跑；
+    # free-text anchor_ref → PASS（不干擾 chk_c22b）。零足跡設計，WARN-only。
+    for _arf, _ard in valid_yamls:
+        if isinstance(_ard, dict) and _ard.get("proof_mode") == "anchor_first":
+            batch_checks.append((
+                "chk_anchor_registry_ref",
+                chk_anchor_registry_ref(_ard, _arf.name, owner),
             ))
     print(f"── 批次級 check（{len(batch_checks)} 件）──")
     for cid, (status, detail) in batch_checks:
@@ -6324,6 +6628,37 @@ if __name__ == "__main__":
         _af_batch = [(Path(f"s{_i}.yaml"), dict(_af_ok)) for _i in range(3)]
         _rb = chk_c22b_anchor_first(dict(_af_ok), "s0.yaml", _af_batch, "楷甯")
         fcheck("F-C22B-7 同 anchor_ref 同批 >2 → WARN（防套路）", _rb[0] == "WARN" and "同批 anchor_ref 重複" in _rb[1], _rb[1])
+
+        # ── F-OFFPRO：目標5 voice_first 偵測收斂 + chk_offpro_leak off-pro-aware（shadow WARN-only）──
+        # 目標5（2026-06-22）：_is_offpro_marker 單一真理源（lane=stance OR proof_mode=voice_first）+ 向後相容 + byte 不變。
+        print("[F-OFFPRO] 目標5 voice_first 偵測：_is_offpro_marker + chk_offpro_leak off-pro-aware")
+        fcheck("F-OFFPRO-1 lane=stance → off-pro（向後相容舊標記）",
+               _is_offpro_marker({"lane": "stance"}) is True, "lane=stance")
+        fcheck("F-OFFPRO-2 proof_mode=voice_first → off-pro（目標5 正式第 4 型）",
+               _is_offpro_marker({"proof_mode": "voice_first"}) is True, "proof_mode=voice_first")
+        fcheck("F-OFFPRO-3 both（lane=stance + voice_first）→ off-pro",
+               _is_offpro_marker({"lane": "stance", "proof_mode": "voice_first"}) is True, "both")
+        fcheck("F-OFFPRO-4 本業稿無標記 → 非 off-pro（byte 不變保證）",
+               _is_offpro_marker({"proof_mode": "proof_first"}) is False
+               and _is_offpro_marker({}) is False, "本業/空")
+        fcheck("F-OFFPRO-5 大小寫/空白 normalize（' Stance '/'VOICE_FIRST'→off-pro）",
+               _is_offpro_marker({"lane": " Stance "}) is True
+               and _is_offpro_marker({"proof_mode": "VOICE_FIRST"}) is True, "normalize")
+        _rl = chk_offpro_leak({"proof_mode": "voice_first",
+                               "scenes": [{"台詞_楷甯": "我帶看了好幾組，最後成交那組讓我學到一課"}]}, "f.yaml")
+        fcheck("F-OFFPRO-6 voice_first 稿本業詞洩漏 → WARN（off-pro-aware 偵測到）",
+               _rl[0] == "WARN" and "本業詞" in _rl[1], _rl[1])
+        _rl = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞_楷甯": "我帶看了好幾組"}]}, "f.yaml")
+        fcheck("F-OFFPRO-7 lane=stance 稿本業詞洩漏 → WARN（向後相容）",
+               _rl[0] == "WARN" and "本業詞" in _rl[1], _rl[1])
+        _rl = chk_offpro_leak({"proof_mode": "proof_first",
+                               "scenes": [{"台詞_瑞祥": "我帶看了好幾組成交"}]}, "f.yaml")
+        fcheck("F-OFFPRO-8 本業稿（非 off-pro）含本業詞 → PASS 跳過（不誤殺）",
+               _rl[0] == "PASS" and "非 off-pro" in _rl[1], _rl[1])
+        _rl = chk_offpro_leak({"proof_mode": "voice_first",
+                               "scenes": [{"台詞_楷甯": "我們都在等一個不用開口的那天"}]}, "f.yaml")
+        fcheck("F-OFFPRO-9 voice_first 稿無本業詞 → PASS",
+               _rl[0] == "PASS" and "PASS" in _rl[1], _rl[1])
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

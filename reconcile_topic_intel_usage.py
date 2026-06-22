@@ -380,6 +380,52 @@ def load_topic_usage_index(cfg: Optional[dict] = None) -> tuple[dict, dict]:
     return by_owner, by_topic
 
 
+def is_recently_used_by_other_owner(
+    topic_id: str,
+    current_owner: str,
+    current_industry: Optional[str] = None,
+    max_days: int = 7,
+    same_industry_only: bool = True,
+    cfg: Optional[dict] = None,
+) -> bool:
+    """
+    跨業主 7 天冷卻查詢（P0-A round 4 — 2026-06-14 industry-native）：
+    topic_id 是否在 max_days 天內被「其他業主（不是 current_owner）」採用過。
+
+    same_industry_only=True（預設）→ 只查同行業其他 owner（不同行業不算衝突）。
+    失敗 → False（fail-soft，避免擋路）。
+
+    設計：僅供 topic_distributor assign 前查、shadow WARN 不擋（enforce 屬 S3 gate）。
+    """
+    try:
+        _, by_topic = load_topic_usage_index(cfg)
+    except Exception:
+        return False  # fail-soft
+
+    topic_entries = by_topic.get(topic_id, [])
+    if not topic_entries:
+        return False
+
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max_days)
+    for entry in topic_entries:
+        other_owner = entry.get("owner_code", "")
+        if not other_owner or other_owner == current_owner:
+            continue
+        # 時間條件
+        if entry.get("ts", "") < cutoff.isoformat():
+            continue
+        # same_industry_only：需確認 other_owner 與 current_owner 同行業
+        # by_topic index 目前不存 industry → fail-soft 放行（不擋）
+        # enforce 階段再補 industry 到 event schema
+        if same_industry_only and current_industry:
+            other_industry = entry.get("industry")
+            if other_industry and other_industry != current_industry:
+                continue  # 不同行業 → 不算冷卻衝突
+        return True
+
+    return False
+
+
 def is_recently_used(
     topic_id: str,
     owner_code: str,

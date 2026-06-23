@@ -2186,12 +2186,12 @@ _FISHING_CUTOFF = _dt.date(2026, 6, 6)
 # 生效日 = 上線日 2026-06-17 + 7 天 WARN 窗（涵蓋 shadow 觀察期）：
 #   batch_date < _S21_EFFECTIVE_FROM  → §21 全部 check 回 WARN-waiver（不 FAIL）
 #   batch_date >= 該日 且非 legacy    → C-21.1 / C-21.2 / C-21.7 走 FAIL 路徑
-# C-21.6 另受 _S21_6_REPORT_ENFORCE 控（見下），現恆 WARN-only。
+# C-21.6 另受 _S21_6_REPORT_ENFORCE 控（見下）；2026-06-23 已翻 True（enforce）。
 _S21_EFFECTIVE_FROM = _dt.date(2026, 6, 24)
 
-# C-21.6 整稿閘報告存在性：先 WARN-only（澤君未拍板「高規格定義」）。
-# 待澤君拍板高規格判定 + shadow 過後，霸告才翻 True 改 FAIL。
-_S21_6_REPORT_ENFORCE = False
+# C-21.6 整稿閘報告存在性。2026-06-23 enforce DONE（澤君拍「直接上線」、霸告翻 True）。
+# 高規格批附 _quality_gate_report.md / 一般批標 quality_gate.exempt（見下值行 + runbook §8）。
+_S21_6_REPORT_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23，澤君拍「直接上線」；高規格批附 _quality_gate_report.md、一般批 _batch_flags.yml 標 quality_gate.exempt）
 
 # C-21.1 破套路門檻：一批 N 支裡 >= 此數同一 exact 骨架型 → 觸發
 # （計算口徑 Codex 三審 P1-1 釘死：13 支 ≥7 同 exact 骨架才「改」）
@@ -2208,23 +2208,19 @@ _S21_2_MAX_SINGLE = 6
 # 對齊 scripter.md §22（§22.4 一般化偵測 7 訊號可機械子集）
 # ════════════════════════════════════════════
 # 生效日 = 上線日 2026-06-17 + 7 天 WARN 窗（與 §21 同步、涵蓋 shadow 觀察期）。
-# 誠實定位（照計劃 + §22.4）：C-22 全程「只擋低級空泛、不判好題」——
-#   shadow / 全程 WARN-only（不 FAIL），語義級「好不好」留 GPT/真人。
-# _S22_EFFECTIVE_FROM 保留作「過渡窗」標示（過渡期 detail 帶 batch_date 提示），
-#   但因 _S22_ENFORCE=False，現階段 enforce 側也仍 WARN（生效日後若拍板才翻 True）。
+# 誠實定位（照計劃 + §22.4）：C-22 仍「只擋低級空泛、不判好題」——
+#   2026-06-23 翻 enforce（FAIL）後語義級「好不好」仍留 GPT/真人（proof_removed_judge advisory）。
+# _S22_EFFECTIVE_FROM 為「過渡窗」標示。
 _S22_EFFECTIVE_FROM = _dt.date(2026, 6, 24)
-# C-22 enforce 開關：先 WARN-only（澤君未拍板「題目一般化擋死」）。
-# shadow 過 + 澤君拍板才翻 True 改 enforce 側 FAIL。
-_S22_ENFORCE = False
-# C-22b anchor_first 機械閘 enforce 開關：先 False（shadow 觀察）。
-# anchor_first 三必填（anchor_ref / anchor_cost / because_bridge）缺任一 → WARN。
-# 待 pilot 雙批驗過 + 澤君拍板才翻 True 改 FAIL。
-ANCHOR_FIRST_ENFORCE = False
-# C-offpro-placeholder：台詞占位符守門（shadow=WARN-only）。
-# 待保鏢驗回歸 + 澤君拍板才翻 True 改 FAIL。
-_OFFPRO_PLACEHOLDER_ENFORCE = False
-# C-offpro-leak：off-pro 立場 lane 本業詞守門（shadow=WARN-only）。
-_OFFPRO_LEAK_ENFORCE = False
+# C-22 enforce 開關：2026-06-23 翻 True（澤君拍「直接上線」、14 真實批零誤擋、batch-ratio 0.9 backstop 保好批）。
+_S22_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；14 真實批 enforce-sim 零誤擋、batch-ratio 0.9 backstop 保護口語故事批）
+# C-22b anchor_first 機械閘 enforce 開關：2026-06-23 翻 True（只對 proof_mode=anchor_first 稿觸發、現生產 0 支）。
+# anchor_first 三必填（anchor_ref / anchor_cost / because_bridge）缺任一 → 現 FAIL。
+ANCHOR_FIRST_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；只對 proof_mode=anchor_first 稿觸發、現生產 0 支、零誤擋）
+# C-offpro-placeholder：台詞占位符守門。2026-06-23 翻 True（off-pro 稿→FAIL、本業稿→WARN，見值行）。
+_OFFPRO_PLACEHOLDER_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；全稿偵測占位符，off-pro 稿→FAIL、本業稿→WARN〔避 FP：本業批偶帶 [需確認] 待補，瑞祥36×4〕；Codex R1 P0-2 修）
+# C-offpro-leak：off-pro 立場 lane 本業詞守門。2026-06-23 翻 True（§8#8 硬化後，見值行）。
+_OFFPRO_LEAK_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；§8#8 掃全 publish 欄+去混淆硬化後翻，保鏢 condition 已補）
 # C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
 # 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
 #   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
@@ -3721,7 +3717,11 @@ def _s21_6_batch_exempt(batch_dir: Path) -> tuple[str, str]:
         return "none", f"_batch_flags.yml quality_gate 非 mapping（{type(qg).__name__}）→ 無豁免（fail-closed）"
     if qg.get("exempt") is not True:
         return "none", f"_batch_flags.yml quality_gate.exempt 非 boolean true（{qg.get('exempt')!r}）→ 無豁免"
-    reason = str(qg.get("reason", "") or "").strip()
+    raw_reason = qg.get("reason", "")
+    if not isinstance(raw_reason, str):
+        # Codex R4 P1：reason 非字串（list/dict）被 str() 成非空字串 → 誤過豁免；fail-closed
+        return "none", f"_batch_flags.yml quality_gate.reason 非字串（{type(raw_reason).__name__}）→ 無豁免（fail-closed）"
+    reason = raw_reason.strip()
     if not reason:
         return "exempt_no_reason", "_batch_flags.yml quality_gate.exempt=true 但 reason 為空"
     return "exempt", f"_batch_flags.yml quality_gate 豁免有效（reason={reason!r}）"
@@ -3738,7 +3738,7 @@ def chk_c21_6_quality_gate_report(
       （與 fishing_dm_card / topic_intel_closure 同檔同機制），exempt: true 且須有 reason →
       豁免 PASS。**不再認單支 yaml 的 quality_gate_exempt**。
     - **P1-4②報告須 bytes>0**：_quality_gate_report.md 須存在「且非空」（0 bytes 不算 PASS）。
-    - 現 WARN-only（_S21_6_REPORT_ENFORCE=False）；待澤君拍板高規格判定 + shadow 過後翻 True 改 FAIL。
+    - 2026-06-23 翻 enforce（_S21_6_REPORT_ENFORCE=True）：缺報告/無效 exempt → FAIL（高規格批附報告、一般批標 exempt）。
     - 過渡期同樣 WARN（與 enforce 旗標雙重保護）。
     """
     # P1-4①：批次級豁免偵測（_batch_flags.yml quality_gate 段）
@@ -3746,11 +3746,14 @@ def chk_c21_6_quality_gate_report(
     if ex_state == "exempt":
         return "PASS", f"C-21.6：批次豁免整稿閘報告（{ex_detail}）"
     if ex_state == "exempt_no_reason":
-        # 標豁免但缺 reason → WARN 提醒（不擋）
-        return "WARN", f"C-21.6：{ex_detail} — 豁免須補 reason 才成立，請於 _batch_flags.yml quality_gate.reason 補理由"
+        # Codex R1 P0：原 early-return WARN 會讓「exempt:true 但無 reason」繞過 enforce（豁免不成立卻放行）。
+        # 修：shadow（_S21_6_REPORT_ENFORCE=False）→ WARN 提醒；enforce（=True）→ 豁免不成立、不 early-return，
+        #     fall through 檢查 _quality_gate_report.md（有有效報告仍 PASS、缺/空 → FAIL，fail-closed）。
+        if not _S21_6_REPORT_ENFORCE:
+            return "WARN", f"C-21.6：{ex_detail} — 豁免須補 reason 才成立，請於 _batch_flags.yml quality_gate.reason 補理由"
 
     report = batch_dir / "_quality_gate_report.md"
-    if report.exists():
+    if report.is_file():  # Codex R4 P2：非檔（目錄/symlink）→ 不算有效報告（POSIX 目錄 stat size 非 0 會誤 PASS）
         try:
             sz = report.stat().st_size
         except Exception:
@@ -3966,12 +3969,12 @@ def chk_c22_topic_generality(
     yamls: list[tuple[Path, dict]],
     owner: str,
 ) -> tuple[str, str]:
-    """C-22 選題一般化偵測（batch-level，純規則 shadow WARN-only）—
+    """C-22 選題一般化偵測（batch-level，純規則；2026-06-23 翻 enforce FAIL，語義級仍留 GPT/真人）—
     一批裡「偏一般」（非一般訊號 < _S22_MIN_SIGNALS）的題目占比 >= _S22_BATCH_WARN_RATIO → WARN。
 
     對齊 scripter.md §22.4：
     - 誠實定位：**只擋低級空泛、不判好題**。語義級「好不好」留 GPT/真人。
-    - 全程 WARN-only（_S22_ENFORCE=False；shadow / 過渡日機制照 §21）。
+    - 2026-06-23 翻 enforce（_S22_ENFORCE=True；過渡日機制照 §21）；語義級「好不好」仍留 GPT/真人（proof_removed_judge advisory）。
     - 骨架階段（>50% title placeholder）→ SKIP（題目未定，等填完再驗）。
     - 與既有 check 正交不重複計：C-22=題目一般化；C-21.x=craft；C-cta-mix=CTA 配比；
       C-017=知識型主體段具體化密度（C-017 看 scenes 主體段內容、C-22 看題目/標題/角度）。
@@ -4051,7 +4054,7 @@ def chk_c22_topic_generality(
             f"建議換角度（見 §22.4：綁業主真料 proof_asset / 具體數字 / 在地 / 受眾真代價 / 反直覺）。"
             f"偏一般支：{detail_list}{more}{backstop_note}{warn_note}"
         )
-        # _S22_ENFORCE=False → 恆 WARN（只擋低級空泛、不判好題、不 FAIL）
+        # _S22_ENFORCE（2026-06-23 翻 True）→ enforce 側 FAIL（只擋低級空泛、不判好題；語義靠 GPT/真人）
         if _S22_ENFORCE and not in_warn:
             return "FAIL", msg
         return "WARN", msg
@@ -4359,22 +4362,27 @@ def _s22_batch_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
     return max(dates) if dates else None
 
 
-# ── C-offpro-placeholder（2026-06-21）──
-# 台詞占位符守門：台詞欄含 [需確認]/[需提供]/[需XX確認] → WARN。
+# ── C-offpro-placeholder（2026-06-21；2026-06-23 enforce flip）──
+# 台詞占位符守門：台詞欄含 [需確認]/[需提供]/[需XX確認] → off-pro 稿 FAIL、本業稿 WARN。
 # 豁免：只掃台詞欄位（台詞 / 台詞_*），不掃 source_ref/claim_ledger/metadata。
-# 全程 shadow=WARN-only（_OFFPRO_PLACEHOLDER_ENFORCE=False）。
+# 2026-06-23 翻 enforce（_OFFPRO_PLACEHOLDER_ENFORCE=True）：severity off-pro-aware（見 chk_offpro_placeholder）。
 import re as _re_placeholder
 _PLACEHOLDER_PAT = _re_placeholder.compile(r'\[需[^\]]*(?:確認|提供)[^\]]*\]')
 
 
 def chk_offpro_placeholder(data: dict, fname: str) -> tuple[str, str]:
-    """C-offpro-placeholder：台詞占位符守門（shadow WARN-only，2026-06-21）。
-    台詞欄（台詞 / 台詞_*）含 [需確認]/[需提供]/[需XX確認] → WARN「台詞須可拍、不留占位」。
-    豁免：非台詞欄（source_ref/claim_ledger/metadata/翠文/畫面）不掃。
+    """C-placeholder：台詞占位符守門（2026-06-21；Codex R1 P0-2 修：severity off-pro-aware）。
+    台詞欄（台詞 / 台詞_*）含 [需確認]/[需提供]/[需XX確認] → 台詞不可拍。
+    **全稿偵測；severity off-pro-aware**：off-pro 立場稿（_is_offpro_marker）→ FAIL（enforce）；
+      本業稿 → WARN（不擋、避 FP——本業批實務偶帶 [需確認] 待補，見瑞祥36 placeholder×4；保留 WARN 信號）。
+    名稱沿用 offpro 前綴＝歷史，實為通用占位守門。豁免：非台詞欄（source_ref/claim_ledger/metadata/翠文/畫面）不掃。
     """
-    severity = "FAIL" if _OFFPRO_PLACEHOLDER_ENFORCE else "WARN"
+    severity = "FAIL" if (_OFFPRO_PLACEHOLDER_ENFORCE and _is_offpro_marker(data)) else "WARN"
     hits: list[str] = []
-    for scene in data.get("scenes", []):
+    _scenes = data.get("scenes") or []
+    if not isinstance(_scenes, list):
+        _scenes = []
+    for scene in _scenes:
         if not isinstance(scene, dict):
             continue
         for key, val in scene.items():
@@ -4420,13 +4428,138 @@ _OFFPRO_LEAK_WORDS: dict[str, list[str]] = {
 # 合併全詞庫供掃描（不分業主 — 都是本業詞，off-pro 稿不應出現）
 _ALL_LEAK_WORDS: list[str] = sum(_OFFPRO_LEAK_WORDS.values(), [])
 
+# ── §8#8 enforce 前置硬化（2026-06-23，保鏢 GO-with-condition 條件；Codex R1/R2 修）──
+# 翻 _OFFPRO_LEAK_ENFORCE=True 前必補：①掃所有 publish-visible 欄（原只掃台詞＝洩漏點，遞迴跳內部欄）
+#   ②去混淆 normalize（NFKC 全半形/相容字 + 去零寬字元；**刻意保留一般空白避 cross-word FP**，
+#     如「完成 交流」不誤判含「成交」；零寬無合法用途、放心去）。可見空白拆字靠人工複審。
+import unicodedata as _ud_offpro
+
+
+def _deobfuscate(text: str) -> str:
+    """去混淆：NFKC（全形→半形/相容字）+ 去零寬字元；**刻意保留一般空白避 cross-word FP**
+    （「完成 交流」不誤判含「成交」；零寬無合法用途、放心去）。供本業詞比對前 normalize。"""
+    if not text:
+        return ""
+    norm = _ud_offpro.normalize("NFKC", str(text))
+    return re.sub(r"[​‌‍﻿]+", "", norm)
+
+
+# 詞庫預先去混淆（與待掃文字同口徑比對）
+_ALL_LEAK_WORDS_NORM: list[tuple[str, str]] = [(_deobfuscate(w), w) for w in _ALL_LEAK_WORDS]
+
+
+# §8#8（Codex R2 P1 + R4 P2）：遞迴收葉值時跳過非 publish 內部欄（避 FP：asset_path/url/reason/note/hash/id/thumbnail/utm…）。
+_OFFPRO_LEAF_SKIP_EXACT = {
+    "asset_path", "path", "url", "uri", "link", "href", "img", "image", "id", "uuid",
+    "sha256", "hash", "reason", "note", "internal_note", "disabled_reason", "debug",
+    "metadata", "meta", "source", "source_ref", "schema_version", "version",
+    "thumbnail", "cover", "tracking", "utm", "utm_source", "utm_campaign", "utm_medium",
+}
+_OFFPRO_LEAF_SKIP_SUFFIX = ("_path", "_url", "_uri", "_id", "_ref", "_note", "_reason",
+                            "_hash", "_sha", "_at", "_ts", "_thumbnail", "_cover")
+
+# 巢狀超深 fail-closed 哨兵（Codex R4 P2）
+_OFFPRO_NEST_OVERFLOW = "\x00__offpro_nest_overflow__\x00"
+# 整個值像 URL/檔案路徑/asset → 非 publish copy、跳過不掃（Codex R4 P2，防 thumbnail/asset 路徑含本業詞誤判）
+_OFFPRO_ASSET_VALUE_RE = re.compile(
+    r"^\s*(?:https?://|//|/|\./|\.\./|[A-Za-z]:[\\/]|assets?[\\/]|[\w./\\-]+\.(?:png|jpe?g|gif|webp|svg|mp4|mov|pdf|ico|json|ya?ml|css|js))\s*$",
+    re.IGNORECASE,
+)
+
+
+def _skip_offpro_leaf_key(k) -> bool:
+    kl = str(k).lower()
+    return kl in _OFFPRO_LEAF_SKIP_EXACT or kl.endswith(_OFFPRO_LEAF_SKIP_SUFFIX)
+
+
+def _is_offpro_asset_value(s: str) -> bool:
+    """整個值像 URL/檔案路徑/asset → 非 publish copy、跳過（避免 thumbnail/asset 路徑含本業詞誤判）。"""
+    return bool(_OFFPRO_ASSET_VALUE_RE.match(s))
+
+
+def _collect_str_leaves(obj, prefix, out, _depth=0, _seen=None) -> None:
+    """§8#8（Codex R1 P1-2 + R2 P1）：遞迴收 obj 內 publish str 葉值 → out.append((path, text))。
+    防巢狀藏本業詞（dm_card.body.text / platform_variants.ig.cta）。
+    R2 收嚴：①跳過非 publish 內部欄（_skip_offpro_leaf_key：asset_path/url/reason/note/hash…）
+            ②depth guard（max 20）+ cycle guard（seen id）防 YAML anchor 自參照 → RecursionError。"""
+    if _depth > 40:
+        # Codex R4 P2：超深巢狀 fail-closed — append 哨兵讓 chk_offpro_leak 對 off-pro 標 hit（無法完整掃描）
+        out.append((f"{prefix}.<overflow>", _OFFPRO_NEST_OVERFLOW))
+        return
+    if _seen is None:
+        _seen = set()
+    if isinstance(obj, (dict, list, tuple)):
+        _oid = id(obj)
+        if _oid in _seen:
+            return
+        _seen.add(_oid)
+    if isinstance(obj, str):
+        if obj and not _is_offpro_asset_value(obj):
+            out.append((prefix, obj))
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            if _skip_offpro_leaf_key(k):
+                continue
+            _collect_str_leaves(v, f"{prefix}.{k}", out, _depth + 1, _seen)
+    elif isinstance(obj, (list, tuple)):
+        for i, v in enumerate(obj):
+            _collect_str_leaves(v, f"{prefix}[{i}]", out, _depth + 1, _seen)
+
+
+# off-pro 稿 scene 級 publish-visible 文字欄（Codex R1 P1-1 擴充，原只台詞/翠文；算盤覆核補中文鍵 藏鏡人）。
+# 刻意不含「畫面」（拍攝指示非公開字幕、非 publish-visible）。
+# 🔴 藏鏡人＝公開 hook 字幕（生產 130/172 支用），原漏（whitelist 只有英文 offscreen_interaction＝0 生產用）→ 算盤抓到補。
+_OFFPRO_SCENE_TEXT_KEYS = ("台詞", "翠文", "字幕", "旁白", "藏鏡人", "dialogue", "subtitle", "offscreen_interaction")
+
+
+def _offpro_publish_fields(data: dict) -> list[tuple[str, str]]:
+    """§8#8（Codex R1 P1 擴充 + 算盤覆核補 藏鏡人/cta）：收 off-pro 稿主要 publish-visible 欄 → [(label, raw), ...]。
+    scene：台詞_* / 翠文 / 字幕 / 旁白 / 藏鏡人 / dialogue / subtitle / offscreen_interaction；
+    top：title / 標題 / caption / 收束 / 結尾 / hashtag(s)；
+    巢狀（遞迴 str 葉值，跳內部欄）：dm_card / platform_variants / cta。
+    off-pro 立場稿任一公開欄都不該出現本業詞 → 掃主要 publish 欄。
+    刻意排除：畫面（拍攝指示）/ source_ref / claim_ledger / metadata / score_type 等非 publish 欄。"""
+    out: list[tuple[str, str]] = []
+    _scenes = data.get("scenes") or []
+    if not isinstance(_scenes, list):
+        _scenes = []
+    for scene in _scenes:
+        if not isinstance(scene, dict):
+            continue
+        for key, val in scene.items():
+            if not val:
+                continue
+            ks = str(key)
+            # Codex R2 P1：收嚴 — 只認 台詞_<業主> + 明確 publish 文字欄；排除 台詞備註/台詞數 等內部欄
+            if ks.startswith("台詞_") or ks in _OFFPRO_SCENE_TEXT_KEYS:
+                out.append((ks, str(val)))
+    for key in ("title", "標題", "caption", "收束", "結尾"):
+        v = data.get(key)
+        if v:
+            out.append((key, str(v)))
+    for key in ("hashtag", "hashtags"):
+        v = data.get(key)
+        if isinstance(v, list):
+            joined = " ".join(str(x) for x in v if x)
+            if joined:
+                out.append((key, joined))
+        elif v:
+            out.append((key, str(v)))
+    # 巢狀結構遞迴收 str 葉值（dm_card 巢狀 dict / platform_variants 各平台 / top-level cta.message·keyword）
+    for nested_key in ("dm_card", "platform_variants", "cta"):
+        nv = data.get(nested_key)
+        if nv is not None:
+            _collect_str_leaves(nv, nested_key, out)
+    return out
+
 
 def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
-    """C-offpro-leak：off-pro 立場稿本業詞守門（shadow WARN-only，2026-06-21；目標5 2026-06-22）。
+    """C-offpro-leak：off-pro 立場稿本業詞守門（2026-06-21 建；2026-06-23 翻 enforce，目標5 + §8#8 硬化）。
     off-pro-aware：只對 off-pro 立場稿掃（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
     非 off-pro → PASS 跳過（不誤殺本業稿）。
     詞庫：房仲（成交/屋主/帶看/陌生開發/陌生電話/簽約/買房）+ 美容（膚況/做臉/療程/醫美）。
-    掃台詞欄位（台詞 / 台詞_*）；命中 → WARN「off-pro 偷渡本業詞：X」。
+    §8#8（2026-06-23 enforce 前置硬化）：掃所有 publish-visible 欄（台詞_*/翠文/title/caption/hashtag/dm_card 巢狀…）
+    + 去混淆（NFKC 全半形/相容字 + 去零寬；保留一般空白避 cross-word FP）；命中 → WARN/FAIL（_OFFPRO_LEAK_ENFORCE）。
     """
     if not _is_offpro_marker(data):
         return "PASS", (f"{fname}: C-offpro-leak 非 off-pro"
@@ -4434,23 +4567,24 @@ def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
 
     severity = "FAIL" if _OFFPRO_LEAK_ENFORCE else "WARN"
     hits: list[str] = []
-    for scene in data.get("scenes", []):
-        if not isinstance(scene, dict):
+    for label, raw in _offpro_publish_fields(data):
+        if raw == _OFFPRO_NEST_OVERFLOW:
+            # Codex R4 P2：巢狀過深 fail-closed → 標 hit（無法完整掃描）
+            entry = f"{label}:<巢狀過深、無法完整掃描（fail-closed）>"
+            if entry not in hits:
+                hits.append(entry)
             continue
-        for key, val in scene.items():
-            if key != "台詞" and not str(key).startswith("台詞_"):
-                continue
-            if not val:
-                continue
-            text = str(val)
-            for word in _ALL_LEAK_WORDS:
-                if word in text:
-                    entry = f"{key}:「{word}」"
-                    if entry not in hits:
-                        hits.append(entry)
+        norm = _deobfuscate(raw)
+        if not norm:
+            continue
+        for word_norm, word_raw in _ALL_LEAK_WORDS_NORM:
+            if word_norm and word_norm in norm:
+                entry = f"{label}:「{word_raw}」"
+                if entry not in hits:
+                    hits.append(entry)
     if hits:
-        return severity, f"{fname}: C-offpro-leak off-pro 偷渡本業詞 — {'; '.join(hits[:5])}"
-    return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，無本業詞洩漏）"
+        return severity, f"{fname}: C-offpro-leak off-pro 偷渡本業詞（§8#8 全 publish 欄+去混淆）— {'; '.join(hits[:8])}"
+    return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，全 publish 欄無本業詞洩漏）"
 
 
 # ────────────────────────────────────────────
@@ -4848,6 +4982,13 @@ if __name__ == "__main__":
             else:
                 print(f"  [FAIL] {label}{(' — ' + detail) if detail else ''}")
                 FAIL_COUNT += 1
+
+        # 6/24 enforce flip（2026-06-23）：以下 check 由 shadow(WARN) 翻 enforce(FAIL)；
+        # 測試期望隨 flag 走 → rollback（flag→False）自動回 WARN、測試不破（非硬編 regime）。
+        _EXP_S216 = "FAIL" if _S21_6_REPORT_ENFORCE else "WARN"
+        _EXP_S22 = "FAIL" if _S22_ENFORCE else "WARN"
+        _EXP_ANCHOR = "FAIL" if ANCHOR_FIRST_ENFORCE else "WARN"
+        _EXP_LEAK = "FAIL" if _OFFPRO_LEAK_ENFORCE else "WARN"
 
         # ── F1 pass：含全新欄位 → 全 PASS ──
         print("[F1] 含全新欄位 → V2 checks 全 PASS")
@@ -5907,13 +6048,13 @@ if __name__ == "__main__":
         _r21e3 = chk_c21_1_break_pattern(_f21e3)
         fcheck("F-21e3 C-21.1 list-parse 骨架 → SKIP（非 FAIL）", _r21e3[0] == "SKIP", _r21e3[1])
 
-        # F-21f：C-21.6 整稿閘報告 — 缺報告 WARN-only（現 _S21_6_REPORT_ENFORCE=False）
+        # F-21f：C-21.6 整稿閘報告 — 缺報告（_S21_6_REPORT_ENFORCE=True：enforce 下 FAIL、flag-aware fixture）
         print("[F-21f] C-21.6 缺整稿閘報告 → WARN-only / 豁免 → PASS")
         import tempfile as _f21_tmp
         with _f21_tmp.TemporaryDirectory() as _td:
             _tdp = Path(_td)
             _r21f = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp)
-            fcheck("F-21f 缺報告 → WARN-only", _r21f[0] == "WARN", _r21f[1])
+            fcheck(f"F-21f 缺報告 → {_EXP_S216}（enforce）", _r21f[0] == _EXP_S216, _r21f[1])
             # 有報告 → PASS
             (_tdp / "_quality_gate_report.md").write_text("R10-R20 報告", encoding="utf-8")
             _r21f2 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp)
@@ -5926,7 +6067,7 @@ if __name__ == "__main__":
                 [(Path("x.yaml"), {"title": "已填", "quality_gate_exempt": True, "quality_gate_exempt_reason": "B 級批"})],
                 _tdp3,
             )
-            fcheck("F-21f3 單支 yaml exempt 不再豁免 → WARN（缺報告）", _r21f3[0] == "WARN", _r21f3[1])
+            fcheck(f"F-21f3 單支 yaml exempt 不再豁免 → {_EXP_S216}（缺報告）", _r21f3[0] == _EXP_S216, _r21f3[1])
 
         # ── 派工 P1 修正子步新 fixtures（2026-06-17 御史/Codex 退回修） ──
         print("\n[F-21 P1] 派工 4 P1 修正驗證")
@@ -6000,7 +6141,7 @@ if __name__ == "__main__":
             _tdp6 = Path(_td6)
             (_tdp6 / "_quality_gate_report.md").write_text("", encoding="utf-8")  # 0 bytes
             _r21p6 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp6)
-            fcheck("F-21-P1-4a 0 bytes 報告 → WARN（非 PASS）", _r21p6[0] == "WARN", _r21p6[1])
+            fcheck(f"F-21-P1-4a 0 bytes 報告 → {_EXP_S216}（非 PASS）", _r21p6[0] == _EXP_S216, _r21p6[1])
             # 對照：非空報告 → PASS
             (_tdp6 / "_quality_gate_report.md").write_text("R10-R20 逐支命中表 + GPT 打分", encoding="utf-8")
             _r21p6b = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp6)
@@ -6016,20 +6157,27 @@ if __name__ == "__main__":
             )
             _r21p7 = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
             fcheck("F-21-P1-4b batch flag exempt+reason → PASS", _r21p7[0] == "PASS", _r21p7[1])
-            # exempt 但缺 reason → WARN（豁免不成立）
+            # exempt 但缺 reason → 豁免不成立（Codex R1 P0：shadow WARN / enforce fall-through 缺報告 FAIL）
             (_tdp7 / "_batch_flags.yml").write_text(
                 "quality_gate:\n  exempt: true\n",
                 encoding="utf-8",
             )
             _r21p7b = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
-            fcheck("F-21-P1-4b2 batch flag exempt 缺 reason → WARN", _r21p7b[0] == "WARN", _r21p7b[1])
+            fcheck(f"F-21-P1-4b2 batch flag exempt 缺 reason → {_EXP_S216}（enforce: 豁免不成立、fall-through 缺報告 FAIL；Codex R1 P0）", _r21p7b[0] == _EXP_S216, _r21p7b[1])
             # exempt 非 boolean true（字串 "true"）→ 不豁免（缺報告 WARN）
             (_tdp7 / "_batch_flags.yml").write_text(
                 "quality_gate:\n  exempt: \"true\"\n  reason: \"x\"\n",
                 encoding="utf-8",
             )
             _r21p7c = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
-            fcheck("F-21-P1-4b3 exempt 字串 'true' 不認 → WARN", _r21p7c[0] == "WARN", _r21p7c[1])
+            fcheck(f"F-21-P1-4b3 exempt 字串 'true' 不認 → {_EXP_S216}", _r21p7c[0] == _EXP_S216, _r21p7c[1])
+            # Codex R4 P1：reason 非字串（list）被 str() 成非空 → 不得誤過豁免（fail-closed）
+            (_tdp7 / "_batch_flags.yml").write_text(
+                "quality_gate:\n  exempt: true\n  reason:\n    - B級批\n",
+                encoding="utf-8",
+            )
+            _r21p7d = chk_c21_6_quality_gate_report([(Path("x.yaml"), {"title": "已填"})], _tdp7)
+            fcheck(f"F-21-P1-4b4 exempt reason 非字串（list）→ {_EXP_S216}（fail-closed 不誤豁免）", _r21p7d[0] == _EXP_S216, _r21p7d[1])
 
         # ⑧ P1-3 順手硬化②：C-21.7 成片90 掃整 yaml 序列化全文（自由欄位漏網防護）
         print("[F-21-P1-3d] C-21.7：成片90 藏自由欄位 → grep 整 yaml 全文抓到 FAIL")
@@ -6361,7 +6509,7 @@ if __name__ == "__main__":
             "存錢方法分享", "理財觀念", "裝潢注意事項", "驗屋要點", "家具怎麼挑",
         ], 1)]
         _r22a = chk_c22_topic_generality(_f22a, "瑞祥")
-        fcheck("F-22a 批內多數偏一般 → WARN（非 FAIL，shadow）", _r22a[0] == "WARN", _r22a[1])
+        fcheck(f"F-22a 批內多數偏一般 → {_EXP_S22}（enforce）", _r22a[0] == _EXP_S22, _r22a[1])
 
         # ── F-22b：批內多數不一般（post-cutover）→ PASS ──
         print("[F-22b] C-22 批內多數不一般 → PASS")
@@ -6415,7 +6563,7 @@ if __name__ == "__main__":
             "看屋技巧", "存錢方法", "理財觀念", "裝潢注意",
         ], 1)]
         _r22f = chk_c22_topic_generality(_f22f, "瑞祥")
-        fcheck("F-22f 混合批 <50% placeholder → 統計已填支（WARN 偏一般，非 SKIP）", _r22f[0] == "WARN", _r22f[1])
+        fcheck(f"F-22f 混合批 <50% placeholder → 統計已填支（{_EXP_S22} 偏一般，非 SKIP）", _r22f[0] == _EXP_S22, _r22f[1])
 
         # ── F-22g：邊界 — list 型未引號 title placeholder → 視 placeholder（不誤統計）──
         print("[F-22g] C-22 邊界：list 型 title ['編劇填'] → 視 placeholder")
@@ -6456,8 +6604,8 @@ if __name__ == "__main__":
         ], 1)]  # 9 支純空泛（訊號 0-1，MIN=2 下偏一般）
         _f22i += [_mk22(100, "我經手 37 組首購，多賠 80 萬都因為這個")]  # 1 支不一般（數字+代價+第一人稱 >= 2）
         _r22i = chk_c22_topic_generality(_f22i, "瑞祥")
-        fcheck(f"F-22i 占比剛好 == 門檻（9/10={9/10:.0%} == {_S22_BATCH_WARN_RATIO:.0%}）→ WARN（>= 觸發）",
-               _r22i[0] == "WARN", _r22i[1])
+        fcheck(f"F-22i 占比剛好 == 門檻（9/10={9/10:.0%} == {_S22_BATCH_WARN_RATIO:.0%}）→ {_EXP_S22}（>= 觸發）",
+               _r22i[0] == _EXP_S22, _r22i[1])
 
         # ── F-22i2：占比剛好低於門檻（0.8 < 0.9）→ PASS（門檻下緣）──
         # 8 偏一般 + 2 不一般 = 10 支 → 偏一般占 8/10 = 0.8 < 0.9 → PASS。
@@ -6512,7 +6660,7 @@ if __name__ == "__main__":
             _mk22(101, "客戶問我，首購要準備什麼"),       # 弱 bait：客戶(weak)+問我(weak) hard=0
         ]
         _rb1 = chk_c22_topic_generality(_bait1, "瑞祥")
-        fcheck("F-22-bait1 11 空泛 + 2 弱 bait → WARN（弱 bait hard=0 不達標）", _rb1[0] == "WARN", _rb1[1])
+        fcheck(f"F-22-bait1 11 空泛 + 2 弱 bait → {_EXP_S22}（弱 bait hard=0 不達標）", _rb1[0] == _EXP_S22, _rb1[1])
 
         # ── bait-2：13 支「客戶問我 + 泛 FAQ」→ WARN（Codex 指定）──
         # 整批套「客戶+問我」弱詞殼，表面 distinct（題目各異）但全 hard=0 → 100% 偏一般 → WARN。
@@ -6525,7 +6673,7 @@ if __name__ == "__main__":
             "客戶問我，什麼時候進場好",
         ], 1)]
         _rb2 = chk_c22_topic_generality(_bait2, "瑞祥")
-        fcheck("F-22-bait2 13 支「客戶問我+泛FAQ」殼 → WARN（整批 hard=0、靠弱詞撐 distinct）", _rb2[0] == "WARN", _rb2[1])
+        fcheck(f"F-22-bait2 13 支「客戶問我+泛FAQ」殼 → {_EXP_S22}（整批 hard=0、靠弱詞撐 distinct）", _rb2[0] == _EXP_S22, _rb2[1])
 
         # ── bait-3（backstop 專測）：弱過關第二層 — 全批達標但靠弱訊號為主 → WARN ──
         # 構：每支都有 1 hard（地名）但 weak（身份+時效）更多 → total>=2、hard>=1 達標但 weak>hard。
@@ -6539,7 +6687,7 @@ if __name__ == "__main__":
             "大社的客戶上週問最多",
         ], 1)]  # 每支：地名(hard 1) + 客戶(weak) + 時效(weak) = total 3 / hard 1 → weak>hard 弱過關
         _rb3 = chk_c22_topic_generality(_bait3, "瑞祥")
-        fcheck("F-22-bait3 全批達標但 weak>hard（弱過關 100%）→ 第二層 backstop WARN", _rb3[0] == "WARN", _rb3[1])
+        fcheck(f"F-22-bait3 全批達標但 weak>hard（弱過關 100%）→ 第二層 backstop {_EXP_S22}", _rb3[0] == _EXP_S22, _rb3[1])
 
         # ── golden-rx38：瑞祥38 風格好批（強第一人稱+數字+代價）→ PASS（recall 沒退）──
         # 模擬瑞祥38 好題型樣本，驗 precision 修後好批仍 PASS（不為 bait 把好批弄回 WARN）。
@@ -6604,7 +6752,7 @@ if __name__ == "__main__":
             "保養三步驟", "防曬怎麼挑", "卸妝要注意什麼",
         ], 1)]
         _rjunk = chk_c22_topic_generality(_junkbatch, "瑞祥")
-        fcheck("F-22-junkbatch 純空泛批（全 hard=0）→ WARN", _rjunk[0] == "WARN", _rjunk[1])
+        fcheck(f"F-22-junkbatch 純空泛批（全 hard=0）→ {_EXP_S22}", _rjunk[0] == _EXP_S22, _rjunk[1])
 
         # ── F-C22B：C-22b anchor_first 機械閘（批次 2 / Cluster A v1.1；shadow WARN-only）──
         # 注意：與既有 F-22a/F-22b（C-22 批次級一般化）不同 check，獨立命名 F-C22B 避免混淆。
@@ -6614,20 +6762,20 @@ if __name__ == "__main__":
                   "anchor_cost": "第一次被屋主罵當場愣住，打電話給澤君問是否要道歉",
                   "because_bridge": "因為被罵還撐下來，所以遇到要不要趁低點買我先看心理準備不是利率"}
         _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": ""}, "f.yaml", [], "楷甯")
-        fcheck("F-C22B-1 anchor_ref 缺 → WARN", _rb[0] == "WARN" and "anchor_ref 缺填" in _rb[1], _rb[1])
+        fcheck(f"F-C22B-1 anchor_ref 缺 → {_EXP_ANCHOR}", _rb[0] == _EXP_ANCHOR and "anchor_ref 缺填" in _rb[1], _rb[1])
         _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": "_楷甯完整公版.generated.md"}, "f.yaml", [], "楷甯")
-        fcheck("F-C22B-2 退役拼接本 .generated.md → WARN（上一輪真 bug 迴歸鎖）", _rb[0] == "WARN" and "退役拼接本" in _rb[1], _rb[1])
+        fcheck(f"F-C22B-2 退役拼接本 .generated.md → {_EXP_ANCHOR}（上一輪真 bug 迴歸鎖）", _rb[0] == _EXP_ANCHOR and "退役拼接本" in _rb[1], _rb[1])
         _rb = chk_c22b_anchor_first({**_af_ok, "anchor_ref": "_楷甯完整公版.GENERATED.MD"}, "f.yaml", [], "楷甯")
-        fcheck("F-C22B-3 .GENERATED.MD 大小寫變體 → WARN", _rb[0] == "WARN" and "退役拼接本" in _rb[1], _rb[1])
+        fcheck(f"F-C22B-3 .GENERATED.MD 大小寫變體 → {_EXP_ANCHOR}", _rb[0] == _EXP_ANCHOR and "退役拼接本" in _rb[1], _rb[1])
         _rb = chk_c22b_anchor_first(dict(_af_ok), "f.yaml", [], "楷甯")
         fcheck("F-C22B-4 三必填齊 → PASS", _rb[0] == "PASS", _rb[1])
         _rb = chk_c22b_anchor_first({"proof_mode": "proof_first"}, "f.yaml", [], "楷甯")
         fcheck("F-C22B-5 proof_first → 跳過 PASS（非 anchor_first 零干擾）", _rb[0] == "PASS" and "跳過" in _rb[1], _rb[1])
         _rb = chk_c22b_anchor_first({**_af_ok, "anchor_cost": "很努力"}, "f.yaml", [], "楷甯")
-        fcheck("F-C22B-6 空泛 anchor_cost → WARN", _rb[0] == "WARN" and "空泛詞" in _rb[1], _rb[1])
+        fcheck(f"F-C22B-6 空泛 anchor_cost → {_EXP_ANCHOR}", _rb[0] == _EXP_ANCHOR and "空泛詞" in _rb[1], _rb[1])
         _af_batch = [(Path(f"s{_i}.yaml"), dict(_af_ok)) for _i in range(3)]
         _rb = chk_c22b_anchor_first(dict(_af_ok), "s0.yaml", _af_batch, "楷甯")
-        fcheck("F-C22B-7 同 anchor_ref 同批 >2 → WARN（防套路）", _rb[0] == "WARN" and "同批 anchor_ref 重複" in _rb[1], _rb[1])
+        fcheck(f"F-C22B-7 同 anchor_ref 同批 >2 → {_EXP_ANCHOR}（防套路）", _rb[0] == _EXP_ANCHOR and "同批 anchor_ref 重複" in _rb[1], _rb[1])
 
         # ── F-OFFPRO：目標5 voice_first 偵測收斂 + chk_offpro_leak off-pro-aware（shadow WARN-only）──
         # 目標5（2026-06-22）：_is_offpro_marker 單一真理源（lane=stance OR proof_mode=voice_first）+ 向後相容 + byte 不變。
@@ -6646,11 +6794,11 @@ if __name__ == "__main__":
                and _is_offpro_marker({"proof_mode": "VOICE_FIRST"}) is True, "normalize")
         _rl = chk_offpro_leak({"proof_mode": "voice_first",
                                "scenes": [{"台詞_楷甯": "我帶看了好幾組，最後成交那組讓我學到一課"}]}, "f.yaml")
-        fcheck("F-OFFPRO-6 voice_first 稿本業詞洩漏 → WARN（off-pro-aware 偵測到）",
-               _rl[0] == "WARN" and "本業詞" in _rl[1], _rl[1])
+        fcheck(f"F-OFFPRO-6 voice_first 稿本業詞洩漏 → {_EXP_LEAK}（off-pro-aware 偵測到）",
+               _rl[0] == _EXP_LEAK and "本業詞" in _rl[1], _rl[1])
         _rl = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞_楷甯": "我帶看了好幾組"}]}, "f.yaml")
-        fcheck("F-OFFPRO-7 lane=stance 稿本業詞洩漏 → WARN（向後相容）",
-               _rl[0] == "WARN" and "本業詞" in _rl[1], _rl[1])
+        fcheck(f"F-OFFPRO-7 lane=stance 稿本業詞洩漏 → {_EXP_LEAK}（向後相容）",
+               _rl[0] == _EXP_LEAK and "本業詞" in _rl[1], _rl[1])
         _rl = chk_offpro_leak({"proof_mode": "proof_first",
                                "scenes": [{"台詞_瑞祥": "我帶看了好幾組成交"}]}, "f.yaml")
         fcheck("F-OFFPRO-8 本業稿（非 off-pro）含本業詞 → PASS 跳過（不誤殺）",
@@ -6659,6 +6807,76 @@ if __name__ == "__main__":
                                "scenes": [{"台詞_楷甯": "我們都在等一個不用開口的那天"}]}, "f.yaml")
         fcheck("F-OFFPRO-9 voice_first 稿無本業詞 → PASS",
                _rl[0] == "PASS" and "PASS" in _rl[1], _rl[1])
+
+        # ── Codex R1 修正驗證（2026-06-23）：§8#8 擴欄+去混淆 / placeholder off-pro-aware ──
+        print("[F-R1FIX] Codex R1 修正：§8#8 擴欄+去混淆 / placeholder off-pro-aware")
+        _r = chk_offpro_leak({"lane": "stance", "caption": "其實成交這件事沒人告訴你"}, "f.yaml")
+        fcheck(f"F-R1-1 §8#8 off-pro caption 藏本業詞 → {_EXP_LEAK}（掃全 publish 欄）",
+               _r[0] == _EXP_LEAK and "caption" in _r[1], _r[1])
+        _r = chk_offpro_leak({"proof_mode": "voice_first", "dm_card": {"body": {"text": "我帶看的心得"}}}, "f.yaml")
+        fcheck(f"F-R1-2 §8#8 巢狀 dm_card.body.text 藏本業詞 → {_EXP_LEAK}（遞迴葉值）",
+               _r[0] == _EXP_LEAK and "dm_card" in _r[1], _r[1])
+        _r = chk_offpro_leak({"lane": "stance", "platform_variants": {"ig": {"cta": "歡迎私訊談簽約"}}}, "f.yaml")
+        fcheck(f"F-R1-3 §8#8 platform_variants.ig.cta 藏本業詞 → {_EXP_LEAK}",
+               _r[0] == _EXP_LEAK and "platform_variants" in _r[1], _r[1])
+        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞_x": "我想說成​交真的"}]}, "f.yaml")
+        fcheck(f"F-R1-4 §8#8 零寬拆字「成[zwsp]交」→ {_EXP_LEAK}（去混淆抓到）",
+               _r[0] == _EXP_LEAK and "本業詞" in _r[1], _r[1])
+        _r = chk_offpro_leak({"lane": "stance", "caption": "今天想跟你聊聊完成 交流的重要"}, "f.yaml")
+        fcheck("F-R1-5 §8#8 cross-word「完成 交流」off-pro → PASS（不去一般空白避 FP）",
+               _r[0] == "PASS", _r[1])
+        _ph_off = "FAIL" if _OFFPRO_PLACEHOLDER_ENFORCE else "WARN"
+        _r = chk_offpro_placeholder({"lane": "stance", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
+        fcheck(f"F-R1-6 placeholder off-pro 稿 [需確認] → {_ph_off}（off-pro-aware 升級）",
+               _r[0] == _ph_off and "占位" in _r[1], _r[1])
+        _r = chk_offpro_placeholder({"proof_mode": "proof_first", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
+        fcheck("F-R1-7 placeholder 本業稿 [需確認] → WARN（非 FAIL、避 FP、保留信號）",
+               _r[0] == "WARN", _r[1])
+        # ── Codex R2 收嚴驗證 ──
+        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞備註": "提醒：不要講成交"}]}, "f.yaml")
+        fcheck("F-R2-1 §8#8 台詞備註（內部欄）含本業詞 → PASS（不掃內部備註欄）",
+               _r[0] == "PASS", _r[1])
+        _r = chk_offpro_leak({"proof_mode": "voice_first",
+                              "dm_card": {"asset_path": "assets/買房/card.png", "body": "今天聊心態"}}, "f.yaml")
+        fcheck("F-R2-2 §8#8 dm_card.asset_path 含本業詞 → PASS（asset_path 內部欄跳過、body 無本業詞）",
+               _r[0] == "PASS", _r[1])
+        _r = chk_offpro_leak({"proof_mode": "voice_first",
+                              "dm_card": {"asset_path": "assets/x.png", "body": "我帶看成交那次"}}, "f.yaml")
+        fcheck(f"F-R2-2b §8#8 dm_card.body 含本業詞 → {_EXP_LEAK}（body 仍掃、asset_path 跳過不影響）",
+               _r[0] == _EXP_LEAK and "dm_card.body" in _r[1], _r[1])
+        _cyc = {"x": "ok"}; _cyc["self"] = _cyc
+        try:
+            _r = chk_offpro_leak({"lane": "stance", "dm_card": _cyc}, "f.yaml")
+            _ok_cyc = True
+        except RecursionError:
+            _ok_cyc = False
+        fcheck("F-R2-3 §8#8 dm_card 自參照（cycle）→ 不 RecursionError（cycle guard）",
+               _ok_cyc, "cycle guard")
+        # ── Codex R4 紅隊修驗證 ──
+        try:
+            _ok_null = (chk_offpro_placeholder({"lane": "stance", "scenes": None}, "f")[0] == "PASS"
+                        and chk_offpro_leak({"lane": "stance", "scenes": None}, "f")[0] == "PASS")
+        except Exception:
+            _ok_null = False
+        fcheck("F-R4-1 §8#8 scenes=null → 不 crash（placeholder/leak 皆不炸）", _ok_null, "scenes=None guard")
+        _r = chk_offpro_leak({"lane": "stance",
+                              "platform_variants": {"ig": {"caption": "assets/買房/card.png"}}}, "f")
+        fcheck("F-R4-2 §8#8 publish 欄值是 asset 路徑（含本業詞）→ PASS（asset value 跳過）",
+               _r[0] == "PASS", _r[1])
+        # ── 算盤覆核補：藏鏡人（中文鍵，生產 130/172 用）+ top-level cta 洩漏偵測 ──
+        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"藏鏡人": "你是不是也帶看了好幾組"}]}, "f")
+        fcheck(f"F-R5-1 §8#8 scene 藏鏡人（公開 hook 字幕）藏本業詞 → {_EXP_LEAK}（算盤補中文鍵）",
+               _r[0] == _EXP_LEAK and "藏鏡人" in _r[1], _r[1])
+        _r = chk_offpro_leak({"proof_mode": "voice_first", "cta": {"message": "私訊我看成交案例"}}, "f")
+        fcheck(f"F-R5-2 §8#8 top-level cta.message 藏本業詞 → {_EXP_LEAK}（算盤補 cta）",
+               _r[0] == _EXP_LEAK and "cta" in _r[1], _r[1])
+        # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
+        if "--expect-enforce" in sys.argv:
+            fcheck("F-CUTOVER 6/24 enforce flags 全 True（_S22/ANCHOR/PLACEHOLDER/LEAK/_S21_6）",
+                   bool(_S22_ENFORCE and ANCHOR_FIRST_ENFORCE and _OFFPRO_PLACEHOLDER_ENFORCE
+                        and _OFFPRO_LEAK_ENFORCE and _S21_6_REPORT_ENFORCE),
+                   f"S22={_S22_ENFORCE} ANCHOR={ANCHOR_FIRST_ENFORCE} PH={_OFFPRO_PLACEHOLDER_ENFORCE} "
+                   f"LEAK={_OFFPRO_LEAK_ENFORCE} S216={_S21_6_REPORT_ENFORCE}")
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

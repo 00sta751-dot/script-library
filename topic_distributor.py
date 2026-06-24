@@ -18,6 +18,7 @@ import os
 import re
 import json
 import argparse
+import hashlib
 import yaml
 from pathlib import Path
 from typing import Optional
@@ -442,6 +443,231 @@ def build_ratio_validation(plan: list[dict], school_ratios: dict, identity_ratio
     }
 
 
+HYBRID_BATCH_PROFILE = "hybrid_70_15_15"
+_BATCH_FLAGS_PROFILE_PARSE_ERROR = "[topic_distributor] _batch_flags.yml 存在但解析失敗，fail-closed（無法確認 batch_profile）"
+
+
+def _read_batch_profile_from_flags(batch_dir: Optional[str]) -> Optional[str]:
+    """Read batch_profile from <batch_dir>/_batch_flags.yml without affecting legacy runs."""
+    if not batch_dir:
+        return None
+    p = Path(batch_dir)
+    flag_path = p if p.name == "_batch_flags.yml" else p / "_batch_flags.yml"
+    if not flag_path.exists():
+        return None
+    try:
+        raw = yaml.safe_load(flag_path.read_text(encoding="utf-8"))
+    except Exception:
+        raise SystemExit(_BATCH_FLAGS_PROFILE_PARSE_ERROR)
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise SystemExit(_BATCH_FLAGS_PROFILE_PARSE_ERROR)
+    profile = raw.get("batch_profile")
+    if profile is None:
+        return None
+    return str(profile).strip()
+
+
+def _resolve_batch_profile(cli_profile: Optional[str], batch_dir: Optional[str]) -> Optional[str]:
+    profile = (cli_profile or "").strip() or _read_batch_profile_from_flags(batch_dir)
+    if not profile:
+        return None
+    if profile != HYBRID_BATCH_PROFILE:
+        raise SystemExit(f"[topic_distributor] unsupported batch_profile: {profile!r}")
+    return profile
+
+
+def _load_owner_content_profile() -> dict:
+    path = Path(__file__).resolve().parent / "owner_content_profile.yaml"
+    if not path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _load_offpro_topic_pillars() -> tuple[list[str], str]:
+    path = Path(__file__).resolve().parent / "offpro_topic_pillar_map.yaml"
+    fallback = (["人生", "金錢", "感情"], "熱門")
+    if not path.exists():
+        return fallback
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return fallback
+    cats = data.get("offpro_topic_categories") if isinstance(data, dict) else None
+    if not isinstance(cats, list):
+        return fallback
+    values = [str(c).strip() for c in cats if str(c).strip()]
+    wildcard = "熱門" if "熱門" in values else (values[-1] if values else fallback[1])
+    pillars = [c for c in values if c not in {"時事", wildcard}]
+    if len(pillars) < 3:
+        pillars = [c for c in values if c != wildcard]
+    pillars = pillars[:3]
+    if len(pillars) < 3:
+        return fallback
+    return pillars, wildcard
+
+
+def _profile_lanes(profile_data: dict) -> dict[str, int]:
+    default = {
+        "voice_first": 7,
+        "demand_first": 2,
+        "anchor_first": 2,
+        "professional": 2,
+    }
+    profiles = profile_data.get("profiles") if isinstance(profile_data, dict) else None
+    strong = profiles.get("strong_default") if isinstance(profiles, dict) else None
+    lanes = strong.get("lanes") if isinstance(strong, dict) else None
+    if not isinstance(lanes, dict):
+        return default
+    resolved = dict(default)
+    for key in default:
+        try:
+            resolved[key] = int(lanes.get(key, default[key]))
+        except (TypeError, ValueError):
+            resolved[key] = default[key]
+    return resolved
+
+
+def _count_by(plan: list[dict], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in plan:
+        val = item.get(key)
+        if isinstance(val, str) and val:
+            counts[val] = counts.get(val, 0) + 1
+    return counts
+
+
+def _plan_lock_hash(plan: list[dict]) -> str:
+    pairs = [
+        {
+            "script_id": item.get("script_id", ""),
+            "content_axis": item.get("content_axis", ""),
+            "lane": item.get("lane", ""),
+            "derived_flags": sorted(str(x) for x in (item.get("derived_flags") or [])),
+        }
+        for item in plan
+    ]
+    raw = json.dumps(pairs, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _hybrid_allocation_report(plan: list[dict]) -> dict:
+    content_axis_count = _count_by(plan, "content_axis")
+    lane_count = _count_by(plan, "lane")
+    topic_category_count = _count_by(plan, "topic_category")
+    identity_bridge_count = sum(
+        1 for item in plan if "identity_bridge" in (item.get("derived_flags") or [])
+    )
+    pure_emotion_count = sum(
+        1 for item in plan if "pure_emotion" in (item.get("derived_flags") or [])
+    )
+    offpro_categories = [
+        item.get("topic_category")
+        for item in plan
+        if item.get("content_axis") == "offpro" and item.get("topic_category")
+    ]
+    offpro_pillar_count = len(set(offpro_categories))
+    news_count = sum(1 for c in offpro_categories if c == "時事")
+
+    infeasible: list[str] = []
+    non_professional = content_axis_count.get("offpro", 0) + content_axis_count.get("personal_anchor", 0)
+    if len(plan) != 13:
+        infeasible.append(f"slot_count={len(plan)} expected=13")
+    if content_axis_count.get("offpro", 0) != 9:
+        infeasible.append(f"offpro={content_axis_count.get('offpro', 0)} expected=9")
+    if content_axis_count.get("personal_anchor", 0) != 2:
+        infeasible.append(f"personal_anchor={content_axis_count.get('personal_anchor', 0)} expected=2")
+    if non_professional != 11:
+        infeasible.append(f"non_professional={non_professional} expected=11")
+    if content_axis_count.get("professional", 0) != 2:
+        infeasible.append(f"professional={content_axis_count.get('professional', 0)} expected=2")
+    voice_first = lane_count.get("voice_first", 0)
+    if not 6 <= voice_first <= 9:
+        infeasible.append(f"voice_first={voice_first} expected_range=6..9")
+    demand_first = lane_count.get("demand_first", 0)
+    if not 2 <= demand_first <= 4:
+        infeasible.append(f"demand_first={demand_first} expected_range=2..4")
+    anchor_first = lane_count.get("anchor_first", 0)
+    if not 1 <= anchor_first <= 3:
+        infeasible.append(f"anchor_first={anchor_first} expected_range=1..3")
+    if identity_bridge_count != 1:
+        infeasible.append(f"identity_bridge={identity_bridge_count} expected=1")
+    if pure_emotion_count < 1:
+        infeasible.append(f"pure_emotion={pure_emotion_count} expected_min=1")
+    if not 3 <= offpro_pillar_count <= 4:
+        infeasible.append(f"offpro_pillar_count={offpro_pillar_count} expected_range=3..4")
+    if news_count > 2:
+        infeasible.append(f"時事={news_count} expected_max=2")
+
+    return {
+        "content_axis_count": content_axis_count,
+        "lane_count": lane_count,
+        "topic_category_count": topic_category_count,
+        "offpro_pillar_count": offpro_pillar_count,
+        "identity_bridge_present": identity_bridge_count == 1,
+        "emotional_slot_present": pure_emotion_count >= 1,
+        "business_leak_check": "placeholder:not_run",
+        "infeasible_constraints": infeasible,
+    }
+
+
+def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dict], str, dict]:
+    lanes = _profile_lanes(profile_data)
+    lane_sequence = (
+        ["voice_first"] * lanes["voice_first"]
+        + ["demand_first"] * lanes["demand_first"]
+        + ["anchor_first"] * lanes["anchor_first"]
+        + ["professional"] * lanes["professional"]
+    )
+    axis_by_lane = {
+        "voice_first": "offpro",
+        "demand_first": "offpro",
+        "anchor_first": "personal_anchor",
+        "professional": "professional",
+    }
+    pillars, wildcard_category = _load_offpro_topic_pillars()
+    offpro_category_index = 0
+
+    annotated: list[dict] = []
+    for idx, item in enumerate(plan):
+        out = dict(item)
+        lane = lane_sequence[idx] if idx < len(lane_sequence) else "unassigned"
+        axis = axis_by_lane.get(lane, "unassigned")
+        flags: list[str] = []
+        if idx == 0 and lane == "voice_first":
+            flags.append("identity_bridge")
+        if idx == 1 and lane in {"voice_first", "anchor_first"}:
+            flags.append("pure_emotion")
+        if idx == 2 and axis == "offpro":
+            flags.append("wildcard")
+            out["wildcard"] = True
+            out["wildcard_reason"] = "料源=Gemini 搜熱門"
+            topic_category = wildcard_category
+        elif axis == "offpro":
+            topic_category = pillars[offpro_category_index % len(pillars)]
+            offpro_category_index += 1
+        elif axis == "personal_anchor":
+            topic_category = "personal_story"
+        elif axis == "professional":
+            topic_category = "professional"
+        else:
+            topic_category = "unassigned"
+        out["content_axis"] = axis
+        out["lane"] = lane
+        out["derived_flags"] = flags
+        out["topic_category"] = topic_category
+        annotated.append(out)
+
+    lock_hash = _plan_lock_hash(annotated)
+    report = _hybrid_allocation_report(annotated)
+    return annotated, lock_hash, report
+
+
 # ════════════════════════════════════════
 # 主程式
 # ════════════════════════════════════════
@@ -456,10 +682,16 @@ def main():
         help="批次目錄路徑（WP-B：讀 _batch_flags.yml topic_intel_closure policy；缺省=off）",
         default=None,
     )
+    parser.add_argument(
+        "--batch-profile",
+        help="optional allocator profile; supported MVP value: hybrid_70_15_15",
+        default=None,
+    )
     args = parser.parse_args()
 
     owner = args.owner
     batch = args.batch
+    batch_profile = _resolve_batch_profile(args.batch_profile, args.batch_dir)
 
     print(f"\n{'='*60}")
     print(f"  題目分配機 v1.0")
@@ -519,6 +751,12 @@ def main():
         school_ratios, identity_ratios, used_topics, batch_spec, owner, batch
     )
     ratio_validation = build_ratio_validation(plan, school_ratios, identity_ratios)
+
+    plan_lock_hash: Optional[str] = None
+    allocation_report: Optional[dict] = None
+    if batch_profile == HYBRID_BATCH_PROFILE:
+        profile_data = _load_owner_content_profile()
+        plan, plan_lock_hash, allocation_report = apply_hybrid_profile(plan, profile_data)
 
     # WP-B Step 5：assign_topic_sources（flag-gated，--batch-dir 缺省=off）
     # 零足跡鐵律：off 時不 import、不讀池、不新增 key、stdout 無 [WP-B] 行
@@ -597,6 +835,10 @@ def main():
         "dedup_info": dedup_info,
         "ratio_validation": ratio_validation,
     }
+    if batch_profile == HYBRID_BATCH_PROFILE:
+        output_data["meta"]["batch_profile"] = batch_profile
+        output_data["plan_lock_hash"] = plan_lock_hash
+        output_data["allocation_report"] = allocation_report
     if assign_report is not None:
         output_data["assign_report"] = assign_report
 

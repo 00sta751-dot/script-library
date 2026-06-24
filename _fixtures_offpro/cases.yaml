@@ -1,0 +1,143 @@
+schema_version: 1
+runner: "python validate_script_batch.py --fixtures --expect-enforce"
+cases:
+  - id: pass_9_2_2
+    expected_gate: C-plan-lock
+    expected_status: PASS
+  - id: fail_8_3_2
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+  - id: fail_9_1_3
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+  - id: fail_offpro_business_leak
+    expected_gate: C-offpro-leak
+    expected_status: FAIL
+    trigger: "offpro caption contains 賣房/成交"
+  - id: fail_professional_chicken_soup
+    expected_gate: C-professional-minimum
+    expected_status: FAIL
+    trigger: "professional_topic_type outside whitelist"
+  - id: fail_third_professional
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "professional slot count exceeds reserved 2"
+  - id: fail_professional_withheld_dm
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "CTA asks for DM to get answer"
+  - id: fail_missing_old_answer
+    expected_gate: C-method
+    expected_status: FAIL
+  - id: fail_strawman_old_answer
+    expected_gate: C-method
+    expected_status: FAIL
+  - id: fail_hook_debt_unclosed
+    expected_gate: C-method
+    expected_status: FAIL
+  - id: fail_barrier_no_why
+    expected_gate: C-method
+    expected_status: FAIL
+  - id: fail_editor_bool_true_withheld
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "editor-filled booleans true but validator recomputes CTA withheld"
+  - id: fail_news_gt_2
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+  - id: fail_yaml_lane_tamper
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "YAML lane differs from allocator plan"
+  - id: fail_yaml_derived_flags_tamper
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "YAML derived_flags differs from allocator plan"
+  - id: fail_plan_lock_hash_lane_bound
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "plan lane changed while old plan_lock_hash is kept"
+  - id: fail_declared_hybrid_bare_yaml
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "_batch_flags.yml declares hybrid_70_15_15 but YAML/topic_plan are not built as hybrid"
+  - id: fail_broken_batch_flags_hybrid
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "_batch_flags.yml exists but is malformed; batch_profile cannot be trusted and must fail closed"
+  - id: fail_malformed_topic_plan
+    expected_gate: C-plan-lock
+    expected_status: FAIL
+    trigger: "topic_plan.json top-level is a list, producing clean topic_plan 結構異常"
+  - id: fail_cta_multi_action_recomputed
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "CTA text contains save/comment/share while declared cta_action_count is 1"
+  - id: fail_method_quote_not_in_dialogue
+    expected_gate: C-method
+    expected_status: FAIL
+    trigger: "old_answer.quote is filled but absent from final dialogue"
+  - id: fail_identity_bridge_professional_leak
+    expected_gate: C-identity-bridge
+    expected_status: FAIL
+    trigger: "identity_bridge dialogue hits hard business/proof terms"
+  - id: fail_no_llm_taste_panel_rejected
+    expected_gate: C-taste-panel
+    expected_status: FAIL
+    trigger: "taste_panel report/summary has no_llm_mode: true"
+  - id: fail_forged_report_mismatch
+    expected_gate: C-taste-panel
+    expected_status: FAIL
+    trigger: "taste_panel report gate_cache_key does not bind recomputed hashes"
+  - id: fail_demand_first_offpro_placeholder
+    expected_gate: C-offpro-placeholder
+    expected_status: FAIL
+    trigger: "content_axis offpro + lane demand_first still hard-fails [需確認]"
+  - id: fail_multi_action_cta_new_lexicon
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "截圖/傳給/照做 recomputes as more than one CTA action"
+  - id: fail_offpro_dm_cta_scope
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "offpro CTA directs to DM/consultation/LINE even after core is delivered"
+  - id: fail_fabricated_hook_debt_quote
+    expected_gate: C-method
+    expected_status: FAIL
+    trigger: "hook_debts opened_quote/closed_quote are absent from final dialogue"
+  - id: fail_identity_bridge_non_voice_first
+    expected_gate: C-identity-bridge
+    expected_status: FAIL
+    trigger: "identity_bridge derived flag appears on lane other than allowed_lanes"
+  - id: fail_hook_debt_quote_wrong_scene
+    expected_gate: C-method
+    expected_status: FAIL
+    trigger: "hook_debts opened_quote appears in dialogue but outside opened_at range"
+  - id: fail_offpro_cta_dm_variants
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "offpro CTA 密我/小盒子 variants hard-block"
+  - id: fail_offpro_cta_english_punct
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "offpro CTA Book a consultation / D.M me hard-block after separator stripping"
+  - id: fail_offpro_cta_call_me_wechat
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "offpro CTA call me / 加微信 hard-block"
+  - id: fail_identity_bridge_config_broken
+    expected_gate: C-identity-bridge
+    expected_status: FAIL
+    trigger: "identity_bridge rules file parse failure fail-closed"
+  - id: fail_cta_forward_new_lexicon
+    expected_gate: C-friend-close
+    expected_status: FAIL
+    trigger: "收藏 + 轉寄 recomputes as more than one CTA action"
+  - id: fail_taste_panel_model_id_mismatch
+    expected_gate: C-taste-panel
+    expected_status: FAIL
+    trigger: "report model_id differs from rubric meta model"
+  - id: fail_taste_panel_summary_model_id_mismatch
+    expected_gate: C-taste-panel
+    expected_status: FAIL
+    trigger: "summary model_id differs from rubric meta model"

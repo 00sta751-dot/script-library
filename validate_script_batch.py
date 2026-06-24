@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_script_batch.py — 腳本批次品管員（v2 — 階段 3 升級 / 含 V2 schema 守門）
+validate_script_batch.py — 腳本批次品管員（v2 — 階段 3 升級 / 含 V2 schema 守門；現役 2026-06-23 enforce-flip：5 旗標 True、§21/§22 機械化、off-pro enforce、202 fixtures）
 對齊 SOP _腳本生產SOP_v3.0.yaml §11 9 件 + §14 §15 + guardian 補 6 件 C-010 ~ C-015
 v2 新增 5 件 V2-001 ~ V2-005（yaml schema 新欄位驗 + migration plan）
 
@@ -30,6 +30,8 @@ import sys
 import os
 import re
 import argparse
+import json
+import hashlib
 import yaml
 from pathlib import Path
 from typing import Any, Optional
@@ -2221,6 +2223,11 @@ ANCHOR_FIRST_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；只對 pr
 _OFFPRO_PLACEHOLDER_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；全稿偵測占位符，off-pro 稿→FAIL、本業稿→WARN〔避 FP：本業批偶帶 [需確認] 待補，瑞祥36×4〕；Codex R1 P0-2 修）
 # C-offpro-leak：off-pro 立場 lane 本業詞守門。2026-06-23 翻 True（§8#8 硬化後，見值行）。
 _OFFPRO_LEAK_ENFORCE = True  # 6/24 enforce flip（霸告 2026-06-23；§8#8 掃全 publish 欄+去混淆硬化後翻，保鏢 condition 已補）
+_HYBRID_PLAN_LOCK_ENFORCE = True
+_HYBRID_METHOD_ENFORCE = True
+_HYBRID_FRIEND_CLOSE_ENFORCE = True
+_HYBRID_PROFESSIONAL_ENFORCE = True
+_TASTE_PANEL_ENFORCE = True
 # C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
 # 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
 #   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
@@ -3768,7 +3775,7 @@ def chk_c21_6_quality_gate_report(
         )
         if _S21_6_REPORT_ENFORCE:
             return "FAIL", msg_empty
-        return "WARN", msg_empty + "（現 WARN-only：待澤君拍板高規格判定後改 FAIL）"
+        return "WARN", msg_empty + "（_S21_6_REPORT_ENFORCE=False 時 WARN；現已 2026-06-23 enforce-live，此 branch 為 rollback 備用）"
 
     # 缺報告且非豁免
     msg = (
@@ -3778,7 +3785,7 @@ def chk_c21_6_quality_gate_report(
     )
     if _S21_6_REPORT_ENFORCE:
         return "FAIL", msg
-    return "WARN", msg + "（現 WARN-only：待澤君拍板高規格判定後改 FAIL）"
+    return "WARN", msg + "（_S21_6_REPORT_ENFORCE=False 時 WARN；現已 2026-06-23 enforce-live，此 branch 為 rollback 備用）"
 
 
 def chk_c21_7_honest_ceiling(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
@@ -4073,7 +4080,7 @@ def chk_c22b_anchor_first(
 ) -> tuple[str, str]:
     """C-22b anchor_first 機械閘（Cluster A v1.1，2026-06-20）—
     只有 proof_mode == anchor_first 的支才跑，其他直接 PASS。
-    全程受 ANCHOR_FIRST_ENFORCE 控（False=WARN-only shadow，True=FAIL）。
+    全程受 ANCHOR_FIRST_ENFORCE 控（False=WARN-only rollback 備用，True=FAIL；2026-06-23 已翻 True enforce-live）。
     誠實邊界：空泛詞偵測是 presence-only 啟發，語義判斷留 D1 抽審/人工。"""
     if data.get("proof_mode") != "anchor_first":
         return "PASS", f"{fname}: C-22b 非 anchor_first，跳過"
@@ -4377,7 +4384,7 @@ def chk_offpro_placeholder(data: dict, fname: str) -> tuple[str, str]:
       本業稿 → WARN（不擋、避 FP——本業批實務偶帶 [需確認] 待補，見瑞祥36 placeholder×4；保留 WARN 信號）。
     名稱沿用 offpro 前綴＝歷史，實為通用占位守門。豁免：非台詞欄（source_ref/claim_ledger/metadata/翠文/畫面）不掃。
     """
-    severity = "FAIL" if (_OFFPRO_PLACEHOLDER_ENFORCE and _is_offpro_marker(data)) else "WARN"
+    severity = "FAIL" if (_OFFPRO_PLACEHOLDER_ENFORCE and _should_check_offpro_leak(data)) else "WARN"
     hits: list[str] = []
     _scenes = data.get("scenes") or []
     if not isinstance(_scenes, list):
@@ -4553,6 +4560,15 @@ def _offpro_publish_fields(data: dict) -> list[tuple[str, str]]:
     return out
 
 
+def _should_check_offpro_leak(data: dict) -> bool:
+    axis = str(data.get("content_axis", "") or "").strip()
+    if axis in {"offpro", "personal_anchor"}:
+        return True
+    if axis == "professional":
+        return False
+    return _is_offpro_marker(data)
+
+
 def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
     """C-offpro-leak：off-pro 立場稿本業詞守門（2026-06-21 建；2026-06-23 翻 enforce，目標5 + §8#8 硬化）。
     off-pro-aware：只對 off-pro 立場稿掃（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
@@ -4561,7 +4577,7 @@ def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
     §8#8（2026-06-23 enforce 前置硬化）：掃所有 publish-visible 欄（台詞_*/翠文/title/caption/hashtag/dm_card 巢狀…）
     + 去混淆（NFKC 全半形/相容字 + 去零寬；保留一般空白避 cross-word FP）；命中 → WARN/FAIL（_OFFPRO_LEAK_ENFORCE）。
     """
-    if not _is_offpro_marker(data):
+    if not _should_check_offpro_leak(data):
         return "PASS", (f"{fname}: C-offpro-leak 非 off-pro"
                         f"（lane={data.get('lane','')!r}/proof_mode={data.get('proof_mode','')!r}），跳過")
 
@@ -4585,6 +4601,844 @@ def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
     if hits:
         return severity, f"{fname}: C-offpro-leak off-pro 偷渡本業詞（§8#8 全 publish 欄+去混淆）— {'; '.join(hits[:8])}"
     return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，全 publish 欄無本業詞洩漏）"
+
+
+HYBRID_BATCH_PROFILE = "hybrid_70_15_15"
+_HYBRID_PROF_TYPES = {
+    "seller_preparation",
+    "pricing",
+    "market_basic",
+    "transaction_risk",
+    "contract_tax_loan_basic",
+    "viewing_listing_logic",
+}
+_OFFPRO_CTA_SCOPES = {"none", "self_check", "discussion_prompt", "save_share", "auxiliary_asset"}
+_PRO_CTA_SCOPES = {"none", "self_check", "save_share", "soft_consultation", "auxiliary_asset"}
+_HYBRID_CAUSAL_WORDS = ("因為", "所以", "因此", "才會", "導致", "讓", "如果", "就")
+_HYBRID_STRAWMAN_WORDS = ("大家都說", "一般人以為")
+_HYBRID_WITHHELD_WORDS = ("私訊", "LINE", "line", "加賴", "諮詢", "PDF", "清單", "名單", "表單", "領取", "下載")
+_HYBRID_PRESSURE_WORDS = ("立刻", "馬上", "限時", "現在就", "趕快", "只到今天")
+_HYBRID_WORK_WORDS = tuple(_ALL_LEAK_WORDS) + ("客戶", "帶看", "成交", "委託", "簽約", "貸款", "行情")
+_OFFPRO_CTA_HARD_BLOCK_RE = re.compile(
+    r"私訊|私信|傳訊|DM|dm|敲我|加\s*(?:LINE|line|賴)|(?:^|[^A-Za-z])LINE(?:$|[^A-Za-z])|"
+    r"(?:^|[^A-Za-z])line(?:$|[^A-Za-z])|預約|諮詢|咨詢|問我|找我聊|領答案|拿答案|"
+    r"領取答案|索取答案|LINE\s*(?:清單|名單|列表|表單|群)",
+    re.IGNORECASE,
+)
+_OFFPRO_CTA_HARD_BLOCK_TERMS = (
+    "私訊", "私我", "密我", "賴我", "加賴", "小盒子", "DM", "dm", "inbox",
+    "direct message", "敲我", "傳訊", "私聊", "諮詢", "預約", "LINE", "line",
+    "加LINE", "加line", "consultation", "consult", "schedule a consult",
+    "schedule a call", "book a consult", "message me", "contact me", "book a call",
+    "call me", "dm me", "pm me", "text me", "whatsapp", "wechat", "加微信",
+)
+
+
+def _offpro_cta_norm(text: str) -> str:
+    text = _deobfuscate(text or "").lower()
+    return "".join(ch for ch in text if re.match(r"[a-z0-9\u3400-\u9fff\uf900-\ufaff]", ch))
+
+
+def _offpro_cta_hard_blocked(text: str) -> bool:
+    compact = _offpro_cta_norm(text)
+    if not compact:
+        return False
+    for term in _OFFPRO_CTA_HARD_BLOCK_TERMS:
+        token = _offpro_cta_norm(term)
+        if token and token in compact:
+            return True
+    return False
+
+
+_CTA_ACTION_LEXICON: dict[str, tuple[str, ...]] = {
+    "comment": ("留言", "留個言", "回覆", "回我", "告訴我", "comment"),
+    "dm": ("私訊", "私信", "傳訊", "敲我", "DM", "dm", "LINE", "line", "加賴"),
+    "share": ("分享", "分享給", "傳給", "發給", "丟給", "轉發", "轉傳", "share"),
+    "save": ("收藏", "收藏起來", "存下來", "存起來", "保存", "截圖", "截圖下來", "save"),
+    "follow": ("追蹤", "訂閱", "follow"),
+    "like": ("按讚", "點讚", "like"),
+    "tag": ("tag", "Tag", "標記", "標記給", "@"),
+    "link": ("點連結", "點鏈結", "連結", "link", "bio"),
+    "claim": ("領取", "下載", "索取", "拿清單", "拿檔案"),
+    "do": ("照做", "試做", "做一次", "跟著做", "明天做", "今天做"),
+}
+_CTA_ACTION_LEXICON["share"] = tuple(dict.fromkeys(
+    _CTA_ACTION_LEXICON["share"] + ("轉寄", "傳送", "寄給", "轉發", "分享給")
+))
+_CTA_ACTION_LEXICON["save"] = tuple(dict.fromkeys(
+    _CTA_ACTION_LEXICON["save"] + ("備份", "存起來", "存下來")
+))
+_IDENTITY_BRIDGE_RULES_CACHE: dict | None = None
+
+
+def _hybrid_na(fname: str, check_id: str) -> tuple[str, str]:
+    return "PASS", f"{fname}: {check_id} N/A 非 hybrid 批"
+
+
+def _is_hybrid_script(data: dict) -> bool:
+    return bool(str(data.get("content_axis", "") or "").strip())
+
+
+def _present(v: Any) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, str):
+        s = v.strip()
+        return bool(s) and not _is_placeholder(s) and s != "[編劇填]"
+    if isinstance(v, (list, tuple, dict)):
+        return bool(v)
+    return True
+
+
+def _as_text(v: Any) -> str:
+    return "" if v is None else str(v)
+
+
+def _scene_texts(data: dict) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    scenes = data.get("scenes") or []
+    if not isinstance(scenes, list):
+        return out
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        ts = str(scene.get("timestamp", "") or "")
+        parts = []
+        for k, v in scene.items():
+            if k == "timestamp" or v is None or isinstance(v, (dict, list)):
+                continue
+            parts.append(str(v))
+        out.append((ts, "\n".join(parts)))
+    return out
+
+
+def _all_scene_text(data: dict) -> str:
+    return "\n".join(text for _, text in _scene_texts(data))
+
+
+def _scene_text_for_ranges(data: dict, ranges: tuple[str, ...]) -> str:
+    chunks = []
+    for ts, text in _scene_texts(data):
+        if ts in ranges:
+            chunks.append(text)
+    return "\n".join(chunks)
+
+
+def _final_cta_scene_text(data: dict) -> str:
+    texts = _scene_texts(data)
+    if not texts:
+        return ""
+    cta_chunks = [text for ts, text in texts if "52-60" in ts or "CTA" in ts.upper()]
+    if cta_chunks:
+        return "\n".join(cta_chunks)
+    return texts[-1][1]
+
+
+def _quote_in_scene(data: dict, quote: Any, ranges: tuple[str, ...] | None = None) -> bool:
+    q = _as_text(quote).strip()
+    if not _present(q):
+        return False
+    haystack = _scene_text_for_ranges(data, ranges) if ranges else _all_scene_text(data)
+    return q in haystack
+
+
+def _hybrid_file_is_skeleton(data: dict) -> bool:
+    """True when this script has no filled scene dialogue yet."""
+    scenes = data.get("scenes") or []
+    if not isinstance(scenes, list):
+        return True
+    saw_dialogue_field = False
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        for key, value in scene.items():
+            key_s = str(key)
+            if key_s != "台詞" and not key_s.startswith("台詞_"):
+                continue
+            saw_dialogue_field = True
+            if not _is_placeholder(value):
+                return False
+    return True
+
+
+def _count_cta_actions(text: str) -> tuple[int, list[str]]:
+    hits: list[str] = []
+    for action, words in _CTA_ACTION_LEXICON.items():
+        if any(w and w in text for w in words):
+            hits.append(action)
+    return len(hits), hits
+
+
+def _identity_bridge_config_path() -> Path:
+    base = Path(__file__).resolve().parent
+    for rel in ("configs/offpro_identity_bridge_rules.yaml", "offpro_identity_bridge_rules.yaml"):
+        p = base / rel
+        if p.exists():
+            return p
+    return base / "offpro_identity_bridge_rules.yaml"
+
+
+def _flatten_str_list(v: Any) -> list[str]:
+    out: list[str] = []
+    if isinstance(v, str):
+        s = v.strip()
+        if s:
+            out.append(s)
+    elif isinstance(v, list):
+        for item in v:
+            out.extend(_flatten_str_list(item))
+    elif isinstance(v, dict):
+        for item in v.values():
+            out.extend(_flatten_str_list(item))
+    return out
+
+
+def _load_identity_bridge_rules() -> dict:
+    global _IDENTITY_BRIDGE_RULES_CACHE
+    if _IDENTITY_BRIDGE_RULES_CACHE is not None:
+        return _IDENTITY_BRIDGE_RULES_CACHE
+    path = _identity_bridge_config_path()
+    if not path.exists():
+        _IDENTITY_BRIDGE_RULES_CACHE = {
+            "path": str(path),
+            "load_error": "identity_bridge 規則檔讀取失敗，fail-closed",
+        }
+        return _IDENTITY_BRIDGE_RULES_CACHE
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        _IDENTITY_BRIDGE_RULES_CACHE = {
+            "path": str(path),
+            "load_error": f"identity_bridge 規則檔讀取失敗，fail-closed: {e}",
+        }
+        return _IDENTITY_BRIDGE_RULES_CACHE
+    if not isinstance(raw, dict):
+        _IDENTITY_BRIDGE_RULES_CACHE = {
+            "path": str(path),
+            "load_error": "identity_bridge 規則檔讀取失敗，fail-closed",
+        }
+        return _IDENTITY_BRIDGE_RULES_CACHE
+    cfg = raw
+    bridge = cfg.get("identity_bridge") if isinstance(cfg.get("identity_bridge"), dict) else {}
+    max_distance = bridge.get("max_cooccurrence_distance_chars", 20) if isinstance(bridge, dict) else 20
+    try:
+        max_distance = int(max_distance)
+    except (TypeError, ValueError):
+        max_distance = 20
+    hard_words = _flatten_str_list(cfg.get("offpro_business_leak_words"))
+    identity_terms = _flatten_str_list(bridge.get("identity_terms") if isinstance(bridge, dict) else [])
+    proof_terms = _flatten_str_list(bridge.get("professional_proof_terms") if isinstance(bridge, dict) else [])
+    allowed_lanes = _flatten_str_list(bridge.get("allowed_lanes") if isinstance(bridge, dict) else [])
+    _IDENTITY_BRIDGE_RULES_CACHE = {
+        "path": str(path),
+        "hard_words": sorted(set(hard_words)),
+        "identity_terms": sorted(set(identity_terms)),
+        "proof_terms": sorted(set(proof_terms)),
+        "allowed_lanes": sorted(set(allowed_lanes or ["voice_first"])),
+        "max_distance": max_distance,
+    }
+    return _IDENTITY_BRIDGE_RULES_CACHE
+
+
+def _terms_cooccur_near(text: str, left_terms: list[str], right_terms: list[str], distance: int) -> tuple[str, str] | None:
+    for left in left_terms:
+        if not left:
+            continue
+        start = text.find(left)
+        while start >= 0:
+            window_start = max(0, start - distance)
+            window_end = min(len(text), start + len(left) + distance)
+            window = text[window_start:window_end]
+            for right in right_terms:
+                if right and right in window:
+                    return left, right
+            start = text.find(left, start + 1)
+    return None
+
+
+def _time_start(v: Any) -> float | None:
+    m = re.search(r"\d+(?:\.\d+)?", _as_text(v))
+    return float(m.group(0)) if m else None
+
+
+def _hybrid_severity(flag: bool) -> str:
+    return "FAIL" if flag else "WARN"
+
+
+def _signal_type_ok(signal: dict) -> bool:
+    quote = _as_text(signal.get("quote")).strip()
+    typ = _as_text(signal.get("type")).strip().lower()
+    if not _present(quote) or not _present(typ):
+        return False
+    if typ == "number":
+        return bool(re.search(r"\d|%|％|一|二|三|四|五|六|七|八|九|十", quote))
+    if typ == "place":
+        return any(w in quote for w in ("在", "到", "店", "公司", "家", "路", "街", "現場"))
+    if typ == "time":
+        return bool(re.search(r"\d|秒|分|小時|天|週|月|年|早上|晚上|昨天|今天|明天", quote))
+    if typ == "person":
+        return any(w in quote for w in ("我", "你", "他", "她", "朋友", "同事", "家人", "客人", "客戶"))
+    if typ in {"object", "sensory"}:
+        return len(quote) >= 2
+    return False
+
+
+def chk_hybrid_method(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
+    if not _is_hybrid_script(data):
+        return _hybrid_na(fname, "C-method")
+    if _hybrid_file_is_skeleton(data):
+        return "SKIP", f"{fname}: C-method 骨架階段（本支台詞未填）跳過，等填完再驗"
+    problems: list[str] = []
+    method = (((data.get("script_method") or {}).get("chxp_v1") or {})
+              if isinstance(data.get("script_method"), dict) else {})
+    four = method.get("four_materials") if isinstance(method, dict) else None
+    four = four if isinstance(four, dict) else {}
+    old = four.get("old_answer") if isinstance(four.get("old_answer"), dict) else {}
+    new = four.get("new_answer") if isinstance(four.get("new_answer"), dict) else {}
+    for label, value in [
+        ("problem_scene", four.get("problem_scene")),
+        ("old_answer.quote", old.get("quote")),
+        ("old_answer.believer_profile", old.get("believer_profile")),
+        ("old_answer.why_reasonable", old.get("why_reasonable")),
+        ("old_answer.weakness", old.get("weakness")),
+        ("new_answer.quote", new.get("quote")),
+        ("answer_expansion", four.get("answer_expansion")),
+    ]:
+        if not _present(value):
+            problems.append(f"{label} 缺填")
+    if any(w in _as_text(old.get("quote")) for w in _HYBRID_STRAWMAN_WORDS):
+        problems.append("old_answer 稻草人句型")
+    for label, quote in [
+        ("old_answer.quote", old.get("quote")),
+        ("new_answer.quote", new.get("quote")),
+    ]:
+        if _present(quote) and not _quote_in_scene(data, quote):
+            problems.append(f"{label} 未出現在最終台詞（編劇可填漂亮話但台詞沒講）")
+
+    opt = method.get("optimization") if isinstance(method, dict) else None
+    opt = opt if isinstance(opt, dict) else {}
+    signals = opt.get("concrete_signals") if isinstance(opt.get("concrete_signals"), list) else []
+    valid_signals = [s for s in signals if isinstance(s, dict) and _signal_type_ok(s)]
+    for idx, signal in enumerate(signals, start=1):
+        if not isinstance(signal, dict):
+            continue
+        quote = signal.get("quote")
+        if _present(quote) and not _quote_in_scene(data, quote):
+            problems.append(f"concrete_signals[{idx}].quote 未出現在最終台詞（編劇可填漂亮話但台詞沒講）")
+    min_signals = 3 if data.get("content_axis") == "professional" else 1
+    if len(valid_signals) < min_signals:
+        problems.append(f"concrete_signals 有效數 {len(valid_signals)} < {min_signals}")
+    if data.get("content_axis") in {"offpro", "personal_anchor"}:
+        for s in valid_signals:
+            q = _as_text(s.get("quote"))
+            if any(w and w in q for w in _HYBRID_WORK_WORDS):
+                problems.append("off-pro concrete_signals 含工作/本業日常")
+                break
+
+    debts = opt.get("hook_debts") if isinstance(opt.get("hook_debts"), list) else []
+    debt_ok = False
+    for idx, debt in enumerate(debts, start=1):
+        if not isinstance(debt, dict):
+            continue
+        opened = _time_start(debt.get("opened_at"))
+        closed = _time_start(debt.get("closed_at"))
+        opened_at = _as_text(debt.get("opened_at")).strip()
+        closed_at = _as_text(debt.get("closed_at")).strip()
+        oq = _as_text(debt.get("opened_quote")).strip()
+        cq = _as_text(debt.get("closed_quote")).strip()
+        oq_in_scene = _quote_in_scene(data, oq, (opened_at,)) if _present(oq) and opened_at else False
+        cq_in_scene = _quote_in_scene(data, cq, (closed_at,)) if _present(cq) and closed_at else False
+        if _present(oq) and not oq_in_scene:
+            problems.append(f"hook_debts[{idx}].opened_quote 未出現在最終台詞")
+        if _present(cq) and not cq_in_scene:
+            problems.append(f"hook_debts[{idx}].closed_quote 未出現在最終台詞")
+        if (
+            opened is not None and closed is not None and closed > opened
+            and _present(oq) and _present(cq) and oq != cq
+            and oq_in_scene and cq_in_scene
+        ):
+            debt_ok = True
+            break
+    if not debt_ok:
+        problems.append("hook_debts 未閉合或 opened/closed 無差異")
+
+    barriers = opt.get("barriers_removed") if isinstance(opt.get("barriers_removed"), list) else []
+    if not any(any(w in _as_text(b) for w in _HYBRID_CAUSAL_WORDS) for b in barriers):
+        problems.append("barriers_removed 缺因果詞")
+
+    pkg = method.get("packaging") if isinstance(method, dict) else None
+    pkg = pkg if isinstance(pkg, dict) else {}
+    if not _quote_in_scene(data, pkg.get("hook_promise"), ("0-3s",)):
+        problems.append("hook_promise 未精準出現在 0-3s")
+    if not _quote_in_scene(data, pkg.get("final_payoff"), ("40-52s", "52-60s")):
+        problems.append("final_payoff 未精準出現在 40-52s/52-60s")
+
+    if problems:
+        return _hybrid_severity(_HYBRID_METHOD_ENFORCE), f"{fname}: C-method FAIL — {'; '.join(problems[:8])}"
+    return "PASS", f"{fname}: C-method PASS"
+
+
+def chk_hybrid_friend_close(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
+    if not _is_hybrid_script(data):
+        return _hybrid_na(fname, "C-friend-close")
+    if _hybrid_file_is_skeleton(data):
+        return "SKIP", f"{fname}: C-friend-close 骨架階段（本支台詞未填）跳過，等填完再驗"
+    problems: list[str] = []
+    evidence = (((data.get("friend_close") or {}).get("evidence") or {})
+                if isinstance(data.get("friend_close"), dict) else {})
+    value_q = evidence.get("value_delivered_quote")
+    core_q = evidence.get("core_answer_quote")
+    cta_q = evidence.get("cta_quote")
+    scope = _as_text(evidence.get("cta_offer_scope")).strip()
+    if scope != _as_text(data.get("cta_offer_scope")).strip() and _present(data.get("cta_offer_scope")):
+        problems.append("cta_offer_scope helper 與 friend_close.evidence 不一致")
+    allowed = _PRO_CTA_SCOPES if data.get("content_axis") == "professional" else _OFFPRO_CTA_SCOPES
+    if scope not in allowed:
+        problems.append(f"cta_offer_scope={scope!r} 不在允許枚舉")
+    for label, quote in [("value_delivered_quote", value_q), ("core_answer_quote", core_q), ("cta_quote", cta_q)]:
+        if not _quote_in_scene(data, quote):
+            problems.append(f"{label} 未精準出現在 final dialogue")
+    try:
+        action_count = int(evidence.get("cta_action_count"))
+    except (TypeError, ValueError):
+        action_count = 99
+    if action_count > 1:
+        problems.append(f"cta_action_count={action_count} > 1")
+    cta_text = _as_text(cta_q)
+    cta_full_text = "\n".join([cta_text, _final_cta_scene_text(data)])
+    recomputed_action_count, _action_hits = _count_cta_actions(cta_full_text)
+    if recomputed_action_count > 1:
+        problems.append(f"CTA 多動作（自算 {recomputed_action_count}>1，不信自填）")
+    if data.get("content_axis") in {"offpro", "personal_anchor"} and _offpro_cta_hard_blocked(cta_full_text):
+        problems.append("off-pro CTA 不得導私訊/諮詢/LINE（脫鉤成交）")
+    if any(w in cta_text for w in _HYBRID_WITHHELD_WORDS) and not _present(core_q):
+        problems.append("CTA 扣答案")
+    if data.get("content_axis") in {"offpro", "personal_anchor"} and _present(core_q) and _present(cta_q):
+        all_text = _all_scene_text(data)
+        core_i = all_text.find(_as_text(core_q).strip())
+        cta_i = all_text.find(_as_text(cta_q).strip())
+        if core_i >= 0 and cta_i >= 0 and core_i > cta_i:
+            problems.append("core_answer 未在 CTA 前交付")
+    if any(w in cta_text for w in _HYBRID_PRESSURE_WORDS):
+        problems.append("CTA 壓迫式語氣")
+    if problems:
+        return _hybrid_severity(_HYBRID_FRIEND_CLOSE_ENFORCE), f"{fname}: C-friend-close FAIL — {'; '.join(problems[:8])}"
+    return "PASS", f"{fname}: C-friend-close PASS"
+
+
+def chk_hybrid_professional_minimum(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
+    if not _is_hybrid_script(data):
+        return _hybrid_na(fname, "C-professional-minimum")
+    if _hybrid_file_is_skeleton(data):
+        return "SKIP", f"{fname}: C-professional-minimum 骨架階段（本支台詞未填）跳過，等填完再驗"
+    axis = data.get("content_axis")
+    if axis != "professional":
+        return "PASS", f"{fname}: C-professional-minimum N/A 非 professional slot"
+    problems: list[str] = []
+    topic_type = _as_text(data.get("professional_topic_type")).strip()
+    if topic_type not in _HYBRID_PROF_TYPES:
+        problems.append(f"professional_topic_type={topic_type!r} 不在 whitelist")
+    method = ((data.get("script_method") or {}).get("chxp_v1") or {}) if isinstance(data.get("script_method"), dict) else {}
+    opt = method.get("optimization") if isinstance(method, dict) else {}
+    signals = opt.get("concrete_signals") if isinstance(opt, dict) and isinstance(opt.get("concrete_signals"), list) else []
+    valid_signals = [s for s in signals if isinstance(s, dict) and _signal_type_ok(s)]
+    if len(valid_signals) < 2:
+        problems.append(f"concrete_signals {len(valid_signals)} < 2")
+    steps = data.get("actionable_steps") if isinstance(data.get("actionable_steps"), list) else []
+    if not any(_present(s) for s in steps):
+        problems.append("actionable_steps 缺填")
+    core = _as_text(data.get("core_answer")).strip()
+    if not _present(core):
+        problems.append("core_answer 缺填")
+    else:
+        all_text = _all_scene_text(data)
+        cta_q = (((data.get("friend_close") or {}).get("evidence") or {}).get("cta_quote")
+                 if isinstance(data.get("friend_close"), dict) else "")
+        core_i = all_text.find(core)
+        cta_i = all_text.find(_as_text(cta_q).strip()) if _present(cta_q) else -1
+        if core_i < 0:
+            problems.append("core_answer 未出現在 final dialogue")
+        elif cta_i >= 0 and core_i > cta_i:
+            problems.append("core_answer 未在 CTA 前交付")
+    if problems:
+        return _hybrid_severity(_HYBRID_PROFESSIONAL_ENFORCE), f"{fname}: C-professional-minimum FAIL — {'; '.join(problems[:8])}"
+    return "PASS", f"{fname}: C-professional-minimum PASS"
+
+
+def chk_hybrid_identity_bridge(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
+    if not _is_hybrid_script(data):
+        return _hybrid_na(fname, "C-identity-bridge")
+    if _hybrid_file_is_skeleton(data):
+        return "SKIP", f"{fname}: C-identity-bridge 骨架階段（本支台詞未填）跳過，等填完再驗"
+    flags = data.get("derived_flags") if isinstance(data.get("derived_flags"), list) else []
+    if "identity_bridge" not in flags:
+        return "PASS", f"{fname}: C-identity-bridge N/A 非 identity_bridge slot"
+    rules = _load_identity_bridge_rules()
+    if rules.get("load_error"):
+        return "FAIL", f"{fname}: C-identity-bridge FAIL — {rules.get('load_error')}"
+    text = _all_scene_text(data)
+    problems: list[str] = []
+    allowed_lanes = rules.get("allowed_lanes") if isinstance(rules.get("allowed_lanes"), list) else ["voice_first"]
+    lane = str(data.get("lane", "") or "").strip()
+    if allowed_lanes and lane not in allowed_lanes:
+        problems.append(f"identity_bridge lane={lane!r} not in allowed_lanes={allowed_lanes}")
+    for word in rules["hard_words"]:
+        if word and word in text:
+            problems.append(f"identity_bridge hard 禁詞命中: {word}")
+            break
+    near = _terms_cooccur_near(text, rules["identity_terms"], rules["proof_terms"], int(rules["max_distance"]))
+    if near:
+        problems.append(f"identity/professional proof 近距離共現 <= {rules['max_distance']} chars: {near[0]} + {near[1]}")
+    if problems:
+        return _hybrid_severity(True), f"{fname}: C-identity-bridge FAIL — {'; '.join(problems[:4])}"
+    return "PASS", f"{fname}: C-identity-bridge PASS"
+
+
+def _find_topic_plan(batch_dir: Path, explicit: Optional[str] = None) -> Optional[Path]:
+    if explicit:
+        p = Path(explicit)
+        return p if p.exists() else None
+    for name in ("topic_plan.json", "_topic_plan.json"):
+        p = batch_dir / name
+        if p.exists():
+            return p
+    matches = sorted(batch_dir.glob("topic_plan*.json"))
+    return matches[0] if matches else None
+
+
+_BATCH_FLAGS_BATCH_PROFILE_ERROR = "_batch_flags.yml 讀取/解析失敗，無法確認 batch_profile（fail-closed）"
+
+
+def _load_batch_flags_checked(batch_dir: Path) -> tuple[dict, Optional[str]]:
+    flag_path = batch_dir / "_batch_flags.yml"
+    if not flag_path.exists():
+        return {}, None
+    try:
+        raw = yaml.safe_load(flag_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}, _BATCH_FLAGS_BATCH_PROFILE_ERROR
+    if not isinstance(raw, dict):
+        return {}, _BATCH_FLAGS_BATCH_PROFILE_ERROR
+    return raw, None
+
+
+def _load_batch_flags(batch_dir: Path) -> dict:
+    raw, _error = _load_batch_flags_checked(batch_dir)
+    return raw
+
+
+def _batch_flags_declares_hybrid(batch_dir: Path) -> bool:
+    return _load_batch_flags(batch_dir).get("batch_profile") == HYBRID_BATCH_PROFILE
+
+
+def _load_topic_plan_checked(plan_path: Optional[Path]) -> tuple[dict, Optional[str]]:
+    if not plan_path:
+        return {}, None
+    try:
+        plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {}, f"topic_plan 讀取失敗: {e}"
+    if not isinstance(plan_data, dict):
+        return {}, "topic_plan 結構異常"
+    meta = plan_data.get("meta") or {}
+    if not isinstance(meta, dict):
+        return {}, "topic_plan 結構異常"
+    plan = plan_data.get("plan")
+    if plan is not None:
+        if not isinstance(plan, list) or any(not isinstance(item, dict) for item in plan):
+            return {}, "topic_plan 結構異常"
+    return plan_data, None
+
+
+def _topic_plan_declares_hybrid(plan_data: dict) -> bool:
+    meta = plan_data.get("meta") or {}
+    return isinstance(meta, dict) and meta.get("batch_profile") == HYBRID_BATCH_PROFILE
+
+
+def _declared_hybrid_not_built(
+    declared_hybrid: bool,
+    yaml_hybrid_count: int,
+    plan_path: Optional[Path],
+    plan: list[dict],
+) -> bool:
+    if not declared_hybrid:
+        return False
+    return not plan_path or yaml_hybrid_count != 13 or len(plan) != 13
+
+
+def _plan_lock_hash(plan: list[dict]) -> str:
+    pairs = [
+        {
+            "script_id": item.get("script_id", ""),
+            "content_axis": item.get("content_axis", ""),
+            "lane": item.get("lane", ""),
+            "derived_flags": sorted(str(x) for x in (item.get("derived_flags") or [])),
+        }
+        for item in plan
+    ]
+    raw = json.dumps(pairs, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _count_key(items: list[dict], key: str) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for item in items:
+        v = item.get(key)
+        if isinstance(v, str) and v:
+            out[v] = out.get(v, 0) + 1
+    return out
+
+
+def chk_hybrid_plan_lock(
+    yamls: list[tuple[Path, dict]],
+    batch_dir: Path,
+    topic_plan_arg: Optional[str] = None,
+) -> tuple[str, str]:
+    hybrid_yamls = [(f, d) for f, d in yamls if isinstance(d, dict) and _is_hybrid_script(d)]
+    yaml_has_hybrid = bool(hybrid_yamls)
+    flags_data, flags_error = _load_batch_flags_checked(batch_dir)
+    if flags_error:
+        return "FAIL", f"C-plan-lock FAIL — {flags_error}"
+    flags_hybrid = flags_data.get("batch_profile") == HYBRID_BATCH_PROFILE
+    plan_path = _find_topic_plan(batch_dir, topic_plan_arg)
+    plan_data, plan_error = _load_topic_plan_checked(plan_path)
+    if plan_error:
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), f"C-plan-lock FAIL — {plan_error}"
+    plan_hybrid = _topic_plan_declares_hybrid(plan_data)
+    declared_hybrid = flags_hybrid or plan_hybrid
+    if not yaml_has_hybrid and not declared_hybrid:
+        return "PASS", "C-plan-lock N/A 非 hybrid 批"
+    plan = plan_data.get("plan") if isinstance(plan_data.get("plan"), list) else []
+    if _declared_hybrid_not_built(declared_hybrid, len(hybrid_yamls), plan_path, plan):
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), "C-plan-lock FAIL — 宣告 hybrid 但腳本/計畫非 hybrid（declared-but-not-built）"
+    if not plan_path:
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), "C-plan-lock FAIL — hybrid 批缺 topic_plan.json"
+
+    problems: list[str] = []
+    if _plan_lock_hash(plan) != plan_data.get("plan_lock_hash"):
+        problems.append("plan_lock_hash mismatch")
+    by_id = {str(item.get("script_id")): item for item in plan if isinstance(item, dict)}
+    for f, data in yamls:
+        if not isinstance(data, dict) or "__parse_error__" in data:
+            continue
+        sid = str(data.get("script_id", ""))
+        if _is_hybrid_script(data):
+            if sid not in by_id:
+                problems.append(f"{f.name}: script_id 不在 plan")
+                continue
+            plan_item = by_id[sid]
+            if data.get("content_axis") != plan_item.get("content_axis"):
+                problems.append(f"{f.name}: content_axis yaml={data.get('content_axis')} plan={plan_item.get('content_axis')}")
+            if data.get("lane") != plan_item.get("lane"):
+                problems.append(f"{f.name}: lane yaml={data.get('lane')} plan={plan_item.get('lane')}")
+            yaml_flags = sorted(str(x) for x in (data.get("derived_flags") or []))
+            plan_flags = sorted(str(x) for x in (plan_item.get("derived_flags") or []))
+            if yaml_flags != plan_flags:
+                problems.append(f"{f.name}: derived_flags yaml={yaml_flags} plan={plan_flags}")
+    axis_count = _count_key(plan, "content_axis")
+    lane_count = _count_key(plan, "lane")
+    if axis_count.get("offpro", 0) != 9 or axis_count.get("personal_anchor", 0) != 2 or axis_count.get("professional", 0) != 2:
+        problems.append(f"content_axis_count={axis_count} expected 9/2/2")
+    if lane_count.get("voice_first", 0) != 7 or lane_count.get("demand_first", 0) != 2 or lane_count.get("anchor_first", 0) != 2 or lane_count.get("professional", 0) != 2:
+        problems.append(f"lane_count={lane_count} expected 7/2/2/2")
+    non_prof = axis_count.get("offpro", 0) + axis_count.get("personal_anchor", 0)
+    if non_prof != 11:
+        problems.append(f"non_professional={non_prof} expected=11")
+    identity_bridge = sum(1 for item in plan if "identity_bridge" in (item.get("derived_flags") or []))
+    pure_emotion = sum(1 for item in plan if "pure_emotion" in (item.get("derived_flags") or []))
+    if identity_bridge != 1:
+        problems.append(f"identity_bridge={identity_bridge} expected=1")
+    if pure_emotion < 1:
+        problems.append(f"pure_emotion={pure_emotion} expected>=1")
+    offpro_cats = [item.get("topic_category") for item in plan if item.get("content_axis") == "offpro" and item.get("topic_category")]
+    offpro_pillar_count = len(set(offpro_cats))
+    news_count = sum(1 for c in offpro_cats if c == "時事")
+    if not 3 <= offpro_pillar_count <= 4:
+        problems.append(f"offpro_pillar_count={offpro_pillar_count} expected 3..4")
+    if news_count > 2:
+        problems.append(f"時事={news_count} expected<=2")
+    prof_slots = [item.get("script_id") for item in plan if item.get("content_axis") == "professional"]
+    yaml_prof = [d.get("script_id") for _, d in yamls if isinstance(d, dict) and d.get("content_axis") == "professional"]
+    if sorted(str(x) for x in yaml_prof) != sorted(str(x) for x in prof_slots if x in set(yaml_prof)):
+        problems.append("professional YAML slots do not match reserved plan slots")
+
+    if problems:
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), f"C-plan-lock FAIL — {'; '.join(problems[:10])}"
+    return "PASS", f"C-plan-lock PASS — content_axis 9/2/2, lane 7/2/2/2, offpro_pillar_count={offpro_pillar_count}, 時事={news_count}"
+
+
+def chk_taste_panel_completeness(
+    yamls: list[tuple[Path, dict]],
+    batch_dir: Path,
+    topic_plan_arg: Optional[str] = None,
+) -> tuple[str, str]:
+    hybrid_yamls = [(f, d) for f, d in yamls if isinstance(d, dict) and _is_hybrid_script(d)]
+    yaml_has_hybrid = bool(hybrid_yamls)
+    flags_data, flags_error = _load_batch_flags_checked(batch_dir)
+    if flags_error:
+        return "FAIL", f"C-taste-panel FAIL — {flags_error}"
+    flags_hybrid = flags_data.get("batch_profile") == HYBRID_BATCH_PROFILE
+    plan_path = _find_topic_plan(batch_dir, topic_plan_arg)
+    plan_data, plan_error = _load_topic_plan_checked(plan_path)
+    severity = _hybrid_severity(_TASTE_PANEL_ENFORCE)
+    if plan_error:
+        return severity, f"C-taste-panel FAIL — {plan_error}"
+    plan_hybrid = _topic_plan_declares_hybrid(plan_data)
+    declared_hybrid = flags_hybrid or plan_hybrid
+    if not yaml_has_hybrid and not declared_hybrid:
+        return "PASS", "C-taste-panel N/A 非 hybrid 批"
+    plan = plan_data.get("plan") if isinstance(plan_data.get("plan"), list) else []
+    if _declared_hybrid_not_built(declared_hybrid, len(hybrid_yamls), plan_path, plan):
+        return severity, "C-taste-panel FAIL — 宣告 hybrid 但腳本/計畫非 hybrid（declared-but-not-built）"
+
+    try:
+        import taste_panel_gate as _tpg  # local gate helper
+    except Exception as e:
+        return severity, f"C-taste-panel FAIL — taste_panel_gate import failed: {e}"
+
+    panel_dir = batch_dir / ".taste_panel"
+    problems: list[str] = []
+    if not panel_dir.exists():
+        return severity, "C-taste-panel FAIL — missing .taste_panel directory"
+    if list(panel_dir.glob("*.tmp")):
+        problems.append(".tmp leftover")
+
+    rubric_path = _tpg.DEFAULT_RUBRIC_PATH
+    if not rubric_path.exists():
+        problems.append(f"rubric missing: {rubric_path}")
+        rubric_hash = ""
+        prompt_hash = ""
+        rubric_model_id = _tpg.DEFAULT_MODEL_ID
+    else:
+        rubric_text = rubric_path.read_text(encoding="utf-8")
+        rubric_hash = _tpg.sha256_text(rubric_text)
+        try:
+            rubric = yaml.safe_load(rubric_text) or {}
+            rubric = rubric if isinstance(rubric, dict) else {}
+            prompt_hash = _tpg.prompt_template_hash(rubric)
+            rubric_model_id = str((rubric.get("meta") or {}).get("model", _tpg.DEFAULT_MODEL_ID))
+        except Exception as e:
+            prompt_hash = ""
+            rubric_model_id = _tpg.DEFAULT_MODEL_ID
+            problems.append(f"rubric parse error: {e}")
+
+    summary_path = panel_dir / "_taste_panel_summary.json"
+    summary = None
+    if not summary_path.exists():
+        problems.append("summary missing")
+    else:
+        try:
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            problems.append(f"summary parse error: {e}")
+
+    if len(hybrid_yamls) != 13:
+        problems.append(f"hybrid yaml count={len(hybrid_yamls)} expected=13")
+
+    report_files = sorted(panel_dir.glob("*_taste_panel_report.json"))
+    if len(report_files) != 13:
+        problems.append(f"report count={len(report_files)} expected=13")
+    reports: list[dict] = []
+    for rp in report_files:
+        try:
+            rep = json.loads(rp.read_text(encoding="utf-8"))
+            if not isinstance(rep, dict):
+                problems.append(f"{rp.name}: schema invalid")
+                continue
+            reports.append(rep)
+        except Exception as e:
+            problems.append(f"{rp.name}: parse error {e}")
+
+    by_sid: dict[str, dict] = {}
+    for rep in reports:
+        sid = str(rep.get("script_id") or "")
+        if not sid:
+            problems.append("report missing script_id")
+            continue
+        if sid in by_sid:
+            problems.append(f"dup script_id={sid}")
+        by_sid[sid] = rep
+        if rep.get("schema_version") != 1:
+            problems.append(f"{sid}: schema invalid")
+        if rep.get("gate_version") != _tpg.GATE_VERSION:
+            problems.append(f"{sid}: gate_version mismatch")
+        if rep.get("rubric_hash") != rubric_hash:
+            problems.append(f"{sid}: rubric_hash mismatch")
+        if not rep.get("model_id"):
+            problems.append(f"{sid}: model_id missing")
+        elif str(rep.get("model_id")) != rubric_model_id:
+            problems.append(f"{sid}: model_id mismatch expected={rubric_model_id} got={rep.get('model_id')}")
+        if not rep.get("prompt_template_hash"):
+            problems.append(f"{sid}: prompt_template_hash missing")
+        elif rep.get("prompt_template_hash") != prompt_hash:
+            problems.append(f"{sid}: prompt_template_hash mismatch")
+        # This binds report fields together, but it is not a secret signature:
+        # a determined forger who computes all fields can still fabricate a report.
+        expected_gate_cache_key = _tpg.cache_key(
+            str(rep.get("raw_input_hash") or ""),
+            str(rep.get("sanitized_input_hash") or ""),
+            rubric_hash,
+            prompt_hash,
+            str(rep.get("model_id") or ""),
+            no_llm=False,
+        )
+        if rep.get("gate_cache_key") != expected_gate_cache_key:
+            problems.append(f"{sid}: gate_cache_key mismatch")
+        if rep.get("mock_report"):
+            problems.append(f"{sid}: mock report")
+        if rep.get("no_llm_mode") is True:
+            problems.append(f"{sid}: taste_panel report is --no-llm (not a real GPT review)")
+        if rep.get("verdict") != "pass":
+            problems.append(f"{sid}: verdict={rep.get('verdict')}")
+        scores = rep.get("scores") if isinstance(rep.get("scores"), dict) else {}
+        for dim in _tpg.REQUIRED_DIMS:
+            val = scores.get(dim)
+            if not isinstance(val, (int, float)) or val < _tpg.PASS_THRESHOLD:
+                problems.append(f"{sid}: {dim}={val} < {_tpg.PASS_THRESHOLD}")
+
+    for f, data in hybrid_yamls:
+        sid = str(data.get("script_id") or f.stem)
+        rep = by_sid.get(sid)
+        if rep is None:
+            problems.append(f"{sid}: missing report")
+            continue
+        try:
+            raw_hash, sanitized_hash = _tpg.compute_hashes(f, data)
+        except Exception as e:
+            problems.append(f"{sid}: hash recompute failed {e}")
+            continue
+        if rep.get("raw_input_hash") != raw_hash:
+            problems.append(f"{sid}: stale raw_input_hash")
+        if rep.get("sanitized_input_hash") != sanitized_hash:
+            problems.append(f"{sid}: stale sanitized_input_hash")
+
+    if summary:
+        if summary.get("rubric_hash") != rubric_hash:
+            problems.append("summary rubric_hash mismatch")
+        if summary.get("gate_version") != _tpg.GATE_VERSION:
+            problems.append("summary gate_version mismatch")
+        if not summary.get("model_id"):
+            problems.append("summary model_id missing")
+        elif str(summary.get("model_id")) != rubric_model_id:
+            problems.append(f"summary model_id mismatch expected={rubric_model_id} got={summary.get('model_id')}")
+        if not summary.get("prompt_template_hash"):
+            problems.append("summary prompt_template_hash missing")
+        elif summary.get("prompt_template_hash") != prompt_hash:
+            problems.append("summary prompt_template_hash mismatch")
+        if summary.get("mock_report"):
+            problems.append("summary mock report")
+        if summary.get("no_llm_mode") is True:
+            problems.append("summary taste_panel report is --no-llm (not a real GPT review)")
+        if summary.get("overall_verdict") != "pass":
+            problems.append(f"summary overall_verdict={summary.get('overall_verdict')}")
+        summary_ids = summary.get("script_ids") if isinstance(summary.get("script_ids"), list) else []
+        expected_ids = [str(d.get("script_id") or f.stem) for f, d in hybrid_yamls]
+        if sorted(summary_ids) != sorted(expected_ids):
+            problems.append("summary script_ids mismatch")
+
+    if problems:
+        return severity, f"C-taste-panel FAIL — {'; '.join(problems[:20])}"
+    return "PASS", "C-taste-panel PASS — 13 reports, all pass, hashes fresh"
 
 
 # ────────────────────────────────────────────
@@ -4665,9 +5519,13 @@ def run_per_file_checks(
             data, _fname_with_dir, topic_intel_policy, is_skeleton, owner=owner
         )))
 
-    # off-pro 品質閘（2026-06-21，shadow WARN-only）
+    # off-pro 品質閘（2026-06-21；2026-06-23 已翻 enforce-live：placeholder→off-pro FAIL/本業 WARN；leak→FAIL）
     checks.append(("C-offpro-placeholder", chk_offpro_placeholder(data, f.name)))
     checks.append(("C-offpro-leak",        chk_offpro_leak(data, f.name)))
+    checks.append(("C-method",             chk_hybrid_method(data, f.name, is_skeleton)))
+    checks.append(("C-friend-close",       chk_hybrid_friend_close(data, f.name, is_skeleton)))
+    checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(data, f.name, is_skeleton)))
+    checks.append(("C-identity-bridge",    chk_hybrid_identity_bridge(data, f.name, is_skeleton)))
 
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -4702,6 +5560,7 @@ def main():
     parser = argparse.ArgumentParser(description="腳本批次品管員（含 V2 schema + voice_lock 守門）")
     parser.add_argument("--owner",     help="業主名（以 owner_projection.generated.json 為準，不傳則從首個 yaml 的 owner 欄自動偵測）")
     parser.add_argument("--batch-dir", required=False, help="第 N 批 yaml 資料夾絕對路徑（--c016-all 模式不需）")
+    parser.add_argument("--topic-plan", help="hybrid topic_plan.json path for C-plan-lock")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
     parser.add_argument("--c016-all",  action="store_true", help="B-1：掃描 owner_projection 全業主公開 HTML 的 C-016 派系名洩漏（取代 pre-commit hardcoded 清單）")
     args = parser.parse_args()
@@ -4804,8 +5663,10 @@ def main():
         ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
         ("C-21.2", chk_c21_2_cta_diversity(valid_yamls, owner, pref_text, batch_tag)),
         ("C-21.6", chk_c21_6_quality_gate_report(valid_yamls, batch_dir)),
-        # §22 選題公式 batch-level（2026-06-17 機器化 §22 落地；shadow WARN-only）
+        # §22 選題公式 batch-level（2026-06-17 機器化 §22 落地；2026-06-23 已翻 enforce-live）
         ("C-22",   chk_c22_topic_generality(valid_yamls, owner)),
+        ("C-plan-lock", chk_hybrid_plan_lock(valid_yamls, batch_dir, args.topic_plan)),
+        ("C-taste-panel", chk_taste_panel_completeness(valid_yamls, batch_dir, args.topic_plan)),
     ]
     # Fix A【P0】V3-002 gated：只有 policy enabled 才 append，off 時完全不註冊（零足跡）
     # off → 不 append V3-002 → batch_checks 件數、len 印出維持原值；無 SKIP 行
@@ -4819,7 +5680,7 @@ def main():
         batch_checks.append(
             ("V3-002", chk_v3_002_batch_slot_count(valid_yamls, _topic_intel_policy))
         )
-    # C-22b anchor_first 機械閘（Cluster A v1.1；shadow WARN-only）—
+    # C-22b anchor_first 機械閘（Cluster A v1.1；2026-06-23 已翻 enforce-live）—
     # 只對 proof_mode == anchor_first 的支跑；無此類支則零 append（零足跡，沿用 V3-002 off 邏輯）。
     for _c22b_f, _c22b_data in valid_yamls:
         if isinstance(_c22b_data, dict) and _c22b_data.get("proof_mode") == "anchor_first":
@@ -4989,6 +5850,11 @@ if __name__ == "__main__":
         _EXP_S22 = "FAIL" if _S22_ENFORCE else "WARN"
         _EXP_ANCHOR = "FAIL" if ANCHOR_FIRST_ENFORCE else "WARN"
         _EXP_LEAK = "FAIL" if _OFFPRO_LEAK_ENFORCE else "WARN"
+        _EXP_HYBRID_PLAN = "FAIL" if _HYBRID_PLAN_LOCK_ENFORCE else "WARN"
+        _EXP_HYBRID_METHOD = "FAIL" if _HYBRID_METHOD_ENFORCE else "WARN"
+        _EXP_HYBRID_FRIEND = "FAIL" if _HYBRID_FRIEND_CLOSE_ENFORCE else "WARN"
+        _EXP_HYBRID_PRO = "FAIL" if _HYBRID_PROFESSIONAL_ENFORCE else "WARN"
+        _EXP_TASTE = "FAIL" if _TASTE_PANEL_ENFORCE else "WARN"
 
         # ── F1 pass：含全新欄位 → 全 PASS ──
         print("[F1] 含全新欄位 → V2 checks 全 PASS")
@@ -6391,7 +7257,7 @@ if __name__ == "__main__":
         fcheck("F-21-R3-4c list 型真標題已填缺三欄 → FAIL（不誤放水）", _r21r3_4c[0] == "FAIL", _r21r3_4c[1])
 
         # ══════════════════════════════════════════════════════════════
-        # [F-22] §22 選題公式 — C-22 一般化偵測（2026-06-17 機器化 §22；shadow WARN-only）
+        # [F-22] §22 選題公式 — C-22 一般化偵測（2026-06-17 機器化 §22；2026-06-23 已翻 enforce-live）
         # ══════════════════════════════════════════════════════════════
         print("\n[F-22] §22 選題一般化偵測：偏一般 WARN / 不一般 PASS / 骨架 SKIP / 過渡標示")
 
@@ -6754,7 +7620,7 @@ if __name__ == "__main__":
         _rjunk = chk_c22_topic_generality(_junkbatch, "瑞祥")
         fcheck(f"F-22-junkbatch 純空泛批（全 hard=0）→ {_EXP_S22}", _rjunk[0] == _EXP_S22, _rjunk[1])
 
-        # ── F-C22B：C-22b anchor_first 機械閘（批次 2 / Cluster A v1.1；shadow WARN-only）──
+        # ── F-C22B：C-22b anchor_first 機械閘（批次 2 / Cluster A v1.1；2026-06-23 已翻 enforce-live）──
         # 注意：與既有 F-22a/F-22b（C-22 批次級一般化）不同 check，獨立命名 F-C22B 避免混淆。
         print("[F-C22B] anchor_first 三必填 + 退役拼接本 BLOCK + 防套路（C-22b 機械閘）")
         _af_ok = {"proof_mode": "anchor_first",
@@ -6777,7 +7643,7 @@ if __name__ == "__main__":
         _rb = chk_c22b_anchor_first(dict(_af_ok), "s0.yaml", _af_batch, "楷甯")
         fcheck(f"F-C22B-7 同 anchor_ref 同批 >2 → {_EXP_ANCHOR}（防套路）", _rb[0] == _EXP_ANCHOR and "同批 anchor_ref 重複" in _rb[1], _rb[1])
 
-        # ── F-OFFPRO：目標5 voice_first 偵測收斂 + chk_offpro_leak off-pro-aware（shadow WARN-only）──
+        # ── F-OFFPRO：目標5 voice_first 偵測收斂 + chk_offpro_leak off-pro-aware（2026-06-23 已翻 enforce-live）──
         # 目標5（2026-06-22）：_is_offpro_marker 單一真理源（lane=stance OR proof_mode=voice_first）+ 向後相容 + byte 不變。
         print("[F-OFFPRO] 目標5 voice_first 偵測：_is_offpro_marker + chk_offpro_leak off-pro-aware")
         fcheck("F-OFFPRO-1 lane=stance → off-pro（向後相容舊標記）",
@@ -6832,6 +7698,9 @@ if __name__ == "__main__":
         _r = chk_offpro_placeholder({"proof_mode": "proof_first", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
         fcheck("F-R1-7 placeholder 本業稿 [需確認] → WARN（非 FAIL、避 FP、保留信號）",
                _r[0] == "WARN", _r[1])
+        _r = chk_offpro_placeholder({"content_axis": "offpro", "lane": "demand_first", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
+        fcheck(f"F-R1-8 demand_first offpro placeholder → {_ph_off}",
+               _r[0] == _ph_off and "占位" in _r[1], _r[1])
         # ── Codex R2 收嚴驗證 ──
         _r = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞備註": "提醒：不要講成交"}]}, "f.yaml")
         fcheck("F-R2-1 §8#8 台詞備註（內部欄）含本業詞 → PASS（不掃內部備註欄）",
@@ -6870,13 +7739,456 @@ if __name__ == "__main__":
         _r = chk_offpro_leak({"proof_mode": "voice_first", "cta": {"message": "私訊我看成交案例"}}, "f")
         fcheck(f"F-R5-2 §8#8 top-level cta.message 藏本業詞 → {_EXP_LEAK}（算盤補 cta）",
                _r[0] == _EXP_LEAK and "cta" in _r[1], _r[1])
+        print("[F-HYBRID] off-pro hybrid deterministic gates")
+
+        def _hybrid_base(axis: str = "offpro") -> dict:
+            d = {
+                "script_id": "fx_01_01",
+                "content_axis": axis,
+                "lane": "voice_first" if axis == "offpro" else ("anchor_first" if axis == "personal_anchor" else "professional"),
+                "derived_flags": [],
+                "topic_category": "人生",
+                "cta_offer_scope": "save_share",
+                "scenes": [
+                    {"timestamp": "0-3s", "台詞": "今天先講一個問題：焦慮不是因為你不努力。"},
+                    {"timestamp": "3-12s", "台詞": "我昨天看到三個人都卡在同一個選擇。"},
+                    {"timestamp": "12-25s", "台詞": "以前我也以為先撐過去就好。"},
+                    {"timestamp": "25-40s", "台詞": "但真正的原因是選項太大。"},
+                    {"timestamp": "40-52s", "台詞": "答案是先把選擇變小，因為你才看得到代價。"},
+                    {"timestamp": "52-60s", "台詞": "你可以先存下來，今晚自己檢查一次。"},
+                ],
+                "script_method": {"chxp_v1": {
+                    "four_materials": {
+                        "problem_scene": "選項太大",
+                        "old_answer": {
+                            "quote": "先撐過去就好",
+                            "believer_profile": "怕麻煩的人",
+                            "why_reasonable": "因為短期看起來省力",
+                            "weakness": "沒有降低選擇成本",
+                        },
+                        "new_answer": {"quote": "先把選擇變小"},
+                        "answer_expansion": "把選項縮到兩個再比",
+                    },
+                    "assembly": {"story_vehicle": "捷運站觀察"},
+                    "optimization": {
+                        "concrete_signals": [
+                            {"quote": "我昨天看到三個人都卡在同一個選擇", "type": "number"}
+                        ],
+                        "hook_debts": [
+                            {"opened_at": "0-3s", "opened_quote": "焦慮不是因為你不努力", "closed_at": "40-52s", "closed_quote": "先把選擇變小"}
+                        ],
+                        "barriers_removed": ["因為選項太大，所以人會停住"],
+                    },
+                    "packaging": {
+                        "hook_promise": "焦慮不是因為你不努力",
+                        "final_payoff": "先把選擇變小",
+                        "cta_type": "save_share",
+                    },
+                }},
+                "friend_close": {"evidence": {
+                    "value_delivered_quote": "先把選擇變小",
+                    "core_answer_quote": "先把選擇變小",
+                    "cta_quote": "先存下來",
+                    "cta_action_count": 1,
+                    "cta_offer_scope": "save_share",
+                    "viewer_value_delivered": True,
+                    "one_action_only": True,
+                    "no_withheld_core_answer": True,
+                    "pressure_free": True,
+                }},
+            }
+            if axis == "professional":
+                d["lane"] = "professional"
+                d["topic_category"] = "professional"
+                d["cta_offer_scope"] = "soft_consultation"
+                d["professional_topic_type"] = "pricing"
+                d["actionable_steps"] = ["先列三個可比價格"]
+                d["core_answer"] = "先列三個可比價格"
+                d["scenes"][4]["台詞"] = "核心答案是先列三個可比價格，因為你才知道差距。"
+                d["scenes"][5]["台詞"] = "需要我看你的情況，再私訊我。"
+                d["script_method"]["chxp_v1"]["optimization"]["concrete_signals"] = [
+                    {"quote": "三個可比價格", "type": "number"},
+                    {"quote": "現場看到價格差距", "type": "place"},
+                    {"quote": "今天先列表", "type": "time"},
+                ]
+                d["script_method"]["chxp_v1"]["packaging"]["final_payoff"] = "先列三個可比價格"
+                d["friend_close"]["evidence"] = {
+                    "value_delivered_quote": "先列三個可比價格",
+                    "core_answer_quote": "先列三個可比價格",
+                    "cta_quote": "私訊我",
+                    "cta_action_count": 1,
+                    "cta_offer_scope": "soft_consultation",
+                }
+            return d
+
+        def _hybrid_plan(axis_counts=(9, 2, 2), prof_extra=False, news_count=0) -> list[dict]:
+            axes = ["offpro"] * axis_counts[0] + ["personal_anchor"] * axis_counts[1] + ["professional"] * axis_counts[2]
+            lanes = ["voice_first"] * 7 + ["demand_first"] * 2 + ["anchor_first"] * 2 + ["professional"] * 2
+            cats = ["人生", "金錢", "感情", "熱門", "人生", "金錢", "感情", "人生", "金錢"]
+            if news_count:
+                cats = ["時事"] * news_count + cats[news_count:]
+            plan = []
+            for i, axis in enumerate(axes):
+                flags = []
+                if i == 0:
+                    flags = ["identity_bridge"]
+                if i == 1:
+                    flags = ["pure_emotion"]
+                if i == 2:
+                    flags = ["wildcard"]
+                cat = cats[i] if axis == "offpro" and i < len(cats) else ("personal_story" if axis == "personal_anchor" else "professional")
+                plan.append({"seq": i + 1, "script_id": f"fx_01_{i+1:02d}", "content_axis": axis, "lane": lanes[i] if i < len(lanes) else "professional", "derived_flags": flags, "topic_category": cat})
+            if prof_extra and len(plan) >= 3:
+                plan[2]["content_axis"] = "professional"
+            return plan
+
+        def _plan_check(plan: list[dict], yaml_mutator=None, lock_hash_plan: list[dict] | None = None) -> tuple[str, str]:
+            import tempfile as _tempfile
+            with _tempfile.TemporaryDirectory() as td:
+                bdir = Path(td)
+                body = {"meta": {"batch_profile": HYBRID_BATCH_PROFILE}, "plan": plan, "plan_lock_hash": _plan_lock_hash(lock_hash_plan or plan)}
+                (bdir / "topic_plan.json").write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+                yamls = []
+                for item in plan:
+                    y = {
+                        "script_id": item["script_id"],
+                        "content_axis": item["content_axis"],
+                        "lane": item.get("lane"),
+                        "derived_flags": item.get("derived_flags") or [],
+                    }
+                    if yaml_mutator:
+                        yaml_mutator(y, item)
+                    yamls.append((bdir / f"{item['script_id']}.yaml", y))
+                return chk_hybrid_plan_lock(yamls, bdir)
+
+        _r = _plan_check(_hybrid_plan())
+        fcheck("F-HYBRID-1 9/2/2 PASS", _r[0] == "PASS", _r[1])
+        _r = _plan_check(_hybrid_plan((8, 3, 2)))
+        fcheck(f"F-HYBRID-2 8/3/2 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "content_axis_count" in _r[1], _r[1])
+        _r = _plan_check(_hybrid_plan((9, 1, 3)))
+        fcheck(f"F-HYBRID-3 9/1/3 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "content_axis_count" in _r[1], _r[1])
+        _r = _plan_check(_hybrid_plan((9, 2, 2), prof_extra=True))
+        fcheck(f"F-HYBRID-4 第3支 professional → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN, _r[1])
+        _r = _plan_check(_hybrid_plan(news_count=3))
+        fcheck(f"F-HYBRID-5 時事>2 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "時事" in _r[1], _r[1])
+        _r = _plan_check(_hybrid_plan(), yaml_mutator=lambda y, item: y.update({"lane": "demand_first"}) if item.get("script_id") == "fx_01_01" else None)
+        fcheck(f"F-HYBRID-5b YAML lane tamper → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "lane yaml" in _r[1], _r[1])
+        _r = _plan_check(_hybrid_plan(), yaml_mutator=lambda y, item: y.update({"derived_flags": []}) if item.get("script_id") == "fx_01_01" else None)
+        fcheck(f"F-HYBRID-5c YAML derived_flags tamper → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "derived_flags yaml" in _r[1], _r[1])
+        _old_plan = _hybrid_plan()
+        _new_plan = [dict(x) for x in _old_plan]
+        _new_plan[0]["lane"] = "demand_first"
+        _r = _plan_check(_new_plan, lock_hash_plan=_old_plan)
+        fcheck(f"F-HYBRID-5d plan_lock_hash binds lane → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "plan_lock_hash mismatch" in _r[1], _r[1])
+        import tempfile as _tempfile
+        with _tempfile.TemporaryDirectory() as _td:
+            _bdir = Path(_td)
+            (_bdir / "_batch_flags.yml").write_text(f"batch_profile: {HYBRID_BATCH_PROFILE}\n", encoding="utf-8")
+            _bare = [(Path("bare.yaml"), {"script_id": "bare_01", "scenes": [{"timestamp": "0-3s", "台詞": "bare"}]})]
+            _r = chk_hybrid_plan_lock(_bare, _bdir)
+            fcheck(f"F-HYBRID-5e declared hybrid bare YAML → {_EXP_HYBRID_PLAN}",
+                   _r[0] == _EXP_HYBRID_PLAN and "declared-but-not-built" in _r[1], _r[1])
+            _rt = chk_taste_panel_completeness(_bare, _bdir)
+            fcheck(f"F-HYBRID-5e2 declared hybrid bare YAML C-taste → {_EXP_TASTE}",
+                   _rt[0] == _EXP_TASTE and "declared-but-not-built" in _rt[1], _rt[1])
+        with _tempfile.TemporaryDirectory() as _td:
+            _bdir = Path(_td)
+            (_bdir / "_batch_flags.yml").write_text("batch_profile: [hybrid_70_15_15\n", encoding="utf-8")
+            _bare = [(Path("bare.yaml"), {"script_id": "bare_01", "scenes": [{"timestamp": "0-3s", "台詞": "bare"}]})]
+            _r = chk_hybrid_plan_lock(_bare, _bdir)
+            fcheck("F-HYBRID-5e3 broken _batch_flags fail-closed → C-plan-lock FAIL",
+                   _r[0] == "FAIL" and "_batch_flags.yml 讀取/解析失敗" in _r[1] and "fail-closed" in _r[1], _r[1])
+            _rt = chk_taste_panel_completeness(_bare, _bdir)
+            fcheck("F-HYBRID-5e4 broken _batch_flags fail-closed → C-taste-panel FAIL",
+                   _rt[0] == "FAIL" and "_batch_flags.yml 讀取/解析失敗" in _rt[1] and "fail-closed" in _rt[1], _rt[1])
+        with _tempfile.TemporaryDirectory() as _td:
+            _bdir = Path(_td)
+            (_bdir / "topic_plan.json").write_text("[]", encoding="utf-8")
+            _r = chk_hybrid_plan_lock([], _bdir)
+            fcheck(f"F-HYBRID-5f malformed topic_plan clean FAIL → {_EXP_HYBRID_PLAN}",
+                   _r[0] == _EXP_HYBRID_PLAN and "topic_plan 結構異常" in _r[1], _r[1])
+            _rt = chk_taste_panel_completeness([], _bdir)
+            fcheck(f"F-HYBRID-5g malformed topic_plan C-taste clean FAIL → {_EXP_TASTE}",
+                   _rt[0] == _EXP_TASTE and "topic_plan 結構異常" in _rt[1], _rt[1])
+
+        _d = _hybrid_base("offpro")
+        fcheck("F-HYBRID-6 C-method PASS", chk_hybrid_method(_d, "f.yaml")[0] == "PASS", chk_hybrid_method(_d, "f.yaml")[1])
+        fcheck("F-HYBRID-7 C-friend-close PASS", chk_hybrid_friend_close(_d, "f.yaml")[0] == "PASS", chk_hybrid_friend_close(_d, "f.yaml")[1])
+        _leak = _hybrid_base("offpro"); _leak["caption"] = "這支賣房成交很快"
+        _r = chk_offpro_leak(_leak, "f.yaml")
+        fcheck(f"F-HYBRID-8 offpro 賣房成交 → {_EXP_LEAK}", _r[0] == _EXP_LEAK, _r[1])
+        _bad = _hybrid_base("professional"); _bad["professional_topic_type"] = "chicken_soup"
+        _r = chk_hybrid_professional_minimum(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-9 雞湯標 professional → {_EXP_HYBRID_PRO}", _r[0] == _EXP_HYBRID_PRO and "whitelist" in _r[1], _r[1])
+        _bad = _hybrid_base("professional"); _bad["friend_close"]["evidence"]["core_answer_quote"] = ""; _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我拿答案"
+        _bad["scenes"][5]["台詞"] = "私訊我拿答案"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-10 professional 私訊扣答案 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "扣答案" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = ""
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-11 缺 old_answer → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "old_answer.quote" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "大家都說撐過去就好"
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-12 稻草人 old_answer → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "稻草人" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["closed_at"] = "0-3s"
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-13 坑沒埋 → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["opened_quote"] = "台詞裡沒有的開坑"
+        _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["closed_quote"] = "台詞裡沒有的收束"
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-13b fabricated hook_debt quote → {_EXP_HYBRID_METHOD}",
+               _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1] and "未出現在最終台詞" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["opened_quote"] = _scene_texts(_bad)[1][1]
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-13c hook_debt quote wrong scene → {_EXP_HYBRID_METHOD}",
+               _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["optimization"]["barriers_removed"] = ["拿掉一個選項"]
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-14 barrier 無 why → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "barriers_removed" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro"); _bad["friend_close"]["evidence"]["core_answer_quote"] = ""; _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我拿答案"; _bad["scenes"][5]["台詞"] = "私訊我拿答案"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-15 editor bool true 但 CTA 扣答案 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "扣答案" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["scenes"][4]["台詞"] = "你可以先存下來。"
+        _bad["scenes"][5]["台詞"] = "答案是先把選擇變小。"
+        _bad["friend_close"]["evidence"]["core_answer_quote"] = "先把選擇變小"
+        _bad["friend_close"]["evidence"]["cta_quote"] = "先存下來"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-16 core_answer 在 CTA 後 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "CTA 前" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["friend_close"]["evidence"]["cta_quote"] = "截圖下來，傳給朋友，明天照做一次"
+        _bad["friend_close"]["evidence"]["cta_action_count"] = 1
+        _bad["scenes"][5]["台詞"] = "截圖下來，傳給朋友，明天照做一次。"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-17 CTA 多動作自算 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "自算" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["friend_close"]["evidence"]["cta_quote"] = "收藏，轉寄給朋友"
+        _bad["friend_close"]["evidence"]["cta_action_count"] = 1
+        _bad["scenes"][5]["台詞"] = "收藏，轉寄給朋友"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-17a CTA 轉寄 multi-action → {_EXP_HYBRID_FRIEND}",
+               _r[0] == _EXP_HYBRID_FRIEND and "自算" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我"
+        _bad["friend_close"]["evidence"]["cta_action_count"] = 1
+        _bad["scenes"][5]["台詞"] = "核心答案是先把選擇變小。私訊我。"
+        _r = chk_hybrid_friend_close(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-17b offpro DM CTA scope hard-block → {_EXP_HYBRID_FRIEND}",
+               _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
+        for _term in ("Book a consultation", "D.M me", "call me", "加微信"):
+            _bad = _hybrid_base("offpro")
+            _bad["friend_close"]["evidence"]["cta_quote"] = _term
+            _bad["friend_close"]["evidence"]["cta_action_count"] = 1
+            _bad["scenes"][5]["台詞"] = f"核心講完了，{_term}"
+            _r = chk_hybrid_friend_close(_bad, "f.yaml")
+            fcheck(f"F-HYBRID-17b2 offpro English/punct CTA {_term!r} → {_EXP_HYBRID_FRIEND}",
+                   _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "台詞沒有講的漂亮話"
+        for _term in ("密我", "小盒子"):
+            _bad = _hybrid_base("offpro")
+            _bad["friend_close"]["evidence"]["cta_quote"] = f"{_term}拿清單"
+            _bad["friend_close"]["evidence"]["cta_action_count"] = 1
+            _bad["scenes"][5]["台詞"] = f"這個答案可以先存下來，{_term}拿清單"
+            _r = chk_hybrid_friend_close(_bad, "f.yaml")
+            fcheck(f"F-HYBRID-17c offpro {_term} CTA hard-block → {_EXP_HYBRID_FRIEND}",
+                   _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "台詞裡沒有這句話"
+        _r = chk_hybrid_method(_bad, "f.yaml")
+        fcheck(f"F-HYBRID-18 method quote not in dialogue → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "未出現在最終台詞" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["derived_flags"] = ["identity_bridge"]
+        _bad["scenes"][2]["台詞"] = "我以前用房仲專業去證明自己，才發現那不是朋友會說的話。"
+        _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
+        fcheck("F-HYBRID-19 identity_bridge hard/proof leak → FAIL", _r[0] == "FAIL" and "identity_bridge" in _r[1], _r[1])
+        _bad = _hybrid_base("offpro")
+        _bad["derived_flags"] = ["identity_bridge"]
+        _bad["lane"] = "demand_first"
+        _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
+        fcheck("F-HYBRID-20 identity_bridge non-voice_first lane → FAIL",
+               _r[0] == "FAIL" and "allowed_lanes" in _r[1], _r[1])
+        import tempfile as _tempfile
+        _old_identity_cache = _IDENTITY_BRIDGE_RULES_CACHE
+        _old_identity_path_fn = _identity_bridge_config_path
+        try:
+            with _tempfile.TemporaryDirectory() as _td:
+                _broken_path = Path(_td) / "offpro_identity_bridge_rules.yaml"
+                _broken_path.write_text("identity_bridge: [broken\n", encoding="utf-8")
+                globals()["_IDENTITY_BRIDGE_RULES_CACHE"] = None
+                globals()["_identity_bridge_config_path"] = lambda: _broken_path
+                _bad = _hybrid_base("offpro")
+                _bad["derived_flags"] = ["identity_bridge"]
+                _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
+                fcheck("F-HYBRID-21 identity_bridge config-broken fail-closed → FAIL",
+                       _r[0] == "FAIL" and "fail-closed" in _r[1], _r[1])
+        finally:
+            globals()["_IDENTITY_BRIDGE_RULES_CACHE"] = _old_identity_cache
+            globals()["_identity_bridge_config_path"] = _old_identity_path_fn
+
+        import copy as _copy
+        _skel = _copy.deepcopy(_hybrid_base("offpro"))
+        _skel["title"] = "[編劇填]"
+        _skel["derived_flags"] = ["identity_bridge"]
+        for _scene in _skel["scenes"]:
+            _scene["台詞"] = "[編劇填]"
+        _skel["script_method"] = {"chxp_v1": {}}
+        _skel["friend_close"] = {"evidence": {}}
+        _skel_results = [
+            chk_hybrid_method(_skel, "skel.yaml"),
+            chk_hybrid_friend_close(_skel, "skel.yaml"),
+            chk_hybrid_professional_minimum(_skel, "skel.yaml"),
+            chk_hybrid_identity_bridge(_skel, "skel.yaml"),
+        ]
+        fcheck("F-HYBRID-22 raw placeholder dialogue skeleton → 4 gates SKIP",
+               all(_r[0] == "SKIP" and "本支台詞未填" in _r[1] for _r in _skel_results),
+               " | ".join(_r[1] for _r in _skel_results))
+
+        _filled_bad = _copy.deepcopy(_hybrid_base("offpro"))
+        _filled_bad["title"] = "[編劇填]"
+        _filled_bad["script_method"] = {"chxp_v1": {}}
+        _batch_yamls = []
+        for _i in range(13):
+            _d = _copy.deepcopy(_hybrid_base("offpro"))
+            _d["title"] = "[編劇填]" if _i < 7 else f"real title {_i}"
+            _batch_yamls.append((Path(f"hybrid_{_i:02d}.yaml"), _d))
+        _batch_yamls[0] = (Path("hybrid_filled_bad.yaml"), _filled_bad)
+        _batch_skeleton = _is_skeleton_mode(_batch_yamls)
+        _r = chk_hybrid_method(_filled_bad, "hybrid_filled_bad.yaml", is_skeleton=_batch_skeleton)
+        fcheck("F-HYBRID-23 filled dialogue ignores batch skeleton title ratio → C-method FAIL",
+               _batch_skeleton and _r[0] == _EXP_HYBRID_METHOD and "缺填" in _r[1],
+               f"batch_skeleton={_batch_skeleton}; {_r[1]}")
+
+        print("[F-TASTE] C-taste-panel completeness gate")
+        def _make_taste_batch(fixture: dict | None = None, exempt: bool = False):
+            import tempfile as _tempfile
+            import subprocess as _subprocess
+            tdir = Path(_tempfile.mkdtemp())
+            axes = ["offpro"] * 9 + ["personal_anchor"] * 2 + ["professional"] * 2
+            lanes = ["voice_first"] * 7 + ["demand_first"] * 2 + ["anchor_first"] * 2 + ["professional"] * 2
+            for i, axis in enumerate(axes, start=1):
+                sid = f"tp_01_{i:02d}"
+                data = {
+                    "script_id": sid,
+                    "owner": "fixture",
+                    "batch": "01",
+                    "content_axis": axis,
+                    "lane": lanes[i - 1],
+                    "topic_category": "人生" if axis == "offpro" else axis,
+                    "scenes": [
+                        {"timestamp": "0-3s", "台詞": "先給你答案"},
+                        {"timestamp": "52-60s", "台詞": "存起來"},
+                    ],
+                    "caption": "fixture caption",
+                }
+                (tdir / f"script_{sid}.yaml").write_text("---\n" + yaml.safe_dump(data, allow_unicode=True, sort_keys=False) + "---\n", encoding="utf-8")
+            if fixture is not None:
+                (tdir / "_taste_panel_no_llm_fixture.json").write_text(json.dumps(fixture, ensure_ascii=False), encoding="utf-8")
+            if exempt:
+                (tdir / "_batch_flags.yml").write_text("quality_gate:\n  exempt: true\n  reason: fixture\n", encoding="utf-8")
+            cp = _subprocess.run([sys.executable, "taste_panel_gate.py", "--batch", str(tdir), "--no-llm"], cwd=Path(__file__).resolve().parent, text=True, capture_output=True, encoding="utf-8", errors="replace")
+            ydata = load_yamls(tdir)
+            valid = [(p, d) for p, d in ydata if isinstance(d, dict) and "__parse_error__" not in d]
+            return tdir, cp, valid
+
+        def _rewrite_taste_reports_as_real(panel_dir: Path):
+            import taste_panel_gate as _tpg
+            summary_path = panel_dir / "_taste_panel_summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["no_llm_mode"] = False
+            summary_path.write_text(json.dumps(summary, ensure_ascii=False), encoding="utf-8")
+            for rp in sorted(panel_dir.glob("*_taste_panel_report.json")):
+                rep = json.loads(rp.read_text(encoding="utf-8"))
+                rep["no_llm_mode"] = False
+                rep["gate_cache_key"] = _tpg.cache_key(
+                    str(rep.get("raw_input_hash") or ""),
+                    str(rep.get("sanitized_input_hash") or ""),
+                    str(rep.get("rubric_hash") or ""),
+                    str(rep.get("prompt_template_hash") or ""),
+                    str(rep.get("model_id") or ""),
+                    no_llm=False,
+                )
+                rp.write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+
+        _tdir, _cp, _valid = _make_taste_batch()
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-1 all-pass no-llm gate rc0 but C rejects → {_EXP_TASTE}", _cp.returncode == 0 and _r[0] == _EXP_TASTE and "--no-llm" in _r[1], f"gate_rc={_cp.returncode}; {_r[1]}; {_cp.stdout[-200:]}")
+        _tdir, _cp, _valid = _make_taste_batch()
+        _rewrite_taste_reports_as_real(_tdir / ".taste_panel")
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck("F-TASTE-REAL-SIM no_llm=False + false-key report accepted",
+               _cp.returncode == 0 and _r[0] == "PASS", f"gate_rc={_cp.returncode}; {_r[1]}")
+        _tdir, _cp, _valid = _make_taste_batch()
+        _rewrite_taste_reports_as_real(_tdir / ".taste_panel")
+        _panel = _tdir / ".taste_panel"
+        _rp = sorted(_panel.glob("*_taste_panel_report.json"))[0]
+        _rep = json.loads(_rp.read_text(encoding="utf-8"))
+        _rep["model_id"] = "forged-model"
+        import taste_panel_gate as _tpg
+        _rep["gate_cache_key"] = _tpg.cache_key(
+            str(_rep.get("raw_input_hash") or ""),
+            str(_rep.get("sanitized_input_hash") or ""),
+            str(_rep.get("rubric_hash") or ""),
+            str(_rep.get("prompt_template_hash") or ""),
+            str(_rep.get("model_id") or ""),
+            no_llm=False,
+        )
+        _rp.write_text(json.dumps(_rep, ensure_ascii=False), encoding="utf-8")
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-1b model_id mismatch → {_EXP_TASTE}",
+               _r[0] == _EXP_TASTE and "model_id mismatch" in _r[1], _r[1])
+        _tdir, _cp, _valid = _make_taste_batch()
+        _rewrite_taste_reports_as_real(_tdir / ".taste_panel")
+        _panel = _tdir / ".taste_panel"
+        _summary_path = _panel / "_taste_panel_summary.json"
+        _summary = json.loads(_summary_path.read_text(encoding="utf-8"))
+        _summary["model_id"] = "forged-summary-model"
+        _summary_path.write_text(json.dumps(_summary, ensure_ascii=False), encoding="utf-8")
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-1c summary model_id mismatch → {_EXP_TASTE}",
+               _r[0] == _EXP_TASTE and "summary model_id mismatch" in _r[1], _r[1])
+        _fixture_nonpass = {"overrides": {"tp_01_03": {"verdict": "revise", "scores": {"D1": 80, "D2": 95, "D3": 95, "D4": 95, "D5": 95}}}}
+        _tdir, _cp, _valid = _make_taste_batch(_fixture_nonpass)
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-2 non-pass report → {_EXP_TASTE}", _cp.returncode == 1 and _r[0] == _EXP_TASTE and "verdict" in _r[1], f"gate_rc={_cp.returncode}; {_r[1]}")
+        _fixture_stale = {"overrides": {"tp_01_04": {"stale_hash": True}}}
+        _tdir, _cp, _valid = _make_taste_batch(_fixture_stale)
+        _rewrite_taste_reports_as_real(_tdir / ".taste_panel")
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-3 stale taste_panel report → {_EXP_TASTE}", _cp.returncode == 1 and _r[0] == _EXP_TASTE and "stale" in _r[1], f"gate_rc={_cp.returncode}; {_r[1]}")
+        _tdir, _cp, _valid = _make_taste_batch(exempt=True)
+        (_tdir / ".taste_panel" / "_taste_panel_summary.json").unlink()
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-4 quality_gate.exempt 不跳 taste_panel → {_EXP_TASTE}", _r[0] == _EXP_TASTE and "summary missing" in _r[1], _r[1])
+        _tdir, _cp, _valid = _make_taste_batch()
+        _panel = _tdir / ".taste_panel"
+        _summary_path = _panel / "_taste_panel_summary.json"
+        _summary = json.loads(_summary_path.read_text(encoding="utf-8"))
+        _summary["no_llm_mode"] = False
+        _summary_path.write_text(json.dumps(_summary, ensure_ascii=False), encoding="utf-8")
+        for _rp in sorted(_panel.glob("*_taste_panel_report.json")):
+            _rep = json.loads(_rp.read_text(encoding="utf-8"))
+            _rep["no_llm_mode"] = False
+            _rp.write_text(json.dumps(_rep, ensure_ascii=False), encoding="utf-8")
+        _r = chk_taste_panel_completeness(_valid, _tdir)
+        fcheck(f"F-TASTE-FLIP no-llm true-key flipped false -> {_EXP_TASTE}",
+               _r[0] == _EXP_TASTE and "gate_cache_key mismatch" in _r[1], _r[1])
+
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:
             fcheck("F-CUTOVER 6/24 enforce flags 全 True（_S22/ANCHOR/PLACEHOLDER/LEAK/_S21_6）",
                    bool(_S22_ENFORCE and ANCHOR_FIRST_ENFORCE and _OFFPRO_PLACEHOLDER_ENFORCE
-                        and _OFFPRO_LEAK_ENFORCE and _S21_6_REPORT_ENFORCE),
+                        and _OFFPRO_LEAK_ENFORCE and _S21_6_REPORT_ENFORCE
+                        and _HYBRID_PLAN_LOCK_ENFORCE and _HYBRID_METHOD_ENFORCE
+                        and _HYBRID_FRIEND_CLOSE_ENFORCE and _HYBRID_PROFESSIONAL_ENFORCE
+                        and _TASTE_PANEL_ENFORCE),
                    f"S22={_S22_ENFORCE} ANCHOR={ANCHOR_FIRST_ENFORCE} PH={_OFFPRO_PLACEHOLDER_ENFORCE} "
-                   f"LEAK={_OFFPRO_LEAK_ENFORCE} S216={_S21_6_REPORT_ENFORCE}")
+                   f"LEAK={_OFFPRO_LEAK_ENFORCE} S216={_S21_6_REPORT_ENFORCE} "
+                   f"HPLAN={_HYBRID_PLAN_LOCK_ENFORCE} HMETHOD={_HYBRID_METHOD_ENFORCE} "
+                   f"HFRIEND={_HYBRID_FRIEND_CLOSE_ENFORCE} HPRO={_HYBRID_PROFESSIONAL_ENFORCE} "
+                   f"TASTE={_TASTE_PANEL_ENFORCE}")
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

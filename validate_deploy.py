@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_deploy.py — 短影音腳本上線前驗證腳本 (15 件檢查)
+validate_deploy.py — 短影音腳本上線前驗證腳本 (17 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
 
-15 件檢查（v1 5 件 + v2 新增 5 件 + v3/v4/v5/v6/v7 各新增 1 件）：
+17 件檢查（v1 5 件 + v2 新增 5 件 + v3/v4/v5/v6/v7/v8/v9 各新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）
 2. 資產齊全度（圖卡 PNG 有對應 html link / 必要檔不存在）
 3. build 跟 html 雙改 git diff（漏改其中一個）
@@ -46,6 +46,10 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (15 件檢查)
     — 獨立 validate_pwa_assets.py（6 件：manifest 可解析/欄齊/icon 檔在/sw 在/
       index.html 雙引用/description 禁硬編「N支」過期計數）
     — fail-closed：驗證器缺檔 = FAIL
+--- v8 新增（2026-06-15 WP2 第10洞 — 脆文 source→對外頁數量一致性）---
+16. threads_presence 與最新批一致（check_16_threads_presence_matches_latest_batch）
+--- v9 新增（2026-06-15 WP2 B-9 — pre-commit C-016 守門涵蓋 anti-regression）---
+17. owner coverage gate（check_17_gate_owner_coverage）
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -55,6 +59,9 @@ v2 升級：2026-05-18 SOP v2 9 件功能邏輯對齊
 v3 升級：2026-05-20 加第 11 件藏鏡人獨立泡泡 HARD BLOCK
 v6 升級：2026-06-07 加第 14 件 owner-scoped 成品禁詞掃描
 v7 升級：2026-06-12 加第 15 件 PWA 三件驗證（零留尾戰役 WP-D）+ 第 11 件描述對齊實碼（F-8）
+v8 升級：2026-06-15 WP2 加第 16 件 脆文 source→對外頁數量一致性（第10洞）
+v9 升級：2026-06-15 WP2 加第 17 件 owner coverage gate（B-9 anti-regression）
+        —— main() 實跑 check_1~check_17、成功訊息「✅ 全部通過 — 17 件齊」（2026-06-23 doc 對齊：原檔頭/CLAUDE.md/rules 寫 14-15 為 v8/v9 前快照）
 """
 
 import os
@@ -285,7 +292,7 @@ def check_3_build_html_dual_change():
         # 2026-06-11 保鏢核可：純工具變更通道（仿 OWNER_PROJECTION_VERIFIER_OPTIONAL 前例）
         # 只改 build_*.py 的 argparse/守門邏輯、零渲染輸出變更時，顯式宣告降 WARN + 稽核留痕
         if os.environ.get('DEPLOY_TOOL_CHANGE_ONLY') == '1':
-            msg = f'⚠️ [CHECK_1 DOWNGRADED — WARN_ALLOWANCE] TOOL_CHANGE_ONLY: build_*.py ({py_modified}) 宣告為純工具變更（零渲染輸出變更），降 WARN 放行；其餘 14 件照常'
+            msg = f'⚠️ [CHECK_1 DOWNGRADED — WARN_ALLOWANCE] TOOL_CHANGE_ONLY: build_*.py ({py_modified}) 宣告為純工具變更（零渲染輸出變更），降 WARN 放行；其餘 16 件照常'
             log(f'  {msg}')
             write_skip_log(f'WARN_ALLOWANCE TOOL_CHANGE_ONLY check_1 py_modified={py_modified}')
         else:

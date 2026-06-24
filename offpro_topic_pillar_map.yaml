@@ -1,0 +1,55 @@
+schema_version: 1
+purpose: "voice_lock signal to off-pro topic category map for hybrid_70_15_15"
+
+offpro_topic_categories:
+  - 時事
+  - 人生
+  - 金錢
+  - 感情
+  - 職涯
+  - 生活
+  - 冷知識
+  - 熱門
+
+voice_lock_signal_map:
+  social_observation:
+    topic_category: 人生
+    examples:
+      - "人際觀察"
+      - "選擇與代價"
+  emotional_resonance:
+    topic_category: 感情
+    examples:
+      - "關係裡的委屈"
+      - "安全感"
+  money_belief:
+    topic_category: 金錢
+    examples:
+      - "消費決策"
+      - "風險感"
+  work_identity:
+    topic_category: 職涯
+    examples:
+      - "工作焦慮"
+      - "專業邊界"
+  daily_life:
+    topic_category: 生活
+    examples:
+      - "習慣"
+      - "家庭分工"
+  explainable_fact:
+    topic_category: 冷知識
+    examples:
+      - "反直覺常識"
+      - "心理偏誤"
+  current_event:
+    topic_category: 時事
+    examples:
+      - "新聞切角"
+      - "公共討論"
+  trend_search:
+    topic_category: 熱門
+    examples:
+      - "Gemini 搜熱門"
+      - "平台熱議"
+

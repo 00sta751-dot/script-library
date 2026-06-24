@@ -1,0 +1,50 @@
+schema_version: 1
+purpose: "off-pro identity_bridge controls for hybrid_70_15_15"
+
+offpro_business_leak_words:
+  real_estate:
+    - 房仲
+    - 買房
+    - 賣房
+    - 成交
+    - 帶看
+    - 物件
+    - 客戶
+    - 委託
+    - 簽約
+    - 貸款
+    - 行情
+    - 諮詢
+    - 私訊
+    - LINE
+    - line
+    - 加賴
+    - 估價
+    - 斡旋
+    - 開價
+    - 屋主
+  beauty:
+    - 除毛
+    - 做臉
+    - 美容
+    - 課程
+
+identity_bridge:
+  required_count_per_batch: 1
+  allowed_lanes:
+    - voice_first
+  max_cooccurrence_distance_chars: 20
+  identity_terms:
+    - 房仲
+    - 專業
+    - 顧問
+    - 經手
+    - 案例
+    - 經驗
+  professional_proof_terms:
+    - 看過很多人
+    - 處理過很多案例
+    - 我的專業
+    - 我建議你
+  rule: "identity_terms and professional_proof_terms may co-occur only inside the 20-character identity_bridge proof window."
+

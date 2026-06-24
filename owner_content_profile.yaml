@@ -1,0 +1,59 @@
+schema_version: 1
+purpose: "per-owner content allocation profiles for topic_distributor hybrid MVP"
+
+profiles:
+  strong_default:
+    status: active
+    content_axis:
+      offpro: 9
+      personal_anchor: 2
+      professional: 2
+    lanes:
+      voice_first: 7
+      demand_first: 2
+      anchor_first: 2
+      professional: 2
+    derived_constraints:
+      identity_bridge:
+        count: 1
+        lane: voice_first
+      pure_emotion:
+        min_count: 1
+        allowed_lanes:
+          - voice_first
+          - anchor_first
+        forbidden_lanes:
+          - demand_first
+        cannot_share_slot_with:
+          - identity_bridge
+      wildcard:
+        count: 1
+        content_axis: offpro
+        reason: "料源=Gemini 搜熱門"
+    invariants:
+      non_professional: 11
+      professional: 2
+      voice_first_range: [6, 9]
+      demand_first_range: [2, 4]
+      anchor_first_range: [1, 3]
+      identity_bridge: 1
+      pure_emotion_min: 1
+
+  medium:
+    status: post-MVP
+    comment: "post-MVP"
+
+  weak_discovery:
+    status: post-MVP
+    comment: "post-MVP"
+
+owners:
+  default: strong_default
+
+# Override schema example, not active in MVP:
+# overrides:
+#   阿奇:
+#     profile: strong_default
+#     reason: "temporary editorial test"
+#     expires_after_batches: 2
+

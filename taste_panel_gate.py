@@ -25,6 +25,16 @@ from typing import Any, Optional
 
 import yaml
 
+from taste_panel_relative import (
+    STATUS_HUMAN,
+    STATUS_PASS,
+    STATUS_REJECT,
+    compute_deploy_decision,
+    is_offpro_report,
+    is_relative_enabled,
+    mirror_legacy_decision,
+)
+
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -177,12 +187,17 @@ def scene_publish_text(data: dict) -> str:
 
 
 def sanitized_input(data: dict) -> dict:
+    # TEXT_CEILING ACK（2026-06-24）：加入誠實天花板欄位進 sanitized_input，
+    # 防止改欄位冒充舊報告（Codex P1.2：hash binding）
     return {
         "script_id": data.get("script_id"),
         "content_axis": data.get("content_axis"),
         "lane": data.get("lane"),
         "topic_category": data.get("topic_category"),
         "final_text": scene_publish_text(data),
+        "score_type": data.get("score_type"),                       # 誠實天花板 binding
+        "true_material_source": data.get("true_material_source"),   # 誠實天花板 binding
+        "claim_allowed": data.get("claim_allowed"),                 # 誠實天花板 binding
     }
 
 
@@ -314,6 +329,25 @@ def load_existing_taste_panel_module():
     return mod
 
 
+def _norm(v: Any) -> str:
+    return str(v or "").strip().lower()
+
+
+def _is_offpro_report(report: dict) -> bool:
+    # 委派 helper 單一真理源（gate/validate 共用、防漂移）。
+    return is_offpro_report(report)
+
+
+def _attach_deploy_decision(report: dict) -> dict:
+    is_offpro = _is_offpro_report(report)
+    scores = report.get("scores") or {}
+    if is_relative_enabled():
+        report["deploy_decision"] = compute_deploy_decision(scores, is_offpro, True, legacy_verdict=report.get("verdict"))
+    else:
+        report["deploy_decision"] = mirror_legacy_decision(scores, report.get("verdict"), is_offpro)
+    return report
+
+
 def make_real_report(
     path: Path,
     data: dict,
@@ -414,13 +448,20 @@ def validate_reports(batch_dir: Path, reports: list[dict], summary: Optional[dic
             problems.append(f"{sid}: rubric_hash mismatch")
         if rep.get("mock_report"):
             problems.append(f"{sid}: mock report")
-        if rep.get("verdict") != "pass":
-            problems.append(f"{sid}: verdict={rep.get('verdict')}")
-        scores = rep.get("scores") if isinstance(rep.get("scores"), dict) else {}
-        for dim in REQUIRED_DIMS:
-            val = scores.get(dim)
-            if not isinstance(val, (int, float)) or val < PASS_THRESHOLD:
-                problems.append(f"{sid}: {dim}={val} < {PASS_THRESHOLD}")
+        if is_relative_enabled():
+            # relative 分支：只有 REJECT 才算 problem；HUMAN_REVIEW/PASS_WITH_NOTES 放行
+            decision = rep.get("deploy_decision") or {}
+            if decision.get("status") == STATUS_REJECT:
+                problems.append(f"{sid}: deploy_decision=REJECT reasons={decision.get('reject_reasons')}")
+        else:
+            # 原邏輯不動
+            if rep.get("verdict") != "pass":
+                problems.append(f"{sid}: verdict={rep.get('verdict')}")
+            scores = rep.get("scores") if isinstance(rep.get("scores"), dict) else {}
+            for dim in REQUIRED_DIMS:
+                val = scores.get(dim)
+                if not isinstance(val, (int, float)) or val < PASS_THRESHOLD:
+                    problems.append(f"{sid}: {dim}={val} < {PASS_THRESHOLD}")
     for path, data in hybrid_yamls:
         sid = str(data.get("script_id") or path.stem)
         rep = by_sid.get(sid)
@@ -491,6 +532,7 @@ def main() -> int:
                 report = make_no_llm_report(path, data, fixture, rubric_hash, prompt_hash, rubric_version, model_id)
             else:
                 report = make_real_report(path, data, rubric, rubric_hash, prompt_hash, rubric_version, model_id)
+            report = _attach_deploy_decision(report)
             reports.append(report)
             sid = report["script_id"]
             atomic_write_json(panel_dir / f"{sid}_taste_panel_report.json", report)
@@ -513,7 +555,16 @@ def main() -> int:
         "script_count": len(reports),
         "script_ids": [r.get("script_id") for r in reports],
         "verdict_counts": verdict_counts,
-        "overall_verdict": "pass" if len(reports) == 13 and all(r.get("verdict") == "pass" for r in reports) else "reject",
+        "overall_verdict": (
+            "pass"
+            if len(reports) == 13 and all(
+                (r.get("deploy_decision") or {}).get("status") != STATUS_REJECT
+                for r in reports
+            )
+            else "reject"
+        ) if is_relative_enabled() else (
+            "pass" if len(reports) == 13 and all(r.get("verdict") == "pass" for r in reports) else "reject"
+        ),
         "mock_report": False,
         "no_llm_mode": bool(args.no_llm),
         "generated_at": datetime.now().isoformat(),

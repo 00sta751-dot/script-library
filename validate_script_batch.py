@@ -36,6 +36,15 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+from taste_panel_relative import (
+    STATUS_HUMAN,
+    STATUS_PASS,
+    STATUS_REJECT,
+    compute_deploy_decision,
+    is_offpro_report,
+    is_relative_enabled,
+)
+
 # ── 共用派系解析器（第一刀 2026-06-05）──
 try:
     _FP_DIR = Path(__file__).resolve().parent
@@ -1875,9 +1884,36 @@ def chk_c_cta_mix(
     - 缺 source field → FAIL（hard + post-cutover + confirmed）
     - 比例超 tolerance_count → FAIL
     - _MIX_PARSER_OK=False → WARN 不 crash
+
+    Codex R2 P0.2 修（2026-06-24）：C-cta-mix scoping —
+    - hybrid 批（任何稿有 content_axis 欄位）只驗 content_axis=="professional" 的稿
+    - content_axis∈{offpro,personal_anchor} 排除（脫鉤業主本業成交配比）
+    - legacy 批（無 content_axis 欄位的稿）行為完全不變
     """
     if not _MIX_PARSER_OK or _parse_mix_block is None:
         return "WARN", "C-cta-mix：_mix_parser 不可用，CTA 比例驗證跳過"
+
+    # Codex R2 P0.2：hybrid 批 scoping — 只驗 professional 稿，排除 offpro/personal_anchor
+    # 放在 pref_text check 之前：offpro-only 批直接 PASS N/A，不需要讀偏好.md
+    _OFFPRO_AXES = {"offpro", "personal_anchor"}
+    _has_hybrid = any(
+        isinstance(d, dict) and str(d.get("content_axis", "") or "").strip()
+        for _, d in yamls
+    )
+    if _has_hybrid:
+        yamls_for_mix = [
+            (f, d) for f, d in yamls
+            if not (isinstance(d, dict) and str(d.get("content_axis", "") or "").strip().lower() in _OFFPRO_AXES)
+        ]
+        if not yamls_for_mix:
+            return "PASS", "C-cta-mix：hybrid 批無 professional 稿，CTA mix 驗證 N/A（off-pro 脫鉤）"
+        # hybrid 批 professional 子集太小（< 5）→ cta_mix 配比無意義，降 WARN-surface
+        if len(yamls_for_mix) < 5:
+            return "WARN", (
+                f"C-cta-mix：hybrid 批 professional 子集僅 {len(yamls_for_mix)} 支（< 5），"
+                f"業主 cta_mix 配比以全批 13 支為基準、不適用於 professional 子集 → WARN-surface"
+            )
+        yamls = yamls_for_mix
 
     if not pref_text:
         return "WARN", f"C-cta-mix：找不到業主 '{owner}' 偏好.md，跳過"
@@ -2228,6 +2264,20 @@ _HYBRID_METHOD_ENFORCE = True
 _HYBRID_FRIEND_CLOSE_ENFORCE = True
 _HYBRID_PROFESSIONAL_ENFORCE = True
 _TASTE_PANEL_ENFORCE = True
+# TEXT_CEILING ACK（澤君 2026-06-24 拍板啟用）：純文字稿（true_material_source=="none" AND
+# score_type∈{"script","angle"}）若 5 維全≥80 但有維度 <90 → TEXT_CEILING WARN（非 FAIL）。
+# 任一維 <80 或 generic 退件 → 仍 hard FAIL（不放水）。
+# 關閉：_TEXT_CEILING_ACK_ENABLE = False
+_TEXT_CEILING_ACK_ENABLE: bool = True
+_TEXT_CEILING_FLOOR: int = 80  # 純文字稿黃燈門檻；低於此值仍 FAIL
+# C-22-OFFPRO-ANGLE：off-pro 寫稿前角度守門（2026-06-24 建，Phase 0 shadow）。
+# 投影 §22.3/22.4/22.9/22.9.1 反一般化欄位，只對 off-pro 立場稿跑。
+# Codex R1 P0-5 修（2026-06-24）：由單一 bool 改為「依錯誤碼分級」，空集合=Phase 0 全 WARN。
+# Phase 2 集合={001,002,004,007,009,011,012,014}；Phase 3 集合={001-014 全部} — 由澤君拍板啟用。
+# 006 NO_BEHAVIOR_DELTA 永遠 WARN（不受此集合影響）。
+_C22_OFFPRO_ANGLE_ENFORCE_CODES: set[str] = set()  # 空=Phase 0 全 shadow WARN；澤君拍板加碼
+# 向後相容：_C22_OFFPRO_ANGLE_ENFORCE 保留為唯讀屬性供舊單元測試參照（等效 bool(集合非空)）
+_C22_OFFPRO_ANGLE_ENFORCE: bool = bool(_C22_OFFPRO_ANGLE_ENFORCE_CODES)
 # C-22 一般化偵測門檻：一支題目「非一般訊號」數 < 此數 → 偏一般（WARN）。
 # 2026-06-17 P1 調 3→2（御史/算盤/Codex 一致退回）：
 #   原 3 對「口語第一人稱故事題」太苛——這類好題（如「我打電話，偷偷希望對方不接」）
@@ -2920,9 +2970,9 @@ def _is_skeleton_mode(yamls: list[tuple]) -> bool:
             continue
         valid_count += 1
         title = str(data.get("title", "") or "")
-        # _is_placeholder 定義在下方，此處直接判斷常見的骨架 placeholder
-        token = re.split(r'[\s#]', title.strip())[0].lower() if title.strip() else ""
-        if token in ('[編劇填]', 'pending', 'todo', '待填') or not title.strip():
+        # R3 Fix 4（2026-06-24）：改用 _is_placeholder 統一判定（含 [填：…] 格式）
+        # _is_placeholder 定義在下方，_is_skeleton_mode 呼叫時 _is_placeholder 已被 Python 載入（同模組）
+        if not title.strip() or _is_placeholder(title):
             placeholder_count += 1
     if valid_count == 0:
         return False
@@ -2962,7 +3012,13 @@ def _is_placeholder(val) -> bool:
         return True
     # 取 comment 前的有效部份（以 '#' 或空白分割取第一段）
     token = re.split(r'[\s#]', s)[0].lower()
-    return token in ('[編劇填]', 'pending', 'todo', '待填')
+    if token in ('[編劇填]', 'pending', 'todo', '待填'):
+        return True
+    # Codex R2 P0.1（2026-06-24）：skeleton 產出的中括號佔位格式，例如 [填：...] / [填:...] / [完稿後填]
+    # 只要字串以 [填 開頭（全型冒號/半型冒號/空白/右括號任何跟隨）→ placeholder
+    if re.match(r'^\[填', s):
+        return True
+    return False
 
 
 def chk_v2_026_template_adaptation_required(data: dict, fname: str) -> tuple[str, str]:
@@ -4561,7 +4617,8 @@ def _offpro_publish_fields(data: dict) -> list[tuple[str, str]]:
 
 
 def _should_check_offpro_leak(data: dict) -> bool:
-    axis = str(data.get("content_axis", "") or "").strip()
+    # R4 Fix 2（2026-06-24）：content_axis lower-normalize（對齊其他四處）
+    axis = str(data.get("content_axis", "") or "").strip().lower()
     if axis in {"offpro", "personal_anchor"}:
         return True
     if axis == "professional":
@@ -4603,6 +4660,304 @@ def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
     return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，全 publish 欄無本業詞洩漏）"
 
 
+# ── C-22-OFFPRO-ANGLE：off-pro 寫稿前角度守門（2026-06-24 建；Phase 0 shadow）──
+# 投影 §22.3/§22.4/§22.9/§22.9.1 反一般化欄位成 validator 可讀的 c22_offpro_angle_stub。
+# 只對 off-pro 立場稿觸發（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
+# 其他稿直接 PASS 跳過，不影響本業/demand_first/anchor_first。
+# 10 個錯誤碼：001-010（各自偵測、可多項命中、串接進 message）。
+# _C22_OFFPRO_ANGLE_ENFORCE=False（Phase 0）：所有 FAIL 降 WARN；=True 後照錯誤碼定義。
+# 006 NO_BEHAVIOR_DELTA 永遠 WARN（不受 enforce flag 影響，pilot 後才升 FAIL）。
+
+# 溫共識詞庫（seed；TODO：可由 config 擴充）
+_C22_OFFPRO_SOFT_CONSENSUS: list[str] = [
+    "被看見", "先看人", "情緒在場", "做自己", "愛要看行動",
+    "活在當下", "慢慢來就好", "好好愛自己", "真誠最重要", "陪伴最重要",
+    "初心", "正能量", "換位思考", "珍惜當下", "勇敢做自己",
+]
+
+# 對比標記（任一出現代表有取捨，003 不因溫共識詞單獨命中而 FAIL）
+_C22_OFFPRO_CONTRAST_MARKERS: list[str] = [
+    "不是", "而是", "不看", "與其", "不如", "寧可", "真正的", "才是", "不在",
+]
+
+# 寬泛詞集（007 audience_decision_moment 太寬泛判斷）
+# Codex R1 P1 修（2026-06-24）：加 任何人/所有的人/大眾/上班族；不加「…的人」泛 pattern 避誤殺具體受眾。
+# Codex R2 P2 修（2026-06-24）：加 所有上班族/每個正在努力的人/正在努力的人（明確泛詞，不加可誤殺具體受眾的 pattern）。
+_C22_OFFPRO_BROAD_AUDIENCE: set[str] = {
+    "大家", "人人", "每個人", "所有人", "所有的人", "年輕人", "觀眾",
+    "現代人", "這個世代", "我們", "你們", "社會大眾",
+    "任何人", "大眾", "上班族",
+    "所有上班族", "每個正在努力的人", "正在努力的人",
+}
+
+
+def _c22_normalize(text: str) -> str:
+    """正規化：strip + 去全形空白。字串比較用此結果。"""
+    if not text:
+        return ""
+    return str(text).strip().replace("　", "").strip()
+
+
+def _should_check_c22_offpro_angle(data: dict) -> bool:
+    """Codex R1 P0 修（2026-06-24）：off-pro 角度守門的精確觸發 gate。
+    ⚠️  **不要動 _is_offpro_marker**（parity 綁 taste_panel）。
+        本 gate 比 _is_offpro_marker 更窄：排除 anchor/demand_first/professional/proof_first
+        這些 proof_mode，以及 content_axis 非 offpro 的稿（legacy/professional 不套角度檢查）。
+
+    觸發規則：
+      1. content_axis == "offpro"（或 content_axis 不存在時不排除）
+      2. lane 不在 {"anchor","anchor_first"}
+      3. proof_mode 不在 {"anchor_first","demand_first","professional","proof_first"}
+      4. lane=="voice_first" 或 lane=="stance" 或 proof_mode=="voice_first"
+         → 至少命中其一才觸發（避免 legacy 稿誤套）
+
+    修正 P0.1 proof_mode 繞過 + P1 content_axis 誤套 legacy/professional 問題。
+    """
+    axis = str(data.get("content_axis", "") or "").strip().lower()
+    lane = str(data.get("lane", "") or "").strip().lower()
+    proof = str(data.get("proof_mode", "") or "").strip().lower()
+
+    # content_axis 明確是非 offpro 業務稿（professional / personal_anchor / 本業類）→ 不套
+    if axis and axis not in ("offpro",):
+        return False
+    # lane 是 anchor 型 → 不套
+    if lane in ("anchor", "anchor_first"):
+        return False
+    # proof_mode 明確是非 voice_first 型 → 不套
+    if proof in ("anchor_first", "demand_first", "professional", "proof_first"):
+        return False
+    # 至少要命中一個 off-pro 立場訊號才觸發
+    return lane in ("voice_first", "stance") or proof == "voice_first"
+
+
+def _c22_code_severity(code: str) -> str:
+    """依 _C22_OFFPRO_ANGLE_ENFORCE_CODES 判斷單碼 severity。
+    006 永遠 WARN；其餘：code 在集合內 → FAIL，否則 WARN（Phase 0 空集合=全 WARN）。
+    """
+    if code == "006":
+        return "WARN"
+    return "FAIL" if code in _C22_OFFPRO_ANGLE_ENFORCE_CODES else "WARN"
+
+
+def _c22_collect_script_text(data: dict) -> str:
+    """從 scenes 收集台詞欄（台詞 / 台詞_*）全文，供 stub binding 比對。
+    不依賴外部 helper（_all_scene_text 不存在），直接遍歷 scenes。
+    """
+    parts: list[str] = []
+    scenes = data.get("scenes") or []
+    if not isinstance(scenes, list):
+        return ""
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        for key, val in scene.items():
+            if key != "台詞" and not str(key).startswith("台詞_"):
+                continue
+            if val:
+                parts.append(str(val))
+    return " ".join(parts)
+
+
+def chk_c22_offpro_angle(data: dict, fname: str) -> tuple[str, str]:
+    """C-22-OFFPRO-ANGLE：off-pro 寫稿前角度守門（2026-06-24 建；Phase 0 shadow）。
+    Codex R1 P0/P1 修（2026-06-24）：
+      - 改用 _should_check_c22_offpro_angle gate（精確觸發，排除 anchor/demand/professional）
+      - 11 欄全驗（新增 011 MISSING_TOPIC / 012 MISSING_CONCRETE_SCENE / 013 MISSING_TIMELINESS）
+      - 所有字串欄用 _is_placeholder 偵測，placeholder 視同缺欄
+      - 014 SHARP_CLAIM_NOT_IN_SCRIPT：sharp_claim 須是台詞的子字串
+      - phase-based enforce：_C22_OFFPRO_ANGLE_ENFORCE_CODES 集合決定哪些碼 FAIL
+      - 010 加 bool 型別守門 + >5 值非法
+      - 008 改為 substring echo（rebuttal 包含 sharp_claim 也 FAIL）
+      - 006 NO_BEHAVIOR_DELTA 永遠 WARN（不受 enforce 集合影響）
+    """
+    if not _should_check_c22_offpro_angle(data):
+        return ("PASS", f"{fname}: C-22-OFFPRO-ANGLE 非 off-pro 立場稿，N/A")
+
+    stub = data.get("c22_offpro_angle_stub")
+    errors: list[str] = []  # 命中的 "[碼] 說明" 串
+    error_codes: list[str] = []  # 對應碼，決定 severity
+
+    # ── 001 MISSING_STUB：stub 缺 / 非 dict ──
+    if not stub or not isinstance(stub, dict):
+        errors.append("[001] c22_offpro_angle_stub 缺或非 dict")
+        error_codes.append("001")
+        sev = _c22_code_severity("001")
+        return (sev, f"{fname}: C-22-OFFPRO-ANGLE {sev}（shadow）— {'; '.join(errors)}")
+
+    def _missing_or_placeholder(key: str) -> bool:
+        """欄位不存在 / 空白 / _is_placeholder / 非 scalar → True。
+        Codex R2 P2 修（2026-06-24）：list/dict 值視為非法缺欄（不 str() 當有效）。
+        """
+        v = stub.get(key)
+        if v is None:
+            return True
+        # list/dict 非 scalar → 視為缺欄（防 YAML anchor 或手寫錯誤混入）
+        if isinstance(v, (list, dict)):
+            return True
+        if _is_placeholder(v):
+            return True
+        return not bool(_c22_normalize(str(v)))
+
+    # ── 011 MISSING_TOPIC ──
+    if _missing_or_placeholder("topic"):
+        errors.append("[011] topic 空白或 placeholder")
+        error_codes.append("011")
+
+    # ── 012 MISSING_CONCRETE_SCENE ──
+    if _missing_or_placeholder("concrete_scene"):
+        errors.append("[012] concrete_scene 空白或 placeholder")
+        error_codes.append("012")
+
+    # ── 013 MISSING_TIMELINESS ──
+    if _missing_or_placeholder("timeliness_or_context"):
+        errors.append("[013] timeliness_or_context 空白或 placeholder")
+        error_codes.append("013")
+
+    # ── 002 GENERIC_TAKE_MISSING ──
+    generic_take_raw = stub.get("generic_take", "")
+    if _missing_or_placeholder("generic_take"):
+        errors.append("[002] generic_take 空白或 placeholder")
+        error_codes.append("002")
+        generic_take = ""
+    else:
+        generic_take = _c22_normalize(str(generic_take_raw))
+
+    # ── 003 CLAIM_NOT_NON_OBVIOUS ──
+    sharp_claim_raw = stub.get("sharp_claim", "")
+    if _missing_or_placeholder("sharp_claim"):
+        errors.append("[003] sharp_claim 空白或 placeholder")
+        error_codes.append("003")
+        sharp_claim = ""
+    elif generic_take and _c22_normalize(str(sharp_claim_raw)) == generic_take:
+        errors.append("[003] sharp_claim 正規化後 == generic_take（原文照抄）")
+        error_codes.append("003")
+        sharp_claim = _c22_normalize(str(sharp_claim_raw))
+    else:
+        sharp_claim = _c22_normalize(str(sharp_claim_raw))
+        # 003 保守版（P1 修 9）：溫共識詞庫命中 AND 無對比標記
+        # 若去掉對比標記後 sharp_claim 仍被溫共識詞主導 → FAIL；
+        # 保守：只在沒有任何對比標記時才判；有對比就認為有取捨
+        hit_consensus = any(w in sharp_claim for w in _C22_OFFPRO_SOFT_CONSENSUS)
+        has_contrast = any(m in sharp_claim for m in _C22_OFFPRO_CONTRAST_MARKERS)
+        if hit_consensus and not has_contrast:
+            matched = [w for w in _C22_OFFPRO_SOFT_CONSENSUS if w in sharp_claim]
+            errors.append(f"[003] sharp_claim 命中溫共識（{'/'.join(matched[:3])}）且無對比標記")
+            error_codes.append("003")
+
+    # ── 004 NO_REJECTED_BELIEF ──
+    if _missing_or_placeholder("rejected_common_belief"):
+        errors.append("[004] rejected_common_belief 空白或 placeholder")
+        error_codes.append("004")
+
+    # ── 005 NO_COST ──
+    if _missing_or_placeholder("tradeoff_or_cost"):
+        errors.append("[005] tradeoff_or_cost 空白或 placeholder")
+        error_codes.append("005")
+
+    # ── 006 NO_BEHAVIOR_DELTA（永遠 WARN，不受 enforce codes）──
+    if _missing_or_placeholder("behavior_delta"):
+        errors.append("[006] behavior_delta 空白或 placeholder（永遠 WARN）")
+        error_codes.append("006")
+
+    # ── 007 AUDIENCE_TOO_BROAD ──
+    audience_raw = stub.get("audience_decision_moment", "")
+    if _missing_or_placeholder("audience_decision_moment"):
+        errors.append("[007] audience_decision_moment 空白或 placeholder")
+        error_codes.append("007")
+    else:
+        audience = _c22_normalize(str(audience_raw))
+        if audience in _C22_OFFPRO_BROAD_AUDIENCE:
+            errors.append(f"[007] audience_decision_moment 寬泛詞「{audience}」")
+            error_codes.append("007")
+
+    # ── 008 NO_REAL_REBUTTAL（P1 修 7：substring echo 也 FAIL）──
+    rebuttal_raw = stub.get("opposing_rebuttal", "")
+    if _missing_or_placeholder("opposing_rebuttal"):
+        errors.append("[008] opposing_rebuttal 空白或 placeholder")
+        error_codes.append("008")
+    else:
+        rebuttal = _c22_normalize(str(rebuttal_raw))
+        if sharp_claim and rebuttal == sharp_claim:
+            errors.append("[008] opposing_rebuttal 正規化後 == sharp_claim（完全回聲）")
+            error_codes.append("008")
+        elif sharp_claim and len(sharp_claim) >= 4 and sharp_claim in rebuttal:
+            errors.append(f"[008] opposing_rebuttal 包含 sharp_claim 為子字串（trivial echo）")
+            error_codes.append("008")
+        # Codex R2 P2 修（2026-06-24）：雙向子字串 — sharp_claim 是 rebuttal 的子字串也算回聲
+        elif sharp_claim and len(rebuttal) >= 4 and rebuttal in sharp_claim:
+            errors.append(f"[008] sharp_claim 包含 opposing_rebuttal 為子字串（reverse echo）")
+            error_codes.append("008")
+
+    # ── 009 TITLE_NO_GAP ──
+    title_gap_raw = stub.get("title_gap", "")
+    if _missing_or_placeholder("title_gap"):
+        errors.append("[009] title_gap 空白或 placeholder")
+        error_codes.append("009")
+    else:
+        title_gap = _c22_normalize(str(title_gap_raw))
+        topic_norm = _c22_normalize(str(stub.get("topic", "") or ""))
+        title_norm = _c22_normalize(str(data.get("title", "") or ""))
+        if topic_norm and title_gap == topic_norm:
+            errors.append("[009] title_gap 正規化後 == topic（只是重述 topic）")
+            error_codes.append("009")
+        elif title_norm and title_gap == title_norm:
+            errors.append("[009] title_gap 正規化後 == yaml title（只是重述 title）")
+            error_codes.append("009")
+
+    # ── 010 VOICE_REMOVED_LT4（P1 修 8：加 bool 守門 + >5 非法）──
+    vr = stub.get("voice_removed")
+    if not vr or not isinstance(vr, dict):
+        errors.append("[010] voice_removed 缺或非 dict")
+        error_codes.append("010")
+    else:
+        for sub_key in ("concreteness", "stance_sharpness", "replacement_loss"):
+            val = vr.get(sub_key)
+            if val is None:
+                errors.append(f"[010] voice_removed.{sub_key} 缺")
+                error_codes.append("010")
+            elif isinstance(val, bool):
+                # bool 是 int 子類，須先排除（True/False 不算有效整數評分）
+                errors.append(f"[010] voice_removed.{sub_key}=bool（{val}），應為 int 0-5")
+                error_codes.append("010")
+            elif not isinstance(val, int):
+                errors.append(f"[010] voice_removed.{sub_key} 非 int（{type(val).__name__}）")
+                error_codes.append("010")
+            elif val < 0 or val > 5:
+                errors.append(f"[010] voice_removed.{sub_key}={val} 值非法（應 0-5）")
+                error_codes.append("010")
+            elif val < 4:
+                errors.append(f"[010] voice_removed.{sub_key}={val} < 4")
+                error_codes.append("010")
+
+    # ── 014 SHARP_CLAIM_NOT_IN_SCRIPT（P0 修 4：stub binding）──
+    # sharp_claim 須出現在台詞中（否則角度沒進台詞、一張自證的表無法保證落地）
+    # Codex R2 P1.4 修（2026-06-24）：補 new_answer.quote path —
+    #   stub.new_answer.quote（若存在）正規化後 == sharp_claim → 亦視為落地 PASS
+    # 僅在 sharp_claim 有實際值（非 placeholder/空）時才驗
+    if sharp_claim and len(sharp_claim) >= 4:
+        script_text = _c22_collect_script_text(data)
+        # R3 Fix 2（2026-06-24）：014 binding — sharp_claim 必須直接出現在最終台詞中。
+        # 移除 new_answer.quote substitution path（quote 只是 source annotation，不可替代台詞落地）。
+        # 若 script_text 空（骨架 / 尚未填台詞）→ 不觸發 014，讓骨架正常通過。
+        _in_script = script_text and sharp_claim in _c22_normalize(script_text)
+        if script_text and not _in_script:
+            errors.append(f"[014] sharp_claim 未出現在台詞中（角度沒落地 — 請將核心主張嵌入台詞）")
+            error_codes.append("014")
+
+    # ── 收斂最終 status ──
+    if not errors:
+        return ("PASS", f"{fname}: C-22-OFFPRO-ANGLE PASS（角度 stub 齊、無 generic 訊號）")
+
+    # 決定最終 severity：取所有命中碼中最嚴的
+    # 006 永遠 WARN；其餘碼若在 ENFORCE_CODES 集合 → FAIL
+    unique_codes = list(dict.fromkeys(error_codes))  # 去重保序
+    severities = [_c22_code_severity(c) for c in unique_codes]
+    final_status = "FAIL" if "FAIL" in severities else "WARN"
+
+    return (final_status,
+            f"{fname}: C-22-OFFPRO-ANGLE {final_status}（shadow）— {'; '.join(errors)}")
+
+
 HYBRID_BATCH_PROFILE = "hybrid_70_15_15"
 _HYBRID_PROF_TYPES = {
     "seller_preparation",
@@ -4614,6 +4969,10 @@ _HYBRID_PROF_TYPES = {
 }
 _OFFPRO_CTA_SCOPES = {"none", "self_check", "discussion_prompt", "save_share", "auxiliary_asset"}
 _PRO_CTA_SCOPES = {"none", "self_check", "save_share", "soft_consultation", "auxiliary_asset"}
+# Codex R2 P0.2 修（2026-06-24）：off-pro CTA policy enforce flag
+# 預設 False（shadow WARN-only）；澤君拍板後改 True。
+# 通用、無業主 hardcode；L2 只能縮緊不能放寬此脫鉤成交紅線。
+_OFFPRO_CTA_POLICY_ENFORCE: bool = False
 _HYBRID_CAUSAL_WORDS = ("因為", "所以", "因此", "才會", "導致", "讓", "如果", "就")
 _HYBRID_STRAWMAN_WORDS = ("大家都說", "一般人以為")
 _HYBRID_WITHHELD_WORDS = ("私訊", "LINE", "line", "加賴", "諮詢", "PDF", "清單", "名單", "表單", "領取", "下載")
@@ -4648,6 +5007,141 @@ def _offpro_cta_hard_blocked(text: str) -> bool:
         if token and token in compact:
             return True
     return False
+
+
+def chk_offpro_cta_policy(
+    yamls: list[tuple[Path, dict]],
+) -> tuple[str, str]:
+    """C-offpro-cta-policy（Codex R2 P0.2 新增，2026-06-24；預設 shadow WARN-only）
+
+    對 content_axis∈{offpro,personal_anchor} 的稿：
+    1. CTA scope（cta_offer_scope 欄 / schema_check.CTA類型 映射）必須 ∈ _OFFPRO_CTA_SCOPES
+    2. 硬擋私訊/LINE/諮詢/預約/成交導流（用既有 _offpro_cta_hard_blocked）
+    3. batch 級：off-pro 稿 ≥3 種 distinct scope（pure_emotion 可 none，不算違規）
+
+    通用、無業主 hardcode；L2 只能縮緊不能放寬。
+    _OFFPRO_CTA_POLICY_ENFORCE=True → FAIL；False → WARN（shadow）。
+    """
+    _OFFPRO_AXES = {"offpro", "personal_anchor"}
+    offpro_yamls = [
+        (f, d) for f, d in yamls
+        if isinstance(d, dict) and str(d.get("content_axis", "") or "").strip().lower() in _OFFPRO_AXES
+    ]
+    if not offpro_yamls:
+        return "PASS", "C-offpro-cta-policy N/A（批次無 off-pro 稿）"
+
+    severity = "FAIL" if _OFFPRO_CTA_POLICY_ENFORCE else "WARN"
+    problems: list[str] = []
+    scope_set: set[str] = set()
+
+    for f, data in offpro_yamls:
+        fname = f.name if hasattr(f, "name") else str(f)
+        # 取 CTA scope
+        scope_raw = str(data.get("cta_offer_scope", "") or "").strip().lower()
+        if not scope_raw:
+            # 嘗試從 schema_check.CTA類型 映射
+            sc = data.get("schema_check") or {}
+            cta_type = str(sc.get("CTA類型", "") or "").strip().lower()
+            # 映射常見業主 CTA 類型到 off-pro scope
+            _CTA_TYPE_MAP = {
+                "無強cta": "none", "self_check": "self_check",
+                "存分享": "save_share", "討論": "discussion_prompt",
+                "輔助素材": "auxiliary_asset",
+            }
+            scope_raw = _CTA_TYPE_MAP.get(cta_type, cta_type)
+
+        # 硬擋 hard-blocked terms — 只掃 publish-visible CTA 欄白名單，不掃 script_method 內容欄
+        # 白名單（R3 Fix 3，2026-06-24）：
+        #   1. friend_close.evidence.cta_quote
+        #   2. 最後一段 CTA scenes 台詞（52-60s 或最後段）
+        #   3. top-level cta（str 或 dict.text/content）
+        #   4. platform_variants.*.cta（各平台 CTA 覆寫）
+        #   5. caption（caption 字串）
+        # 仍 **不掃** script_method（內容說理欄）
+        _cta_texts: list[str] = []
+
+        # 1. friend_close.evidence.cta_quote
+        _fc = data.get("friend_close")
+        _fc_ev = (_fc.get("evidence") or {}) if isinstance(_fc, dict) else {}
+        _cta_q = str(_fc_ev.get("cta_quote", "") or "") if isinstance(_fc_ev, dict) else ""
+        if _cta_q:
+            _cta_texts.append(_cta_q)
+
+        # 2. 最後一段 CTA scenes 台詞（52-60s 或最後段）
+        _scenes_list = data.get("scenes") or []
+        if isinstance(_scenes_list, list):
+            _cta_scene_parts: list[str] = []
+            _last_scene_parts: list[str] = []
+            for scene in _scenes_list:
+                if not isinstance(scene, dict):
+                    continue
+                ts = str(scene.get("時間軸", "") or scene.get("timestamp", "") or "")
+                parts = [str(v) for k, v in scene.items()
+                         if v and (k == "台詞" or str(k).startswith("台詞_"))]
+                if parts:
+                    _last_scene_parts = parts
+                    if "52-60" in ts or "CTA" in ts.upper():
+                        _cta_scene_parts.extend(parts)
+            _cta_texts.extend(_cta_scene_parts if _cta_scene_parts else _last_scene_parts)
+
+        # 3. top-level cta
+        _top_cta = data.get("cta")
+        if isinstance(_top_cta, str) and _top_cta:
+            _cta_texts.append(_top_cta)
+        elif isinstance(_top_cta, dict):
+            # R4 Fix 1（2026-06-24）：加掃 message / keyword（常見 CTA dict 欄）
+            for _ck in ("text", "content", "body", "cta_text", "message", "keyword"):
+                _cv = str(_top_cta.get(_ck, "") or "")
+                if _cv:
+                    _cta_texts.append(_cv)
+
+        # 4. platform_variants.*.cta
+        _pv = data.get("platform_variants")
+        if isinstance(_pv, dict):
+            for _pname, _pval in _pv.items():
+                if isinstance(_pval, dict):
+                    _pv_cta = _pval.get("cta")
+                    if isinstance(_pv_cta, str) and _pv_cta:
+                        _cta_texts.append(_pv_cta)
+                    elif isinstance(_pv_cta, dict):
+                        for _ck in ("text", "content", "body"):
+                            _cv2 = str(_pv_cta.get(_ck, "") or "")
+                            if _cv2:
+                                _cta_texts.append(_cv2)
+
+        # 5. caption
+        _caption = data.get("caption")
+        if isinstance(_caption, str) and _caption:
+            _cta_texts.append(_caption)
+
+        for _ct in _cta_texts:
+            if _offpro_cta_hard_blocked(_ct):
+                problems.append(f"{fname}: 含成交導流詞（諮詢/私訊/LINE）")
+                break
+
+        # scope 合法性（R3 Fix 5，2026-06-24）：
+        # - scope 缺填或非法 → 該支 WARN（per-script，不只 batch 層）
+        # - scope 合法 → 納入 batch distinct 統計
+        if not scope_raw:
+            problems.append(f"{fname}: cta_offer_scope 缺填（off-pro 稿必須宣告 CTA scope）")
+        elif scope_raw not in _OFFPRO_CTA_SCOPES:
+            problems.append(f"{fname}: cta_offer_scope={scope_raw!r} 不在合法 off-pro scope 集合")
+        else:
+            # pure_emotion 可 none，統計 distinct scope
+            if not (str(data.get("derived_flags") or "").find("pure_emotion") >= 0 and scope_raw == "none"):
+                scope_set.add(scope_raw)
+
+    # batch 級：off-pro 稿 ≥3 種 distinct scope
+    if len(offpro_yamls) >= 3 and len(scope_set) < 3:
+        problems.append(
+            f"off-pro 批次 distinct scope 不足 3（實際 {len(scope_set)}：{sorted(scope_set)}）"
+        )
+
+    if not problems:
+        return "PASS", f"C-offpro-cta-policy PASS（{len(offpro_yamls)} 支 off-pro 稿，scope 齊、無導流詞）"
+
+    msg = f"C-offpro-cta-policy {severity}（shadow）— " + "；".join(problems[:5])
+    return severity, msg
 
 
 _CTA_ACTION_LEXICON: dict[str, tuple[str, ...]] = {
@@ -4925,10 +5419,12 @@ def chk_hybrid_method(data: dict, fname: str, is_skeleton: bool = False) -> tupl
         quote = signal.get("quote")
         if _present(quote) and not _quote_in_scene(data, quote):
             problems.append(f"concrete_signals[{idx}].quote 未出現在最終台詞（編劇可填漂亮話但台詞沒講）")
-    min_signals = 3 if data.get("content_axis") == "professional" else 1
+    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
+    _c_axis = str(data.get("content_axis", "") or "").strip().lower()
+    min_signals = 3 if _c_axis == "professional" else 1
     if len(valid_signals) < min_signals:
         problems.append(f"concrete_signals 有效數 {len(valid_signals)} < {min_signals}")
-    if data.get("content_axis") in {"offpro", "personal_anchor"}:
+    if _c_axis in {"offpro", "personal_anchor"}:
         for s in valid_signals:
             q = _as_text(s.get("quote"))
             if any(w and w in q for w in _HYBRID_WORK_WORDS):
@@ -4992,7 +5488,9 @@ def chk_hybrid_friend_close(data: dict, fname: str, is_skeleton: bool = False) -
     scope = _as_text(evidence.get("cta_offer_scope")).strip()
     if scope != _as_text(data.get("cta_offer_scope")).strip() and _present(data.get("cta_offer_scope")):
         problems.append("cta_offer_scope helper 與 friend_close.evidence 不一致")
-    allowed = _PRO_CTA_SCOPES if data.get("content_axis") == "professional" else _OFFPRO_CTA_SCOPES
+    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
+    _fc_axis = str(data.get("content_axis", "") or "").strip().lower()
+    allowed = _PRO_CTA_SCOPES if _fc_axis == "professional" else _OFFPRO_CTA_SCOPES
     if scope not in allowed:
         problems.append(f"cta_offer_scope={scope!r} 不在允許枚舉")
     for label, quote in [("value_delivered_quote", value_q), ("core_answer_quote", core_q), ("cta_quote", cta_q)]:
@@ -5009,11 +5507,11 @@ def chk_hybrid_friend_close(data: dict, fname: str, is_skeleton: bool = False) -
     recomputed_action_count, _action_hits = _count_cta_actions(cta_full_text)
     if recomputed_action_count > 1:
         problems.append(f"CTA 多動作（自算 {recomputed_action_count}>1，不信自填）")
-    if data.get("content_axis") in {"offpro", "personal_anchor"} and _offpro_cta_hard_blocked(cta_full_text):
+    if _fc_axis in {"offpro", "personal_anchor"} and _offpro_cta_hard_blocked(cta_full_text):
         problems.append("off-pro CTA 不得導私訊/諮詢/LINE（脫鉤成交）")
     if any(w in cta_text for w in _HYBRID_WITHHELD_WORDS) and not _present(core_q):
         problems.append("CTA 扣答案")
-    if data.get("content_axis") in {"offpro", "personal_anchor"} and _present(core_q) and _present(cta_q):
+    if _fc_axis in {"offpro", "personal_anchor"} and _present(core_q) and _present(cta_q):
         all_text = _all_scene_text(data)
         core_i = all_text.find(_as_text(core_q).strip())
         cta_i = all_text.find(_as_text(cta_q).strip())
@@ -5031,7 +5529,8 @@ def chk_hybrid_professional_minimum(data: dict, fname: str, is_skeleton: bool = 
         return _hybrid_na(fname, "C-professional-minimum")
     if _hybrid_file_is_skeleton(data):
         return "SKIP", f"{fname}: C-professional-minimum 骨架階段（本支台詞未填）跳過，等填完再驗"
-    axis = data.get("content_axis")
+    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
+    axis = str(data.get("content_axis", "") or "").strip().lower()
     if axis != "professional":
         return "PASS", f"{fname}: C-professional-minimum N/A 非 professional slot"
     problems: list[str] = []
@@ -5173,6 +5672,7 @@ def _plan_lock_hash(plan: list[dict]) -> str:
             "content_axis": item.get("content_axis", ""),
             "lane": item.get("lane", ""),
             "derived_flags": sorted(str(x) for x in (item.get("derived_flags") or [])),
+            "proof_mode": item.get("proof_mode", ""),  # R3 Fix 1（2026-06-24）：proof_mode 納入 hash
         }
         for item in plan
     ]
@@ -5227,7 +5727,10 @@ def chk_hybrid_plan_lock(
                 problems.append(f"{f.name}: script_id 不在 plan")
                 continue
             plan_item = by_id[sid]
-            if data.get("content_axis") != plan_item.get("content_axis"):
+            # R3 Fix 6（2026-06-24）：content_axis lower-normalize 再比對
+            _yaml_axis = str(data.get("content_axis", "") or "").strip().lower()
+            _plan_axis = str(plan_item.get("content_axis", "") or "").strip().lower()
+            if _yaml_axis != _plan_axis:
                 problems.append(f"{f.name}: content_axis yaml={data.get('content_axis')} plan={plan_item.get('content_axis')}")
             if data.get("lane") != plan_item.get("lane"):
                 problems.append(f"{f.name}: lane yaml={data.get('lane')} plan={plan_item.get('lane')}")
@@ -5235,6 +5738,34 @@ def chk_hybrid_plan_lock(
             plan_flags = sorted(str(x) for x in (plan_item.get("derived_flags") or []))
             if yaml_flags != plan_flags:
                 problems.append(f"{f.name}: derived_flags yaml={yaml_flags} plan={plan_flags}")
+            # Codex R2 P1.3 修（2026-06-24）：proof_mode derive-lock
+            # 從 plan 的 lane 推導 expected proof_mode，有 expected 才比（避免 legacy 稿恆 FAIL）
+            # 只鎖 off-pro lanes（proof_mode==lane 的型別）；
+            # professional 不列入：本業稿用 proof_first，proof_mode 與 lane 不同，不適用 derive-lock
+            _LANE_TO_PROOF = {
+                "voice_first": "voice_first",
+                "stance": "voice_first",
+                "demand_first": "demand_first",
+                "anchor_first": "anchor_first",
+                # "professional": 不鎖（proof_mode=proof_first，≠ lane name）
+                # "proof_first": 不鎖（這是 proof_mode 值而非 lane 名）
+            }
+            plan_lane_pm = plan_item.get("lane", "")
+            plan_proof_mode = plan_item.get("proof_mode")  # plan 顯式宣告
+            # R3 Fix 1（2026-06-24）：lane-derived expected 永遠權威；
+            # 若 plan 也有顯式 proof_mode 但與 lane 推導不一致 → FAIL（plan 本身寫錯）
+            _lane_derived_pm = _LANE_TO_PROOF.get(plan_lane_pm)
+            if _lane_derived_pm:
+                if plan_proof_mode and plan_proof_mode != _lane_derived_pm:
+                    problems.append(
+                        f"{f.name}: topic_plan proof_mode={plan_proof_mode} 與 lane={plan_lane_pm} 推導值 {_lane_derived_pm} 衝突"
+                    )
+                expected_pm = _lane_derived_pm  # lane 推導永遠權威
+                yaml_pm = data.get("proof_mode")
+                if yaml_pm != expected_pm:
+                    problems.append(
+                        f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane={plan_lane_pm} 推導）"
+                    )
     axis_count = _count_key(plan, "content_axis")
     lane_count = _count_key(plan, "lane")
     if axis_count.get("offpro", 0) != 9 or axis_count.get("personal_anchor", 0) != 2 or axis_count.get("professional", 0) != 2:
@@ -5349,6 +5880,15 @@ def chk_taste_panel_completeness(
         except Exception as e:
             problems.append(f"{rp.name}: parse error {e}")
 
+    # TEXT_CEILING ACK（2026-06-24）：建立 yaml-by-sid 索引，供 per-report 判斷時 lookup
+    yaml_by_sid: dict[str, dict] = {
+        str(d.get("script_id") or f.stem): d
+        for f, d in hybrid_yamls
+        if isinstance(d, dict)
+    }
+    # text_ceiling_warns：純文字稿 5 維全≥80 但有維度 <90 的支（WARN 非 FAIL）
+    text_ceiling_warns: list[str] = []
+
     by_sid: dict[str, dict] = {}
     for rep in reports:
         sid = str(rep.get("script_id") or "")
@@ -5388,13 +5928,81 @@ def chk_taste_panel_completeness(
             problems.append(f"{sid}: mock report")
         if rep.get("no_llm_mode") is True:
             problems.append(f"{sid}: taste_panel report is --no-llm (not a real GPT review)")
-        if rep.get("verdict") != "pass":
-            problems.append(f"{sid}: verdict={rep.get('verdict')}")
+
+        # ── 評分閘：relative 模式 vs 原邏輯 ──
         scores = rep.get("scores") if isinstance(rep.get("scores"), dict) else {}
-        for dim in _tpg.REQUIRED_DIMS:
-            val = scores.get(dim)
-            if not isinstance(val, (int, float)) or val < _tpg.PASS_THRESHOLD:
-                problems.append(f"{sid}: {dim}={val} < {_tpg.PASS_THRESHOLD}")
+
+        if is_relative_enabled():
+            # execution 失敗（評審未跑完：GPT 沒回完 / schema fail）→ execution FAIL、非內容 REJECT
+            # （分類清楚、不把「評審沒跑完」污染成「內容垃圾」；不進 deploy_decision 內容分類器）。
+            if str(rep.get("verdict") or "") == "pending_review":
+                problems.append(f"{sid}: C-taste-panel 評審未跑完（verdict=pending_review·execution incomplete·非內容品質問題）")
+                continue
+            # relative ON：TEXT_CEILING hard-gate 退出；改走 deploy_decision
+            def _is_offpro_report_vsb(r: dict) -> bool:
+                # 委派 helper 單一真理源（gate/validate 共用、防漂移）。
+                return is_offpro_report(r)
+
+            # 一律從 report 當前 scores+verdict 重算 deploy_decision（純函式、確定性）；
+            # 不信任 report 內 stored deploy_decision（防 stale：score/verdict 改後決策未同步、generic 高分稿漏網）。
+            decision = compute_deploy_decision(
+                scores, _is_offpro_report_vsb(rep), True, legacy_verdict=rep.get("verdict")
+            )
+            if decision.get("status") == STATUS_REJECT:
+                problems.append(
+                    f"{sid}: deploy_decision=REJECT verdict={rep.get('verdict')} reasons={decision.get('reject_reasons')}"
+                )
+            elif decision.get("status") == STATUS_HUMAN:
+                # HUMAN_REVIEW = WARN（非硬擋·放行）：borderline 稿照樣上線、但明確標記建議人工複審。
+                # 命名與行為一致（GPT 上線後驗證 round1）：這是「通過·borderline·建議複審」、非「擋住待審」。
+                text_ceiling_warns.append(
+                    f"{sid}: 通過(borderline·建議人工複審·非硬擋) avg={decision.get('avg')} "
+                    f"deploy_index={decision.get('deploy_index')} weakest={decision.get('weakest_dim')}"
+                )
+            # STATUS_PASS → 不加任何 problem
+
+        else:
+            # ── TEXT_CEILING ACK：verdict / score 判斷（2026-06-24）──（原邏輯不動）
+            yaml_data = yaml_by_sid.get(sid, {})
+            _tms = str(yaml_data.get("true_material_source", "") or "").strip().lower()
+            _st = str(yaml_data.get("score_type", "") or "").strip().lower()
+            _is_text_only = _tms == "none" and _st in {"script", "angle"}
+
+            # generic 退件（reject_generic verdict）→ 永遠 hard FAIL，不走黃燈
+            _verdict = str(rep.get("verdict") or "")
+            _is_generic_reject = _verdict == "reject_generic"
+
+            if _TEXT_CEILING_ACK_ENABLE and _is_text_only and not _is_generic_reject:
+                # 純文字稿路徑：依各維度值決定黃燈 / hard FAIL
+                _dim_vals: dict[str, float | None] = {}
+                for dim in _tpg.REQUIRED_DIMS:
+                    val = scores.get(dim)
+                    _dim_vals[dim] = val if isinstance(val, (int, float)) else None
+
+                _below_floor = [d for d, v in _dim_vals.items() if v is None or v < _TEXT_CEILING_FLOOR]
+                _below_90 = [d for d, v in _dim_vals.items() if v is None or v < _tpg.PASS_THRESHOLD]
+
+                if _below_floor:
+                    # 任一維 < 80 → hard FAIL（稿太弱，要 rework）
+                    if _verdict != "pass":
+                        problems.append(f"{sid}: verdict={_verdict}")
+                    for dim in _below_floor:
+                        problems.append(f"{sid}: {dim}={_dim_vals[dim]} < {_TEXT_CEILING_FLOOR}（純文字弱維，需 rework）")
+                elif _below_90:
+                    # 全維≥80 但有維度 <90 → TEXT_CEILING 黃燈 WARN
+                    dim_strs = ", ".join(f"{d}={_dim_vals[d]}" for d in _below_90)
+                    text_ceiling_warns.append(
+                        f"{sid}: TEXT_CEILING 純文字交付（各維≥{_TEXT_CEILING_FLOOR}·未達成片90·需口播）{dim_strs}"
+                    )
+                # else: 全維≥90 → PASS（fall-through，不加任何 problem）
+            else:
+                # 成片稿 or TEXT_CEILING 未啟用 or generic_reject → 原邏輯不變
+                if _verdict != "pass":
+                    problems.append(f"{sid}: verdict={_verdict}")
+                for dim in _tpg.REQUIRED_DIMS:
+                    val = scores.get(dim)
+                    if not isinstance(val, (int, float)) or val < _tpg.PASS_THRESHOLD:
+                        problems.append(f"{sid}: {dim}={val} < {_tpg.PASS_THRESHOLD}")
 
     for f, data in hybrid_yamls:
         sid = str(data.get("script_id") or f.stem)
@@ -5429,15 +6037,33 @@ def chk_taste_panel_completeness(
             problems.append("summary mock report")
         if summary.get("no_llm_mode") is True:
             problems.append("summary taste_panel report is --no-llm (not a real GPT review)")
-        if summary.get("overall_verdict") != "pass":
+        # relative ON：不信 gate stored summary verdict（切換前 legacy 模式算的）；validate 已用當下 flag
+        # 重算每支 deploy_decision 為權威。integrity summary 檢查（mock/no_llm/hash/gate_version）仍照跑。
+        if not is_relative_enabled() and summary.get("overall_verdict") != "pass":
             problems.append(f"summary overall_verdict={summary.get('overall_verdict')}")
         summary_ids = summary.get("script_ids") if isinstance(summary.get("script_ids"), list) else []
         expected_ids = [str(d.get("script_id") or f.stem) for f, d in hybrid_yamls]
         if sorted(summary_ids) != sorted(expected_ids):
             problems.append("summary script_ids mismatch")
 
+    # ── TEXT_CEILING ACK 彙總（2026-06-24）──
     if problems:
-        return severity, f"C-taste-panel FAIL — {'; '.join(problems[:20])}"
+        # hard FAIL 優先：不管有多少黃燈，只要有 FAIL 就回 FAIL
+        fail_msg = f"C-taste-panel FAIL — {'; '.join(problems[:20])}"
+        if text_ceiling_warns:
+            tc_note = f"（另有 {len(text_ceiling_warns)} 支 TEXT_CEILING 純文字黃燈）"
+            fail_msg += " " + tc_note
+        return severity, fail_msg
+    if text_ceiling_warns:
+        # 無 hard FAIL，但有純文字黃燈 → batch WARN（誠實，非假象 PASS）
+        n_tc = len(text_ceiling_warns)
+        n_pass = len(hybrid_yamls) - n_tc
+        warn_detail = "; ".join(text_ceiling_warns[:10])
+        return "WARN", (
+            f"C-taste-panel WARN（TEXT_CEILING）— "
+            f"純文字交付：{n_tc} 支達純文字好稿門檻(各維≥{_TEXT_CEILING_FLOOR})·未達成片90·需口播；"
+            f"{n_pass} 支 PASS — {warn_detail}"
+        )
     return "PASS", "C-taste-panel PASS — 13 reports, all pass, hashes fresh"
 
 
@@ -5522,6 +6148,7 @@ def run_per_file_checks(
     # off-pro 品質閘（2026-06-21；2026-06-23 已翻 enforce-live：placeholder→off-pro FAIL/本業 WARN；leak→FAIL）
     checks.append(("C-offpro-placeholder", chk_offpro_placeholder(data, f.name)))
     checks.append(("C-offpro-leak",        chk_offpro_leak(data, f.name)))
+    checks.append(("C-22-OFFPRO-ANGLE",   chk_c22_offpro_angle(data, f.name)))
     checks.append(("C-method",             chk_hybrid_method(data, f.name, is_skeleton)))
     checks.append(("C-friend-close",       chk_hybrid_friend_close(data, f.name, is_skeleton)))
     checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(data, f.name, is_skeleton)))
@@ -5658,6 +6285,7 @@ def main():
         ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
         # P3 比例驗證器（2026-06-08）
         ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
+        ("C-offpro-cta-policy", chk_offpro_cta_policy(valid_yamls)),
         ("C-content-mix", chk_c_content_mix(valid_yamls, owner, pref_text, batch_tag)),
         # §21 腳本品質公式 batch-level（2026-06-17 機器化 §21 落地）
         ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
@@ -7844,16 +8472,25 @@ if __name__ == "__main__":
 
         def _plan_check(plan: list[dict], yaml_mutator=None, lock_hash_plan: list[dict] | None = None) -> tuple[str, str]:
             import tempfile as _tempfile
+            # derive proof_mode from lane（同 derive-lock 推導表）
+            # professional 不列：本業稿 proof_mode=proof_first（≠ lane name），不受 derive-lock
+            _L2P = {
+                "voice_first": "voice_first", "stance": "voice_first",
+                "demand_first": "demand_first", "anchor_first": "anchor_first",
+                "professional": "proof_first",  # 本業稿實際用 proof_first
+            }
             with _tempfile.TemporaryDirectory() as td:
                 bdir = Path(td)
                 body = {"meta": {"batch_profile": HYBRID_BATCH_PROFILE}, "plan": plan, "plan_lock_hash": _plan_lock_hash(lock_hash_plan or plan)}
                 (bdir / "topic_plan.json").write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
                 yamls = []
                 for item in plan:
+                    item_lane = item.get("lane", "")
                     y = {
                         "script_id": item["script_id"],
                         "content_axis": item["content_axis"],
-                        "lane": item.get("lane"),
+                        "lane": item_lane,
+                        "proof_mode": _L2P.get(item_lane),  # derive proof_mode to satisfy derive-lock
                         "derived_flags": item.get("derived_flags") or [],
                     }
                     if yaml_mutator:
@@ -8175,6 +8812,653 @@ if __name__ == "__main__":
         _r = chk_taste_panel_completeness(_valid, _tdir)
         fcheck(f"F-TASTE-FLIP no-llm true-key flipped false -> {_EXP_TASTE}",
                _r[0] == _EXP_TASTE and "gate_cache_key mismatch" in _r[1], _r[1])
+
+        # ── F-TEXT-CEILING：TEXT_CEILING ACK adversarial fixtures（2026-06-24）──
+        print("[F-TEXT-CEILING] TEXT_CEILING ACK 黃燈/硬擋驗收")
+
+        def _patch_yaml_fields(tdir: Path, sid: str, **extra_fields):
+            """把 extra_fields 寫進對應 yaml（供 TEXT_CEILING 測試用）。
+            yaml 格式：---\nfrontmatter\n---\n，只讀第一個 document。
+            回傳 (Path, patched_dict) 供 caller rehash；找不到回 None。"""
+            import re as _re
+            for _yp in tdir.glob("*.yaml"):
+                _raw = _yp.read_text(encoding="utf-8")
+                # 取兩個 --- 之間的 frontmatter
+                _m = _re.match(r"^---\s*\n(.*?)\n---\s*\n?", _raw, _re.DOTALL)
+                if _m:
+                    _front = _m.group(1)
+                else:
+                    _front = _raw
+                _d = yaml.safe_load(_front) or {}
+                if str(_d.get("script_id")) == sid:
+                    _d.update(extra_fields)
+                    _yp.write_text("---\n" + yaml.safe_dump(_d, allow_unicode=True, sort_keys=False) + "---\n", encoding="utf-8")
+                    return _yp, _d
+            return None
+
+        def _rehash_report_for_patched_yaml(panel_dir: Path, sid: str, yaml_path: Path, yaml_data: dict):
+            """yaml 被 patch 後，更新對應 report 的 raw/sanitized hash + gate_cache_key。"""
+            import taste_panel_gate as _tpg3
+            for _rp in panel_dir.glob("*_taste_panel_report.json"):
+                _rep = json.loads(_rp.read_text(encoding="utf-8"))
+                if str(_rep.get("script_id")) == sid:
+                    _new_raw, _new_san = _tpg3.compute_hashes(yaml_path, yaml_data)
+                    _rep["raw_input_hash"] = _new_raw
+                    _rep["sanitized_input_hash"] = _new_san
+                    _rep["stale_raw_input_hash"] = False
+                    _rep["stale_sanitized_input_hash"] = False
+                    _rep["gate_cache_key"] = _tpg3.cache_key(
+                        _new_raw, _new_san,
+                        str(_rep.get("rubric_hash") or ""),
+                        str(_rep.get("prompt_template_hash") or ""),
+                        str(_rep.get("model_id") or ""),
+                        no_llm=bool(_rep.get("no_llm_mode")),
+                    )
+                    _rp.write_text(json.dumps(_rep, ensure_ascii=False), encoding="utf-8")
+                    return True
+            return False
+
+        def _patch_report_scores(panel_dir: Path, sid: str, scores: dict, verdict: str = "revise"):
+            """直接修改 report JSON 的 scores 和 verdict（bypass no-llm gate，供白盒測試）。"""
+            import taste_panel_gate as _tpg2
+            for _rp in panel_dir.glob("*_taste_panel_report.json"):
+                _rep = json.loads(_rp.read_text(encoding="utf-8"))
+                if str(_rep.get("script_id")) == sid:
+                    _rep["scores"] = {**_rep.get("scores", {}), **scores}
+                    _rep["verdict"] = verdict
+                    # 重算 gate_cache_key（保留目前 no_llm_mode，不強制 True）
+                    _rep["gate_cache_key"] = _tpg2.cache_key(
+                        str(_rep.get("raw_input_hash") or ""),
+                        str(_rep.get("sanitized_input_hash") or ""),
+                        str(_rep.get("rubric_hash") or ""),
+                        str(_rep.get("prompt_template_hash") or ""),
+                        str(_rep.get("model_id") or ""),
+                        no_llm=bool(_rep.get("no_llm_mode")),
+                    )
+                    _rp.write_text(json.dumps(_rep, ensure_ascii=False), encoding="utf-8")
+                    return True
+            return False
+
+        def _make_tc_batch_with_patch(sid: str, yaml_extra: dict, report_scores: dict, report_verdict: str):
+            """TEXT_CEILING 測試共用流程：建 batch → rewrite real → patch yaml → rehash → patch scores → load。"""
+            _td, _cp, _ = _make_taste_batch()
+            _panel = _td / ".taste_panel"
+            _rewrite_taste_reports_as_real(_panel)
+            _yp_data = _patch_yaml_fields(_td, sid, **yaml_extra)
+            if _yp_data:
+                _ypath, _ydata = _yp_data
+                _rehash_report_for_patched_yaml(_panel, sid, _ypath, _ydata)
+            _patch_report_scores(_panel, sid, report_scores, report_verdict)
+            _valid = [(p, d) for p, d in load_yamls(_td) if isinstance(d, dict) and "__parse_error__" not in d]
+            return _valid, _td
+
+        # F-TEXT-CEILING-1：純文字稿 5 維 80-89（各維≥80、有維<90）→ TEXT_CEILING WARN
+        _sid_tc = "tp_01_01"
+        _valid_tc1, _tdir_tc1 = _make_tc_batch_with_patch(
+            _sid_tc,
+            yaml_extra={"true_material_source": "none", "score_type": "script"},
+            report_scores={"D1": 82, "D2": 85, "D3": 88, "D4": 86, "D5": 84},
+            report_verdict="revise",
+        )
+        _r_tc1 = chk_taste_panel_completeness(_valid_tc1, _tdir_tc1)
+        fcheck("F-TEXT-CEILING-1 純文字稿 5 維 80-89 → TEXT_CEILING WARN（非 FAIL）",
+               _r_tc1[0] == "WARN" and "TEXT_CEILING" in _r_tc1[1], _r_tc1[1])
+
+        # F-TEXT-CEILING-2：純文字稿但某維 <80 → hard FAIL（稿太弱不轉黃燈）
+        _valid_tc2, _tdir_tc2 = _make_tc_batch_with_patch(
+            _sid_tc,
+            yaml_extra={"true_material_source": "none", "score_type": "angle"},
+            report_scores={"D1": 82, "D2": 75, "D3": 88, "D4": 86, "D5": 84},
+            report_verdict="revise",
+        )
+        _r_tc2 = chk_taste_panel_completeness(_valid_tc2, _tdir_tc2)
+        fcheck("F-TEXT-CEILING-2 純文字稿某維 <80（D2=75）→ hard FAIL（不轉黃燈）",
+               _r_tc2[0] == _EXP_TASTE and "純文字弱維" in _r_tc2[1], _r_tc2[1])
+
+        # F-TEXT-CEILING-3：generic 退件純文字稿（verdict=reject_generic）→ hard FAIL（不轉黃燈）
+        _valid_tc3, _tdir_tc3 = _make_tc_batch_with_patch(
+            _sid_tc,
+            yaml_extra={"true_material_source": "none", "score_type": "script"},
+            report_scores={"D1": 82, "D2": 85, "D3": 88, "D4": 86, "D5": 84},
+            report_verdict="reject_generic",
+        )
+        _r_tc3 = chk_taste_panel_completeness(_valid_tc3, _tdir_tc3)
+        fcheck("F-TEXT-CEILING-3 generic 退件純文字稿 → hard FAIL（不轉黃燈）",
+               _r_tc3[0] == _EXP_TASTE and ("verdict=reject_generic" in _r_tc3[1] or "verdict" in _r_tc3[1]), _r_tc3[1])
+
+        # F-TEXT-CEILING-4：成片稿（true_material_source!="none"）有維度 <90 → 原邏輯 hard FAIL（不走黃燈）
+        _valid_tc4, _tdir_tc4 = _make_tc_batch_with_patch(
+            _sid_tc,
+            yaml_extra={"true_material_source": "real_footage", "score_type": "finished_video"},
+            report_scores={"D1": 85, "D2": 92, "D3": 93, "D4": 91, "D5": 90},
+            report_verdict="revise",
+        )
+        _r_tc4 = chk_taste_panel_completeness(_valid_tc4, _tdir_tc4)
+        fcheck("F-TEXT-CEILING-4 成片稿有維度 <90 → hard FAIL（原邏輯不變）",
+               _r_tc4[0] == _EXP_TASTE and "D1=85" in _r_tc4[1], _r_tc4[1])
+
+        # F-TEXT-CEILING-5：純文字稿 5 維全≥90 → PASS（正常路徑，黃燈不擋）
+        _valid_tc5, _tdir_tc5 = _make_tc_batch_with_patch(
+            _sid_tc,
+            yaml_extra={"true_material_source": "none", "score_type": "script"},
+            report_scores={"D1": 91, "D2": 92, "D3": 93, "D4": 91, "D5": 90},
+            report_verdict="pass",
+        )
+        _r_tc5 = chk_taste_panel_completeness(_valid_tc5, _tdir_tc5)
+        fcheck("F-TEXT-CEILING-5 純文字稿 5 維全≥90 → PASS",
+               _r_tc5[0] == "PASS", _r_tc5[1])
+
+        # ── F-C22-ANGLE：chk_c22_offpro_angle 單元測試（2026-06-24）──
+        # Phase 0 shadow（_C22_OFFPRO_ANGLE_ENFORCE=False），所有 FAIL 降 WARN
+        print("[F-C22-ANGLE] C-22-OFFPRO-ANGLE 角度守門 per-script 單元測試")
+
+        def _mk_stub(**kwargs) -> dict:
+            """產一個合規 stub（11 欄齊 + voice_removed 全 5），可 override 任意欄。"""
+            base = {
+                "topic": "決定總是慢半拍",
+                "generic_take": "大家都說要衝就要衝",
+                "sharp_claim": "不是你太慢，是你在等對方先開口——那才是真的沒底",
+                "rejected_common_belief": "果斷的人行動快",
+                "tradeoff_or_cost": "等待的代價是機會窗口縮短、對方讀成你不在意",
+                "behavior_delta": "下次當你想等的時候，先問自己：我在等時機還是等對方？",
+                "audience_decision_moment": "考慮要不要先開口的那個晚上",
+                "opposing_rebuttal": "等是一種尊重，讓對方有空間思考",
+                "concrete_scene": "捷運站等人那次，一直滑手機但沒傳出去那則訊息",
+                "timeliness_or_context": "在大家都說慢慢來的現在，沉默卻是最貴的代價",
+                "title_gap": "你以為在等時機，其實在等它消失",
+                "voice_removed": {"concreteness": 5, "stance_sharpness": 5, "replacement_loss": 5},
+            }
+            base.update(kwargs)
+            return base
+
+        def _mk_angle_data(stub=None, lane="voice_first", proof_mode="voice_first", **extra) -> dict:
+            d = {"lane": lane, "proof_mode": proof_mode, "title": "決定總是慢半拍"}
+            if stub is not None:
+                d["c22_offpro_angle_stub"] = stub
+            d.update(extra)
+            return d
+
+        _EXP_ANG = "WARN"  # Phase 0 shadow：所有 FAIL 降 WARN
+
+        # F-C22-ANGLE-0：非 off-pro 稿 → PASS N/A 跳過
+        _r = chk_c22_offpro_angle({"proof_mode": "proof_first"}, "f0.yaml")
+        fcheck("F-C22-ANGLE-0 非 off-pro → PASS N/A（不誤殺本業稿）",
+               _r[0] == "PASS" and "N/A" in _r[1], _r[1])
+
+        # F-C22-ANGLE-001：MISSING_STUB（stub 缺）
+        _r = chk_c22_offpro_angle(_mk_angle_data(), "f001.yaml")
+        fcheck(f"F-C22-ANGLE-001 stub 缺 → {_EXP_ANG}（shadow 降 WARN）",
+               _r[0] == _EXP_ANG and "001" in _r[1], _r[1])
+
+        # F-C22-ANGLE-001b：stub 非 dict
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub="not_a_dict"), "f001b.yaml")
+        fcheck(f"F-C22-ANGLE-001b stub 非 dict → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "001" in _r[1], _r[1])
+
+        # F-C22-ANGLE-002：GENERIC_TAKE_MISSING
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(generic_take="")), "f002.yaml")
+        fcheck(f"F-C22-ANGLE-002 generic_take 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "002" in _r[1], _r[1])
+
+        # F-C22-ANGLE-003a：sharp_claim 空白
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(sharp_claim="")), "f003a.yaml")
+        fcheck(f"F-C22-ANGLE-003a sharp_claim 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "003" in _r[1], _r[1])
+
+        # F-C22-ANGLE-003b：sharp_claim == generic_take
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take="大家都說要衝就要衝", sharp_claim="大家都說要衝就要衝")), "f003b.yaml")
+        fcheck(f"F-C22-ANGLE-003b sharp_claim == generic_take → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "003" in _r[1], _r[1])
+
+        # F-C22-ANGLE-003c：命中溫共識詞庫 AND 無對比標記 → FAIL（降 WARN）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim="好好愛自己，先看人再做決定")), "f003c.yaml")
+        fcheck(f"F-C22-ANGLE-003c 命中溫共識詞+無對比標記 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "003" in _r[1], _r[1])
+
+        # F-C22-ANGLE-003d：命中溫共識詞庫 BUT 有對比標記 → 不觸發 003
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim="不是好好愛自己，而是先確認自己的底線")), "contrast_guard.yaml")
+        fcheck("F-C22-ANGLE-003d 溫共識+有對比標記 → PASS（對比標記保護，003 不命中）",
+               _r[0] == "PASS", _r[1])
+
+        # F-C22-ANGLE-004：NO_REJECTED_BELIEF
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(rejected_common_belief="")), "f004.yaml")
+        fcheck(f"F-C22-ANGLE-004 rejected_common_belief 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "004" in _r[1], _r[1])
+
+        # F-C22-ANGLE-005：NO_COST
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(tradeoff_or_cost="")), "f005.yaml")
+        fcheck(f"F-C22-ANGLE-005 tradeoff_or_cost 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "005" in _r[1], _r[1])
+
+        # F-C22-ANGLE-006：NO_BEHAVIOR_DELTA（永遠 WARN，不受 enforce flag）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(behavior_delta="")), "f006.yaml")
+        fcheck("F-C22-ANGLE-006 behavior_delta 空白 → WARN（永遠 WARN，不受 enforce flag）",
+               _r[0] == "WARN" and "006" in _r[1], _r[1])
+
+        # F-C22-ANGLE-007a：AUDIENCE_TOO_BROAD（空白）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(audience_decision_moment="")), "f007a.yaml")
+        fcheck(f"F-C22-ANGLE-007a audience_decision_moment 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "007" in _r[1], _r[1])
+
+        # F-C22-ANGLE-007b：audience 在寬泛詞集
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(audience_decision_moment="大家")), "f007b.yaml")
+        fcheck(f"F-C22-ANGLE-007b audience_decision_moment='大家'（寬泛詞）→ {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "007" in _r[1], _r[1])
+
+        # F-C22-ANGLE-008a：NO_REAL_REBUTTAL（空白）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(opposing_rebuttal="")), "f008a.yaml")
+        fcheck(f"F-C22-ANGLE-008a opposing_rebuttal 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "008" in _r[1], _r[1])
+
+        # F-C22-ANGLE-008b：opposing_rebuttal == sharp_claim（回聲）
+        _sc = "不是你太慢，是你在等對方先開口"
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(sharp_claim=_sc, opposing_rebuttal=_sc)), "f008b.yaml")
+        fcheck(f"F-C22-ANGLE-008b opposing_rebuttal == sharp_claim（回聲）→ {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "008" in _r[1], _r[1])
+
+        # F-C22-ANGLE-009a：TITLE_NO_GAP（空白）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(title_gap="")), "f009a.yaml")
+        fcheck(f"F-C22-ANGLE-009a title_gap 空白 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "009" in _r[1], _r[1])
+
+        # F-C22-ANGLE-009b：title_gap == topic
+        _r = chk_c22_offpro_angle(_mk_angle_data(
+            stub=_mk_stub(topic="決定總是慢半拍", title_gap="決定總是慢半拍")), "f009b.yaml")
+        fcheck(f"F-C22-ANGLE-009b title_gap == topic → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "009" in _r[1], _r[1])
+
+        # F-C22-ANGLE-009c：title_gap == yaml title
+        _r = chk_c22_offpro_angle(
+            {"lane": "voice_first", "proof_mode": "voice_first",
+             "title": "決定總是慢半拍",
+             "c22_offpro_angle_stub": _mk_stub(title_gap="決定總是慢半拍")}, "f009c.yaml")
+        fcheck(f"F-C22-ANGLE-009c title_gap == yaml title → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "009" in _r[1], _r[1])
+
+        # F-C22-ANGLE-010a：VOICE_REMOVED_LT4（缺 voice_removed）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(voice_removed=None)), "f010a.yaml")
+        fcheck(f"F-C22-ANGLE-010a voice_removed 缺 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "010" in _r[1], _r[1])
+
+        # F-C22-ANGLE-010b：子項值 < 4
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            voice_removed={"concreteness": 3, "stance_sharpness": 5, "replacement_loss": 5})), "f010b.yaml")
+        fcheck(f"F-C22-ANGLE-010b voice_removed.concreteness=3 < 4 → {_EXP_ANG}",
+               _r[0] == _EXP_ANG and "010" in _r[1], _r[1])
+
+        # F-C22-ANGLE-PASS：11 欄齊 + voice_removed 全 ≥4 + 有對比標記 sharp_claim → PASS
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub()), "f_pass.yaml")
+        fcheck("F-C22-ANGLE-PASS 11 欄齊+voice_removed≥4+有對比標記 sharp_claim → PASS",
+               _r[0] == "PASS" and "PASS" in _r[1], _r[1])
+
+        # F-C22-ANGLE-SHADOW：shadow 模式下 FAIL 降 WARN（enforce=False 時多個 FAIL 碼 → WARN）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take="", rejected_common_belief="", tradeoff_or_cost="")), "f_shadow.yaml")
+        fcheck("F-C22-ANGLE-SHADOW shadow 模式（enforce=False）多個 FAIL 碼 → WARN（非 FAIL）",
+               _r[0] == "WARN" and "002" in _r[1] and "004" in _r[1] and "005" in _r[1], _r[1])
+
+        # ── Codex R1 修 adversarial fixtures（2026-06-24）──
+
+        # F-C22-ANGLE-R1-GATE-DEMAND：proof_mode=demand_first → N/A（新 gate 排除）
+        _r = chk_c22_offpro_angle({"proof_mode": "demand_first", "content_axis": "offpro"}, "r1_demand.yaml")
+        fcheck("F-C22-ANGLE-R1-GATE-DEMAND proof_mode=demand_first → PASS N/A（新 gate 排除）",
+               _r[0] == "PASS" and "N/A" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-GATE-PROFESSIONAL：proof_mode=professional → N/A
+        _r = chk_c22_offpro_angle({"proof_mode": "professional", "content_axis": "offpro"}, "r1_pro.yaml")
+        fcheck("F-C22-ANGLE-R1-GATE-PROFESSIONAL proof_mode=professional → PASS N/A",
+               _r[0] == "PASS" and "N/A" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-GATE-ANCHOR：lane=anchor_first → N/A
+        _r = chk_c22_offpro_angle({"lane": "anchor_first", "content_axis": "offpro"}, "r1_anchor.yaml")
+        fcheck("F-C22-ANGLE-R1-GATE-ANCHOR lane=anchor_first → PASS N/A",
+               _r[0] == "PASS" and "N/A" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-GATE-LANE-VOICEFIRST-NO-PROOF：lane=voice_first 但 proof_mode 漏填 → 新 gate 應觸發
+        _r = chk_c22_offpro_angle({"lane": "voice_first"}, "r1_lane_noproof.yaml")
+        fcheck("F-C22-ANGLE-R1-GATE-LANE-VOICEFIRST proof_mode 漏填+lane=voice_first → 觸發（001 stub 缺）",
+               _r[0] == _EXP_ANG and "001" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-PH-STUB：placeholder stub → FAIL(降 WARN)
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take="[編劇填]", sharp_claim="[編劇填]")), "r1_ph_stub.yaml")
+        fcheck(f"F-C22-ANGLE-R1-PH-STUB placeholder 值視同缺欄 → {_EXP_ANG}（002/003）",
+               _r[0] == _EXP_ANG and ("002" in _r[1] or "003" in _r[1]), _r[1])
+
+        # F-C22-ANGLE-R1-MISSING-TOPIC：topic 空白 → 011
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(topic="")), "r1_no_topic.yaml")
+        fcheck(f"F-C22-ANGLE-R1-MISSING-TOPIC topic 空白 → {_EXP_ANG}（011）",
+               _r[0] == _EXP_ANG and "011" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-MISSING-SCENE：concrete_scene 空白 → 012
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(concrete_scene="")), "r1_no_scene.yaml")
+        fcheck(f"F-C22-ANGLE-R1-MISSING-SCENE concrete_scene 空白 → {_EXP_ANG}（012）",
+               _r[0] == _EXP_ANG and "012" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-MISSING-TIME：timeliness_or_context 空白 → 013
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(timeliness_or_context="")), "r1_no_time.yaml")
+        fcheck(f"F-C22-ANGLE-R1-MISSING-TIME timeliness_or_context 空白 → {_EXP_ANG}（013）",
+               _r[0] == _EXP_ANG and "013" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-010-BOOL：voice_removed 子項=True（bool）→ FAIL（降 WARN）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            voice_removed={"concreteness": True, "stance_sharpness": 5, "replacement_loss": 5})), "r1_vr_bool.yaml")
+        fcheck(f"F-C22-ANGLE-R1-010-BOOL voice_removed.concreteness=True(bool) → {_EXP_ANG}（010）",
+               _r[0] == _EXP_ANG and "010" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-010-OVERLIMIT：voice_removed 子項=999 → FAIL（降 WARN）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            voice_removed={"concreteness": 999, "stance_sharpness": 5, "replacement_loss": 5})), "r1_vr_999.yaml")
+        fcheck(f"F-C22-ANGLE-R1-010-OVERLIMIT voice_removed.concreteness=999 → {_EXP_ANG}（010）",
+               _r[0] == _EXP_ANG and "010" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-008-SUBSTRING：opposing_rebuttal 包含 sharp_claim 為子字串 → FAIL（降 WARN）
+        _sc2 = "不是等對方開口，是自己先表態"
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim=_sc2,
+            opposing_rebuttal=f"我不認同：{_sc2}，這樣反而失去尊重")), "r1_008_substr.yaml")
+        fcheck(f"F-C22-ANGLE-R1-008-SUBSTRING rebuttal 包含 sharp_claim 子字串 → {_EXP_ANG}（008）",
+               _r[0] == _EXP_ANG and "008" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-014-BINDING：sharp_claim 不在台詞中 → FAIL（降 WARN）
+        _claim = "不是等對方開口，是你在等機會消失"
+        _r = chk_c22_offpro_angle({
+            "lane": "voice_first", "proof_mode": "voice_first",
+            "c22_offpro_angle_stub": _mk_stub(sharp_claim=_claim),
+            "scenes": [{"台詞": "今天我打了通電話，電話通了，但我什麼都沒說。"}]
+        }, "r1_014_binding.yaml")
+        fcheck(f"F-C22-ANGLE-R1-014-BINDING sharp_claim 不在台詞 → {_EXP_ANG}（014）",
+               _r[0] == _EXP_ANG and "014" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-BINDING-PASS：sharp_claim 在台詞中 → 014 不觸發
+        _claim2 = "不是等對方開口，是你在等機會消失"
+        _r = chk_c22_offpro_angle({
+            "lane": "voice_first", "proof_mode": "voice_first",
+            "c22_offpro_angle_stub": _mk_stub(sharp_claim=_claim2),
+            "scenes": [{"台詞": f"我問自己：{_claim2}，所以那次我先開口了。"}]
+        }, "r1_binding_ok.yaml")
+        fcheck("F-C22-ANGLE-R1-BINDING-PASS sharp_claim 在台詞 → 014 不觸發（PASS）",
+               _r[0] == "PASS" and "014" not in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-007-NEW-BROAD：新增寬泛詞（任何人/所有的人/上班族）→ FAIL（降 WARN）
+        for _broad in ("任何人", "所有的人", "上班族"):
+            _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(audience_decision_moment=_broad)), f"r1_007_{_broad}.yaml")
+            fcheck(f"F-C22-ANGLE-R1-007-{_broad} 新擴充寬泛詞 → {_EXP_ANG}（007）",
+                   _r[0] == _EXP_ANG and "007" in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-007-SPECIFIC：具體受眾不誤殺
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(audience_decision_moment="考慮要不要先開口的那個晚上")), "r1_audience_specific.yaml")
+        fcheck("F-C22-ANGLE-R1-007-SPECIFIC 具體受眾不誤殺（007 不命中）",
+               "007" not in _r[1], _r[1])
+
+        # F-C22-ANGLE-R1-NOSKELETON-BINDING：骨架稿（無 scenes）→ 014 不觸發（不誤殺骨架）
+        _r = chk_c22_offpro_angle({
+            "lane": "voice_first", "proof_mode": "voice_first",
+            "c22_offpro_angle_stub": _mk_stub(sharp_claim="不是等對方開口，是你在等機會消失"),
+        }, "r1_skeleton_no_scenes.yaml")
+        fcheck("F-C22-ANGLE-R1-NOSKELETON-BINDING 骨架無 scenes → 014 不觸發",
+               "014" not in _r[1], _r[1])
+
+        # ── Codex R2 fixtures（2026-06-24）──
+
+        # F-C22-R2-PLACEHOLDER：skeleton [填：...] 格式被 _is_placeholder 認出 → 視同缺欄
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take="[填：同行都能講的通用觀點，作對照用]",
+            sharp_claim="[填：一句同行講不出的尖主張]"
+        )), "r2_ph_bracket.yaml")
+        fcheck(f"F-C22-R2-PLACEHOLDER [填：...] 格式被認出為 placeholder → {_EXP_ANG}（002/003）",
+               _r[0] == _EXP_ANG and ("002" in _r[1] or "003" in _r[1]), _r[1])
+
+        # F-C22-R2-PLACEHOLDER-PASS：已填寫的值不誤判為 placeholder
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take="大家都說要等感覺對了再開口",
+            sharp_claim="不是等感覺，是等你先認輸"
+        )), "r2_ph_not_placeholder.yaml")
+        fcheck("F-C22-R2-PLACEHOLDER-PASS 已填寫的值不誤判 placeholder → PASS",
+               _r[0] == "PASS", _r[1])
+
+        # F-C22-R2-SCALAR-FAIL：stub 字串欄是 list → 視為缺欄 FAIL（降 WARN）
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            generic_take=["大家都說", "要衝就衝"]
+        )), "r2_scalar_list.yaml")
+        fcheck(f"F-C22-R2-SCALAR-FAIL generic_take=list → {_EXP_ANG}（002）",
+               _r[0] == _EXP_ANG and "002" in _r[1], _r[1])
+
+        # F-C22-R2-014-QUOTE-PATH：R3 Fix 2（2026-06-24）行為更新
+        # sharp_claim == new_answer.quote 但不在台詞 → 014 觸發（quote 不可替代台詞落地）
+        # 舊 R2 預期：PASS（quote 可替代）→ R3 後：014 WARN
+        _claim_q = "不是在等感覺，是在等你先開口"
+        _r = chk_c22_offpro_angle({
+            "lane": "voice_first", "proof_mode": "voice_first",
+            "c22_offpro_angle_stub": _mk_stub(
+                sharp_claim=_claim_q,
+                new_answer={"quote": _claim_q, "source": "2026-06-24訪談"},
+            ),
+            "scenes": [{"台詞": "今天我打了一通電話，電話通了，但我什麼都沒說。"}],
+        }, "r2_quote_path.yaml")
+        fcheck("F-C22-R2-014-QUOTE-PATH sharp_claim==new_answer.quote 但不在台詞 → 014 觸發（R3：quote 不替代台詞）",
+               "[014]" in _r[1], _r[1])
+
+        # F-C22-R2-008-REVERSE-ECHO：sharp_claim 包含 rebuttal 為子字串（反向 echo）→ WARN
+        # rebuttal 需 >= 4 字（保護短詞誤殺）
+        _reb_short = "等待才是尊重"  # 6 字，作為 sharp_claim 的子句
+        _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim=f"不是你太慢——{_reb_short}，讓機會窗口縮短",
+            opposing_rebuttal=_reb_short,
+        )), "r2_rev_echo.yaml")
+        fcheck(f"F-C22-R2-008-REVERSE-ECHO sharp_claim 包含 rebuttal 子字串（>=4 字）→ {_EXP_ANG}（008）",
+               _r[0] == _EXP_ANG and "[008]" in _r[1], _r[1])
+
+        # F-C22-R2-007-NEW-BROAD-2：新增寬泛詞（所有上班族/每個正在努力的人）→ WARN
+        for _broad2 in ("所有上班族", "每個正在努力的人", "正在努力的人"):
+            _r = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+                audience_decision_moment=_broad2
+            )), f"r2_007_{_broad2}.yaml")
+            fcheck(f"F-C22-R2-007-{_broad2} R2 新寬泛詞 → {_EXP_ANG}（007）",
+                   _r[0] == _EXP_ANG and "007" in _r[1], _r[1])
+
+        # F-C22-R2-PLAN-LOCK-PROOF：proof_mode derive-lock 推導邏輯輕量單元測試
+        # professional 不在 LANE_TO_PROOF（本業稿 proof_mode=proof_first，≠ lane name，不受 derive-lock）
+        _LANE_TO_PROOF_TEST = {
+            "voice_first": "voice_first", "stance": "voice_first",
+            "demand_first": "demand_first", "anchor_first": "anchor_first",
+            # professional 不列（不鎖）
+        }
+        _r_pm_vf = _LANE_TO_PROOF_TEST.get("voice_first") == "voice_first"
+        _r_pm_pro_skip = _LANE_TO_PROOF_TEST.get("professional") is None  # professional 不在表 → skip
+        _r_pm_mismatch = _LANE_TO_PROOF_TEST.get("voice_first") != "demand_first"
+        fcheck("F-C22-R2-PLAN-LOCK-PROOF voice_first→voice_first 推導正確",
+               _r_pm_vf, f"voice_first→{_LANE_TO_PROOF_TEST.get('voice_first')}")
+        fcheck("F-C22-R2-PLAN-LOCK-PROOF-PRO-SKIP professional 不在 LANE_TO_PROOF（不鎖）",
+               _r_pm_pro_skip, f"professional→{_LANE_TO_PROOF_TEST.get('professional')}")
+        fcheck("F-C22-R2-PLAN-LOCK-PROOF-MISMATCH voice_first vs demand_first 應偵測到不符",
+               _r_pm_mismatch, "mismatch check")
+
+        # F-C22-R2-CTA-MIX-SCOPE：hybrid 批排除 offpro 稿 — offpro 被排除後 yamls 空 → PASS N/A
+        _offpro_only = [(Path("s1.yaml"), {"content_axis": "offpro", "schema_check": {"CTA類型": "諮詢"}})]
+        _r_ctamix = chk_c_cta_mix(_offpro_only, "瑞祥", None, "")
+        fcheck("F-C22-R2-CTA-MIX-SCOPE offpro-only yamls → PASS N/A（off-pro 排除，不驗業主 mix）",
+               _r_ctamix[0] == "PASS" and ("N/A" in _r_ctamix[1] or "偏好.md" in _r_ctamix[1]), _r_ctamix[1])
+
+        # F-C22-R2-OFFPRO-CTA-POLICY-LEGAL：合法 scope（none/self_check）→ PASS
+        _legal_offpro = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none"}),
+            (Path("s2.yaml"), {"content_axis": "offpro", "cta_offer_scope": "self_check"}),
+            (Path("s3.yaml"), {"content_axis": "offpro", "cta_offer_scope": "save_share"}),
+        ]
+        _r_pol = chk_offpro_cta_policy(_legal_offpro)
+        fcheck("F-C22-R2-OFFPRO-CTA-POLICY-LEGAL 合法 off-pro scope → PASS",
+               _r_pol[0] == "PASS", _r_pol[1])
+
+        # F-C22-R2-OFFPRO-CTA-POLICY-BLOCKED：含私訊/LINE → WARN（shadow）
+        _blocked_offpro = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "scenes": [{"台詞": "有需要可以私訊我喔"}]}),
+        ]
+        _r_pol2 = chk_offpro_cta_policy(_blocked_offpro)
+        fcheck(f"F-C22-R2-OFFPRO-CTA-POLICY-BLOCKED 含私訊 → WARN（shadow）",
+               _r_pol2[0] in ("WARN", "FAIL") and "導流詞" in _r_pol2[1], _r_pol2[1])
+
+        # F-C22-R2-OFFPRO-CTA-POLICY-NA：非 offpro 批 → PASS N/A
+        _non_offpro = [(Path("s1.yaml"), {"content_axis": "professional"})]
+        _r_pol3 = chk_offpro_cta_policy(_non_offpro)
+        fcheck("F-C22-R2-OFFPRO-CTA-POLICY-NA 非 offpro 批 → PASS N/A",
+               _r_pol3[0] == "PASS" and "N/A" in _r_pol3[1], _r_pol3[1])
+
+        # ── R3 fixtures（2026-06-24）──
+
+        # Fix 1：plan_lock_hash 含 proof_mode，且 lane-derived 永遠權威
+        # 測：LANE_TO_PROOF 表不含 professional（lane-derived 為 None → skip）
+        _LANE_TO_PROOF_R3 = {
+            "voice_first": "voice_first", "stance": "voice_first",
+            "demand_first": "demand_first", "anchor_first": "anchor_first",
+        }
+        # R4 Fix 3（2026-06-24）：清掉死斷言 or True
+        # 真實測試：有 proof_mode 欄的 plan 和沒有 proof_mode 的 plan 給出不同 hash
+        _h_with_pm = _plan_lock_hash([{"script_id": "x", "content_axis": "offpro",
+                                        "lane": "voice_first", "derived_flags": [],
+                                        "proof_mode": "voice_first"}])
+        _h_without_pm = _plan_lock_hash([{"script_id": "x", "content_axis": "offpro",
+                                           "lane": "voice_first", "derived_flags": []}])
+        # 無 proof_mode 欄時 item.get("proof_mode", "") → ""，有欄時 → "voice_first"，hash 應不同
+        fcheck("F-R3-PLAN-LOCK-HASH-PROOF_MODE proof_mode 納入 hash（有無 proof_mode → hash 不同）",
+               _h_with_pm != _h_without_pm, f"with={_h_with_pm[:8]} without={_h_without_pm[:8]}")
+        _h1 = _plan_lock_hash([{"script_id": "x", "content_axis": "offpro", "lane": "voice_first",
+                                 "derived_flags": [], "proof_mode": "voice_first"}])
+        _h2 = _plan_lock_hash([{"script_id": "x", "content_axis": "offpro", "lane": "voice_first",
+                                 "derived_flags": [], "proof_mode": "demand_first"}])
+        fcheck("F-R3-PLAN-LOCK-HASH-PROOF_MODE proof_mode 不同 → hash 不同",
+               _h1 != _h2, f"h1={_h1[:8]} h2={_h2[:8]}")
+
+        fcheck("F-R3-PLAN-LOCK-LANE-AUTHORITATIVE lane-derived professional=None → skip（不鎖）",
+               _LANE_TO_PROOF_R3.get("professional") is None, f"pro→{_LANE_TO_PROOF_R3.get('professional')}")
+
+        # Fix 2：014 binding — sharp_claim 不在台詞 → WARN（不靠 new_answer.quote 繞過）
+        _claim_r3 = "原來不開口才是真正的尊重"
+        _r_014_no_script = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim=_claim_r3,
+            new_answer={"quote": _claim_r3, "source": "訪談"},
+        )), "r3_014_no_script.yaml")
+        fcheck("F-R3-014-BINDING new_answer.quote==sharp_claim 但台詞空 → 014 不觸發（骨架跳過）",
+               "[014]" not in _r_014_no_script[1], _r_014_no_script[1])
+
+        # sharp_claim 在 new_answer.quote 但不在台詞 → 014 WARN（quote 不可替代台詞）
+        _r_014_in_quote_only = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim=_claim_r3,
+            new_answer={"quote": _claim_r3, "source": "訪談"},
+        ), scenes=[{"台詞": "台詞裡完全沒有那句話，只有別的內容。"}]), "r3_014_quote_only.yaml")
+        fcheck("F-R3-014-BINDING sharp_claim 只在 new_answer.quote 不在台詞 → 014 觸發 WARN",
+               "[014]" in _r_014_in_quote_only[1], _r_014_in_quote_only[1])
+
+        # sharp_claim 直接在台詞 → PASS（正常路徑）
+        _r_014_in_script = chk_c22_offpro_angle(_mk_angle_data(stub=_mk_stub(
+            sharp_claim=_claim_r3,
+            new_answer={"quote": _claim_r3, "source": "訪談"},
+        ), scenes=[{"台詞": f"今天我想跟你說：{_claim_r3}，這是我的核心觀點。"}]), "r3_014_in_script.yaml")
+        fcheck("F-R3-014-BINDING sharp_claim 在台詞 → PASS",
+               "[014]" not in _r_014_in_script[1], _r_014_in_script[1])
+
+        # Fix 3：C-offpro-cta-policy 掃 top-level cta / caption
+        _blocked_cta_field = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "cta": "有興趣可以私訊我"}),
+        ]
+        _r_pol_cta = chk_offpro_cta_policy(_blocked_cta_field)
+        fcheck("F-R3-CTA-POLICY-TOP-CTA top-level cta 含私訊 → WARN",
+               _r_pol_cta[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_cta[1], _r_pol_cta[1])
+
+        _blocked_caption = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "caption": "LINE 我拿資料"}),
+        ]
+        _r_pol_cap = chk_offpro_cta_policy(_blocked_caption)
+        fcheck("F-R3-CTA-POLICY-CAPTION caption 含 LINE → WARN",
+               _r_pol_cap[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_cap[1], _r_pol_cap[1])
+
+        # platform_variants.*.cta 含私訊 → WARN
+        _blocked_pv = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "platform_variants": {"IG": {"cta": "可以私訊我喔"}}}),
+        ]
+        _r_pol_pv = chk_offpro_cta_policy(_blocked_pv)
+        fcheck("F-R3-CTA-POLICY-PLATFORM-VARIANTS platform_variants.IG.cta 含私訊 → WARN",
+               _r_pol_pv[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_pv[1], _r_pol_pv[1])
+
+        # script_method 欄仍不掃（false-positive 防護）
+        _safe_script_method = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "self_check",
+                               "script_method": {"chxp_v1": {"four_materials": {"old_answer": {"why_reasonable": "感情諮詢書籍鼓勵開口"}}}}
+                               }),
+            (Path("s2.yaml"), {"content_axis": "offpro", "cta_offer_scope": "save_share"}),
+            (Path("s3.yaml"), {"content_axis": "offpro", "cta_offer_scope": "discussion_prompt"}),
+        ]
+        _r_pol_sm = chk_offpro_cta_policy(_safe_script_method)
+        fcheck("F-R3-CTA-POLICY-SCRIPT-METHOD script_method.why_reasonable 感情諮詢 不誤判",
+               _r_pol_sm[0] == "PASS", _r_pol_sm[1])
+
+        # Fix 4：_is_skeleton_mode 吃 _is_placeholder — [填：...] title 算 skeleton
+        _skel_fill_yamls = [
+            (None, {"title": "[填：請填寫標題]", "content_axis": "offpro"}),
+            (None, {"title": "[填：第二支]", "content_axis": "offpro"}),
+        ]
+        fcheck("F-R3-SKELETON-MODE-FILL-TITLE [填：...] title → is_skeleton=True",
+               _is_skeleton_mode(_skel_fill_yamls), f"count={sum(1 for _,d in _skel_fill_yamls if isinstance(d,dict))}")
+
+        # 一般已填 title 不算 skeleton
+        _real_yamls = [
+            (None, {"title": "我不說話不代表我同意", "content_axis": "offpro"}),
+        ]
+        fcheck("F-R3-SKELETON-MODE-REAL-TITLE 真實標題 → is_skeleton=False",
+               not _is_skeleton_mode(_real_yamls), "real title")
+
+        # Fix 5：per-script offpro CTA scope 缺填 → WARN（per-script）
+        _missing_scope = [
+            (Path("s1.yaml"), {"content_axis": "offpro"}),  # 無 cta_offer_scope
+        ]
+        _r_pol_ms = chk_offpro_cta_policy(_missing_scope)
+        fcheck("F-R3-CTA-POLICY-MISSING-SCOPE cta_offer_scope 缺填 → WARN per-script",
+               _r_pol_ms[0] in ("WARN", "FAIL") and "缺填" in _r_pol_ms[1], _r_pol_ms[1])
+
+        # Fix 6：content_axis lower-normalize — "Professional"（首字大寫）不誤殺
+        _upper_axis = {"content_axis": "Professional", "lane": "professional"}
+        _c_axis_norm = str(_upper_axis.get("content_axis", "") or "").strip().lower()
+        fcheck("F-R3-CONTENT-AXIS-LOWER 'Professional' lower-normalize → 'professional'",
+               _c_axis_norm == "professional", f"normalized={_c_axis_norm!r}")
+
+        # ── R4 fixtures（2026-06-24）──
+
+        # Fix 1：top-level cta dict 掃 message / keyword
+        _blocked_cta_msg = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "cta": {"message": "有問題可以私訊我"}}),
+        ]
+        _r_r4_msg = chk_offpro_cta_policy(_blocked_cta_msg)
+        fcheck("F-R4-CTA-POLICY-DICT-MESSAGE cta.message 含私訊 → WARN",
+               _r_r4_msg[0] in ("WARN", "FAIL") and "導流詞" in _r_r4_msg[1], _r_r4_msg[1])
+
+        _blocked_cta_kw = [
+            (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
+                               "cta": {"keyword": "LINE 我"}}),
+        ]
+        _r_r4_kw = chk_offpro_cta_policy(_blocked_cta_kw)
+        fcheck("F-R4-CTA-POLICY-DICT-KEYWORD cta.keyword 含 LINE → WARN",
+               _r_r4_kw[0] in ("WARN", "FAIL") and "導流詞" in _r_r4_kw[1], _r_r4_kw[1])
+
+        # Fix 2：_should_check_offpro_leak lower-normalize — "Offpro"（首字大寫）正確觸發
+        _r_leak_upper = _should_check_offpro_leak({"content_axis": "Offpro"})
+        fcheck("F-R4-LEAK-LOWER 'Offpro' lower-normalize → True（觸發洩漏檢查）",
+               _r_leak_upper is True, f"result={_r_leak_upper}")
+
+        _r_leak_pro = _should_check_offpro_leak({"content_axis": "Professional"})
+        fcheck("F-R4-LEAK-LOWER 'Professional' lower-normalize → False（不觸發）",
+               _r_leak_pro is False, f"result={_r_leak_pro}")
+
+        # Fix 3：死斷言 or True 已清，驗 hash 確實因 proof_mode 有無而不同（已在 R3 Fix 1 段驗）
+
+        # ── end F-C22-ANGLE ──
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:

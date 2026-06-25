@@ -460,7 +460,7 @@ def main():
         description="選題情報池 per-owner projection cache 生成器 (WP-B Step 3)"
     )
     parser.add_argument(
-        "--owner", help="只產指定業主（預設：全部 7 業主）"
+        "--owner", help="只產指定業主（預設：全部現役業主）"
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="印統計不寫檔"

@@ -46,9 +46,9 @@ from typing import Optional, Union
 # 合法 mode 值
 _VALID_MODES = frozenset(["off", "shadow", "enforce"])
 
-# min/max slots 合法範圍（規格 §9：2..4）
+# min/max slots 合法範圍（規格 §9：2..13；2026-06-26 放寬至 13 支持 bind_scope=all_offpro 最多 13 稿）
 _MIN_SLOTS_LOWER = 2
-_MAX_SLOTS_UPPER = 4
+_MAX_SLOTS_UPPER = 13
 
 
 def _disabled(detail: str) -> dict:
@@ -98,7 +98,7 @@ def load_topic_intel_policy(
     5. mode 非 string 或不在 {off, shadow, enforce} → invalid
     6. mode=off → disabled
     7. mode in {shadow, enforce}：驗 approved_by==澤君、approved_at 可 parse、
-       min_slots/max_slots 合法（2..4，min<=max）→ 任何不合 → invalid
+       min_slots/max_slots 合法（2..13，min<=max）→ 任何不合 → invalid
     8. 全部合法 → 回 mode + 完整 policy
     """
     # 1. 無參數
@@ -228,18 +228,29 @@ def load_topic_intel_policy(
         )
 
     # 8. 全部合法
-    return {
+    # bind_scope：透傳給 assign_topic_sources（"all_offpro" 或空字串 legacy）
+    bind_scope_raw = closure_cfg.get("bind_scope", "") or ""
+    bind_scope_out = str(bind_scope_raw).strip()
+
+    # detail text 和 return dict：bind_scope 只在非空時加入（legacy 無此欄，不打破舊 byte-compat）
+    _detail_parts = [f"mode={mode}, min={min_slots}, max={max_slots}"]
+    if bind_scope_out:
+        _detail_parts.append(f"bind_scope={bind_scope_out!r}")
+    _detail_parts.append(f"approved_by={approved_by}, approved_at={approved_at_str}")
+    _detail_text = f"WP-B enabled（{', '.join(_detail_parts)}）"
+
+    result: dict = {
         "mode": mode,
         "enabled": True,
         "min_slots": min_slots,
         "max_slots": max_slots,
         "approved_by": approved_by,
         "approved_at": approved_at_str,
-        "detail": (
-            f"WP-B enabled（mode={mode}, min={min_slots}, max={max_slots}, "
-            f"approved_by={approved_by}, approved_at={approved_at_str}）"
-        ),
+        "detail": _detail_text,
     }
+    if bind_scope_out:
+        result["bind_scope"] = bind_scope_out
+    return result
 
 
 # ── 快速自測（python topic_intel_policy.py）─────────────────────────────────
@@ -326,17 +337,32 @@ if __name__ == "__main__":
         assert r8["mode"] == "off" and not r8["enabled"], f"Case 8 failed: {r8}"
         print(f"Case 8 PASS: 無 topic_intel_closure 區塊 → disabled")
 
-        # Case 9: min_slots 超上限 → invalid
+        # Case 9: max_slots 超上限（>13）→ invalid
         _write_flag(tmpdir, """topic_intel_closure:
   mode: enforce
   min_slots: 2
-  max_slots: 10
+  max_slots: 14
   approved_by: 澤君
   approved_at: "2026-06-13"
 """)
         r9 = load_topic_intel_policy(tmpdir)
         assert r9["mode"] == "invalid", f"Case 9 failed: {r9}"
-        print(f"Case 9 PASS: max_slots=10 超上限 → invalid")
+        print(f"Case 9 PASS: max_slots=14 超上限 → invalid")
+
+        # Case 10: max_slots=9（bind_scope=all_offpro 典型值）→ 合法（2026-06-26 放寬）
+        _write_flag(tmpdir, """topic_intel_closure:
+  mode: shadow
+  min_slots: 2
+  max_slots: 9
+  bind_scope: all_offpro
+  approved_by: 澤君
+  approved_at: "2026-06-26"
+""")
+        r10 = load_topic_intel_policy(tmpdir)
+        assert r10["mode"] == "shadow" and r10["enabled"], f"Case 10 failed: {r10}"
+        assert r10["max_slots"] == 9, f"Case 10 max_slots: {r10}"
+        assert r10.get("bind_scope") == "all_offpro", f"Case 10 bind_scope: {r10}"
+        print(f"Case 10 PASS: max_slots=9 bind_scope=all_offpro → enabled（上限 13 內）")
 
         import shutil
         shutil.rmtree(empty_dir, ignore_errors=True)

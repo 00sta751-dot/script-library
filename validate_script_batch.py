@@ -3252,6 +3252,334 @@ def _load_projection_candidate_index(owner: str) -> Optional[dict]:
     }
 
 
+# ── AI 語意閘（R5-3b）v2 ──────────────────────────────────────────────────────
+# Gemini Flash 做題目同一性 shadow 判定（§22.9：只比題目，不比角度）
+# env flag: TOPIC_INTEL_AI_GATE=1 才真打 API；預設 skip（不污染、不擋批）
+# 呼叫法對齊 vision_judge.py（google-genai SDK）
+# v2 硬化：timeout / confidence 門檻 / 巢狀 JSON / few-shot / 2-judge / 厚 evidence / full cache key
+
+_AI_GATE_MODEL = "gemini-2.5-flash"          # 預設模型（2.0-flash free tier 429；2.5-flash 有配額）
+_AI_GATE_PROMPT_VERSION = "v2"               # 改 prompt 時 bump → 舊 cache 自動失效
+_AI_GATE_TIMEOUT_SEC = 15                    # 硬化 1：per-call timeout（秒）
+_AI_GATE_CONF_THRESHOLD = 85                 # 硬化 2：different_topic 需 >= 此信心才 flag
+
+_TOPIC_INTEL_AI_GATE_CACHE: dict = {}  # 跨呼叫同 process 快取 {cache_key: result_dict}
+
+# 硬化 4：few-shot + 2 鐵律。主要 judge prompt。
+_TOPIC_INTEL_AI_GATE_PROMPT_TEMPLATE = """\
+你是短影音「題目同一性」審核員。
+
+【§22.9 設計約束 — 鐵律不可修改】
+1. 腳本本來就該有自己的角度；same_topic_new_angle = 合格放行。
+2. 只有當腳本講的是「根本不同的題目/核心痛點」才回 different_topic。
+3. 只比「題目同一性」，絕對不比「角度一致性」。
+
+【鐵律 A】same_topic_new_angle 與 different_topic 之間不確定 -> 一律選 same_topic_new_angle。
+【鐵律 B】只有 evidence 痛點與腳本痛點「互不相關」才回 different_topic。
+
+【few-shot 範例】
+---
+範例 1（同題新角度 -> same_topic_new_angle）
+evidence：買房頭期款存不到，年輕人月薪三萬怎麼存？
+腳本：你知道為什麼有人月薪三萬能買房、有人月薪六萬還在租屋？三個理財習慣的差距。
+verdict: {{"verdict":"same_topic_new_angle","reason":"同樣買房存款痛點，切入習慣新角度","confidence":90}}
+---
+範例 2（同題不同用詞 -> same_topic）
+evidence：殺價議價率 Top10，桃園大園 22.5%
+腳本：跟建商談房價，這三句話能讓你多省 10%。
+verdict: {{"verdict":"same_topic","reason":"同樣是與建商談價的痛點","confidence":95}}
+---
+範例 3（根本不同題 -> different_topic）
+evidence：殺價議價率 Top10，桃園大園 22.5%
+腳本：帶你看台南最新個案，三房兩廳採光超好。
+verdict: {{"verdict":"different_topic","reason":"議價率 vs 個案介紹，痛點互不相關","confidence":93}}
+---
+範例 4（evidence 不足 -> insufficient_evidence）
+evidence：（標題為空，逐字稿為空）
+腳本：今天講預售屋陷阱。
+verdict: {{"verdict":"insufficient_evidence","reason":"evidence 無可比較文字","confidence":80}}
+---
+
+【evidence（爆款出處摘要）】
+{evidence_text}
+
+【腳本 body（前段，用於題目判斷）】
+{script_body}
+
+請判斷：腳本的核心題目/痛點 與 evidence 的核心題目/痛點 是否為同一件事。
+
+回 JSON（只回 JSON，不加說明）：
+{{
+  "verdict": "same_topic" | "same_topic_new_angle" | "different_topic" | "insufficient_evidence",
+  "reason": "<20字以內說明，聚焦題目差異，不提角度>",
+  "confidence": <int, 0-100>
+}}
+"""
+
+# 硬化 5：第 2 個 judge（更寬鬆版本，用於 2-judge 共識）
+_TOPIC_INTEL_AI_GATE_PROMPT_LENIENT = """\
+你是短影音「題目同一性」審核員。你的職責是保護腳本不被誤判。
+
+【鐵律（不可修改）】
+- same_topic_new_angle = 合格放行；腳本換角度是正常的。
+- 只有 evidence 核心痛點 與 腳本核心痛點「根本不同、互不相關」才回 different_topic。
+- 不確定時 -> 選 same_topic_new_angle（保護腳本不被誤殺）。
+- 只比「是否同一個問題/痛點」，絕對不比角度一致性。
+
+【evidence（爆款出處）】
+{evidence_text}
+
+【腳本 body】
+{script_body}
+
+回 JSON：
+{{
+  "verdict": "same_topic" | "same_topic_new_angle" | "different_topic" | "insufficient_evidence",
+  "reason": "<15字>",
+  "confidence": <0-100>
+}}
+"""
+
+
+def _genai_client_factory(api_key: str):
+    """
+    Gemini client 工廠（獨立函數讓測試可 mock patch）。
+    對齊 vision_judge.py 的 google-genai SDK 呼叫法。
+    """
+    from google import genai as _genai  # noqa: F401
+    return _genai.Client(api_key=api_key)
+
+
+def _extract_verdict_from_parsed(parsed: object) -> str:
+    """硬化 3：Robust verdict 抽取（向後相容：只回 verdict 字串）。
+    內部委託 _extract_fields_from_parsed，確保 verdict 和 confidence 從同一層抽。
+    """
+    return _extract_fields_from_parsed(parsed).get("verdict", "insufficient_evidence")
+
+
+def _extract_fields_from_parsed(parsed: object) -> dict:
+    """硬化 3 defect-2 fix：從巢狀 JSON 同層一次抽出 verdict + confidence + reason。
+
+    舊寫法：_extract_verdict_from_parsed 只抽 verdict，confidence 在 _single_judge_call
+    讀 top-level parsed.get("confidence")。巢狀 {{"result":{{"verdict":"different_topic",
+    "confidence":92}}}} → verdict 抽到但 confidence 讀 top-level=None=0 → 被誤降級。
+    修：verdict/confidence/reason 從同一個子 dict 一起抽。
+    """
+    _VALID = ("same_topic", "same_topic_new_angle", "different_topic", "insufficient_evidence")
+
+    def _from_dict(d: dict):
+        v = str(d.get("verdict", ""))
+        if v in _VALID:
+            c_raw = d.get("confidence")
+            return {
+                "verdict": v,
+                "confidence": int(c_raw) if c_raw is not None else 0,
+                "reason": str(d.get("reason", "")),
+            }
+        return None
+
+    if not isinstance(parsed, dict):
+        return {}
+    # top-level 優先
+    r = _from_dict(parsed)
+    if r:
+        return r
+    # known nested keys
+    for key in ("result", "output", "response", "data", "answer", "classification"):
+        nested = parsed.get(key)
+        if isinstance(nested, dict):
+            r = _from_dict(nested)
+            if r:
+                return r
+    # 任意巢狀
+    for v in parsed.values():
+        if isinstance(v, dict):
+            r = _from_dict(v)
+            if r:
+                return r
+    return {}
+
+
+def _parse_ai_gate_response(text: str) -> dict:
+    """硬化 3：Robust JSON 解析，支援 markdown fence / 巢狀 / 文字夾 JSON。"""
+    import json as _j
+    import re as _re
+    text = text.strip()
+    if not text:
+        return {}
+    if text.startswith("```"):
+        text = _re.sub(r"^```(?:json)?\s*", "", text)
+        text = _re.sub(r"\s*```$", "", text)
+        text = text.strip()
+    try:
+        parsed = _j.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except _j.JSONDecodeError:
+        pass
+    match = _re.search(r'\{[\s\S]*\}', text)
+    if match:
+        try:
+            parsed = _j.loads(match.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except _j.JSONDecodeError:
+            pass
+    return {}
+
+
+def _single_judge_call(client, prompt: str, timeout_sec: int) -> dict:
+    """硬化 1：帶 timeout 的單次 Gemini 呼叫，逾時或例外 -> api_unavailable。
+    使用 daemon=True thread + queue.Queue，逾時後立即回傳，背景 thread 在進程退出時
+    自動清除，不會因 shutdown(wait=False) 累積卡著的背景 thread（defect 3 緩解）。
+    """
+    import threading as _threading
+    import queue as _queue
+
+    _rq: _queue.Queue = _queue.Queue(maxsize=1)
+
+    def _do_call():
+        try:
+            from google.genai import types as _gtypes
+            resp = client.models.generate_content(
+                model=_AI_GATE_MODEL,
+                contents=[prompt],
+                config=_gtypes.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0,
+                ),
+            )
+            _rq.put(("ok", resp.text or ""))
+        except Exception as _e:
+            _rq.put(("err", str(_e)))
+
+    _t = _threading.Thread(target=_do_call, daemon=True)
+    _t.start()
+    try:
+        status, val = _rq.get(timeout=timeout_sec)
+    except _queue.Empty:
+        return {"verdict": "api_unavailable", "note": f"Gemini 呼叫逾時（>{timeout_sec}s）"}
+
+    if status == "err":
+        return {"verdict": "api_unavailable", "note": f"API 呼叫失敗：{val}"}
+
+    raw_text = val
+    parsed = _parse_ai_gate_response(raw_text)
+    if not parsed:
+        return {"verdict": "api_unavailable", "note": f"Gemini 回傳無法解析：{raw_text[:100]}"}
+
+    # defect 2 fix：用 _extract_fields_from_parsed 從同層一次抽 verdict+confidence+reason
+    fields = _extract_fields_from_parsed(parsed)
+    if not fields:
+        return {"verdict": "insufficient_evidence",
+                "reason": "無法從回應抽出有效 verdict", "confidence": 0}
+    return fields
+
+
+def _consensus_verdict(judge_results: list) -> dict:
+    """
+    硬化 5 defect-1 fix：2-judge 共識，§22.9 最寬鬆者勝。
+
+    舊邏輯：valid = [過濾 api_unavailable]，再判 all(valid==different_topic) → flag。
+    缺陷：judge1=api_unavailable + judge2=different_topic → valid=[judge2] → 單 judge 就 flag，
+    違反「只有兩個 judge 各自真的回了 verdict 且皆 different_topic」的要求。
+
+    新邏輯（priority 順序）：
+    1. 任一 judge 說 same_topic / same_topic_new_angle → 放行
+    2. 任一 judge 是 api_unavailable / insufficient_evidence → 降 insufficient_evidence（不 flag）
+       （不確定性傳染：一個 judge 不確定 = 整體不確定）
+    3. 全部 judge 均回 different_topic → avg_conf → 交給 caller 做 conf 門檻判定
+    4. 其他混合 → insufficient_evidence
+    """
+    if not judge_results:
+        return {"verdict": "api_unavailable", "note": "無 judge 結果"}
+
+    # Step 1：任一放行 → 放行（最高優先，§22.9 最寬鬆者勝）
+    _PASS = ("same_topic", "same_topic_new_angle")
+    for r in judge_results:
+        if r.get("verdict") in _PASS:
+            return r
+
+    # Step 2：任一不可用/不確定 → 降 insufficient_evidence（不 flag）
+    _UNCERTAIN = ("api_unavailable", "insufficient_evidence")
+    for r in judge_results:
+        if r.get("verdict") in _UNCERTAIN:
+            note = r.get("note") or r.get("reason") or "judge 不可用或不確定"
+            return {"verdict": "insufficient_evidence",
+                    "reason": f"某 judge 不可用或不確定（{note}），採寬鬆判定（§22.9）",
+                    "confidence": 0}
+
+    # Step 3：全部 judge 均確認 different_topic → 計 avg_conf 交 caller 處理
+    if all(r.get("verdict") == "different_topic" for r in judge_results):
+        confs = [r.get("confidence", 0) for r in judge_results]
+        avg_conf = int(sum(confs) / len(confs)) if confs else 0
+        return dict(judge_results[0], confidence=avg_conf)
+
+    # Step 4：其他混合
+    return {"verdict": "insufficient_evidence", "reason": "judges 不一致，採寬鬆判定", "confidence": 0}
+
+
+def _call_topic_intel_ai_gate(
+    evidence_text: str,
+    script_body: str,
+    cache_key: str,
+) -> dict:
+    """
+    2-judge Gemini Flash 題目同一性判斷。
+
+    回傳 {"verdict": str, "reason": str, "confidence": int}
+    API 不可用/逾時/回傳爛 -> {"verdict": "api_unavailable", "note": str}
+
+    硬化清單：
+    - 硬化 1: per-call timeout
+    - 硬化 2: different_topic 需 confidence >= _AI_GATE_CONF_THRESHOLD
+    - 硬化 3: robust nested/non-JSON parsing
+    - 硬化 4: few-shot prompt + 2 鐵律
+    - 硬化 5: 2-judge consensus（§22.9 最寬鬆者勝）
+    caller 只需拿 verdict 決定是否 shadow_warn（never crash、never block batch）。
+    """
+    import os as _os_ag
+
+    if cache_key in _TOPIC_INTEL_AI_GATE_CACHE:
+        return _TOPIC_INTEL_AI_GATE_CACHE[cache_key]
+
+    api_key = _os_ag.environ.get("GOOGLE_API_KEY", "")
+    if not api_key:
+        result = {"verdict": "api_unavailable", "note": "GOOGLE_API_KEY 未設"}
+        _TOPIC_INTEL_AI_GATE_CACHE[cache_key] = result
+        return result
+
+    try:
+        _client = _genai_client_factory(api_key)
+    except ImportError:
+        result = {"verdict": "api_unavailable", "note": "google-genai 未安裝（pip install google-genai）"}
+        _TOPIC_INTEL_AI_GATE_CACHE[cache_key] = result
+        return result
+
+    ev_text = evidence_text[:1500].strip() or "（無 evidence 文字）"
+    sc_text = script_body[:1500].strip() or "（無腳本文字）"
+
+    # 硬化 5：2 judges（primary few-shot + lenient）
+    _p1 = _TOPIC_INTEL_AI_GATE_PROMPT_TEMPLATE.format(evidence_text=ev_text, script_body=sc_text)
+    _p2 = _TOPIC_INTEL_AI_GATE_PROMPT_LENIENT.format(evidence_text=ev_text, script_body=sc_text)
+
+    judge1 = _single_judge_call(_client, _p1, _AI_GATE_TIMEOUT_SEC)
+    judge2 = _single_judge_call(_client, _p2, _AI_GATE_TIMEOUT_SEC)
+
+    result = _consensus_verdict([judge1, judge2])
+
+    # 硬化 2：different_topic 需信心 >= 門檻，否則降為 insufficient_evidence
+    if result.get("verdict") == "different_topic":
+        conf = result.get("confidence", 0)
+        if conf < _AI_GATE_CONF_THRESHOLD:
+            result = dict(result, verdict="insufficient_evidence",
+                          reason=f"confidence={conf} < {_AI_GATE_CONF_THRESHOLD}，採寬鬆判定")
+
+    _TOPIC_INTEL_AI_GATE_CACHE[cache_key] = result
+    return result
+# ── AI 語意閘 v2 end ──────────────────────────────────────────────────────────
+
+
 def chk_topic_intel_provenance(
     data: dict,
     fname: str,
@@ -3288,6 +3616,7 @@ def chk_topic_intel_provenance(
 
     issues = []
     is_fail = False
+    shadow_warns: list = []  # R5 新增補強項（一律 shadow WARN，不升 enforce）
 
     # 1. evidence_sha256 非空
     sha = str(sti.get("evidence_sha256", "") or "").strip()
@@ -3300,6 +3629,139 @@ def chk_topic_intel_provenance(
     if not ev_path:
         issues.append("evidence_path 為空（assign 端必填 canonical resolved path）")
         is_fail = True
+
+    # R5-2：真指紋 — evidence_path 檔案存在 + 重算 sha256 比對（shadow WARN）
+    # （不升 enforce；檔不存在或 sha 不符 → 只 WARN，讓批次繼續但留警示）
+    if ev_path:
+        try:
+            _ev_file = Path(ev_path)
+            if not _ev_file.exists():
+                shadow_warns.append(
+                    f"evidence_path 指向的檔案不存在（{ev_path!r}）"
+                )
+            else:
+                # 修 11：全檔 sha — 對齊 gen_topic_intel_projection.py 全檔 sha256（cap 只用於文本解析）
+                # 修 8：一次 read 拆兩用，避免雙次 IO
+                _ev_bytes_full = _ev_file.read_bytes()
+                _EV_TEXT_CAP = 1_048_576  # 僅文本解析（YAML parse）cap 防大檔 OOM，不影響 sha
+                _ev_bytes = _ev_bytes_full[:_EV_TEXT_CAP]
+                if sha:
+                    _recomputed_sha = hashlib.sha256(_ev_bytes_full).hexdigest()  # 全檔 sha（修 11）
+                    if _recomputed_sha != sha:
+                        shadow_warns.append(
+                            f"evidence_path 重算 sha256 不符 evidence_sha256"
+                            f"（檔={_recomputed_sha[:8]}…, 記錄={sha[:8]}…，指紋失真）"
+                        )
+
+                # R5-3：真比對 — 腳本 ↔ evidence 題目同一性（§22.9：只驗題目，絕不限角度）
+                # evidence 訊號：title + transcript_preview + dissect.hook_structure.first_3_sec_text
+                # 修 8：加 hook_structure 補弱訊號（adapter 允許無 transcript 但有 hook_struct 的候選）
+                # 修 9：shadow 啟發式偵測，寬鬆門檻有誤判空間（§22.9 角度自由）
+                try:
+                    import re as _re_ev
+                    import yaml as _yaml_ev
+                    _ev_raw = _ev_bytes.decode("utf-8", errors="replace")
+                    _ev_raw = _re_ev.sub(r"^---\s*\n", "", _ev_raw, count=1)
+                    _ev_raw = _re_ev.sub(r"\n---\s*$", "", _ev_raw)
+                    _ev_data = _yaml_ev.safe_load(_ev_raw) or {}
+                    _ev_title = str(_ev_data.get("title", "") or "")
+                    _ev_transcript = str(_ev_data.get("transcript_preview", "") or "")
+                    # 修 8：補 dissect.hook_structure.first_3_sec_text
+                    _ev_hook_text = ""
+                    _ev_dissect = _ev_data.get("dissect") or {}
+                    if isinstance(_ev_dissect, dict):
+                        _ev_hook_struct = _ev_dissect.get("hook_structure") or {}
+                        if isinstance(_ev_hook_struct, dict):
+                            _ev_hook_text = str(_ev_hook_struct.get("first_3_sec_text", "") or "")
+                    _ev_topic_text = f"{_ev_title} {_ev_transcript} {_ev_hook_text}"
+                    _ev_tokens = _normalize_and_tokenize(_ev_topic_text)
+                    _body_text_ev = _extract_script_body_text(data)
+                    _body_tokens_ev = _normalize_and_tokenize(_body_text_ev)
+                    _TOPIC_SHARED_THRESHOLD = 2  # 寬鬆門檻（§22.9 角度自由、有誤判空間）
+                    if _ev_tokens:
+                        _topic_shared = _ev_tokens & _body_tokens_ev
+                        if len(_topic_shared) < _TOPIC_SHARED_THRESHOLD:
+                            shadow_warns.append(
+                                f"腳本與爆款出處題目疑似不同"
+                                f"（共享詞 {len(_topic_shared)} < {_TOPIC_SHARED_THRESHOLD}；"
+                                f"交集：{sorted(_topic_shared)[:3]}）"
+                                f"【shadow 啟發式偵測，有誤判空間；§22.9 不限角度】"
+                            )
+                except Exception as _ev_parse_err:
+                    shadow_warns.append(
+                        f"evidence 真比對讀取/解析失敗（略過此檢查）：{_ev_parse_err}"
+                    )
+
+                # R5-3b：AI 語意閘（題目同一性 shadow 判定）
+                # keyword 閘（R5-3）= 快篩；AI 閘 = 權威 shadow 判定（兩者並存）
+                # §22.9 鐵律已嵌入 _TOPIC_INTEL_AI_GATE_PROMPT_TEMPLATE
+                # 需 TOPIC_INTEL_AI_GATE=1 + GOOGLE_API_KEY；預設 skip（不污染、不擋批）
+                try:
+                    import os as _os_aig
+                    import hashlib as _hashlib_aig
+                    _AI_GATE_ENABLED = _os_aig.environ.get("TOPIC_INTEL_AI_GATE", "0") == "1"
+                    if _AI_GATE_ENABLED:
+                        _body_for_ai = _extract_script_body_text(data)
+                        _body_sha = _hashlib_aig.sha256(
+                            _body_for_ai.encode("utf-8", errors="replace")
+                        ).hexdigest()
+                        # 硬化 7：full cache key（evidence sha + body sha + model + prompt_version）
+                        _ev_sha_key = sha if sha else "nosha"
+                        _ai_cache_key = f"{_ev_sha_key}:{_body_sha}:{_AI_GATE_MODEL}:{_AI_GATE_PROMPT_VERSION}"
+                        # 硬化 6：厚 evidence — R5-3 解析結果 + narrative_arc + 痛點 dissect
+                        try:
+                            # R5-3 已解析成功：_ev_topic_text 含 title+transcript+hook
+                            _ai_ev_text = _ev_topic_text  # noqa: F821
+                            # 補 narrative_arc（讓 AI 看到更完整痛點敘事）
+                            try:
+                                _ev_arc = str(_ev_data.get("dissect", {}).get("narrative_arc", "") or "")  # noqa: F821
+                                if _ev_arc:
+                                    _ai_ev_text = f"{_ai_ev_text}\n[痛點敘事] {_ev_arc[:500]}"
+                            except Exception:
+                                pass
+                        except NameError:
+                            # R5-3 解析失敗 → 從 bytes 重新提取
+                            import re as _re_aig2
+                            import yaml as _yaml_aig2
+                            _raw2 = _ev_bytes.decode("utf-8", errors="replace")
+                            _raw2 = _re_aig2.sub(r"^---\s*\n", "", _raw2, count=1)
+                            _d2 = _yaml_aig2.safe_load(_raw2) or {}
+                            _ai_ev_text = (
+                                f"{_d2.get('title', '')} "
+                                f"{_d2.get('transcript_preview', '')} "
+                                f"{str((_d2.get('dissect') or {}).get('narrative_arc', ''))}"
+                            )
+                        _ai_result = _call_topic_intel_ai_gate(
+                            evidence_text=_ai_ev_text,
+                            script_body=_body_for_ai,
+                            cache_key=_ai_cache_key,
+                        )
+                        _ai_verdict = _ai_result.get("verdict", "api_unavailable")
+                        _ai_reason = _ai_result.get("reason", "")
+                        _ai_conf = _ai_result.get("confidence", 0)
+                        if _ai_verdict == "different_topic":
+                            # 重用修 10 flag 鏈：消息含「題目疑似不同」→ 現有 _r5_3_flagged_fnames 邏輯同時捕捉
+                            shadow_warns.append(
+                                f"【AI語意閘】腳本與爆款出處題目疑似不同"
+                                f"（verdict=different_topic, confidence={_ai_conf}；{_ai_reason}）"
+                                f"【shadow advisory；§22.9 不限角度；絕不擋批】"
+                            )
+                        elif _ai_verdict == "insufficient_evidence":
+                            shadow_warns.append(
+                                f"【AI語意閘】evidence 資訊不足，無法判定（confidence={_ai_conf}）；AI 閘略過"
+                            )
+                        elif _ai_verdict == "api_unavailable":
+                            shadow_warns.append(
+                                f"【AI語意閘】暫不可用，skip（{_ai_result.get('note', '')}）"
+                            )
+                        # same_topic / same_topic_new_angle → 通過，不加 warn（§22.9 合格放行）
+                    # _AI_GATE_ENABLED=False → 靜默 skip
+                except Exception as _ai_gate_err:
+                    shadow_warns.append(
+                        f"【AI語意閘】執行例外（skip，不擋批）：{_ai_gate_err}"
+                    )
+        except Exception as _ev_outer_err:
+            shadow_warns.append(f"evidence_path 指紋/比對檢查例外（略過）：{_ev_outer_err}")
 
     # 3. adopted_topic_statement 驗
     adopted = str(sti.get("adopted_topic_statement", "") or "").strip()
@@ -3323,8 +3785,13 @@ def chk_topic_intel_provenance(
             is_fail = True
 
     # 4. Fix G：projection cache 比對（驗真來源）
+    # R5-1：topic_id 必須非空（shadow WARN）— 堵空 topic_id 繞過 projection 比對
     topic_id = str(sti.get("topic_id", "") or "")
-    if topic_id and sha:
+    if not topic_id:
+        shadow_warns.append(
+            "topic_id 為空，無法驗真來源（防繞過 projection 比對）"
+        )
+    elif sha:
         try:
             _proj_index = _load_projection_candidate_index(owner) if owner else None
             if _proj_index is not None:
@@ -3351,7 +3818,10 @@ def chk_topic_intel_provenance(
             if mode == "enforce":
                 is_fail = True
 
-    if not issues:
+    # 結果彙整（shadow_warns 一律不升 enforce FAIL）
+    _all_issues = issues + [f"[補強] {w}" for w in shadow_warns]
+
+    if not _all_issues:
         adopted_tokens = _normalize_and_tokenize(adopted)
         body_text = _extract_script_body_text(data)
         body_tokens = _normalize_and_tokenize(body_text)
@@ -3363,8 +3833,8 @@ def chk_topic_intel_provenance(
         )
 
     if mode == "enforce" and is_fail:
-        return "FAIL", f"V3-001 provenance FAIL（enforce）：{'；'.join(issues)}"
-    return "WARN", f"V3-001 provenance WARN（{mode}）：{'；'.join(issues)}"
+        return "FAIL", f"V3-001 provenance FAIL（enforce）：{'；'.join(_all_issues)}"
+    return "WARN", f"V3-001 provenance WARN（{mode}）：{'；'.join(_all_issues)}"
 
 
 def chk_v3_002_batch_slot_count(
@@ -3377,10 +3847,16 @@ def chk_v3_002_batch_slot_count(
     policy disabled / off / invalid → SKIP（零足跡，不讀 yaml）。
     policy enabled（shadow/enforce）：
       統計整批有 source_topic_intel 的 yaml 數量。
-      < min_slots → FAIL
-      > max_slots → FAIL
-      in [min_slots, max_slots] → PASS
-    shadow / enforce 皆為 FAIL（批次結構問題，非單篇）。
+      < min_slots → FAIL / WARN
+      > ceiling → FAIL / WARN（ceiling 定義見下）
+      in [min_slots, ceiling] → PASS
+
+    ceiling 規則（2026-06-26）：
+      bind_scope == "all_offpro"：ceiling = 批次中 content_axis=="offpro" 的稿數
+        （即全部 offpro 稿都應綁；用 offpro 實際數而非 max_slots，避免假 WARN）
+      其他：ceiling = max_slots（規格 §9 原行為）
+
+    shadow → WARN；enforce → FAIL（批次結構問題，非單篇）。
     """
     if not topic_intel_policy or not topic_intel_policy.get("enabled", False):
         # off / disabled / invalid → 零足跡 SKIP
@@ -3389,6 +3865,7 @@ def chk_v3_002_batch_slot_count(
     mode = topic_intel_policy.get("mode", "off")
     min_slots = topic_intel_policy.get("min_slots") or 2
     max_slots = topic_intel_policy.get("max_slots") or 4
+    bind_scope = str(topic_intel_policy.get("bind_scope", "") or "").strip()
 
     # 統計有 source_topic_intel 的 yaml 數量（skeleton 也驗 —— assign 後已應存在 block）
     sti_count = sum(
@@ -3397,6 +3874,18 @@ def chk_v3_002_batch_slot_count(
     )
     total = len(valid_yamls)
 
+    # ceiling 決策：bind_scope=all_offpro 時用 offpro 稿實際數（2026-06-26）
+    if bind_scope == "all_offpro":
+        offpro_count = sum(
+            1 for _, data in valid_yamls
+            if str(data.get("content_axis", "") or "").strip().lower() == "offpro"
+        )
+        ceiling = offpro_count
+        ceiling_label = f"offpro 稿數={offpro_count}（bind_scope=all_offpro）"
+    else:
+        ceiling = max_slots
+        ceiling_label = f"max_slots={max_slots}"
+
     # Fix F【P1】shadow=WARN / enforce=FAIL（shadow 觀察期不被擋死）
     _v3002_severity = "FAIL" if mode == "enforce" else "WARN"
 
@@ -3404,12 +3893,57 @@ def chk_v3_002_batch_slot_count(
         return _v3002_severity, (
             f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total} < min_slots={min_slots}（{mode}）"
         )
-    if sti_count > max_slots:
+    if sti_count > ceiling:
         return _v3002_severity, (
-            f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total} > max_slots={max_slots}（{mode}）"
+            f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total} > {ceiling_label}（{mode}）"
         )
     return "PASS", (
-        f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total}（min={min_slots}, max={max_slots}, mode={mode}）"
+        f"V3-002 批次 source_topic_intel 總數 {sti_count}/{total}（min={min_slots}, ceiling={ceiling_label}, mode={mode}）"
+    )
+
+
+def chk_v3_001b_topic_id_unique(
+    valid_yamls: list[tuple],
+    topic_intel_policy: dict,
+) -> tuple[str, str]:
+    """
+    V3-001b：批次唯一性 — 同一批次內同一 topic_id 不重複掛（R5 Fix 4）。
+
+    policy disabled / off → SKIP（零足跡）。
+    policy enabled（shadow/enforce）：
+      掃整批 source_topic_intel.topic_id，找重複。
+      有重複 → shadow=WARN / enforce=WARN（皆 shadow 程度，不升 enforce FAIL）。
+      無重複 → PASS。
+    """
+    if not topic_intel_policy or not topic_intel_policy.get("enabled", False):
+        return "SKIP", "V3-001b WP-B policy off/disabled，跳過批次 topic_id 唯一驗"
+
+    mode = topic_intel_policy.get("mode", "off")
+    seen: dict = {}     # topic_id → 第一次出現的 fname
+    duplicates: list = []
+
+    for f, data in valid_yamls:
+        sti = data.get("source_topic_intel") if isinstance(data, dict) else None
+        if not isinstance(sti, dict):
+            continue
+        tid = str(sti.get("topic_id", "") or "").strip()
+        if not tid:
+            continue
+        fname = getattr(f, "name", str(f))
+        if tid in seen:
+            duplicates.append(f"{fname!r}（重複 topic_id={tid!r}，首次在 {seen[tid]!r}）")
+        else:
+            seen[tid] = fname
+
+    if not duplicates:
+        return "PASS", (
+            f"V3-001b 批次 topic_id 唯一（{len(seen)} 個各不重複，mode={mode}）"
+        )
+
+    dup_list = "；".join(duplicates[:5])
+    suffix = f"（共 {len(duplicates)} 筆重複）" if len(duplicates) > 5 else ""
+    return "WARN", (
+        f"V3-001b 批次內 topic_id 重複（shadow WARN，不擋批）：{dup_list}{suffix}"
     )
 
 
@@ -6308,6 +6842,10 @@ def main():
         batch_checks.append(
             ("V3-002", chk_v3_002_batch_slot_count(valid_yamls, _topic_intel_policy))
         )
+        # R5 Fix 4：批次唯一 topic_id（shadow WARN，不升 enforce）
+        batch_checks.append(
+            ("V3-001b", chk_v3_001b_topic_id_unique(valid_yamls, _topic_intel_policy))
+        )
     # C-22b anchor_first 機械閘（Cluster A v1.1；2026-06-23 已翻 enforce-live）—
     # 只對 proof_mode == anchor_first 的支跑；無此類支則零 append（零足跡，沿用 V3-002 off 邏輯）。
     for _c22b_f, _c22b_data in valid_yamls:
@@ -6382,6 +6920,18 @@ def main():
         import datetime as _datetime
 
         # 收集所有 V3-001 PASS 的 topic_intel 資料
+        # 修 7（R5 帳本失真 bug）：被 R5-3「題目疑似不同」WARN 的項標 topic_fidelity_flagged=True
+        # R5-3b（AI語意閘）也使用「題目疑似不同」短語 → 同一條件同時捕捉 keyword + AI 兩道閘的 flag
+        # 修 10 後實際鏈：validator 標 flag → reconciler 帶入 events.jsonl（修 10a）
+        #                → load_offered 拆 offered_by_batch_clean（修 10b）
+        #                → compute_slos 在 adoption_rate["clean"] 呈報乾淨採用率
+        # （選標記而非排除：shadow WARN 哲學，透明稽核，flag 由下游 observability 分開呈報）
+        _r5_3_flagged_fnames: set = {
+            fname
+            for cid, status, fname, detail in all_results
+            if cid == "V3-001" and status == "WARN" and "題目疑似不同" in detail
+        }
+
         v3_pass_items = []
         batch_id_from_yaml = valid_yamls[0][1].get("batch_tag", batch_dir.name) if valid_yamls else batch_dir.name
         for f, data in valid_yamls:
@@ -6389,13 +6939,16 @@ def main():
             if not sti or not isinstance(sti, dict):
                 continue
             script_id = data.get("script_id", f.stem)
-            v3_pass_items.append({
+            _item: dict = {
                 "topic_id": sti.get("topic_id", ""),
                 "script_id": script_id,
                 "batch_id": batch_id_from_yaml,
                 "evidence_sha256": sti.get("evidence_sha256", ""),
                 "assignment_mode": sti.get("assignment_mode", _topic_intel_policy.get("mode", "off")),
-            })
+            }
+            if f.name in _r5_3_flagged_fnames:
+                _item["topic_fidelity_flagged"] = True  # R5-3 shadow WARN；下游 adoption_rate 跳過此項
+            v3_pass_items.append(_item)
 
         # Fix C【P0】反查 owner_code（全鏈統一用 owner_code 當 key）
         _owner_code_for_report: str = ""
@@ -6452,6 +7005,65 @@ def main():
     if not args.strict and fail_count > 0:
         sys.exit(1)
     sys.exit(0)
+
+
+# ════════════════════════════════════════════
+# 選題候選粗篩（件 A shadow，2026-06-26）
+# ════════════════════════════════════════════
+# 用 C-22 同把尺（_s22_count_signals）對題目候選字串做紅黃綠粗篩。
+# 紅＝零訊號且含 FAQ 句型詞（明顯通用）；黃＝零訊號且無 FAQ；綠＝≥1 訊號。
+# shadow only：不硬擋出批、不改既有 C-22 邏輯。
+# ════════════════════════════════════════════
+
+_PREFILTER_FAQ_PATTERNS: list[str] = [
+    "怎麼", "如何", "要注意", "哪個好", "可不可以", "應不應該",
+    "對嗎", "好嗎", "值不值", "有什麼", "有哪些",
+]
+
+
+def run_topic_prefilter(
+    topics: list[str],
+    owner: str = "",
+) -> list[dict]:
+    """選題候選粗篩（shadow only，件 A 2026-06-26）。
+
+    輸入題目候選字串清單，回每題的紅黃綠標記 + 訊號明細。
+    用既有 _s22_count_signals() 同把尺，不另開平行系統。
+
+    判準（v1）：
+    - 紅（明顯通用）：total=0 AND 含 _PREFILTER_FAQ_PATTERNS 任一詞
+    - 黃（零訊號非 FAQ）：total=0 AND 無 FAQ 詞（off-pro 立場題短情感金句）
+    - 綠（有具體訊號）：total >= 1
+
+    誠實定位：
+    - 不參與評分，不預測 D1/D3/D4/D5
+    - 只擋 FAQ 型明顯通用題；對 off-pro 立場題寬容（黃不擋出批）
+    - 不替代 batch-level C-22 check（C-22 照跑不退場）
+    """
+    results: list[dict] = []
+    for t in topics:
+        t_s = str(t).strip() if t else ""
+        total, hard, hits = _s22_count_signals(t_s, owner)
+        is_faq = any(w in t_s for w in _PREFILTER_FAQ_PATTERNS)
+        if total == 0 and is_faq:
+            flag = "紅"
+            reason = "零訊號+FAQ句型（明顯通用，建議換角度）"
+        elif total == 0:
+            flag = "黃"
+            reason = "零訊號、無FAQ句型（off-pro立場題範圍，請確認角度不空泛）"
+        else:
+            hit_keys = [k for k, v in hits.items() if v]
+            flag = "綠"
+            reason = f"訊號 total={total} hard={hard}（命中：{hit_keys}）"
+        results.append({
+            "topic": t_s,
+            "flag": flag,
+            "total": total,
+            "hard": hard,
+            "hits": hits,
+            "reason": reason,
+        })
+    return results
 
 
 if __name__ == "__main__":

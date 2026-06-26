@@ -59,8 +59,8 @@ def fail(label: str, detail: str = "") -> None:
 
 # ── 共用 fixture：policy dict ──────────────────────────────────────────────
 
-def _policy(mode: str, min_slots: int = 2, max_slots: int = 4) -> dict:
-    return {
+def _policy(mode: str, min_slots: int = 2, max_slots: int = 4, bind_scope: str = "") -> dict:
+    result = {
         "mode": mode,
         "enabled": mode in ("shadow", "enforce"),
         "min_slots": min_slots,
@@ -69,6 +69,9 @@ def _policy(mode: str, min_slots: int = 2, max_slots: int = 4) -> dict:
         "approved_at": "2026-06-13",
         "detail": f"test policy mode={mode}",
     }
+    if bind_scope:
+        result["bind_scope"] = bind_scope
+    return result
 
 
 def _off_policy() -> dict:
@@ -110,6 +113,36 @@ def _make_plan(batch: str = "第01批_2026-06-13", n: int = 3) -> list[dict]:
         {"seq": i + 1, "batch": batch, "school": "直球派", "identity": "觀點分享", "topic": ""}
         for i in range(n)
     ]
+
+
+def _make_hybrid_plan(
+    batch: str = "第01批_2026-06-13",
+    n_offpro: int = 9,
+    n_anchor: int = 2,
+    n_pro: int = 2,
+) -> list[dict]:
+    """hybrid batch plan with content_axis（offpro / personal_anchor / professional）"""
+    items: list[dict] = []
+    seq = 1
+    for _ in range(n_offpro):
+        items.append({
+            "seq": seq, "batch": batch, "content_axis": "offpro",
+            "school": "直球派", "identity": "觀點分享", "topic": "",
+        })
+        seq += 1
+    for _ in range(n_anchor):
+        items.append({
+            "seq": seq, "batch": batch, "content_axis": "personal_anchor",
+            "school": "直球派", "identity": "觀點分享", "topic": "",
+        })
+        seq += 1
+    for _ in range(n_pro):
+        items.append({
+            "seq": seq, "batch": batch, "content_axis": "professional",
+            "school": "直球派", "identity": "觀點分享", "topic": "",
+        })
+        seq += 1
+    return items
 
 
 def _make_projection_json(
@@ -492,6 +525,55 @@ def tc7_v3002_batch_slot_count() -> None:
     status_off, detail_off = chk_v3_002_batch_slot_count(yamls_0, policy_off)
     ok(f"TC-7 off→SKIP（函式層）: status={status_off}") if status_off == "SKIP" else fail(
         f"TC-7 off 應 SKIP，實得 {status_off}: {detail_off}"
+    )
+
+    # ── TC-7 補 1：bind_scope=all_offpro — ceiling 改用 offpro 實際稿數（2026-06-26）──
+
+    def _yaml_offpro_with_sti(n_offpro: int, n_sti: int, n_total: int) -> list[tuple]:
+        """
+        n_offpro 支設 content_axis=offpro；前 n_sti 支同時設 source_topic_intel。
+        n_total 為批次總數（含非 offpro 稿）。
+        """
+        result = []
+        for i in range(n_total):
+            data: dict = {"title": f"腳本_{i}", "owner": "瑞祥"}
+            if i < n_offpro:
+                data["content_axis"] = "offpro"
+            if i < n_sti:
+                data["source_topic_intel"] = {
+                    "topic_id": f"ti_{i}",
+                    "evidence_sha256": "abc",
+                    "adopted_topic_statement": "測試主題很長的描述，符合十二字要求的中文陳述",
+                    "assigned_by": "topic_distributor",
+                    "assignment_mode": "shadow",
+                }
+            result.append((Path(f"script_{i:02d}.yaml"), data))
+        return result
+
+    policy_all_offpro = _policy("shadow", min_slots=2, max_slots=9, bind_scope="all_offpro")
+
+    # TC-7b-1: 9 offpro 稿、9 STI → ceiling=9, sti=9 ≤ 9 → PASS（舊 max_slots=4 時誤 WARN）
+    yamls_9_9 = _yaml_offpro_with_sti(n_offpro=9, n_sti=9, n_total=13)
+    s_9_9, d_9_9 = chk_v3_002_batch_slot_count(yamls_9_9, policy_all_offpro)
+    ok(f"TC-7b-1 9offpro/9sti→PASS: status={s_9_9}") if s_9_9 == "PASS" else fail(
+        f"TC-7b-1 bind_scope=all_offpro 9offpro/9sti 應 PASS，實得 {s_9_9}: {d_9_9}"
+    )
+    ok("TC-7b-1 detail 含 bind_scope=all_offpro") if "all_offpro" in d_9_9 else fail(
+        f"TC-7b-1 detail 應含 all_offpro，實得: {d_9_9}"
+    )
+
+    # TC-7b-2: 5 offpro 稿、3 STI → ceiling=5, sti=3 in [2,5] → PASS
+    yamls_5_3 = _yaml_offpro_with_sti(n_offpro=5, n_sti=3, n_total=13)
+    s_5_3, d_5_3 = chk_v3_002_batch_slot_count(yamls_5_3, policy_all_offpro)
+    ok(f"TC-7b-2 5offpro/3sti→PASS: status={s_5_3}") if s_5_3 == "PASS" else fail(
+        f"TC-7b-2 bind_scope=all_offpro 5offpro/3sti(in[2,5]) 應 PASS，實得 {s_5_3}: {d_5_3}"
+    )
+
+    # TC-7b-3: 5 offpro 稿、6 STI → ceiling=5, sti=6 > 5 → WARN（bind_scope shadow）
+    yamls_5_6 = _yaml_offpro_with_sti(n_offpro=5, n_sti=6, n_total=13)
+    s_5_6, d_5_6 = chk_v3_002_batch_slot_count(yamls_5_6, policy_all_offpro)
+    ok(f"TC-7b-3 5offpro/6sti→WARN: status={s_5_6}") if s_5_6 == "WARN" else fail(
+        f"TC-7b-3 bind_scope=all_offpro 5offpro/6sti(>5) 應 WARN，實得 {s_5_6}: {d_5_6}"
     )
 
 
@@ -1307,6 +1389,322 @@ def tc17_p2_usage_index_state_three_values() -> None:
 
 # ── 執行 ──────────────────────────────────────────────────────────────────────
 
+# ── TC-18：bind_scope=all_offpro 部分不足（pool thin WARN + 不擋批）─────────────
+def tc18_bind_scope_all_offpro_pool_thin() -> None:
+    """
+    TC-18：bind_scope=all_offpro + 5 候選 / 9 offpro slot / min=2
+    → 綁 5（不滿 9）+ WARN 含 pool thin + error=None（§22.9 絕不擋批）
+    + assign_report 含 bind_scope 欄
+    """
+    print("\n[TC-18] bind_scope=all_offpro 部分不足（5 候選 / 9 offpro slot）")
+    from topic_distributor import assign_topic_sources  # type: ignore[import]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        candidates = [_make_candidate(f"ti_tc18_{i}") for i in range(5)]
+        proj = _make_projection_json(candidates)
+        proj_path = Path(tmpdir) / "active.json"
+        proj_path.write_text(json.dumps(proj), encoding="utf-8")
+
+        plan = _make_hybrid_plan(n_offpro=9, n_anchor=2, n_pro=2)
+        plan_out, report = assign_topic_sources(
+            plan=plan,
+            dedup_info={},
+            policy=_policy("shadow", min_slots=2, max_slots=4, bind_scope="all_offpro"),
+            projection_path=str(proj_path),
+        )
+
+    # 應綁 5 個（= 候選數，不足 9 但 ≥ min=2）
+    sti_count = sum(1 for item in plan_out if "source_topic_intel" in item)
+    ok(f"TC-18: 綁 5 個（實得 {sti_count}）") if sti_count == 5 else fail(
+        f"TC-18: 期望綁 5，實得 {sti_count}",
+        f"report={report.get('detail', '')}",
+    )
+
+    # bound slots 全部是 offpro slot（index 0-8）
+    bound_slots = report.get("assigned_slots", [])
+    all_offpro = all(plan[s].get("content_axis") == "offpro" for s in bound_slots)
+    ok(f"TC-18: 綁入 slots 全為 offpro（slots={bound_slots}）") if all_offpro else fail(
+        f"TC-18: 有非 offpro slot 被綁入，slots={bound_slots}",
+    )
+
+    # 應有 pool thin WARN（含「5」且含「9」字元，或含「pool thin」）
+    has_pool_thin = any(
+        "pool thin" in w or ("5" in w and "9" in w)
+        for w in report.get("warnings", [])
+    )
+    ok("TC-18: warnings 含 pool thin WARN") if has_pool_thin else fail(
+        "TC-18: 應有 pool thin WARN",
+        f"warnings={report.get('warnings')}",
+    )
+
+    # error=None（§22.9 絕不擋批）
+    ok("TC-18: error=None（不擋批）") if report.get("error") is None else fail(
+        f"TC-18: error 應為 None，實得 {report.get('error')!r}",
+    )
+
+    # assign_report 含 bind_scope 欄（因為 bind_scope 非空）
+    ok("TC-18: assign_report 含 bind_scope 欄") if "bind_scope" in report else fail(
+        f"TC-18: assign_report 應含 bind_scope，keys={list(report.keys())}",
+    )
+
+
+# ── TC-19：bind_scope=all_offpro 充足（≥9 候選 → 綁滿 9）────────────────────────
+def tc19_bind_scope_all_offpro_sufficient() -> None:
+    """
+    TC-19：bind_scope=all_offpro + 11 候選 / 9 offpro slot / min=2
+    → 綁 9（滿）+ 無 pool thin WARN + error=None + 非 offpro slot 無 STI
+    """
+    print("\n[TC-19] bind_scope=all_offpro 充足（11 候選 / 9 offpro slot）")
+    from topic_distributor import assign_topic_sources  # type: ignore[import]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        candidates = [_make_candidate(f"ti_tc19_{i}") for i in range(11)]
+        proj = _make_projection_json(candidates)
+        proj_path = Path(tmpdir) / "active.json"
+        proj_path.write_text(json.dumps(proj), encoding="utf-8")
+
+        plan = _make_hybrid_plan(n_offpro=9, n_anchor=2, n_pro=2)
+        plan_out, report = assign_topic_sources(
+            plan=plan,
+            dedup_info={},
+            policy=_policy("shadow", min_slots=2, max_slots=4, bind_scope="all_offpro"),
+            projection_path=str(proj_path),
+        )
+
+    # 應綁 9 個（全部 offpro slot）
+    sti_count = sum(1 for item in plan_out if "source_topic_intel" in item)
+    ok(f"TC-19: 綁 9 個（實得 {sti_count}）") if sti_count == 9 else fail(
+        f"TC-19: 期望綁 9，實得 {sti_count}",
+        f"report={report.get('detail', '')}",
+    )
+
+    # bound slots 應剛好是 [0,1,...,8]（9 個 offpro）
+    bound_slots = report.get("assigned_slots", [])
+    ok(f"TC-19: slots=[0..8]（實得 {bound_slots}）") \
+        if bound_slots == list(range(9)) else fail(
+        f"TC-19: slots 期望 [0..8]，實得 {bound_slots}",
+    )
+
+    # 無 pool thin WARN
+    has_pool_thin = any("pool thin" in w for w in report.get("warnings", []))
+    ok("TC-19: 無 pool thin WARN（候選充足）") if not has_pool_thin else fail(
+        f"TC-19: 不應有 pool thin WARN，warnings={report.get('warnings')}",
+    )
+
+    # error=None
+    ok("TC-19: error=None（充足）") if report.get("error") is None else fail(
+        f"TC-19: error 應為 None，實得 {report.get('error')!r}",
+    )
+
+    # 非 offpro slot 不含 source_topic_intel
+    non_offpro_with_sti = [
+        item for item in plan_out
+        if item.get("content_axis") != "offpro" and "source_topic_intel" in item
+    ]
+    ok("TC-19: 非 offpro slot 無 source_topic_intel") if not non_offpro_with_sti else fail(
+        f"TC-19: 非 offpro slot 不應有 STI，found={len(non_offpro_with_sti)} 個",
+    )
+
+
+# ── TC-20：legacy（無 bind_scope）assign_report 不含 bind_scope 欄（修 3 驗收）──
+def tc20_legacy_no_bind_scope_in_report() -> None:
+    """
+    TC-20：legacy policy（無 bind_scope key）在 shadow/enforce PASS 時，
+    assign_report 不應含 bind_scope 欄位（§修 3：不打破舊 assign_report byte-compat）
+    """
+    print("\n[TC-20] legacy（無 bind_scope）assign_report 不含 bind_scope 欄")
+    from topic_distributor import assign_topic_sources  # type: ignore[import]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        candidates = [_make_candidate(f"ti_tc20_{i}") for i in range(5)]
+        proj = _make_projection_json(candidates)
+        proj_path = Path(tmpdir) / "active.json"
+        proj_path.write_text(json.dumps(proj), encoding="utf-8")
+
+        plan = _make_plan(n=5)  # 無 content_axis → legacy plan
+        # _policy("shadow") 不帶 bind_scope（legacy）
+        plan_out, report = assign_topic_sources(
+            plan=plan,
+            dedup_info={},
+            policy=_policy("shadow", min_slots=2, max_slots=4),
+            projection_path=str(proj_path),
+        )
+
+    # assign_report 不含 bind_scope 欄（legacy 行為）
+    ok("TC-20: assign_report 無 bind_scope 欄（legacy）") \
+        if "bind_scope" not in report else fail(
+        f"TC-20: legacy assign_report 不應有 bind_scope，keys={list(report.keys())}",
+    )
+
+    # 仍正常綁（min=2 ≤ 5 候選 ≤ max=4 → 綁 4）
+    sti_count = sum(1 for item in plan_out if "source_topic_intel" in item)
+    ok(f"TC-20: legacy 仍正常綁（實得 {sti_count}）") if sti_count > 0 else fail(
+        f"TC-20: legacy 應有正常綁入，sti_count={sti_count}",
+    )
+
+
+# ── TC-21：bind_scope=all_offpro 剛好 9 候選 / 9 offpro slot（邊界）─────────────
+def tc21_bind_scope_exact_boundary() -> None:
+    """
+    TC-21：候選數 == offpro slot 數（9/9）
+    → 綁 9、無 pool-thin WARN（不少一個）、error=None
+    """
+    print("\n[TC-21] bind_scope=all_offpro 邊界（9 候選 / 9 offpro slot）")
+    from topic_distributor import assign_topic_sources  # type: ignore[import]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        candidates = [_make_candidate(f"ti_tc21_{i}") for i in range(9)]
+        proj = _make_projection_json(candidates)
+        proj_path = Path(tmpdir) / "active.json"
+        proj_path.write_text(json.dumps(proj), encoding="utf-8")
+
+        plan = _make_hybrid_plan(n_offpro=9, n_anchor=2, n_pro=2)
+        plan_out, report = assign_topic_sources(
+            plan=plan,
+            dedup_info={},
+            policy=_policy("shadow", min_slots=2, max_slots=4, bind_scope="all_offpro"),
+            projection_path=str(proj_path),
+        )
+
+    # 應綁 9 個（剛好全滿）
+    sti_count = sum(1 for item in plan_out if "source_topic_intel" in item)
+    ok(f"TC-21: 綁 9 個（實得 {sti_count}）") if sti_count == 9 else fail(
+        f"TC-21: 期望綁 9，實得 {sti_count}",
+        f"report={report.get('detail', '')}",
+    )
+
+    # 無 pool-thin WARN（候選數剛好等於 slot 數，不算 thin）
+    has_pool_thin = any("pool thin" in w for w in report.get("warnings", []))
+    ok("TC-21: 無 pool thin WARN（9/9 剛好滿）") if not has_pool_thin else fail(
+        f"TC-21: 9/9 不應有 pool thin，warnings={report.get('warnings')}",
+    )
+
+    # error=None
+    ok("TC-21: error=None") if report.get("error") is None else fail(
+        f"TC-21: error 應為 None，實得 {report.get('error')!r}",
+    )
+
+    # bound_slots 剛好 [0..8]
+    bound_slots = report.get("assigned_slots", [])
+    ok(f"TC-21: slots=[0..8]（實得 {bound_slots}）") \
+        if bound_slots == list(range(9)) else fail(
+        f"TC-21: slots 期望 [0..8]，實得 {bound_slots}",
+    )
+
+
+# ── TC-22：bind_scope=all_offpro 但批次 0 個 off-pro slot → 清楚 WARN + 不擋批 ──
+def tc22_bind_scope_zero_offpro_slots() -> None:
+    """
+    TC-22：plan 中無 offpro slot（n_offpro=0）
+    → 清楚 WARN（「此批無 off-pro slot」）、selected_count=0、error=None（不擋批）
+    驗修 4：不再誤觸「qualified < min_slots」那條誤導分支
+    """
+    print("\n[TC-22] bind_scope=all_offpro 但 plan 無 offpro slot → 清楚 WARN + error=None")
+    from topic_distributor import assign_topic_sources  # type: ignore[import]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 足夠候選（proof 有料），排除「候選不足」那條分支
+        candidates = [_make_candidate(f"ti_tc22_{i}") for i in range(10)]
+        proj = _make_projection_json(candidates)
+        proj_path = Path(tmpdir) / "active.json"
+        proj_path.write_text(json.dumps(proj), encoding="utf-8")
+
+        # plan 全為 non-offpro（anchor + professional only）
+        plan = _make_hybrid_plan(n_offpro=0, n_anchor=4, n_pro=4)
+        plan_out, report = assign_topic_sources(
+            plan=plan,
+            dedup_info={},
+            policy=_policy("shadow", min_slots=2, max_slots=4, bind_scope="all_offpro"),
+            projection_path=str(proj_path),
+        )
+
+    # 清楚 WARN 含「off-pro slot」或「無可綁定」
+    has_clear_warn = any(
+        "off-pro slot" in w or "無可綁定" in w
+        for w in report.get("warnings", [])
+    )
+    ok("TC-22: warnings 含清楚 off-pro slot WARN") if has_clear_warn else fail(
+        f"TC-22: 應有清楚 WARN，warnings={report.get('warnings')}",
+    )
+
+    # 不含「qualified < min_slots」誤導訊息
+    no_misleading = not any("min_slots" in w for w in report.get("warnings", []))
+    ok("TC-22: warnings 無 min_slots 誤導訊息") if no_misleading else fail(
+        f"TC-22: 不應有 min_slots 誤導 WARN，warnings={report.get('warnings')}",
+    )
+
+    # selected_count=0、error=None（不擋批）
+    ok(f"TC-22: selected_count=0（實得 {report.get('selected_count')}）") \
+        if report.get("selected_count") == 0 else fail(
+        f"TC-22: selected_count 應為 0，實得 {report.get('selected_count')}",
+    )
+    ok("TC-22: error=None（不擋批）") if report.get("error") is None else fail(
+        f"TC-22: error 應為 None，實得 {report.get('error')!r}",
+    )
+
+    # plan 未被改動（無 source_topic_intel）
+    sti_count = sum(1 for item in plan_out if "source_topic_intel" in item)
+    ok(f"TC-22: plan 無 source_topic_intel（{sti_count}）") if sti_count == 0 else fail(
+        f"TC-22: 應綁 0，實得 {sti_count}",
+    )
+
+
+# ── TC-23：_owner_matches alias 命中（修 6）──────────────────────────────────
+
+def tc23_owner_matches_alias_hit() -> None:
+    """
+    TC-23：_owner_matches alias 命中（修 6）
+    業主 proj 有 _aliases=["叭噗"]，applicable_owners=["叭噗"]
+    → _owner_matches 應回傳 True（alias 命中）
+
+    對比：
+    - applicable_owners=["不存在"] → False
+    - applicable_owners=[] → 走 industry 路徑（非 alias 路徑）
+    - applicable_owners=["叭噗_小C"] → True（正式名命中）
+    """
+    print("\n[TC-23] _owner_matches alias 命中（修 6）")
+    from gen_topic_intel_projection import _owner_matches  # type: ignore[import]
+
+    owner_rec = {
+        "owner_name": "叭噗_小C",
+        "owner_id": "BAPU",
+        "owner_code": "bappu",
+        "_aliases": ["叭噗"],   # runtime_aliases 逆查：叭噗 → 叭噗_小C
+        "industry_id": "美容",
+        "industries": ["美容"],
+    }
+
+    # (A) alias 命中 → True
+    result_a = _owner_matches(owner_rec, applicable_owners=["叭噗"], industry="美容")
+    ok("TC-23A: alias 命中 → True") if result_a is True else fail(
+        f"TC-23A: 應 True，實得 {result_a!r}",
+    )
+
+    # (B) 正式名命中 → True（regression 保護）
+    result_b = _owner_matches(owner_rec, applicable_owners=["叭噗_小C"], industry="美容")
+    ok("TC-23B: 正式名命中 → True") if result_b is True else fail(
+        f"TC-23B: 應 True，實得 {result_b!r}",
+    )
+
+    # (C) owner_id 命中 → True（regression 保護）
+    result_c = _owner_matches(owner_rec, applicable_owners=["BAPU"], industry="美容")
+    ok("TC-23C: owner_id 命中 → True") if result_c is True else fail(
+        f"TC-23C: 應 True，實得 {result_c!r}",
+    )
+
+    # (D) 不在清單且無 alias 命中 → False（owner-leak 保護）
+    result_d = _owner_matches(owner_rec, applicable_owners=["瑞祥"], industry="美容")
+    ok("TC-23D: 不含此業主 → False（owner-leak 保護）") if result_d is False else fail(
+        f"TC-23D: 應 False，實得 {result_d!r}",
+    )
+
+    # (E) applicable_owners 空 → 走 industry 路徑（alias 路徑不觸發）
+    result_e = _owner_matches(owner_rec, applicable_owners=[], industry="美容")
+    ok("TC-23E: applicable_owners 空 + industry 命中 → True") if result_e is True else fail(
+        f"TC-23E: 應 True（industry 路徑），實得 {result_e!r}",
+    )
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("  WP-B 閉環整合測試 test_wpb_closure.py")
@@ -1330,6 +1728,12 @@ if __name__ == "__main__":
     tc15_p02_invalid_policy_fail_closed()
     tc16_p1_evidence_path_missing_key_enforce_skip()
     tc17_p2_usage_index_state_three_values()
+    tc18_bind_scope_all_offpro_pool_thin()
+    tc19_bind_scope_all_offpro_sufficient()
+    tc20_legacy_no_bind_scope_in_report()
+    tc21_bind_scope_exact_boundary()
+    tc22_bind_scope_zero_offpro_slots()
+    tc23_owner_matches_alias_hit()
 
     print("\n" + "=" * 60)
     print(f"  結果：{PASS_COUNT} PASS / {FAIL_COUNT} FAIL")

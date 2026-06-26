@@ -279,6 +279,10 @@ def reconcile(report_path: Path) -> int:
             "validator_report_sha256": report_sha,
             "_idempotent_key": idem_key,
         }
+        # 修 10a：把 topic_fidelity_flagged 帶進 events.jsonl（R5-3 shadow WARN 標記）
+        # 讓下游 load_offered 能分辨乾淨採用 vs 疑似腦補採用
+        if item.get("topic_fidelity_flagged"):
+            ev["topic_fidelity_flagged"] = True
         new_events.append(ev)
         existing_keys.add(idem_key)  # 批內去重
 

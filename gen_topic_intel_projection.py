@@ -215,22 +215,35 @@ def _load_owner_projection_json() -> dict:
 
 def _owner_matches(proj: dict, applicable_owners: list, industry: str) -> bool:
     """
-    業主是否命中：applicable_owners 包含業主名/alias，
-    或 industry 命中業主的 industry_id/industries。
+    業主是否命中：applicable_owners 包含業主名/id/code/alias（任一命中即 True），
+    或 applicable_owners 為空時以 industry 命中業主的 industry_id/industries。
+
+    alias 來源：proj["_aliases"]（runtime_aliases 逆查結果，由 main 在呼叫前注入）。
+    例：叭噗_小C 的 _aliases = ["叭噗"]，candidate 若寫 applicable_owners: ["叭噗"] 亦能命中。
     """
     owner_name: str = proj.get("owner_name", "")
     owner_id: str = proj.get("owner_id", "")
     owner_code: str = proj.get("owner_code", "")
+    owner_aliases: list = proj.get("_aliases", [])  # 修 6：runtime_aliases 逆查 aliases
     industries: list = proj.get("industries", [])
     industry_id: str = proj.get("industry_id", "")
 
-    # applicable_owners 列表命中（名稱 or id or code）
+    # applicable_owners 列表命中（名稱 or id or code or aliases 任一命中）
+    # owner-leak fix：若列表非空但不含此業主 → 明確排除，不 fall-through 到 industry 比對
+    # （industry-scope 只適用 applicable_owners 為空時）
     if applicable_owners:
         targets = {str(x).strip() for x in applicable_owners}
-        if owner_name in targets or owner_id in targets or owner_code in targets:
+        if (
+            owner_name in targets
+            or owner_id in targets
+            or owner_code in targets
+            or any(str(a).strip() in targets for a in owner_aliases)
+        ):
             return True
+        # 明確 owner scope 但不含此業主（含 alias）→ 排除
+        return False
 
-    # industry 命中
+    # applicable_owners 空 → industry-scope 候選：行業相符才放行
     if industry:
         if industry == industry_id or industry in industries:
             return True
@@ -365,6 +378,7 @@ def generate_owner_projection(
 
     # 過濾 + 投影
     qualified: list[dict] = []
+    excluded_owner_leak: int = 0  # applicable_owners 非空且不含此業主的排除數（owner-leak fix）
 
     for path, sha in file_entries:
         raw = _load_cyborg_yaml(path)
@@ -380,6 +394,9 @@ def generate_owner_projection(
             applicable_owners,
             industry,
         ):
+            # 計數 owner-leak 排除（applicable_owners 非空且不含此業主）
+            if applicable_owners:
+                excluded_owner_leak += 1
             continue
 
         # adapter 投影（eligibility check）
@@ -422,6 +439,7 @@ def generate_owner_projection(
         "generated_at": generated_at,
         "expires_at": expires_at,
         "qualified_count": len(qualified),
+        "excluded_owner_leak_count": excluded_owner_leak,  # owner-leak fix 排除計數
         "candidates": qualified,
     }
 
@@ -440,15 +458,16 @@ def generate_owner_projection(
         )
         fsize = out_path.stat().st_size
         print(
-            f"  [{owner_name}] qualified={len(qualified)} → {out_path} ({fsize} bytes)"
+            f"  [{owner_name}] qualified={len(qualified)}, excluded_leak={excluded_owner_leak} → {out_path} ({fsize} bytes)"
         )
     else:
-        print(f"  [{owner_name}] dry-run: qualified={len(qualified)}")
+        print(f"  [{owner_name}] dry-run: qualified={len(qualified)}, excluded_leak={excluded_owner_leak}")
 
     return {
         "owner": owner_name,
         "owner_code": owner_code,
         "qualified_count": len(qualified),
+        "excluded_owner_leak_count": excluded_owner_leak,
         "output_path": str(out_path) if not dry_run else None,
         "fingerprint": fingerprint,
         "error": None,

@@ -436,7 +436,10 @@ def build_yaml_skeleton(item: dict) -> str:
         lines.append(f"  topic_id: \"{sti.get('topic_id', '')}\"")
         lines.append(f"  source_kind: {sti.get('source_kind', 'cyborg_yaml')}")
         ev_path = sti.get("evidence_path", "") or ""
-        lines.append(f"  evidence_path: \"{ev_path}\"")
+        # Fix：Windows 反斜線在 YAML 雙引號字串中會被解為 Unicode escape（\U → 解析失敗）
+        # 改用正斜線（Python pathlib / YAML 解析器均接受）
+        ev_path_yaml = ev_path.replace("\\", "/")
+        lines.append(f"  evidence_path: \"{ev_path_yaml}\"")
         lines.append(f"  evidence_sha256: \"{sti.get('evidence_sha256', '')}\"")
         # adopted_topic_statement：編劇填（validator skeleton 階段 SKIP，成稿驗關鍵詞交集）
         adopted = sti.get("adopted_topic_statement", "") or ""

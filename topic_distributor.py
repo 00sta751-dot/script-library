@@ -851,6 +851,24 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(output_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    # ── 選題粗篩 shadow（件 A，fail-open，2026-06-26）──
+    try:
+        _pf_dir = Path(__file__).resolve().parent
+        _pf_sys_path = str(_pf_dir)
+        if _pf_sys_path not in sys.path:
+            sys.path.insert(0, _pf_sys_path)
+        from validate_script_batch import run_topic_prefilter as _run_pf  # type: ignore[import]
+        _pf_topics = [str(e.get("direction", "")).strip() for e in plan if e.get("direction")]
+        _pf_results = _run_pf(_pf_topics, owner)
+        _pf_path = out_path.parent / "_topic_prefilter_shadow.json"
+        _pf_path.write_text(json.dumps(_pf_results, ensure_ascii=False, indent=2), encoding="utf-8")
+        _pf_red = sum(1 for r in _pf_results if r["flag"] == "紅")
+        _pf_yellow = sum(1 for r in _pf_results if r["flag"] == "黃")
+        _pf_green = sum(1 for r in _pf_results if r["flag"] == "綠")
+        print(f"[prefilter shadow] 紅={_pf_red} 黃={_pf_yellow} 綠={_pf_green} → {_pf_path}")
+    except Exception as _pf_err:
+        print(f"[prefilter shadow] SKIP（fail-open）：{_pf_err}", file=sys.stderr)
+
     # 驗 file size
     fsize = out_path.stat().st_size
     print(f"\n[DONE] 輸出：{out_path}  ({fsize} bytes)")
@@ -936,14 +954,19 @@ def assign_topic_sources(
     mode = policy.get("mode", "off")
     min_slots: int = policy.get("min_slots") or 2
     max_slots: int = policy.get("max_slots") or 4
+    # bind_scope="all_offpro" → 綁滿 plan 中所有 offpro slot；"" → legacy max_slots 行為
+    bind_scope: str = str(policy.get("bind_scope", "") or "")
 
     warnings: list[str] = []
-    assign_report_base = {
+    assign_report_base: dict = {
         "mode": mode,
         "enabled": True,
         "min_slots": min_slots,
         "max_slots": max_slots,
     }
+    # bind_scope 只在非空時加入（legacy 無此欄，不打破舊 assign_report byte-compat）
+    if bind_scope:
+        assign_report_base["bind_scope"] = bind_scope
 
     # batch_id 一致性（§9 r3 盲點1）
     batch_id: Optional[str] = None
@@ -1168,20 +1191,46 @@ def assign_topic_sources(
 
     qualified_count = len(filtered_candidates)
 
-    # 計算 selected_count
+    # bind_scope=all_offpro → 只綁 offpro slot，以 plan 中 offpro 數量為上限
+    # bind_scope="" (legacy) → 綁前 max_slots 個 slot，不看 content_axis（向後相容）
+    if bind_scope == "all_offpro":
+        eligible_slot_indices = [
+            i for i, item in enumerate(plan)
+            if item.get("content_axis") == "offpro"
+        ]
+        effective_max_slots = len(eligible_slot_indices)
+        if effective_max_slots == 0:
+            # 此批無 offpro slot → 無可綁定（不是候選不足）→ 清楚 WARN + 乾淨結束（§22.9 不擋批）
+            warnings.append("[WARN] 此批無 off-pro slot，bind_scope=all_offpro 無可綁定，略過（不擋批）")
+            return plan, {
+                **assign_report_base,
+                "selected_count": 0,
+                "assigned_slots": [],
+                "qualified_count": qualified_count,
+                "batch_id": batch_id,
+                "error": None,
+                "warnings": warnings,
+                "detail": "assign skip: bind_scope=all_offpro 但此批無 off-pro slot（不擋批）",
+            }
+    else:
+        # legacy：全 slot 候補，effective_max_slots = max_slots
+        eligible_slot_indices = list(range(len(plan)))
+        effective_max_slots = max_slots
+
+    # 計算 selected_count（用 effective_max_slots）
     if qualified_count < min_slots:
         selected_count = 0
     else:
-        selected_count = min(max_slots, qualified_count)
+        selected_count = min(effective_max_slots, qualified_count)
 
-    # enforce 不足 min → 不綁 + error
+    # enforce 不足 min → 不綁 + error；shadow → 綁得到的就綁（§22.9 絕不擋批、絕不退題）
     if selected_count == 0:
         msg = (
             f"合格候選 {qualified_count} 支 < min_slots={min_slots}，"
             f"enforce 不綁（需補充選題情報池 pending 料）"
         )
         if mode == "shadow":
-            # shadow 不足 min → 綁 qualified_count 個觀察（規格 §9 r3）
+            # shadow：候選不足時綁 qualified_count 個觀察，絕不擋批（§22.9 紅線）
             selected_count = qualified_count
             warnings.append(f"shadow: 合格候選 {qualified_count} < min_slots={min_slots}，綁 {qualified_count} 個觀察")
         else:
@@ -1206,14 +1255,28 @@ def assign_topic_sources(
         selected.append(candidate)
         reserved_topic_ids.add(tid)
 
-    # 綁進 plan 前 N 個 slot（§9 r3）
+    # pool-thin WARN（bind_scope=all_offpro + 有候選但不足 offpro slot 數）§22.9 絕不擋批
+    if bind_scope == "all_offpro" and 0 < len(selected) < len(eligible_slot_indices):
+        warnings.append(
+            f"[WARN] pool thin: 綁了 {len(selected)}/{len(eligible_slot_indices)} 個 off-pro slot，"
+            f"剩 {len(eligible_slot_indices) - len(selected)} 個 slot 留給編劇走正常 off-pro（不擋批）"
+        )
+
+    # 綁進 eligible_slot_indices 的前 N 個 slot
+    # bind_scope=all_offpro → eligible_slot_indices 只含 offpro 位置
+    # legacy → eligible_slot_indices = [0,1,...,N-1]（與舊行為 byte-identical）
     assigned_slots: list[int] = []
     plan_copy = [dict(item) for item in plan]  # 不 mutate 原 plan
 
     for i, candidate in enumerate(selected):
-        if i >= len(plan_copy):
-            warnings.append(f"plan 長度 {len(plan_copy)} < selected_count {len(selected)}，截斷")
+        # 取目標 slot index
+        if i >= len(eligible_slot_indices):
+            warnings.append(
+                f"eligible_slot_indices 長度 {len(eligible_slot_indices)} < selected {len(selected)}，截斷"
+            )
             break
+        target_slot = eligible_slot_indices[i]
+
         # Fix G：evidence_path 從 projection candidate 的 evidence_path 欄取 canonical path
         # gen_topic_intel_projection 在 qualified.append(proj) 前已填入 path.resolve()
         _ev_path_raw = candidate.get("evidence_path")  # None = 欄不存在（舊格式/fixture）
@@ -1232,7 +1295,7 @@ def assign_topic_sources(
                 warnings.append(
                     f"[WARN] 候選 topic_id={_tid_for_warn!r} evidence_path 空，shadow 綁但標空路徑"
                 )
-        plan_copy[i]["source_topic_intel"] = {
+        plan_copy[target_slot]["source_topic_intel"] = {
             "topic_id": candidate.get("topic_id", ""),
             "source_kind": "cyborg_yaml",
             "evidence_path": _ev_path,       # Fix G+Fix5：assign 端必填 canonical path
@@ -1241,7 +1304,7 @@ def assign_topic_sources(
             "assigned_by": "topic_distributor",
             "assignment_mode": mode,
         }
-        assigned_slots.append(i)
+        assigned_slots.append(target_slot)
 
     # Fix P1 縱深：assign loop 後若 enforce 且實際綁入數 < min_slots（evidence_path 空等情形跳過）→ error
     if mode == "enforce" and len(assigned_slots) < min_slots:

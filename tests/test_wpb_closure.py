@@ -576,6 +576,46 @@ def tc7_v3002_batch_slot_count() -> None:
         f"TC-7b-3 bind_scope=all_offpro 5offpro/6sti(>5) 應 WARN，實得 {s_5_6}: {d_5_6}"
     )
 
+    # ── TC-7c：bind_scope typo → WARN 出現 + 退 legacy + 不擋批（2026-06-26 GPT hardening）──
+    print("\n[TC-7c] bind_scope typo → WARN + 退 legacy + 不擋批")
+    import tempfile as _tmpfile, pathlib as _pathlib
+    from topic_intel_policy import load_topic_intel_policy  # type: ignore[import]
+
+    with _tmpfile.TemporaryDirectory() as _td:
+        _flag = _pathlib.Path(_td) / "_batch_flags.yml"
+        _flag.write_text("""topic_intel_closure:
+  mode: shadow
+  min_slots: 2
+  max_slots: 4
+  bind_scope: all_offproo
+  approved_by: 澤君
+  approved_at: "2026-06-26"
+""", encoding="utf-8")
+        _typo_policy = load_topic_intel_policy(_td)
+
+    # 應 enabled（不 invalid → 不擋批）
+    ok("TC-7c typo policy enabled") if _typo_policy.get("enabled") else fail(
+        f"TC-7c typo bind_scope 不應 invalid（不擋批），實得: {_typo_policy}"
+    )
+    # bind_scope 應退 legacy（None 或 ""）
+    _bs = _typo_policy.get("bind_scope", None)
+    ok(f"TC-7c bind_scope 退 legacy={_bs!r}") if _bs in (None, "") else fail(
+        f"TC-7c typo bind_scope 應退 legacy，實得 bind_scope={_bs!r}"
+    )
+    # WARN 字樣應出現在 warnings 或 detail
+    _ws = _typo_policy.get("warnings", [])
+    _det = _typo_policy.get("detail", "")
+    _warn_present = any("all_offproo" in w for w in _ws) or "all_offproo" in _det
+    ok("TC-7c WARN 含 typo 值") if _warn_present else fail(
+        f"TC-7c WARN 應含 'all_offproo' 字樣，warnings={_ws}, detail={_det}"
+    )
+    # chk_v3_002 走 legacy 路徑（ceiling=max_slots=4），3 STI in [2,4] → PASS
+    _yamls_leg = _yaml_with_sti(3, 13)
+    _s_leg, _d_leg = chk_v3_002_batch_slot_count(_yamls_leg, _typo_policy)
+    ok(f"TC-7c legacy path PASS: {_s_leg}") if _s_leg == "PASS" else fail(
+        f"TC-7c typo 退 legacy 後 3sti/max=4 應 PASS，實得 {_s_leg}: {_d_leg}"
+    )
+
 
 # ── TC-8：Fix H validator CLI golden（off 零足跡）+ end-to-end owner_code ──────
 

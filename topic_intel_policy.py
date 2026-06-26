@@ -232,11 +232,23 @@ def load_topic_intel_policy(
     bind_scope_raw = closure_cfg.get("bind_scope", "") or ""
     bind_scope_out = str(bind_scope_raw).strip()
 
+    # bind_scope 白名單驗證（只接受 "" 或 "all_offpro"）
+    # typo 等未知值 → WARN + 退 legacy（不 invalid / 不擋批，§22.9）
+    _VALID_BIND_SCOPES: set = {"", "all_offpro"}
+    _policy_warnings: list[str] = []
+    if bind_scope_out not in _VALID_BIND_SCOPES:
+        _policy_warnings.append(
+            f"[WARN] 未知 bind_scope={bind_scope_out!r}，退 legacy（只接受 '' 或 'all_offpro'）"
+        )
+        bind_scope_out = ""  # 退 legacy，不擋批
+
     # detail text 和 return dict：bind_scope 只在非空時加入（legacy 無此欄，不打破舊 byte-compat）
     _detail_parts = [f"mode={mode}, min={min_slots}, max={max_slots}"]
     if bind_scope_out:
         _detail_parts.append(f"bind_scope={bind_scope_out!r}")
     _detail_parts.append(f"approved_by={approved_by}, approved_at={approved_at_str}")
+    if _policy_warnings:
+        _detail_parts.append(f"warnings={_policy_warnings}")
     _detail_text = f"WP-B enabled（{', '.join(_detail_parts)}）"
 
     result: dict = {
@@ -250,6 +262,8 @@ def load_topic_intel_policy(
     }
     if bind_scope_out:
         result["bind_scope"] = bind_scope_out
+    if _policy_warnings:
+        result["warnings"] = _policy_warnings
     return result
 
 
@@ -363,6 +377,28 @@ if __name__ == "__main__":
         assert r10["max_slots"] == 9, f"Case 10 max_slots: {r10}"
         assert r10.get("bind_scope") == "all_offpro", f"Case 10 bind_scope: {r10}"
         print(f"Case 10 PASS: max_slots=9 bind_scope=all_offpro → enabled（上限 13 內）")
+
+        # Case 11: bind_scope typo → WARN + 退 legacy + 不擋批（不 invalid）
+        _write_flag(tmpdir, """topic_intel_closure:
+  mode: shadow
+  min_slots: 2
+  max_slots: 4
+  bind_scope: all_offproo
+  approved_by: 澤君
+  approved_at: "2026-06-26"
+""")
+        r11 = load_topic_intel_policy(tmpdir)
+        assert r11["mode"] == "shadow" and r11["enabled"], f"Case 11 應 enabled（不 invalid）: {r11}"
+        # typo → 退 legacy → bind_scope 不應出現在 result
+        assert r11.get("bind_scope") != "all_offproo", f"Case 11 typo bind_scope 不應透傳: {r11}"
+        assert r11.get("bind_scope") in (None, ""), f"Case 11 bind_scope 應退 legacy（空或缺）: {r11}"
+        # WARN 應出現在 warnings 或 detail
+        warns = r11.get("warnings", [])
+        detail = r11.get("detail", "")
+        assert any("all_offproo" in w for w in warns) or "all_offproo" in detail, (
+            f"Case 11 WARN 應含 all_offproo 字樣: warnings={warns}, detail={detail}"
+        )
+        print(f"Case 11 PASS: bind_scope typo='all_offproo' → WARN + 退 legacy + enabled（不擋批）")
 
         import shutil
         shutil.rmtree(empty_dir, ignore_errors=True)

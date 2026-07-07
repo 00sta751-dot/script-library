@@ -1485,6 +1485,91 @@ def check_17_gate_owner_coverage():
     return fails
 
 
+def check_18_ai_residue_secrets_shadow():
+    """check 18（2026-07-07 立制度 v2 C2 — shadow 模式，不影響 exit code；澤君 /goal 授權掛載）：
+    掃 LIB 下 *.html / build_*.py 找 AI 殘留（ChatGPT/Claude 匯出殘留）與 secrets（BLOCK 級子集）。
+    **永遠回傳 []**（不進 all_fails、不影響 sys.exit）；命中只 log 出來供人工事後查閱。
+    全函式 try/except 保護，內部任何例外都不外洩（新 check 掛掉不得拖垮整支驗證腳本）。
+    急停：建檔 C:/Users/00sta/claude-state/flags/disable_check18_shadow 即整段跳過。
+    升級路徑：3 次乾淨部署後才考慮 secrets 子集轉硬擋（獨立變更、需重過保鏢＋澤君）。
+    回退：刪本函式＋main() 內兩行呼叫即可（.bak_v2c2_20260707 留原版）。
+    """
+    import re as _re
+    import os as _os
+
+    try:
+        if _os.path.exists(r'C:/Users/00sta/claude-state/flags/disable_check18_shadow'):
+            log('[check 18][SHADOW] 已由急停 flag 停用，跳過')
+            return []
+    except Exception:
+        pass
+
+    log('[check 18][SHADOW] AI 殘留 / secrets 掃描（不影響驗證結果，僅供人工查閱）')
+
+    try:
+        # ---- BLOCK 級 pattern 子集（近零誤報；WARN 級刻意不搬入 shadow 觀察）----
+        block_patterns = [
+            ("utm_source_openai", _re.compile(r"utm_source=(openai|chatgpt\.com)")),
+            ("citeturn", _re.compile(r"citeturn\d")),
+            ("citegenerated", _re.compile(r"citegenerated")),
+            ("contentReference", _re.compile(r":contentReference\[oaicite:\d+\]")),
+            ("oai_citation", _re.compile(r"oai_citation")),
+            ("grok_card", _re.compile(r"<grok-card")),
+            ("data_type_citation_card", _re.compile(r'data-type="citation_card"')),
+            ("attributableIndex", _re.compile(r'\{"attribution":\{"attributableIndex"')),
+            ("endoftext", _re.compile(r"<\|endoftext\|>")),
+            ("as_an_ai_en", _re.compile(r"as an AI language model", _re.IGNORECASE)),
+            ("as_an_ai_zh", _re.compile(r"作為一個(AI|人工智慧)語言模型")),
+            ("openai_sk_key", _re.compile(r"sk-[a-zA-Z0-9]{20,}")),
+            ("aws_access_key", _re.compile(r"AKIA[0-9A-Z]{16}")),
+            ("github_pat_ghp", _re.compile(r"ghp_[A-Za-z0-9]{36}")),
+            ("private_key_block", _re.compile(r"BEGIN( RSA| OPENSSH| EC| DSA)? PRIVATE KEY")),
+            ("secret_kv", _re.compile(
+                r"(api[_-]?key|token|password|secret)\s*[:=]\s*['\"][^'\"]{8,}", _re.IGNORECASE)),
+        ]
+
+        targets = []
+        try:
+            targets += list(LIB.glob('*.html'))
+        except Exception:
+            pass
+        try:
+            targets += list(LIB.glob('build_*.py'))
+        except Exception:
+            pass
+        try:
+            if (LIB / 'bappu-cc').exists():
+                targets += list((LIB / 'bappu-cc').glob('*.html'))
+        except Exception:
+            pass
+
+        hit_count = 0
+        for fp in targets:
+            try:
+                text = fp.read_text(encoding='utf-8', errors='replace')
+            except Exception as e:
+                log(f'  ⏭️ check18 讀檔失敗略過：{fp.name}（{e}）')
+                continue
+            for line_no, line in enumerate(text.splitlines(), start=1):
+                for name, pat in block_patterns:
+                    m = pat.search(line)
+                    if m:
+                        hit_count += 1
+                        snippet = m.group(0)[:60]
+                        log(f'  ⚠️[SHADOW] {fp.name}:{line_no} [{name}] {snippet}')
+
+        if hit_count == 0:
+            log('  ✅[SHADOW] check 18 無命中（AI 殘留 / secrets BLOCK 級）')
+        else:
+            log(f'  ⚠️[SHADOW] check 18 共命中 {hit_count} 處 — 僅供人工查閱，不影響本次驗證結果')
+
+    except Exception as e:
+        # 紅線：check_18 自身任何例外都不可拖垮 main()
+        log(f'  ⏭️ check 18 執行例外（已吞下，不影響驗證）：{e}')
+
+    return []  # shadow 模式：永遠不進 all_fails
+
+
 # === main ===
 
 def main():
@@ -1541,6 +1626,10 @@ def main():
     log('')
     # v9 新增（2026-06-15 WP2 B-9 — pre-commit C-016 守門涵蓋 anti-regression）
     all_fails += check_17_gate_owner_coverage()
+    log('')
+    # v10 新增（2026-07-07 立制度 v2 C2 — check 18 shadow 模式，觀察期不影響 exit code；
+    # 故意不寫 all_fails +=，回傳值丟棄＝100% 不影響現行 sys.exit 邏輯；件數對外仍稱 17 件）
+    check_18_ai_residue_secrets_shadow()
     log('')
 
     log('=' * 60)

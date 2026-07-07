@@ -1823,6 +1823,39 @@ def chk_v2_012_beauty_med_words(data: dict, fname: str, owner: str) -> tuple[str
     return "PASS", f"{owner}醫療詞驗 PASS"
 
 
+def chk_v2_012b_threads_med_words(batch_dir: Path, owner: str) -> tuple[str, str]:
+    """V2-012B：美容業主獨立脆文（threads md）醫療效能禁用詞驗 — batch-level。
+
+    背景：V2-012（per-file）只掃 yaml 台詞；昀臻14批脆文 04「發炎」機器綠燈、算盤人工抓到（P0）。
+    → 擴掃批次目錄的獨立脆文 md（threads_*.md / *脆文*.md / *Threads*.md）。
+    純加嚴：新增一道掃描，不放寬任何既有檢查。掃「全部」候選脆文檔（非只最新），任一命中即 FAIL。
+    """
+    BEAUTY_OWNERS = {'昀臻', '溫蒂'}
+    if owner not in BEAUTY_OWNERS:
+        return "PASS", "(非美容業主，跳過)"
+    candidates = []
+    for pattern in ['threads_*.md', '*脆文*.md', '*Threads*.md']:
+        candidates.extend(batch_dir.glob(pattern))
+    candidates = sorted(set(candidates))
+    if not candidates:
+        return "WARN", f"{owner}：批次目錄找不到 threads/脆文 md 可掃醫療詞（V2-007 另驗存在性）"
+    all_hits = []
+    scanned = []
+    for md in candidates:
+        try:
+            text = md.read_text(encoding='utf-8')
+        except Exception as e:
+            return "FAIL", f"{owner} 讀脆文 {md.name} 失敗：{e}（fail-closed）"
+        scanned.append(md.name)
+        hits = sorted({w for w in BEAUTY_MED_WORDS if w in text})
+        if hits:
+            all_hits.append((md.name, hits))
+    if all_hits:
+        detail = "; ".join(f"{n} 含 {h[:5]}" for n, h in all_hits)
+        return "FAIL", f"{owner}脆文含醫療效能禁用詞（對齊第 09 批算盤 20 條）：{detail}"
+    return "PASS", f"{owner}脆文醫療詞驗 PASS（掃 {len(scanned)} 檔：{scanned}）"
+
+
 def chk_v2_013_zhonghao_life_ratio(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
     """V2-013：仲豪生活/房仲字數比驗 — batch-level（仲豪 特化）
     生活字數 / 房仲字數 >= 3.0 (76%+)
@@ -5500,6 +5533,14 @@ _HYBRID_PROF_TYPES = {
     "transaction_risk",
     "contract_tax_loan_basic",
     "viewing_listing_logic",
+    # 美容業擴充（2026-07-07 保鏢 GO-cond 快審過；來源＝昀臻第14批編劇需求註解，非霸告獨創；
+    # 水平加值不改檢查邏輯 — 產業通用、禁業主 hardcode 紅線不變）
+    "skin_condition_basic",
+    "product_usage_logic",
+    "treatment_expectation",
+    "daily_care_routine",
+    "service_selection_logic",
+    "pricing_value_basic",
 }
 _OFFPRO_CTA_SCOPES = {"none", "self_check", "discussion_prompt", "save_share", "auxiliary_asset"}
 _PRO_CTA_SCOPES = {"none", "self_check", "save_share", "soft_consultation", "auxiliary_asset"}
@@ -6816,6 +6857,8 @@ def main():
         ("V2-008", chk_v2_008_used_titles_dedup(valid_yamls, owner)),
         ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
         ("V2-010", chk_v2_010_batch_summary(batch_dir)),
+        # V2-012B（2026-07-07 W2 品管工單）：美容業主獨立脆文 md 醫療詞掃描（V2-012 per-file 只掃 yaml）
+        ("V2-012B", chk_v2_012b_threads_med_words(batch_dir, owner)),
         ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
         # P3 比例驗證器（2026-06-08）
         ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
@@ -10071,6 +10114,44 @@ if __name__ == "__main__":
         # Fix 3：死斷言 or True 已清，驗 hash 確實因 proof_mode 有無而不同（已在 R3 Fix 1 段驗）
 
         # ── end F-C22-ANGLE ──
+
+        # ── F-V2-012B：美容業主脆文 md 醫療詞掃描（2026-07-07 W2 品管工單）──
+        print("[F-V2-012B] 美容脆文 md 醫療詞掃描驗收")
+        import tempfile as _tf_med
+
+        def _make_threads_dir(threads_body: str | None, owner_for_name: str = "test"):
+            _d = Path(_tf_med.mkdtemp())
+            if threads_body is not None:
+                (_d / "threads_test_14.md").write_text(threads_body, encoding="utf-8")
+            return _d
+
+        _clean_threads = (
+            "## Threads 01\n主題：把自己排第一\n\n"
+            "清單永遠補不完，先把自己那條寫上去。\n\n#自我對話 #生活觀察\n"
+        )
+        _dirty_threads = (
+            "## Threads 01\n主題：痘疤保養\n\n"
+            "很多人痘疤反覆，其實是沒分清波動期，這時候更要抗發炎、加強修復。\n\n#護膚\n"
+        )
+        # (a) 乾淨脆文 + 昀臻 → PASS
+        _d_clean = _make_threads_dir(_clean_threads)
+        _r_med_a = chk_v2_012b_threads_med_words(_d_clean, "昀臻")
+        fcheck("F-V2-012B-a 乾淨脆文 md + 昀臻 → PASS",
+               _r_med_a[0] == "PASS", _r_med_a[1])
+        # (b) 含醫療詞脆文 + 昀臻 → FAIL（發炎/修復 命中）
+        _d_dirty = _make_threads_dir(_dirty_threads)
+        _r_med_b = chk_v2_012b_threads_med_words(_d_dirty, "昀臻")
+        fcheck("F-V2-012B-b 含『發炎/修復』脆文 md + 昀臻 → FAIL",
+               _r_med_b[0] == "FAIL" and ("發炎" in _r_med_b[1] or "修復" in _r_med_b[1]), _r_med_b[1])
+        # (c) 含醫療詞脆文 + 非美容業主（仲豪）→ PASS 跳過（不誤殺其他行業）
+        _r_med_c = chk_v2_012b_threads_med_words(_d_dirty, "仲豪")
+        fcheck("F-V2-012B-c 含醫療詞脆文 + 非美容業主 → PASS 跳過",
+               _r_med_c[0] == "PASS" and "跳過" in _r_med_c[1], _r_med_c[1])
+        # (d) 美容業主但無脆文 md → WARN（V2-007 另驗存在性）
+        _d_empty = _make_threads_dir(None)
+        _r_med_d = chk_v2_012b_threads_med_words(_d_empty, "溫蒂")
+        fcheck("F-V2-012B-d 美容業主無脆文 md → WARN（非誤 PASS）",
+               _r_med_d[0] == "WARN", _r_med_d[1])
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:

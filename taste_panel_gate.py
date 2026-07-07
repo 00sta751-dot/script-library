@@ -57,6 +57,12 @@ REQUIRED_DIMS = ("D1", "D2", "D3", "D4", "D5")
 PASS_THRESHOLD = 90
 ALLOWED_VERDICTS = {"pass", "revise", "reject", "pending_review"}
 
+# A2（2026-07-07 W2 品管工單）：GPT 回應缺維度分／解析失敗時的狀態。
+# 技術失敗 ≠ 內容退件：不填 0、不計入平均、不產生 REJECT/PASS verdict，明標「技術失敗待重跑」。
+EXECUTION_TECHNICAL_RETRY = "TECHNICAL_RETRY"
+DEPLOY_STATUS_TECHNICAL = "TECHNICAL_RETRY"
+DEFAULT_REVIEW_RETRIES = 1  # 解析失敗重呼次數（初呼 + 1 重呼 = 最多 2 次）
+
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -339,6 +345,16 @@ def _is_offpro_report(report: dict) -> bool:
 
 
 def _attach_deploy_decision(report: dict) -> dict:
+    # A2：技術失敗（解析失敗重呼耗盡）不進 deploy 決策器 — 絕不把缺分 0-fill 成 REJECT。
+    if report.get("technical_failure"):
+        report["deploy_decision"] = {
+            "status": DEPLOY_STATUS_TECHNICAL,
+            "reject_reasons": [],
+            "note": "評審技術失敗（重呼耗盡）— 不計分、不計平均、待人工重跑",
+            "mode": "technical_retry",
+            "is_offpro": _is_offpro_report(report),
+        }
+        return report
     is_offpro = _is_offpro_report(report)
     scores = report.get("scores") or {}
     if is_relative_enabled():
@@ -346,6 +362,62 @@ def _attach_deploy_decision(report: dict) -> dict:
     else:
         report["deploy_decision"] = mirror_legacy_decision(scores, report.get("verdict"), is_offpro)
     return report
+
+
+def _missing_dims(scores: dict) -> list[str]:
+    """回傳缺維度（非 numeric 分）的清單 — 用來判「解析失敗 vs 正常打分」。"""
+    return [d for d in REQUIRED_DIMS if not isinstance((scores or {}).get(d), (int, float))]
+
+
+def _base_report_fields(path: Path, data: dict, raw_hash: str, sanitized_hash: str,
+                        rubric_hash: str, prompt_hash: str, rubric_version: str, model_id: str) -> dict:
+    return {
+        "schema_version": 1,
+        "gate_version": GATE_VERSION,
+        "script_id": str(data.get("script_id") or path.stem),
+        "source_file": path.name,
+        "content_axis": data.get("content_axis"),
+        "lane": data.get("lane"),
+        "dim_threshold": PASS_THRESHOLD,
+        "required_dims": list(REQUIRED_DIMS),
+        "raw_input_hash": raw_hash,
+        "sanitized_input_hash": sanitized_hash,
+        "rubric_hash": rubric_hash,
+        "rubric_version": rubric_version,
+        "prompt_template_hash": prompt_hash,
+        "gate_cache_key": cache_key(raw_hash, sanitized_hash, rubric_hash, prompt_hash, model_id, no_llm=False),
+        "model_id": model_id,
+        "mock_report": False,
+        "no_llm_mode": False,
+        "reviewed_at": datetime.now().isoformat(),
+    }
+
+
+def _make_technical_retry_report(
+    path: Path, data: dict, partial_scores: dict, attempts: int, reason: str,
+    raw_hash: str, sanitized_hash: str, rubric_hash: str, prompt_hash: str,
+    rubric_version: str, model_id: str,
+) -> dict:
+    """A2：解析失敗（重呼耗盡）→ TECHNICAL_RETRY 報告。
+    缺維度保留 None（絕不 0-fill）；verdict=pending_review（走既有 execution-incomplete 通道，
+    非 REJECT/PASS）；technical_failure=True + execution_status=TECHNICAL_RETRY 明標待重跑。"""
+    scores_out = {
+        d: (partial_scores.get(d) if isinstance((partial_scores or {}).get(d), (int, float)) else None)
+        for d in REQUIRED_DIMS
+    }
+    rep = _base_report_fields(path, data, raw_hash, sanitized_hash, rubric_hash, prompt_hash, rubric_version, model_id)
+    rep.update({
+        "verdict": "pending_review",
+        "execution_status": EXECUTION_TECHNICAL_RETRY,
+        "technical_failure": True,
+        "retry_count": attempts,
+        "scores": scores_out,
+        "blocking_reasons": [
+            f"TECHNICAL_RETRY：GPT 回應解析失敗（共嘗試 {attempts} 次仍缺維度分）— "
+            f"待人工重跑，不計分不填 0。細節：{reason}"
+        ],
+    })
+    return rep
 
 
 def make_real_report(
@@ -356,68 +428,54 @@ def make_real_report(
     prompt_hash: str,
     rubric_version: str,
     model_id: str,
+    max_retries: int = DEFAULT_REVIEW_RETRIES,
 ) -> dict:
-    try:
-        tp = load_existing_taste_panel_module()
-        raw = tp.review_script(path, rubric, mock=False)
-        scores = dict(raw.get("scores") or {})
-        verdict = raw.get("final_verdict", "pending_review")
-        if verdict not in ALLOWED_VERDICTS:
-            verdict = "pending_review"
-        for dim in REQUIRED_DIMS:
-            scores.setdefault(dim, None)
-        if any(not isinstance(scores.get(d), (int, float)) or scores.get(d) < PASS_THRESHOLD for d in REQUIRED_DIMS):
-            verdict = "revise"
-        raw_hash, sanitized_hash = compute_hashes(path, data)
-        return {
-            "schema_version": 1,
-            "gate_version": GATE_VERSION,
-            "script_id": str(data.get("script_id") or path.stem),
-            "source_file": path.name,
-            "content_axis": data.get("content_axis"),
-            "lane": data.get("lane"),
-            "verdict": verdict,
-            "scores": scores,
-            "dim_threshold": PASS_THRESHOLD,
-            "required_dims": list(REQUIRED_DIMS),
-            "blocking_reasons": list(raw.get("blocking_reasons") or ([] if verdict == "pass" else ["taste_panel non-pass"])),
-            "raw_input_hash": raw_hash,
-            "sanitized_input_hash": sanitized_hash,
-            "rubric_hash": rubric_hash,
-            "rubric_version": rubric_version,
-            "prompt_template_hash": prompt_hash,
-            "gate_cache_key": cache_key(raw_hash, sanitized_hash, rubric_hash, prompt_hash, model_id, no_llm=False),
-            "model_id": model_id,
-            "mock_report": False,
-            "no_llm_mode": False,
-            "reviewed_at": datetime.now().isoformat(),
-            "upstream_report": raw,
-        }
-    except Exception as e:
-        raw_hash, sanitized_hash = compute_hashes(path, data)
-        return {
-            "schema_version": 1,
-            "gate_version": GATE_VERSION,
-            "script_id": str(data.get("script_id") or path.stem),
-            "source_file": path.name,
-            "content_axis": data.get("content_axis"),
-            "lane": data.get("lane"),
-            "verdict": "pending_review",
-            "scores": {d: None for d in REQUIRED_DIMS},
-            "dim_threshold": PASS_THRESHOLD,
-            "required_dims": list(REQUIRED_DIMS),
-            "blocking_reasons": [f"taste_panel error: {e}"],
-            "raw_input_hash": raw_hash,
-            "sanitized_input_hash": sanitized_hash,
-            "rubric_hash": rubric_hash,
-            "rubric_version": rubric_version,
-            "prompt_template_hash": prompt_hash,
-            "gate_cache_key": cache_key(raw_hash, sanitized_hash, rubric_hash, prompt_hash, model_id, no_llm=False),
-            "model_id": model_id,
-            "mock_report": False,
-            "no_llm_mode": False,
-            "reviewed_at": datetime.now().isoformat(),
-        }
+    raw_hash, sanitized_hash = compute_hashes(path, data)
+    raw: Optional[dict] = None
+    scores: dict = {}
+    missing: list[str] = list(REQUIRED_DIMS)
+    last_reason = "未執行"
+    attempts = 0
+    # A2：解析失敗（缺維度分 or review_script 例外）→ 重呼；共 max_retries+1 次機會。
+    for _ in range(max_retries + 1):
+        attempts += 1
+        try:
+            tp = load_existing_taste_panel_module()
+            raw = tp.review_script(path, rubric, mock=False)
+            scores = dict((raw or {}).get("scores") or {})
+            missing = _missing_dims(scores)
+            if not missing:
+                break  # 5 維齊 → 解析成功，不再重呼
+            last_reason = f"缺維度分：{missing}"
+        except Exception as e:  # noqa: BLE001 — review 端任何例外都視為技術失敗、可重試
+            raw = None
+            scores = {}
+            missing = list(REQUIRED_DIMS)
+            last_reason = f"taste_panel error: {e}"
+
+    if missing:
+        # 重呼耗盡仍缺維度 → 技術失敗（不 0-fill、不 REJECT/PASS）
+        return _make_technical_retry_report(
+            path, data, scores, attempts, last_reason,
+            raw_hash, sanitized_hash, rubric_hash, prompt_hash, rubric_version, model_id,
+        )
+
+    # 5 維齊 → 正常內容路徑（原邏輯：GPT verdict + 任一維 <90 降 revise；A3 內容退件不變）
+    verdict = (raw or {}).get("final_verdict", "pending_review")
+    if verdict not in ALLOWED_VERDICTS:
+        verdict = "pending_review"
+    if any(scores.get(d) < PASS_THRESHOLD for d in REQUIRED_DIMS):
+        verdict = "revise"
+    rep = _base_report_fields(path, data, raw_hash, sanitized_hash, rubric_hash, prompt_hash, rubric_version, model_id)
+    rep.update({
+        "verdict": verdict,
+        "technical_failure": False,
+        "retry_count": attempts,
+        "scores": scores,
+        "blocking_reasons": list((raw or {}).get("blocking_reasons") or ([] if verdict == "pass" else ["taste_panel non-pass"])),
+        "upstream_report": raw,
+    })
+    return rep
 
 
 def validate_reports(batch_dir: Path, reports: list[dict], summary: Optional[dict], rubric_hash: str) -> list[str]:
@@ -448,7 +506,10 @@ def validate_reports(batch_dir: Path, reports: list[dict], summary: Optional[dic
             problems.append(f"{sid}: rubric_hash mismatch")
         if rep.get("mock_report"):
             problems.append(f"{sid}: mock report")
-        if is_relative_enabled():
+        if rep.get("technical_failure"):
+            # A2：技術失敗 = 評審未完成（重呼耗盡）→ 擋批（不計分、不 0-fill、不當內容 REJECT）
+            problems.append(f"{sid}: TECHNICAL_RETRY 評審未完成（重呼耗盡·不計分·待人工重跑）")
+        elif is_relative_enabled():
             # relative 分支：只有 REJECT 才算 problem；HUMAN_REVIEW/PASS_WITH_NOTES 放行
             decision = rep.get("deploy_decision") or {}
             if decision.get("status") == STATUS_REJECT:
@@ -483,6 +544,77 @@ def validate_reports(batch_dir: Path, reports: list[dict], summary: Optional[dic
         if summary.get("overall_verdict") != "pass":
             problems.append(f"summary overall_verdict={summary.get('overall_verdict')}")
     return problems
+
+
+def load_cached_report(
+    panel_dir: Path,
+    sid: str,
+    raw_hash: str,
+    sanitized_hash: str,
+    rubric_hash: str,
+    prompt_hash: str,
+    model_id: str,
+) -> Optional[dict]:
+    """A1：若既有 real 報告（同 sid）內容 hash / rubric / prompt / model 全同、且非 no_llm、
+    非 mock、非技術失敗、gate_version 相符 → 回傳可沿用的舊報告；否則 None（照常評）。
+
+    守門強度不變（A3）：hash 一變即 cache miss 重評；快取只對「已評過且 hash 未變」生效；
+    技術失敗（TECHNICAL_RETRY）永不快取 — 必重跑。"""
+    rp = panel_dir / f"{sid}_taste_panel_report.json"
+    if not rp.exists():
+        return None
+    try:
+        rep = json.loads(rp.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(rep, dict):
+        return None
+    if rep.get("no_llm_mode") is True:
+        return None
+    if rep.get("mock_report"):
+        return None
+    if rep.get("technical_failure"):
+        return None
+    if rep.get("gate_version") != GATE_VERSION:
+        return None
+    expected_ck = cache_key(raw_hash, sanitized_hash, rubric_hash, prompt_hash, model_id, no_llm=False)
+    if (
+        rep.get("raw_input_hash") == raw_hash
+        and rep.get("sanitized_input_hash") == sanitized_hash
+        and rep.get("rubric_hash") == rubric_hash
+        and rep.get("prompt_template_hash") == prompt_hash
+        and str(rep.get("model_id")) == str(model_id)
+        and rep.get("gate_cache_key") == expected_ck
+    ):
+        return rep
+    return None
+
+
+def evaluate_one(
+    path: Path,
+    data: dict,
+    rubric: dict,
+    rubric_hash: str,
+    prompt_hash: str,
+    rubric_version: str,
+    model_id: str,
+    panel_dir: Path,
+    no_llm: bool,
+    fixture: dict,
+) -> dict:
+    """單支評審決策：no_llm→fixture；real→先查快取（A1，hash 相同免重評）、miss 才呼 GPT。"""
+    if no_llm:
+        return make_no_llm_report(path, data, fixture, rubric_hash, prompt_hash, rubric_version, model_id)
+    sid = str(data.get("script_id") or path.stem)
+    raw_hash, sanitized_hash = compute_hashes(path, data)
+    cached = load_cached_report(panel_dir, sid, raw_hash, sanitized_hash, rubric_hash, prompt_hash, model_id)
+    if cached is not None:
+        report = dict(cached)
+        report["cached"] = True
+        report["cache_note"] = "cached（hash 相同免重評）"
+        report["cache_hit_at"] = datetime.now().isoformat()
+        return report
+    return make_real_report(path, data, rubric, rubric_hash, prompt_hash, rubric_version, model_id)
 
 
 def main() -> int:
@@ -528,10 +660,10 @@ def main() -> int:
             data = load_yaml_frontmatter(path)
             if not data.get("content_axis"):
                 continue
-            if args.no_llm:
-                report = make_no_llm_report(path, data, fixture, rubric_hash, prompt_hash, rubric_version, model_id)
-            else:
-                report = make_real_report(path, data, rubric, rubric_hash, prompt_hash, rubric_version, model_id)
+            report = evaluate_one(
+                path, data, rubric, rubric_hash, prompt_hash, rubric_version, model_id,
+                panel_dir, bool(args.no_llm), fixture,
+            )
             report = _attach_deploy_decision(report)
             reports.append(report)
             sid = report["script_id"]
@@ -559,11 +691,17 @@ def main() -> int:
             "pass"
             if len(reports) == 13 and all(
                 (r.get("deploy_decision") or {}).get("status") != STATUS_REJECT
+                and not r.get("technical_failure")  # A2：技術失敗不算 pass（擋批待重跑）
                 for r in reports
             )
             else "reject"
         ) if is_relative_enabled() else (
-            "pass" if len(reports) == 13 and all(r.get("verdict") == "pass" for r in reports) else "reject"
+            "pass"
+            if len(reports) == 13 and all(
+                r.get("verdict") == "pass" and not r.get("technical_failure")
+                for r in reports
+            )
+            else "reject"
         ),
         "mock_report": False,
         "no_llm_mode": bool(args.no_llm),

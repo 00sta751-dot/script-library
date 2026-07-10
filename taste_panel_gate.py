@@ -47,7 +47,7 @@ DEFAULT_RUBRIC_DIR = Path(
     r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\_腳本品質優化_2026-06\taste_panel"
 )
 DEFAULT_RUBRIC_PATH = DEFAULT_RUBRIC_DIR / "taste_panel_rubric_v1.yaml"
-DEFAULT_MODEL_ID = "gpt-5.5"
+DEFAULT_MODEL_ID = "gpt-5.6-sol"
 HYBRID_BATCH_PROFILE = "hybrid_70_15_15"
 BATCH_FLAGS_PROFILE_ERROR = "_batch_flags.yml 讀取/解析失敗，無法確認 batch_profile（fail-closed）"
 # MVP=D1-D5 (existing rubric); D6_friend_close semantic = post-MVP,

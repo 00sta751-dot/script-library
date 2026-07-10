@@ -853,24 +853,6 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(output_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # ── 選題粗篩 shadow（件 A，fail-open，2026-06-26）──
-    try:
-        _pf_dir = Path(__file__).resolve().parent
-        _pf_sys_path = str(_pf_dir)
-        if _pf_sys_path not in sys.path:
-            sys.path.insert(0, _pf_sys_path)
-        from validate_script_batch import run_topic_prefilter as _run_pf  # type: ignore[import]
-        _pf_topics = [str(e.get("direction", "")).strip() for e in plan if e.get("direction")]
-        _pf_results = _run_pf(_pf_topics, owner)
-        _pf_path = out_path.parent / "_topic_prefilter_shadow.json"
-        _pf_path.write_text(json.dumps(_pf_results, ensure_ascii=False, indent=2), encoding="utf-8")
-        _pf_red = sum(1 for r in _pf_results if r["flag"] == "紅")
-        _pf_yellow = sum(1 for r in _pf_results if r["flag"] == "黃")
-        _pf_green = sum(1 for r in _pf_results if r["flag"] == "綠")
-        print(f"[prefilter shadow] 紅={_pf_red} 黃={_pf_yellow} 綠={_pf_green} → {_pf_path}")
-    except Exception as _pf_err:
-        print(f"[prefilter shadow] SKIP（fail-open）：{_pf_err}", file=sys.stderr)
-
     # 驗 file size
     fsize = out_path.stat().st_size
     print(f"\n[DONE] 輸出：{out_path}  ({fsize} bytes)")

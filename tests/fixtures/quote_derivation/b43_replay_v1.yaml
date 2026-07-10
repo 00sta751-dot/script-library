@@ -1,0 +1,115 @@
+---
+# Canonicalized replay of the real 2026-06-25 b43 desync incident.
+# Source file is not read at test time; these provenance values make the copy
+# auditable without introducing an external-path dependency.
+fixture_source:
+  source_path: "L2_業主層/房仲_瑞祥/01_腳本生產/第43批_2026-06-25/_bak_r2fix/script_ruixiang_43_08.yaml"
+  source_sha256: "75f3010d626ef62e8a66eb8fe87f87f98cb70a00a0dd5b0f169dffbeb8708889"
+  session_jsonl_lines: [609, 614, 616, 620, 759]
+  legacy_stale_new_answer_quote: "省錢沒問題，問題是你省的是什麼"
+quote_derivation_version: 1
+quote_source_hash: "c54438e90f6bf002c9913d0920e2e35d9c9e30c454bf51b4aa57cec624da3ed5"
+script_id: ruixiang_43_08
+owner: 瑞祥
+title: "你以為在省錢，其實在省未來"
+content_axis: offpro
+lane: demand_first
+derived_flags: []
+topic_category: 人生
+cta_offer_scope: save_share
+
+script_method:
+  chxp_v1:
+    four_materials:
+      problem_scene: "很多人把省錢當習慣，但省的是那種讓生活品質和能力往下掉的省法"
+      old_answer:
+        quote:
+          timestamp: "3-12s"
+          dialogue_key: "台詞_瑞祥"
+        believer_profile: "多數人覺得省錢是負責任的態度"
+        why_reasonable: "省錢確實重要，這個觀念沒有錯"
+        weakness: "但省的方向搞錯了，代價往往比花掉更高"
+      new_answer:
+        quote:
+          timestamp: "40-52s"
+          dialogue_key: "台詞_瑞祥"
+      answer_expansion: "這個數字你自己算一下，我跟你算不一樣。"
+    assembly:
+      story_vehicle: "觀點立場型 PREP"
+    optimization:
+      concrete_signals:
+        - quote:
+            timestamp: "25-40s"
+            dialogue_key: "台詞_瑞祥"
+          type: person
+        - quote:
+            timestamp: "12-25s"
+            dialogue_key: "台詞_瑞祥"
+          type: challenge
+      hook_debts:
+        - opened_at: "0-3s"
+          opened_quote:
+            timestamp: "0-3s"
+            dialogue_key: "台詞_瑞祥"
+          closed_at: "40-52s"
+          closed_quote:
+            timestamp: "40-52s"
+            dialogue_key: "台詞_瑞祥"
+      barriers_removed:
+        - "因為省的方向搞錯，所以讓觀眾停下來重算代價"
+    packaging:
+      hook_promise:
+        timestamp: "0-3s"
+        dialogue_key: "台詞_瑞祥"
+      final_payoff:
+        timestamp: "40-52s"
+        dialogue_key: "台詞_瑞祥"
+      cta_type: save_share
+
+friend_close:
+  evidence:
+    value_delivered_quote:
+      timestamp: "40-52s"
+      dialogue_key: "台詞_瑞祥"
+    core_answer_quote:
+      timestamp: "40-52s"
+      dialogue_key: "台詞_瑞祥"
+    cta_quote:
+      timestamp: "52-60s"
+      dialogue_key: "台詞_瑞祥"
+    cta_action_count: 1
+    cta_offer_scope: save_share
+
+scenes:
+  - timestamp: "0-3s"
+    type: Hook
+    台詞_瑞祥: "你以為你在省錢。你有沒有算過，你省的是什麼？"
+    藏鏡人: "你說省錢是美德——但你省的是什麼，你有沒有算過"
+    畫面: "直視鏡頭，語氣直球帶點嗆，停頓一拍"
+    翠文: "你以為在省錢，你省的是什麼"
+  - timestamp: "3-12s"
+    type: 破題
+    台詞_瑞祥: "很多人說省錢是美德，能省則省。我跟你說，省錢沒問題——問題是你省的是什麼。省的方向搞錯，省的代價比花掉更高。"
+    畫面: "語氣直接，稍快，點頭"
+    翠文: "省的方向搞錯，代價比花掉更高"
+  - timestamp: "12-25s"
+    type: 核心論述
+    台詞_瑞祥: "你省健康、省人際、省讓你成長的機會——你以為省了幾千塊，但那幾千塊就是擋掉一個讓你翻倍的機會。這個數字你自己算一下，我跟你算不一樣。"
+    畫面: "語氣帶點嗆，直視鏡頭，節奏稍快"
+    翠文: "這個數字你自己算，我跟你算不一樣"
+  - timestamp: "25-40s"
+    type: 案例轉折
+    台詞_瑞祥: "舉個示意例：有人省掉一門課的費用，那門課學完可以讓他去接更好的案子。省了幾千塊，但省掉的是後面幾萬塊的機會。你說這是省還是花？"
+    藏鏡人: "省了幾千，省掉的是後面幾萬塊的機會"
+    畫面: "說故事語氣，帶點反問的語氣"
+    翠文: "省了幾千，省掉幾萬的機會"
+  - timestamp: "40-52s"
+    type: 收束金句
+    台詞_瑞祥: "省錢沒問題。問題是你省的是什麼。省未來比花掉現在貴多了。下次要省什麼，先問一句：省掉這個，是讓你往前還是往後。"
+    畫面: "語氣收斂，直球，帶點溫暖"
+    翠文: "省未來比花掉現在貴多了"
+  - timestamp: "52-60s"
+    type: CTA
+    台詞_瑞祥: "這支收藏起來，下次要省錢的時候問一下自己：省的是什麼。"
+    畫面: "直視鏡頭，語氣輕，帶微笑"
+    翠文: "收藏起來，下次省錢前問一句省的是什麼"

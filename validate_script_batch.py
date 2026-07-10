@@ -36,6 +36,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 
+from derive_quotes import QuoteDerivationError, derive_quote_view, dialogue_sha256
 from taste_panel_relative import (
     STATUS_HUMAN,
     STATUS_PASS,
@@ -5611,6 +5612,29 @@ def chk_offpro_cta_policy(
 
     for f, data in offpro_yamls:
         fname = f.name if hasattr(f, "name") else str(f)
+        # G11：v1 quote 欄是 selector；本 check 必須和 per-file consumers
+        # 共吃 derive_quote_view，不能把 selector dict 當成 CTA 字串。
+        _quote_data: dict | None = data
+        if "quote_derivation_version" in data or "quote_source_hash" in data:
+            _version = data.get("quote_derivation_version")
+            _true_skeleton = (
+                type(_version) is int
+                and _version == 1
+                and "quote_source_hash" not in data
+                and isinstance(data.get("title"), str)
+                and _is_placeholder(data["title"])
+                and _hybrid_file_is_skeleton(data)
+            )
+            if _true_skeleton:
+                _quote_data = None
+            else:
+                try:
+                    _quote_data = derive_quote_view(data)
+                except QuoteDerivationError as _quote_err:
+                    _quote_data = None
+                    # main 的 C-quote-source 會 hard FAIL；這裡也明示依賴失敗，
+                    # 但沿用本 check 既有 shadow/enforce severity，不讓 batch 先 crash。
+                    problems.append(f"{fname}: C-quote-source {_quote_err.code}（CTA quote 無法解析）")
         # 取 CTA scope
         scope_raw = str(data.get("cta_offer_scope", "") or "").strip().lower()
         if not scope_raw:
@@ -5636,7 +5660,7 @@ def chk_offpro_cta_policy(
         _cta_texts: list[str] = []
 
         # 1. friend_close.evidence.cta_quote
-        _fc = data.get("friend_close")
+        _fc = _quote_data.get("friend_close") if isinstance(_quote_data, dict) else None
         _fc_ev = (_fc.get("evidence") or {}) if isinstance(_fc, dict) else {}
         _cta_q = str(_fc_ev.get("cta_quote", "") or "") if isinstance(_fc_ev, dict) else ""
         if _cta_q:
@@ -5773,8 +5797,15 @@ def _scene_texts(data: dict) -> list[tuple[str, str]]:
             continue
         ts = str(scene.get("timestamp", "") or "")
         parts = []
+        # G11 grandfather：v1/任何顯式版本只認 canonical dialogue；無旗標
+        # legacy 保留舊 all-scalar haystack，否則昀臻 14_12 等已封存批會
+        # 因歷史 quote 只落在翠文而改 verdict。新檔由 skeleton 強制 v1。
+        versioned_quote_contract = "quote_derivation_version" in data
         for k, v in scene.items():
             if k == "timestamp" or v is None or isinstance(v, (dict, list)):
+                continue
+            key_s = str(k)
+            if versioned_quote_contract and key_s != "台詞" and not key_s.startswith("台詞_"):
                 continue
             parts.append(str(v))
         out.append((ts, "\n".join(parts)))
@@ -5813,9 +5844,12 @@ def _quote_in_scene(data: dict, quote: Any, ranges: tuple[str, ...] | None = Non
 
 def _hybrid_file_is_skeleton(data: dict) -> bool:
     """True when this script has no filled scene dialogue yet."""
+    versioned_quote_contract = "quote_derivation_version" in data
     scenes = data.get("scenes") or []
     if not isinstance(scenes, list):
-        return True
+        # Grandfather: pre-G11 legacy files (including markdown-body scripts)
+        # treated a missing/non-list scenes field as an untouched skeleton.
+        return not versioned_quote_contract
     saw_dialogue_field = False
     for scene in scenes:
         if not isinstance(scene, dict):
@@ -5827,7 +5861,9 @@ def _hybrid_file_is_skeleton(data: dict) -> bool:
             saw_dialogue_field = True
             if not _is_placeholder(value):
                 return False
-    return True
+    # G11 P2-1 only tightens versioned files: a v1 shell with no dialogue
+    # fields must be enforced.  Unversioned legacy keeps the old True result.
+    return saw_dialogue_field if versioned_quote_contract else True
 
 
 def _count_cta_actions(text: str) -> tuple[int, list[str]]:
@@ -6665,6 +6701,38 @@ def run_per_file_checks(
         topic_intel_policy = {"mode": "off", "enabled": False, "detail": "未傳入 topic_intel_policy"}
     # P1-1：傳入「批次目錄名/檔名」讓 _extract_batch_date 能從目錄名（如第34批_試水批_2026-05-23）抓日期
     _fname_with_dir = f"{f.parent.name}/{f.name}"
+    # G11 runtime view：legacy 無旗標完全不註冊新 check；任何顯式版本
+    # 都 fail-closed。consumer 不得在 derive 失敗後回退去讀 selector dict。
+    _quote_view: dict | None = data
+    _quote_source_result: tuple[str, str] | None = None
+    if "quote_derivation_version" in data or "quote_source_hash" in data:
+        _quote_version = data.get("quote_derivation_version")
+        _quote_true_skeleton = (
+            type(_quote_version) is int
+            and _quote_version == 1
+            and "quote_source_hash" not in data
+            and isinstance(data.get("title"), str)
+            and _is_placeholder(data["title"])
+            and _hybrid_file_is_skeleton(data)
+        )
+        if _quote_true_skeleton:
+            _quote_source_result = (
+                "SKIP",
+                f"{f.name}: C-quote-source 骨架階段跳過；填入真 title/台詞後即 fail-closed",
+            )
+        else:
+            try:
+                _quote_view = derive_quote_view(data)
+                _quote_source_result = (
+                    "PASS",
+                    f"{f.name}: C-quote-source PASS — dialogue_sha256={dialogue_sha256(data)}",
+                )
+            except QuoteDerivationError as _quote_err:
+                _quote_view = None
+                _quote_source_result = (
+                    "FAIL",
+                    f"{f.name}: C-quote-source FAIL — {_quote_err}",
+                )
     results = []
     checks = [
         # per-file checks
@@ -6724,9 +6792,21 @@ def run_per_file_checks(
     checks.append(("C-offpro-placeholder", chk_offpro_placeholder(data, f.name)))
     checks.append(("C-offpro-leak",        chk_offpro_leak(data, f.name)))
     checks.append(("C-22-OFFPRO-ANGLE",   chk_c22_offpro_angle(data, f.name)))
-    checks.append(("C-method",             chk_hybrid_method(data, f.name, is_skeleton)))
-    checks.append(("C-friend-close",       chk_hybrid_friend_close(data, f.name, is_skeleton)))
-    checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(data, f.name, is_skeleton)))
+    if _quote_source_result is not None:
+        checks.append(("C-quote-source", _quote_source_result))
+    if _quote_view is None:
+        _quote_dependency = (
+            "SKIP",
+            f"{f.name}: C-quote-source FAIL，未執行依賴 runtime quote view 的 consumer",
+        )
+        checks.append(("C-method", _quote_dependency))
+        checks.append(("C-friend-close", _quote_dependency))
+        checks.append(("C-professional-minimum", _quote_dependency))
+    else:
+        checks.append(("C-method",             chk_hybrid_method(_quote_view, f.name, is_skeleton)))
+        checks.append(("C-friend-close",       chk_hybrid_friend_close(_quote_view, f.name, is_skeleton)))
+        checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(_quote_view, f.name, is_skeleton)))
+    # C-identity-bridge 不是 quote 欄 consumer，只看 canonical scenes；保留原 data。
     checks.append(("C-identity-bridge",    chk_hybrid_identity_bridge(data, f.name, is_skeleton)))
 
     for cid, (status, detail) in checks:

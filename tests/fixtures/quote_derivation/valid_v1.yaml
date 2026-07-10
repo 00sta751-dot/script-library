@@ -1,0 +1,110 @@
+---
+# Synthetic G11 fixture.  The dialogue is intentionally small, but every
+# selector-bearing consumer field is present.  Non-dialogue scalar fields
+# contain a fake quote so the visual false-green regression stays observable.
+fixture_source:
+  kind: synthetic_from_validator_inline_fixture
+  reference: validate_script_batch.py:_hybrid_base
+quote_derivation_version: 1
+quote_source_hash: "482b3d44b0870ba93b2c1683857686dfa8c1cc6aec60b2f82e5475f35fb73f9f"
+script_id: quote_v1_valid_01
+owner: 瑞祥
+title: "選擇越多越自由嗎"
+content_axis: offpro
+lane: demand_first
+derived_flags: []
+topic_category: 人生
+cta_offer_scope: save_share
+voice_asset_quote: "這是來源語料，不是派生 quote selector"
+
+script_method:
+  chxp_v1:
+    four_materials:
+      problem_scene: "選項太多，反而做不了決定"
+      old_answer:
+        quote:
+          timestamp: "3-12s"
+          dialogue_key: "台詞_瑞祥"
+        believer_profile: "害怕漏掉機會的人"
+        why_reasonable: "因為保留選項短期看起來最安全"
+        weakness: "沒有看見選擇成本"
+      new_answer:
+        quote:
+          timestamp: "40-52s"
+          dialogue_key: "台詞_瑞祥"
+      answer_expansion: "先刪到兩個選項再比較"
+    assembly:
+      story_vehicle: "日常選擇示意例"
+    optimization:
+      concrete_signals:
+        - quote:
+            timestamp: "25-40s"
+            dialogue_key: "台詞_瑞祥"
+          type: person
+      hook_debts:
+        - opened_at: "0-3s"
+          opened_quote:
+            timestamp: "0-3s"
+            dialogue_key: "台詞_瑞祥"
+          closed_at: "40-52s"
+          closed_quote:
+            timestamp: "40-52s"
+            dialogue_key: "台詞_瑞祥"
+      barriers_removed:
+        - "因為先縮小選項，所以看得見真正代價"
+    packaging:
+      hook_promise:
+        timestamp: "0-3s"
+        dialogue_key: "台詞_瑞祥"
+      final_payoff:
+        timestamp: "40-52s"
+        dialogue_key: "台詞_瑞祥"
+      cta_type: save_share
+
+friend_close:
+  evidence:
+    value_delivered_quote:
+      timestamp: "40-52s"
+      dialogue_key: "台詞_瑞祥"
+    core_answer_quote:
+      timestamp: "40-52s"
+      dialogue_key: "台詞_瑞祥"
+    cta_quote:
+      timestamp: "52-60s"
+      dialogue_key: "台詞_瑞祥"
+    cta_action_count: 1
+    cta_offer_scope: save_share
+
+scenes:
+  - timestamp: "0-3s"
+    type: Hook
+    台詞_瑞祥: "你以為選擇越多越自由。"
+    台詞_藏鏡人: "真的嗎？"
+    藏鏡人: "這是非台詞欄，不能當 quote source"
+    畫面: "直視鏡頭"
+    翠文: "選擇越多越自由嗎"
+  - timestamp: "3-12s"
+    type: 破題
+    台詞_瑞祥: "以前我也相信先把所有選項留下來，才不會後悔。"
+    畫面: "畫面裡的假金句"
+    翠文: "畫面裡的假金句"
+  - timestamp: "12-25s"
+    type: 核心論述
+    台詞_瑞祥: "但我昨天看到三個人都卡在同一個選擇，因為選項太大。"
+    畫面: "手比出三"
+    翠文: "選項太大，人會停住"
+  - timestamp: "25-40s"
+    type: 案例轉折
+    台詞_瑞祥: "舉個示意例：有人列了十個方案，最後一個也沒做。"
+    畫面: "桌上放十張紙"
+    翠文: "十個方案，一個也沒做"
+  - timestamp: "40-52s"
+    type: 收束金句
+    台詞_瑞祥: "答案是先把選擇變小，因為看得見代價才做得了決定。"
+    畫面: "收掉多餘紙張"
+    翠文: "先把選擇變小"
+  - timestamp: "52-60s"
+    type: CTA
+    台詞_瑞祥: "先收藏起來，今晚把選項刪到兩個。"
+    畫面: "微笑收尾"
+    翠文: "今晚刪到兩個"

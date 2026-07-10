@@ -23,6 +23,8 @@ from typing import Any, Optional
 
 import yaml
 
+from derive_quotes import QuoteDerivationError, derive_quote_view
+
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
@@ -116,7 +118,9 @@ def build_table(batch_dir: Path) -> tuple[str, int, int]:
     lines.append("")
     with_chxp = 0
     for p in yamls:
-        data = load_frontmatter(p)
+        # G11：old/new/concrete quote 都從同一份 runtime view 取值；禁止
+        # formatter 各自複製 selector 解析邏輯。legacy 無旗標由共用 helper 原樣保留。
+        data = derive_quote_view(load_frontmatter(p))
         sid = str(data.get("script_id") or p.stem)
         title = _md_cell(_fmt_scalar(data.get("title")))
         chxp = _dig(data, "script_method", "chxp_v1")
@@ -148,7 +152,11 @@ def main() -> int:
         return 1
 
     out_path = Path(args.out) if args.out else (batch_dir / "_陳修平公式白話對照表_auto.md")
-    md, n_yaml, n_chxp = build_table(batch_dir)
+    try:
+        md, n_yaml, n_chxp = build_table(batch_dir)
+    except (OSError, UnicodeError, yaml.YAMLError, QuoteDerivationError) as exc:
+        print(f"[ERROR] quote/runtime view 解析失敗：{exc}", file=sys.stderr)
+        return 1
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(md, encoding="utf-8")
     print(f"[OK] {n_yaml} 支 script yaml，{n_chxp} 支有 chxp_v1 欄 → 對照表已寫：{out_path}")

@@ -1,0 +1,97 @@
+---
+# Reduced, self-contained copy of the real grandfather regression script.
+fixture_source:
+  source_path: "L2_業主層/美容_昀臻/01_腳本生產/第14批_2026-07-07/script_yunzhen_14_12.yaml"
+  source_sha256: "21b3f62dc696177b2bf154644fda3629fb933dd4c3d384103cbe7468cf79b2a9"
+  invariant: "hook_debts.opened_quote exists only in 翠文; no quote_derivation_version"
+script_id: yunzhen_14_12
+owner: 昀臻
+title: "痘疤一直不退，你少做了一步"
+content_axis: professional
+lane: professional
+derived_flags: []
+topic_category: professional
+cta_offer_scope: soft_consultation
+
+script_method:
+  chxp_v1:
+    four_materials:
+      problem_scene: "痘疤反覆很久都不退，換了很多產品還是沒用"
+      old_answer:
+        quote: "換了產品確實有時候會有一點改善，讓人以為是產品的問題。"
+        believer_profile: "痘疤反覆很久、不斷換產品的人"
+        why_reasonable: "換了產品有時會改善，讓人以為是產品問題"
+        weakness: "很多人在波動期跟穩定期用同一套保養"
+      new_answer:
+        quote: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+      answer_expansion: "先分辨波動期還是穩定期，再決定方法"
+    assembly:
+      story_vehicle: "波動期 vs 穩定期兩階段對比"
+    optimization:
+      concrete_signals:
+        - quote: "兩週"
+          type: time
+        - quote: "你是不是也這樣"
+          type: person
+        - quote: "痘疤"
+          type: object
+      hook_debts:
+        - opened_at: "0-3s"
+          opened_quote: "痘疤一直不退，你少做了一步"
+          closed_at: "40-52s"
+          closed_quote: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+      barriers_removed:
+        - "拿掉一定要換產品的迷思，因為問題常在方法跟時間"
+    packaging:
+      hook_promise: "你……你痘疤一直不退，是不是也覺得換個更貴的產品就會好？"
+      final_payoff: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+      cta_type: 個人化諮詢型
+
+friend_close:
+  evidence:
+    value_delivered_quote: "先分辨自己現在是還在波動還是已經穩定，穩定期才加維穩型保養"
+    core_answer_quote: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+    cta_quote: "想看你自己現在是波動期還是穩定期，留言『痘疤』我幫你看一下"
+    cta_action_count: 1
+    cta_offer_scope: soft_consultation
+
+professional_topic_type: skin_condition_basic
+actionable_steps:
+  - "先分辨現在是波動還是穩定"
+  - "穩定期才加維穩型保養"
+core_answer: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+
+scenes:
+  - timestamp: "0-3s"
+    type: Hook
+    台詞_昀臻: "你……你痘疤一直不退，是不是也覺得換個更貴的產品就會好？"
+    藏鏡人: "真的假的？不是要換產品？"
+    畫面: "昀臻在工作室護膚檯前，手拿保養品示意"
+    翠文: "痘疤一直不退，你少做了一步"
+  - timestamp: "3-12s"
+    type: 破題
+    台詞_昀臻: "換了產品確實有時候會有一點改善，讓人以為是產品的問題。"
+    畫面: "昀臻點頭"
+    翠文: "換產品，有時真的會有點改善"
+  - timestamp: "12-25s"
+    type: 核心論述
+    台詞_昀臻: "但很多人在波動期跟穩定期，用了同一套保養。波動期猛推維穩型或美白產品反而刺激；而且皮膚代謝需要時間，兩週看不到效果就換，永遠等不到代謝完成那天。"
+    畫面: "手比出兩階段手勢"
+    翠文: "波動期跟穩定期，方法不一樣"
+  - timestamp: "25-40s"
+    type: 案例轉折
+    台詞_昀臻: "舉個示意例，兩週看不到效果就換一款新產品，一直循環——你是不是也這樣？先分辨自己現在是還在波動還是已經穩定，穩定期才加維穩型保養，同時也要顧到作息跟飲食，內外一起調理。"
+    藏鏡人: "對啦我也是這樣一直換"
+    畫面: "保養品排列在桌上被反覆更換"
+    翠文: "先分辨階段，再決定怎麼保養"
+  - timestamp: "40-52s"
+    type: 收束金句
+    台詞_昀臻: "痘疤退得慢，通常不是保養品不夠好，是你在波動期跟穩定期用了同一套方法，加上沒給皮膚代謝的時間。"
+    畫面: "昀臻直視鏡頭，語氣堅定"
+    翠文: "問題不在產品，在方法跟時間"
+  - timestamp: "52-60s"
+    type: CTA
+    台詞_昀臻: "想看你自己現在是波動期還是穩定期，留言『痘疤』我幫你看一下，不用怕，問問不用錢。"
+    畫面: "昀臻微笑看鏡頭"
+    翠文: "留言『痘疤』，我幫你看"
+

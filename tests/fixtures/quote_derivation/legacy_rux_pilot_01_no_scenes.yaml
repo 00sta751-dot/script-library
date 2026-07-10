@@ -1,0 +1,90 @@
+---
+script_id: script_rux_pilot_01
+owner: 瑞祥
+batch: pilot_範本試點_2026-05-31
+index: 1
+title: 同社區，兩組客戶選的理由差很多
+type: 70%_生活/在地觀察
+faction: 人間觀察派
+platform_primary: IG Reels / FB Reels
+platform_secondary: Threads
+suggested_po_time: 平日 19:10–20:30
+publish_mode: manual
+distribution_mode: organic
+
+template_source_ids:
+  - tmpl_ig_DYJszaxPyCk
+  - tmpl_ig_DYkkp64S1GG
+
+template_adaptation:
+  learned_structure: >
+    Hook 製造認知衝突，接著用兩組人物的反差對話，讓觀眾自己得出結論。
+  changed_context: >
+    同一個社區、同樣物件，兩組客戶選的原因完全不同。
+  forbidden_copy_check: passed
+
+voice_lock: true
+voice_lock_corpus_source: L2_瑞祥偏好_§10.4
+voice_lock_corpus_used:
+  - "我跟你說，這件事沒有你想的那麼複雜"
+  - "問問不用錢"
+voice_lock_forbidden_check: passed
+voice_lock_rewrite_alignment: 2
+
+owner_voice:
+  catchphrase:
+    - "我跟你說"
+    - "你知道嗎？"
+  rhythm: short
+  signature_words:
+    - "直接"
+    - "就是說啊"
+  banned_phrases:
+    - "從宏觀角度來看"
+
+platform_variants:
+  ig_reels: true
+  fb_reels: true
+  tiktok: false
+  threads: true
+
+share_design:
+  target_receiver: "也在找北高雄房的朋友"
+  share_reason: "幫猶豫中的人想通"
+  trigger_line: "同一個社區，兩組人選的理由差很多"
+
+content_axis:
+  label: 70%_生活
+  life_to_point_bridge: >
+    人物故事帶出選房是選生活方式的隱性專業訊息。
+
+retention_payoff: "結果揭曉：兩組客戶選的理由，都沒有提到坪數。"
+
+_markdown_body: |
+  # 同社區，兩組客戶選的理由差很多
+
+  ## 6 段時間軸
+
+  **0-3 秒 Hook**
+  台詞：「我帶兩組客戶看同一個鼓山社區，選的理由差很多。」
+
+  **3-12 秒 破題**
+  台詞：「你知道嗎？很多人以為買房就是比條件。」
+
+  **12-25 秒 核心**
+  台詞：「他在問的不是車位，是作息。」
+
+  **25-40 秒 案例**
+  台詞：「我跟你說，這兩組選的，其實都不是房子。」
+
+  **40-52 秒 收束**
+  台詞：「他們兩組都沒提到坪數。一句都沒提。」
+
+  **52-60 秒 CTA**
+  台詞：「不確定自己在選什麼的，留言『諮詢』，我帶你繞繞，問問不用錢。」
+
+  ## Caption
+  帶兩組客戶看同一個鼓山社區，最後都買了。
+
+  ## Hashtag
+  `#高雄買房` `#鼓山` `#高雄房仲`

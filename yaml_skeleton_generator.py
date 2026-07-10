@@ -186,7 +186,23 @@ def _yaml_quote(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _append_hybrid_prefill(lines: list[str], item: dict) -> None:
+def _append_quote_selector(
+    lines: list[str],
+    indent: str,
+    field_name: str,
+    dialogue_key: str,
+    *,
+    list_item: bool = False,
+) -> None:
+    """Append a G11 v1 {timestamp, dialogue_key} selector."""
+    marker = "- " if list_item else ""
+    lines.append(f"{indent}{marker}{field_name}:")
+    child_indent = indent + ("    " if list_item else "  ")
+    lines.append(f"{child_indent}timestamp: {_yaml_quote('[編劇填]')}")
+    lines.append(f"{child_indent}dialogue_key: {_yaml_quote(dialogue_key)}")
+
+
+def _append_hybrid_prefill(lines: list[str], item: dict, dialogue_key: str) -> None:
     if "content_axis" not in item:
         return
 
@@ -210,42 +226,45 @@ def _append_hybrid_prefill(lines: list[str], item: dict) -> None:
     lines.append(f"cta_offer_scope: {_yaml_quote('[編劇填]')}")
     lines.append("")
 
+    # G11：新 hybrid skeleton 一律走 selector runtime；hash 在填完 scenes 後
+    # 由 derive_quotes.py --write 寫入，骨架不可偽造 placeholder hash。
+    lines.append("quote_derivation_version: 1")
     lines.append("script_method:")
     lines.append("  chxp_v1:")
     lines.append("    four_materials:")
     lines.append(f"      problem_scene: {_yaml_quote('[編劇填]')}")
     lines.append("      old_answer:")
-    lines.append(f"        quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "        ", "quote", dialogue_key)
     lines.append(f"        believer_profile: {_yaml_quote('[編劇填]')}")
     lines.append(f"        why_reasonable: {_yaml_quote('[編劇填]')}")
     lines.append(f"        weakness: {_yaml_quote('[編劇填]')}")
     lines.append("      new_answer:")
-    lines.append(f"        quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "        ", "quote", dialogue_key)
     lines.append(f"      answer_expansion: {_yaml_quote('[編劇填]')}")
     lines.append("    assembly:")
     lines.append(f"      story_vehicle: {_yaml_quote('[編劇填]')}")
     lines.append("    optimization:")
     lines.append("      concrete_signals:")
-    lines.append(f"        - quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "        ", "quote", dialogue_key, list_item=True)
     lines.append(f"          type: {_yaml_quote('[編劇填]')}")
     lines.append("      hook_debts:")
     lines.append(f"        - opened_at: {_yaml_quote('[編劇填]')}")
-    lines.append(f"          opened_quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "          ", "opened_quote", dialogue_key)
     lines.append(f"          closed_at: {_yaml_quote('[編劇填]')}")
-    lines.append(f"          closed_quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "          ", "closed_quote", dialogue_key)
     lines.append("      barriers_removed:")
     lines.append(f"        - {_yaml_quote('[編劇填]')}")
     lines.append("    packaging:")
-    lines.append(f"      hook_promise: {_yaml_quote('[編劇填]')}")
-    lines.append(f"      final_payoff: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "      ", "hook_promise", dialogue_key)
+    _append_quote_selector(lines, "      ", "final_payoff", dialogue_key)
     lines.append(f"      cta_type: {_yaml_quote('[編劇填]')}")
     lines.append("")
 
     lines.append("friend_close:")
     lines.append("  evidence:")
-    lines.append(f"    value_delivered_quote: {_yaml_quote('[編劇填]')}")
-    lines.append(f"    core_answer_quote: {_yaml_quote('[編劇填]')}")
-    lines.append(f"    cta_quote: {_yaml_quote('[編劇填]')}")
+    _append_quote_selector(lines, "    ", "value_delivered_quote", dialogue_key)
+    _append_quote_selector(lines, "    ", "core_answer_quote", dialogue_key)
+    _append_quote_selector(lines, "    ", "cta_quote", dialogue_key)
     lines.append(f"    cta_action_count: {_yaml_quote('[編劇填]')}")
     lines.append(f"    cta_offer_scope: {_yaml_quote('[編劇填]')}")
     lines.append("")
@@ -316,7 +335,7 @@ def build_yaml_skeleton(item: dict) -> str:
     lines.append(f"main_platform: {platform}")
     lines.append(f"publish_mode: manual_today  # enum: manual_today / platform_scheduled / draft_only")
     lines.append(f"distribution_mode: organic_only  # enum: organic_only / boost_candidate / paid_ad")
-    _append_hybrid_prefill(lines, item)
+    _append_hybrid_prefill(lines, item, dialogue_key)
     lines.append(f"voice_lock: true  # 聲明業主聲音語料強制入 Hook（見 L2 偏好.md §voice_lock）")
     lines.append(f"suggested_po_time: \"[編劇填]\"  # e.g. 週三晚 8PM")
     lines.append(f"派系: {school}")

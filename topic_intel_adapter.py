@@ -28,7 +28,7 @@ from typing import Optional
 
 # ── 版本常數（規格 §9.6，照抄不改）────────────────────────────────────────
 ADAPTER_VERSION = "wpb-adapter-v1"
-PROJECTION_SCHEMA_VERSION = 1
+PROJECTION_SCHEMA_VERSION = 2
 SHADOW_REPORT_SCHEMA_VERSION = 1
 EVENT_SCHEMA_VERSION = 1
 

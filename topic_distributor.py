@@ -646,7 +646,9 @@ def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dic
         if idx == 2 and axis == "offpro":
             flags.append("wildcard")
             out["wildcard"] = True
-            out["wildcard_reason"] = "料源=Gemini 搜熱門"
+            out["wildcard_reason"] = (
+                "料源=topic_intel_closure active candidate（closure-only）"
+            )
             topic_category = wildcard_category
         elif axis == "offpro":
             topic_category = pillars[offpro_category_index % len(pillars)]
@@ -1064,7 +1066,21 @@ def assign_topic_sources(
                 "detail": f"assign error（enforce expires_at）: {_expires_at_err}",
             }
         else:
-            warnings.append(f"[WARN] {_expires_at_err}，shadow 繼續跑")
+            warnings.append(
+                f"[WARN] {_expires_at_err}，shadow 本批不綁趨勢題"
+            )
+            return plan, {
+                **assign_report_base,
+                "selected_count": 0,
+                "assigned_slots": [],
+                "batch_id": batch_id,
+                "error": None,
+                "warnings": warnings,
+                "detail": (
+                    "assign skip（shadow stale projection，本批不綁趨勢題）: "
+                    f"{_expires_at_err}"
+                ),
+            }
 
     # ── Fix 1b：跨批去重（is_recently_used）─────────────────────────────────────
     # lazy import reconcile_topic_intel_usage.is_recently_used

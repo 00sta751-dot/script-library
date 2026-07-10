@@ -10,7 +10,7 @@ Fix 6 / 2026-06-13
   TC-3：enforce FAIL（不足 min → error，不綁 slot）
   TC-4：enforce PASS（足夠候選 → 正常綁 N slot）
   TC-5：跨批去重（近期已用 → 跳過，警告）
-  TC-6：新鮮度（過期 projection → enforce FAIL / shadow WARN）
+  TC-6：新鮮度（過期 projection → enforce FAIL / shadow WARN 且零綁）
   TC-7：V3-002 批次級 min/max 硬驗（<min → FAIL，>max → FAIL，in-range → PASS，off → SKIP）
 
 PYTHONHASHSEED=0 跑（TC-1 off byte-compat）：
@@ -413,10 +413,10 @@ def tc5_cross_batch_dedup() -> None:
     )
 
 
-# ── TC-6：新鮮度（過期 projection → enforce FAIL / shadow WARN）──────────────
+# ── TC-6：新鮮度（過期 projection → enforce FAIL / shadow WARN 且零綁）──────
 
 def tc6_stale_projection() -> None:
-    """projection expires_at 已過期 → enforce 回 error；shadow 加 WARN"""
+    """projection expires_at 已過期 → enforce error；shadow WARN 且本批零綁。"""
     print("\n[TC-6] 新鮮度（過期 projection）")
     from topic_distributor import assign_topic_sources  # type: ignore[import]
 
@@ -445,7 +445,7 @@ def tc6_stale_projection() -> None:
             f"TC-6 enforce: 應綁 0，實得 {sti_count_e}",
         )
 
-        # shadow → WARN（繼續跑）
+        # shadow → WARN，但不悄悄吃 stale projection
         plan_out_s, report_s = assign_topic_sources(
             plan=plan,
             dedup_info={},
@@ -460,10 +460,46 @@ def tc6_stale_projection() -> None:
             "TC-6 shadow: 應有 stale WARN",
             f"warnings={report_s.get('warnings')}",
         )
-        # shadow 繼續跑：仍嘗試綁（stale warn 後繼續）
-        ok("TC-6 shadow: error=None（shadow 繼續跑）") if report_s.get("error") is None else fail(
+        ok("TC-6 shadow: error=None（WARN 不硬擋批）") if report_s.get("error") is None else fail(
             f"TC-6 shadow: shadow 不應有 error，error={report_s['error']}",
         )
+        sti_count_s = sum(1 for item in plan_out_s if "source_topic_intel" in item)
+        ok("TC-6 shadow: stale projection 零綁") if (
+            sti_count_s == 0
+            and report_s.get("selected_count") == 0
+            and report_s.get("assigned_slots") == []
+            and plan_out_s == plan
+        ) else fail(
+            "TC-6 shadow: stale projection 必須回原 plan、selected=0、assigned=[]",
+            f"report={report_s}, sti_count={sti_count_s}",
+        )
+
+        # 缺失 / parse fail 同樣是 stale-invalid：shadow WARN + 零綁。
+        for label, bad_expiry in (("missing", ""), ("parse-fail", "not-iso")):
+            bad_proj = _make_projection_json(candidates)
+            bad_proj["expires_at"] = bad_expiry
+            bad_path = Path(tmpdir) / f"active_{label}.json"
+            bad_path.write_text(json.dumps(bad_proj), encoding="utf-8")
+            bad_plan = _make_plan()
+            bad_out, bad_report = assign_topic_sources(
+                plan=bad_plan,
+                dedup_info={},
+                policy=_policy("shadow", min_slots=2, max_slots=4),
+                projection_path=str(bad_path),
+            )
+            bad_bound = sum(
+                1 for item in bad_out if "source_topic_intel" in item
+            )
+            ok(f"TC-6 shadow {label}: WARN + 零綁") if (
+                bad_report.get("error") is None
+                and bad_report.get("warnings")
+                and bad_report.get("selected_count") == 0
+                and bad_bound == 0
+                and bad_out == bad_plan
+            ) else fail(
+                f"TC-6 shadow {label}: 應 WARN + 零綁",
+                f"report={bad_report}, bound={bad_bound}",
+            )
 
 
 # ── TC-7：V3-002 批次級 min/max 硬驗 ─────────────────────────────────────────

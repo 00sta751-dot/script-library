@@ -29,7 +29,7 @@ profiles:
       wildcard:
         count: 1
         content_axis: offpro
-        reason: "料源=Gemini 搜熱門"
+        reason: "料源=topic_intel_closure active candidate（closure-only）"
     invariants:
       non_professional: 11
       professional: 2

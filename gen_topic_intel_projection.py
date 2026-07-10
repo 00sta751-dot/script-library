@@ -29,11 +29,13 @@ WP-B Wave 1 Step 3 / 2026-06-13
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # UTF-8 輸出防亂碼
 try:
@@ -65,8 +67,25 @@ _TI_DEFAULTS: dict = {
 _HERE = Path(__file__).resolve().parent
 _OWNER_PROJECTION_PATH = _HERE / "owner_projection.generated.json"
 
-# projection TTL
+# projection cache TTL（讀取端新鮮度）
 _PROJECTION_TTL_HOURS = 24
+
+# active candidate TTL / fixed ranker（封存自 stage1 trend_rank_v1）
+_CANDIDATE_TTL_DAYS = 30
+_TREND_RANKER_VERSION = "trend_rank_v1"
+_TREND_RANK_FEATURE_WEIGHTS = {
+    "freshness": 0.40,
+    "viral_data_completeness": 0.25,
+    "formula_completeness": 0.25,
+    "platform_diversity": 0.10,
+}
+_TREND_RANK_VIRAL_FIELDS = ("view_count", "like_count", "comment_count")
+_TREND_RANK_FORMULA_FIELDS = (
+    "hook_structure",
+    "narrative_arc",
+    "audio_features",
+    "editing_rhythm",
+)
 
 # WP-B strict 要求
 _WPBD_REQUIRED_KEYS = frozenset([
@@ -251,36 +270,9 @@ def _owner_matches(proj: dict, applicable_owners: list, industry: str) -> bool:
     return False
 
 
-def _sort_key(proj: dict) -> tuple:
-    """
-    排序 key（規格 §9.1，deterministic）：
-    (-confidence, -transferability_score, publish_date desc, discovery_date desc, topic_id asc, source_sha256 asc)
-    publish/discovery_date desc = 負字串（str 排序降序近似）
-    """
-    ev = proj.get("evidence_snapshot", {})
-    conf = ev.get("confidence", 0)
-    ts = ev.get("transferability_score", 0)
-    pub = str(ev.get("publish_date", "") or "")
-    topic_id = str(proj.get("topic_id", "") or "")
-    sha = str(proj.get("source_sha256", "") or "")
-
-    # publish_date desc → 前置負號（str 降序：反轉字串比較）
-    neg_pub = tuple(-ord(c) for c in pub) if pub else (0,)
-
-    try:
-        conf_f = -float(conf)
-    except (TypeError, ValueError):
-        conf_f = 0.0
-    try:
-        ts_f = -float(ts)
-    except (TypeError, ValueError):
-        ts_f = 0.0
-
-    return (conf_f, ts_f, neg_pub, topic_id, sha)
-
-
 def _compute_source_pool_fingerprint(
     file_entries: list[tuple[Path, str]],
+    ordered_candidate_source_sha256: list[str],
     owner_proj_json_sha: str,
     pref_md_sha: Optional[str],
     adapter_version: str,
@@ -288,11 +280,11 @@ def _compute_source_pool_fingerprint(
 ) -> str:
     """
     source_pool_fingerprint（規格 §8.6.2）：
-    sha256(canonical JSON of sorted [(basename, sha256, mtime, size)] +
-    owner_projection.json sha + 業主偏好.md sha + adapter_version + projection_schema_version)
+    sha256(canonical JSON of source files + owner ordered candidate sha +
+    owner_projection.json sha + 業主偏好.md sha + adapter/schema/ranker/TTL)
     """
     entries = []
-    for p, sha in sorted(file_entries, key=lambda x: x[0].name):
+    for p, sha in sorted(file_entries, key=lambda item: item[0].name):
         try:
             stat = p.stat()
             mtime = stat.st_mtime
@@ -309,6 +301,10 @@ def _compute_source_pool_fingerprint(
             "pref_md_sha": pref_md_sha or "",
             "adapter_version": adapter_version,
             "projection_schema_version": projection_schema_version,
+            "ranker_version": _TREND_RANKER_VERSION,
+            "ranker_feature_weights": _TREND_RANK_FEATURE_WEIGHTS,
+            "candidate_ttl_days": _CANDIDATE_TTL_DAYS,
+            "ordered_candidate_source_sha256": ordered_candidate_source_sha256,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -338,9 +334,179 @@ def _load_cyborg_yaml(path: Path) -> Optional[dict]:
         return None
 
 
+def _rank_numeric_present(value: Any) -> bool:
+    """trend_rank_v1：bool 不算數字；只收有限、非負數值。"""
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+        and float(value) >= 0
+    )
+
+
+def _rank_nonempty(value: Any) -> bool:
+    """trend_rank_v1：固定的非空判定。"""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (dict, list, tuple, set)):
+        return bool(value)
+    return True
+
+
+def _candidate_duplicate_key(raw: dict, source_sha256: str) -> str:
+    """同影片 canonical key：platform+video_id，其次 URL，最後 source SHA。"""
+    platform = str(raw.get("platform") or "UNKNOWN").strip().casefold() or "unknown"
+    video_id = str(raw.get("video_id") or "").strip().casefold()
+    if video_id:
+        return f"platform_video:{platform}:{video_id}"
+    source_url = str(raw.get("url") or "").strip().casefold()
+    if source_url:
+        return f"url:{source_url}"
+    return f"sha256:{source_sha256}"
+
+
+def _prepare_active_sources(
+    file_entries: list[tuple[Path, str]],
+    now_utc: Optional[datetime] = None,
+) -> tuple[list[dict], dict]:
+    """
+    active candidate 唯一前處理：30d mtime TTL → 同影片去重 → trend_rank_v1。
+
+    duplicate canonical 固定取最新 mtime；mtime 相同取 source SHA 字典序最小。
+    排名固定為未四捨五入 score desc、mtime desc、source SHA asc。
+    """
+    if now_utc is None:
+        now_utc = datetime.now(tz=timezone.utc)
+    elif now_utc.tzinfo is None:
+        raise ValueError("now_utc 必須含 timezone")
+    else:
+        now_utc = now_utc.astimezone(timezone.utc)
+
+    loaded: list[dict] = []
+    parse_error_count = 0
+    ttl_seconds = _CANDIDATE_TTL_DAYS * 86400.0
+
+    for path, sha in file_entries:
+        raw = _load_cyborg_yaml(path)
+        if raw is None:
+            parse_error_count += 1
+            continue
+        try:
+            source_mtime = path.stat().st_mtime
+        except OSError as exc:
+            parse_error_count += 1
+            print(
+                f"[gen-projection] WARN: mtime 讀取失敗 {path.name}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+        age_seconds = max(0.0, now_utc.timestamp() - source_mtime)
+        loaded.append(
+            {
+                "path": path,
+                "source_sha256": sha,
+                "raw": raw,
+                "source_mtime": source_mtime,
+                "source_mtime_utc": datetime.fromtimestamp(
+                    source_mtime, tz=timezone.utc
+                ).isoformat(timespec="microseconds"),
+                "age_seconds": age_seconds,
+                "expired": age_seconds > ttl_seconds,
+            }
+        )
+
+    nonexpired = [row for row in loaded if not row["expired"]]
+    # trend_rank_v1 的 inverse-frequency 母體是成功載入的完整 pool；
+    # TTL 僅決定 active eligibility，不改平台分母。
+    platform_counts: Counter[str] = Counter(
+        str(row["raw"].get("platform") or "UNKNOWN").strip() or "UNKNOWN"
+        for row in loaded
+    )
+    min_platform_count = min(platform_counts.values()) if platform_counts else 0
+
+    for row in nonexpired:
+        raw = row["raw"]
+        freshness = max(0.0, 1.0 - (row["age_seconds"] / ttl_seconds))
+        supporting = raw.get("supporting_data")
+        supporting = supporting if isinstance(supporting, dict) else {}
+        viral_score = sum(
+            _rank_numeric_present(supporting.get(field))
+            for field in _TREND_RANK_VIRAL_FIELDS
+        ) / len(_TREND_RANK_VIRAL_FIELDS)
+        dissect = raw.get("dissect")
+        dissect = dissect if isinstance(dissect, dict) else {}
+        formula_score = sum(
+            _rank_nonempty(dissect.get(field))
+            for field in _TREND_RANK_FORMULA_FIELDS
+        ) / len(_TREND_RANK_FORMULA_FIELDS)
+        platform = str(raw.get("platform") or "UNKNOWN").strip() or "UNKNOWN"
+        platform_score = (
+            min_platform_count / platform_counts[platform]
+            if min_platform_count and platform_counts[platform]
+            else 0.0
+        )
+        feature_scores = {
+            "freshness": freshness,
+            "viral_data_completeness": viral_score,
+            "formula_completeness": formula_score,
+            "platform_diversity": platform_score,
+        }
+        row["rank_score_raw"] = sum(
+            _TREND_RANK_FEATURE_WEIGHTS[name] * feature_scores[name]
+            for name in _TREND_RANK_FEATURE_WEIGHTS
+        )
+        row["rank_score"] = round(row["rank_score_raw"], 6)
+        row["rank_features"] = {
+            name: round(value, 6) for name, value in feature_scores.items()
+        }
+        row["duplicate_key"] = _candidate_duplicate_key(
+            raw, str(row["source_sha256"])
+        )
+
+    duplicate_groups: dict[str, list[dict]] = {}
+    for row in nonexpired:
+        duplicate_groups.setdefault(row["duplicate_key"], []).append(row)
+
+    canonical_rows: list[dict] = []
+    duplicate_count = 0
+    for group in duplicate_groups.values():
+        ordered = sorted(
+            group,
+            key=lambda row: (-float(row["source_mtime"]), str(row["source_sha256"])),
+        )
+        canonical_rows.append(ordered[0])
+        duplicate_count += len(ordered) - 1
+
+    canonical_rows.sort(
+        key=lambda row: (
+            -float(row["rank_score_raw"]),
+            -float(row["source_mtime"]),
+            str(row["source_sha256"]),
+        )
+    )
+    for rank, row in enumerate(canonical_rows, 1):
+        row["rank"] = rank
+
+    stats = {
+        "source_file_count": len(file_entries),
+        "loaded_source_count": len(loaded),
+        "parse_error_count": parse_error_count,
+        "nonexpired_count": len(nonexpired),
+        "expired_count": len(loaded) - len(nonexpired),
+        "canonical_count": len(canonical_rows),
+        "duplicate_count": duplicate_count,
+        "platform_counts": dict(sorted(platform_counts.items())),
+    }
+    return canonical_rows, stats
+
+
 def generate_owner_projection(
     owner_name: str,
     owner_rec: dict,
+    prepared_rows: list[dict],
+    source_pool_stats: dict,
     file_entries: list[tuple[Path, str]],
     owner_proj_json_sha: str,
     dry_run: bool = False,
@@ -380,10 +546,10 @@ def generate_owner_projection(
     qualified: list[dict] = []
     excluded_owner_leak: int = 0  # applicable_owners 非空且不含此業主的排除數（owner-leak fix）
 
-    for path, sha in file_entries:
-        raw = _load_cyborg_yaml(path)
-        if raw is None:
-            continue
+    for row in prepared_rows:
+        path: Path = row["path"]
+        sha = str(row["source_sha256"])
+        raw: dict = row["raw"]
 
         # 先做 owner 過濾（eligible 前）
         applicable_owners = raw.get("applicable_owners") or []
@@ -406,15 +572,21 @@ def generate_owner_projection(
 
         # Fix G：把 canonical source path 存入 projection，assign 端填 evidence_path 用
         proj["evidence_path"] = str(path.resolve())
+        proj["trend_rank"] = {
+            "ranker_version": _TREND_RANKER_VERSION,
+            "global_rank": row["rank"],
+            "score": row["rank_score"],
+            "source_mtime_utc": row["source_mtime_utc"],
+        }
 
         qualified.append(proj)
-
-    # 排序（§9.1，防 golden drift）
-    qualified.sort(key=_sort_key)
 
     # fingerprint
     fingerprint = _compute_source_pool_fingerprint(
         file_entries=file_entries,
+        ordered_candidate_source_sha256=[
+            str(candidate.get("source_sha256", "")) for candidate in qualified
+        ],
         owner_proj_json_sha=owner_proj_json_sha,
         pref_md_sha=pref_sha,
         adapter_version=ADAPTER_VERSION,
@@ -429,6 +601,8 @@ def generate_owner_projection(
     output = {
         "schema_version": PROJECTION_SCHEMA_VERSION,
         "adapter_version": ADAPTER_VERSION,
+        "ranker_version": _TREND_RANKER_VERSION,
+        "candidate_ttl_days": _CANDIDATE_TTL_DAYS,
         "eligible_statuses": ["pending"],
         "owner": owner_name,
         "owner_code": owner_code,
@@ -440,6 +614,13 @@ def generate_owner_projection(
         "expires_at": expires_at,
         "qualified_count": len(qualified),
         "excluded_owner_leak_count": excluded_owner_leak,  # owner-leak fix 排除計數
+        "source_file_count": source_pool_stats["source_file_count"],
+        "loaded_source_count": source_pool_stats["loaded_source_count"],
+        "expired_source_count": source_pool_stats["expired_count"],
+        "duplicate_source_count": source_pool_stats["duplicate_count"],
+        "prepared_source_count": source_pool_stats["canonical_count"],
+        "source_parse_error_count": source_pool_stats["parse_error_count"],
+        "source_collision_count": source_pool_stats.get("collision_count", 0),
         "candidates": qualified,
     }
 
@@ -523,6 +704,21 @@ def main():
     owner_proj_json_bytes = _OWNER_PROJECTION_PATH.read_bytes()
     owner_proj_json_sha = _sha256_bytes(owner_proj_json_bytes)
 
+    # active candidate 唯一入口：TTL → dedup → rank，完成後才做 per-owner projection。
+    try:
+        prepared_rows, source_pool_stats = _prepare_active_sources(file_entries)
+    except Exception as e:
+        print(f"[gen-projection] FATAL: active source 準備失敗: {e}", file=sys.stderr)
+        sys.exit(1)
+    source_pool_stats["collision_count"] = len(collisions)
+    print(
+        "[OK] active sources: "
+        f"canonical={source_pool_stats['canonical_count']}, "
+        f"expired={source_pool_stats['expired_count']}, "
+        f"duplicate={source_pool_stats['duplicate_count']}, "
+        f"parse_error={source_pool_stats['parse_error_count']}"
+    )
+
     # 選目標業主
     if args.owner:
         # alias 解析
@@ -550,6 +746,8 @@ def main():
             r = generate_owner_projection(
                 owner_name=owner_name,
                 owner_rec=owner_rec,
+                prepared_rows=prepared_rows,
+                source_pool_stats=source_pool_stats,
                 file_entries=file_entries,
                 owner_proj_json_sha=owner_proj_json_sha,
                 dry_run=args.dry_run,

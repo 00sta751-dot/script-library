@@ -50,6 +50,6 @@ voice_lock_signal_map:
   trend_search:
     topic_category: 熱門
     examples:
-      - "Gemini 搜熱門"
-      - "平台熱議"
+      - "topic_intel_closure active candidate（已有 canonical cyborg/topic_id）"
+      - "active.json 內已有 topic_id 的平台熱議 cyborg"
 

@@ -348,13 +348,13 @@ def build_yaml_skeleton(item: dict) -> str:
     lines.append(f"# series_id: \"\"      # 系列批才填，e.g. 總督系列")
     lines.append(f"# episode: 0          # 系列批集數，e.g. 1")
     lines.append(f"")
-    # ── §22 選題公式（v1.1 proof_mode 三型 + 6 件套；2026-06-17 機器化 §22；C-22 + C-22b batch-level shadow WARN）──
+    # ── §22 選題公式（proof_mode 四型 + 6 件套；2026-06-17 機器化 §22、2026-07-13 W2-D20 四型對齊；C-22 + C-22b batch-level shadow WARN）──
     # 好角度 = 專屬證據→非顯主張→受眾真代價→行為改變 + 決策時刻 + 業主可信度（見 scripter.md §22.1）
     hybrid_proof_mode = _proof_mode_for_hybrid_lane(item)
     if hybrid_proof_mode:
         lines.append(f"proof_mode: {_yaml_quote(hybrid_proof_mode)}             # hybrid allocator-locked from lane；編劇禁手改")
     else:
-        lines.append(f"proof_mode: \"[編劇填]\"             # proof_first / demand_first / anchor_first（三型擇一，見 scripter.md §22.2）")
+        lines.append(f"proof_mode: \"[編劇填]\"             # proof_first / demand_first / anchor_first / voice_first（四型擇一；voice_first=立場 lane 專用、hybrid 批由 allocator 鎖定非手填，見 scripter.md §22.2）")
     lines.append(f"proof_asset: \"[編劇填]\"            # 業主 §0/§10.5 真料（真故事/案例/數據/服務觀察/客戶FAQ）+ source_ref；proof_first 必先有、禁腦補（anchor_first 改走下方 anchor_ref）")
     lines.append(f"non_obvious_claim: \"[編劇填]\"      # 一句同行不會講的話（驗收：proof-removed test — 拿掉業主料若同行仍能講 → 太一般退回）")
     lines.append(f"audience_decision_cost: \"[編劇填]\"  # 連受眾哪個真代價：多花錢/延誤/踩雷/錯買/錯信/錯過（必填、無 → 案例獵奇降權）")

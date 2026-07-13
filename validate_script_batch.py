@@ -153,7 +153,7 @@ except Exception as _sop_err:
     # fallback 函式（回舊硬編值，守門不失效）
     def _load_l0_batch_spec():  # type: ignore
         return {
-            "main_scripts": 13, "fishing_script": 1, "threads_posts": 7,
+            "main_scripts": 13, "fishing_script": 0, "threads_posts": 7,
             "visual_aid_scripts": 0, "duration_seconds": 60, "title_max_chars": 15,
             "traffic_codes_min": 3, "actor_interaction_min": 2,
             "school_diversity_min": 3, "theme_diversity_min": 4, "cta_distribution": {},
@@ -1705,7 +1705,7 @@ def _v2008_content_dup_hits(cur: list, others: list, threshold: float = 0.85) ->
 
 def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
     """V2-008 v2（2026-06-11 澤君拍板 TG 9755：同題開放——可以講一樣的東西，但腳本全文內容不得雷同）
-    A) 標題 fuzzy ≥0.65 對已用題目 → WARN（原 FAIL 降級；同題請換切角/講法；附錄閱讀義務不變）
+    A) 標題 fuzzy ≥0.65 對已用題目 → WARN（原 FAIL 降級；同題請換切角/講法；canonical=raw `_<業主>已用題目.md`、W2-D22——derived 附錄退出讀取契約）
     B) 全文台詞雷同 ratio ≥0.85 → FAIL：批內互比 + 對全業主歷史批次 script_*.yaml 互比
        （跨業主複製同樣禁止 — 保鏢 R1-hard 2026-06-11；排除當前批次目錄防自比假炸；
         歷史單檔讀取失敗跳過 fail-open、真雷同 fail-closed）
@@ -5269,17 +5269,19 @@ def _c22_normalize(text: str) -> str:
 def _should_check_c22_offpro_angle(data: dict) -> bool:
     """Codex R1 P0 修（2026-06-24）：off-pro 角度守門的精確觸發 gate。
     ⚠️  **不要動 _is_offpro_marker**（parity 綁 taste_panel）。
-        本 gate 比 _is_offpro_marker 更窄：排除 anchor/demand_first/professional/proof_first
+        本 gate 比 _is_offpro_marker 更窄：排除 anchor/demand_first/proof_first
         這些 proof_mode，以及 content_axis 非 offpro 的稿（legacy/professional 不套角度檢查）。
 
     觸發規則：
       1. content_axis == "offpro"（或 content_axis 不存在時不排除）
       2. lane 不在 {"anchor","anchor_first"}
-      3. proof_mode 不在 {"anchor_first","demand_first","professional","proof_first"}
+      3. proof_mode 不在 {"anchor_first","demand_first","proof_first"}
       4. lane=="voice_first" 或 lane=="stance" 或 proof_mode=="voice_first"
          → 至少命中其一才觸發（避免 legacy 稿誤套）
 
     修正 P0.1 proof_mode 繞過 + P1 content_axis 誤套 legacy/professional 問題。
+    W2-D20（2026-07-13）：排除清單移除 "professional"——它是 lane 值非 proof_mode
+    （proof_mode=professional 已被 D20-proof-mode-enum 前置硬 FAIL）。
     """
     axis = str(data.get("content_axis", "") or "").strip().lower()
     lane = str(data.get("lane", "") or "").strip().lower()
@@ -5292,10 +5294,78 @@ def _should_check_c22_offpro_angle(data: dict) -> bool:
     if lane in ("anchor", "anchor_first"):
         return False
     # proof_mode 明確是非 voice_first 型 → 不套
-    if proof in ("anchor_first", "demand_first", "professional", "proof_first"):
+    if proof in ("anchor_first", "demand_first", "proof_first"):
         return False
     # 至少要命中一個 off-pro 立場訊號才觸發
     return lane in ("voice_first", "stance") or proof == "voice_first"
+
+
+# ── D20 proof_mode 四型白名單（W2-D20 2026-07-13；決策卡=state\decision_cards\W2-D20\card.md）──
+_D20_PROOF_MODE_CANONICAL = ("proof_first", "demand_first", "anchor_first", "voice_first")
+
+
+def _is_hybrid_batch(batch_dir: Path, yamls: list[tuple]) -> bool:
+    """D20 批次級世代偵測（照 _is_skeleton_mode 同模式，批級算一次傳入 per-file checks）。
+    hybrid_batch=True 條件：批次夾存在 topic_plan.json，或批內任一 yaml 有
+    proof_mode / lane / content_axis 任一鍵。全批零標記＝hybrid schema 世代前的純 legacy 批，
+    D20-proof-mode-enum 回 not-applicable（legacy_pre_hybrid_batch）。
+    批級偵測讓單檔 serializer 誤刪鍵不會把該檔變豁免（兄弟檔＋topic_plan.json 仍標記全批）。
+    """
+    try:
+        if (batch_dir / "topic_plan.json").exists():
+            return True
+    except OSError:
+        pass
+    for _, data in yamls:
+        if not isinstance(data, dict):
+            continue
+        if any(k in data for k in ("proof_mode", "lane", "content_axis")):
+            return True
+    return False
+
+
+def _d20_resolve_proof_mode(data: dict) -> tuple[str, str]:
+    """D20 純函式 resolver：回 (verdict, detail_core)；verdict ∈ PASS / DERIVED / FAIL。
+    零 normalize：不 strip、不 lower——canonical 值由 allocator/skeleton 機器寫入，
+    出現空白/大小寫變體＝上游壞掉，該擋。derive 僅限「鍵整個缺」且 lane 精確 == professional
+    （產有效值 proof_first、只驗不回寫）；null / 空字串 / 非字串型別永不 derive。
+    """
+    if "proof_mode" not in data:
+        if data.get("lane") == "professional":
+            return "DERIVED", "effective=proof_first; source=lane-derived"
+        return "FAIL", "proof_mode 鍵缺且 lane≠professional（四型白名單缺值硬 FAIL）"
+    val = data["proof_mode"]
+    if not isinstance(val, str):
+        return "FAIL", f"proof_mode 非字串型別（{type(val).__name__}）— 四型白名單外硬 FAIL"
+    if val in _D20_PROOF_MODE_CANONICAL:
+        return "PASS", f"proof_mode={val}"
+    return "FAIL", (
+        f"proof_mode={val!r} 不在四型白名單 {list(_D20_PROOF_MODE_CANONICAL)}"
+        "（未知值硬 FAIL；professional 是 lane 值、對應 proof_mode=proof_first）"
+    )
+
+
+def chk_d20_proof_mode_enum(
+    data: dict,
+    fname: str,
+    hybrid_batch: bool,
+    file_title_is_placeholder: bool,
+    batch_skeleton_mode: bool,
+) -> tuple[str, str]:
+    """D20-proof-mode-enum：proof_mode 唯一 enum 機械閘（無 enforce 旗標、直接 FAIL）。
+    骨架窄 SKIP 三條件缺一不可：批級骨架模式＋本支 title placeholder＋proof_mode 恰為 '[編劇填]'。
+    """
+    if not hybrid_batch:
+        return "PASS", f"{fname}: legacy_pre_hybrid_batch — 全批無 topic_plan.json/proof_mode/lane/content_axis，D20 不適用"
+    if (
+        batch_skeleton_mode
+        and file_title_is_placeholder
+        and data.get("proof_mode") == "[編劇填]"
+    ):
+        return "SKIP", f"{fname}: 骨架階段跳過（proof_mode=[編劇填] 佔位、title 未填）— 填完後 fail-closed"
+    verdict, core = _d20_resolve_proof_mode(data)
+    status = "FAIL" if verdict == "FAIL" else "PASS"
+    return status, f"{fname}: {core}"
 
 
 def _c22_code_severity(code: str) -> str:
@@ -6377,36 +6447,48 @@ def chk_hybrid_plan_lock(
                     problems.append(
                         f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane={plan_lane_pm} 推導）"
                     )
-    axis_count = _count_key(plan, "content_axis")
-    lane_count = _count_key(plan, "lane")
-    if axis_count.get("offpro", 0) != 9 or axis_count.get("personal_anchor", 0) != 2 or axis_count.get("professional", 0) != 2:
-        problems.append(f"content_axis_count={axis_count} expected 9/2/2")
-    if lane_count.get("voice_first", 0) != 7 or lane_count.get("demand_first", 0) != 2 or lane_count.get("anchor_first", 0) != 2 or lane_count.get("professional", 0) != 2:
-        problems.append(f"lane_count={lane_count} expected 7/2/2/2")
-    non_prof = axis_count.get("offpro", 0) + axis_count.get("personal_anchor", 0)
-    if non_prof != 11:
-        problems.append(f"non_professional={non_prof} expected=11")
-    identity_bridge = sum(1 for item in plan if "identity_bridge" in (item.get("derived_flags") or []))
-    pure_emotion = sum(1 for item in plan if "pure_emotion" in (item.get("derived_flags") or []))
-    if identity_bridge != 1:
-        problems.append(f"identity_bridge={identity_bridge} expected=1")
-    if pure_emotion < 1:
-        problems.append(f"pure_emotion={pure_emotion} expected>=1")
-    offpro_cats = [item.get("topic_category") for item in plan if item.get("content_axis") == "offpro" and item.get("topic_category")]
-    offpro_pillar_count = len(set(offpro_cats))
-    news_count = sum(1 for c in offpro_cats if c == "時事")
-    if not 3 <= offpro_pillar_count <= 4:
-        problems.append(f"offpro_pillar_count={offpro_pillar_count} expected 3..4")
-    if news_count > 2:
-        problems.append(f"時事={news_count} expected<=2")
+    # W2-D27：allocator 是唯一 allocation canonical；lazy 單向 import，失敗即 fail-closed。
+    try:
+        from topic_distributor import evaluate_hybrid_allocation
+    except Exception as exc:
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
+            "C-plan-lock FAIL — allocator evaluator import error: "
+            f"{type(exc).__name__}: {exc}"
+        )
+    try:
+        allocation = evaluate_hybrid_allocation(plan)
+    except Exception as exc:
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
+            "C-plan-lock FAIL — allocator evaluator error: "
+            f"{type(exc).__name__}: {exc}"
+        )
+    if not isinstance(allocation, dict) or not isinstance(
+        allocation.get("infeasible_constraints"), list
+    ):
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
+            "C-plan-lock FAIL — allocator evaluator returned malformed result"
+        )
+    problems.extend(str(item) for item in allocation["infeasible_constraints"])
+    axis_count = allocation.get("content_axis_count", {})
+    lane_count = allocation.get("lane_count", {})
+    offpro_pillar_count = allocation.get("offpro_pillar_count", 0)
+    news_count = allocation.get("offpro_news_count", 0)
+    allocation_summary = (
+        "allocation_summary="
+        f"content_axis_count={json.dumps(axis_count, ensure_ascii=False, sort_keys=True, separators=(',', ':'))},"
+        f"lane_count={json.dumps(lane_count, ensure_ascii=False, sort_keys=True, separators=(',', ':'))},"
+        f"offpro_pillar_count={offpro_pillar_count},時事={news_count}"
+    )
     prof_slots = [item.get("script_id") for item in plan if item.get("content_axis") == "professional"]
     yaml_prof = [d.get("script_id") for _, d in yamls if isinstance(d, dict) and d.get("content_axis") == "professional"]
     if sorted(str(x) for x in yaml_prof) != sorted(str(x) for x in prof_slots if x in set(yaml_prof)):
         problems.append("professional YAML slots do not match reserved plan slots")
 
     if problems:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), f"C-plan-lock FAIL — {'; '.join(problems[:10])}"
-    return "PASS", f"C-plan-lock PASS — content_axis 9/2/2, lane 7/2/2/2, offpro_pillar_count={offpro_pillar_count}, 時事={news_count}"
+        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
+            f"C-plan-lock FAIL — {'; '.join(problems[:10])}; {allocation_summary}"
+        )
+    return "PASS", f"C-plan-lock PASS — {allocation_summary}"
 
 
 def chk_taste_panel_completeness(
@@ -6688,12 +6770,15 @@ def run_per_file_checks(
     is_skeleton: bool = False,
     fishing_policy: Optional[dict] = None,
     topic_intel_policy: Optional[dict] = None,
+    hybrid_batch: bool = True,
 ) -> list[tuple[str, str, str, str]]:
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
     is_skeleton：由 _is_skeleton_mode(yamls) 傳入，骨架階段跳過 V2-025/026
     fishing_policy：由 load_fishing_policy() 算出後傳入，讓 C-013 知道模式
     topic_intel_policy：由 load_topic_intel_policy() 算出後傳入，讓 V3-001 知道模式（off=SKIP）
+    hybrid_batch：由 _is_hybrid_batch(batch_dir, yamls) 傳入（W2-D20）；預設 True=fail-closed
+    （單檔直呼/harness matrix 語境一律全嚴），只有主流程判定純 legacy 批才傳 False。
     """
     if fishing_policy is None:
         fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
@@ -6808,6 +6893,11 @@ def run_per_file_checks(
         checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(_quote_view, f.name, is_skeleton)))
     # C-identity-bridge 不是 quote 欄 consumer，只看 canonical scenes；保留原 data。
     checks.append(("C-identity-bridge",    chk_hybrid_identity_bridge(data, f.name, is_skeleton)))
+    # D20 proof_mode 四型白名單（W2-D20 2026-07-13）：無條件註冊、無 enforce 旗標；
+    # 批級 hybrid_batch 世代偵測傳入，單檔 title placeholder 判定沿用 C-21.7 逐檔模式。
+    checks.append(("D20-proof-mode-enum", chk_d20_proof_mode_enum(
+        data, f.name, hybrid_batch, _is_placeholder(data.get("title")), is_skeleton
+    )))
 
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -6998,6 +7088,10 @@ def main():
     _skeleton_mode = _is_skeleton_mode(valid_yamls)
     if _skeleton_mode:
         print("[INFO] 偵測到骨架模式（批次 >= 50% yaml 的 title 為 placeholder）— V2-025/026 本批跳過")
+    # D20（W2-D20 2026-07-13）：批次級世代偵測，純 legacy 批 D20 記 legacy_pre_hybrid_batch
+    _hybrid_batch = _is_hybrid_batch(batch_dir, valid_yamls)
+    if not _hybrid_batch:
+        print("[INFO] D20：全批無 hybrid 標記（純 legacy 批）— D20-proof-mode-enum 記 legacy_pre_hybrid_batch")
     _per_file_results_count: int = 0  # 第一支跑完後更新
     print("── 逐篇 check（per-file × 每篇）──")
     for f, data in valid_yamls:
@@ -7008,6 +7102,7 @@ def main():
             is_skeleton=_skeleton_mode,
             fishing_policy=fishing_policy,
             topic_intel_policy=_topic_intel_policy,
+            hybrid_batch=_hybrid_batch,
         )
         for cid, status, fname, detail in per_results:
             icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))

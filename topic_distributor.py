@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 topic_distributor.py — 題目分配機 v1.0
+
+Canonical machine source for the hybrid content-axis allocation contract.
+Consumers must call ``evaluate_hybrid_allocation(plan)`` instead of mirroring
+the constants or acceptance rules declared in this module.
+
 自動分 13 題目方向（按業主流派比例 + 去重已用主題）
 
 用法：
@@ -22,13 +27,6 @@ import hashlib
 import yaml
 from pathlib import Path
 from typing import Optional
-
-# UTF-8 輸出防亂碼（Windows cp950）
-try:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
 
 # ── 共用派系解析器（第一刀 2026-06-05）──
 try:
@@ -64,6 +62,31 @@ except Exception as _ip_err:
 # ── 路徑常數 ──
 L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
 SOP_YAML = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_腳本生產SOP_v3.0.yaml")
+
+# ── Hybrid allocation canonical contract（W2-D27）──
+CONTENT_AXIS_VALUES = ("offpro", "personal_anchor", "professional")
+CONTENT_AXIS_TARGET_COUNTS = {
+    "offpro": 9,
+    "personal_anchor": 2,
+    "professional": 2,
+}
+LANE_GENERATION_DEFAULT_COUNTS = {
+    "voice_first": 7,
+    "demand_first": 2,
+    "anchor_first": 2,
+    "professional": 2,
+}
+LANE_FEASIBLE_RANGES = {
+    "voice_first": (6, 9),
+    "demand_first": (2, 4),
+    "anchor_first": (1, 3),
+}
+LANE_TO_CONTENT_AXIS = {
+    "voice_first": "offpro",
+    "demand_first": "offpro",
+    "anchor_first": "personal_anchor",
+    "professional": "professional",
+}
 
 # Phase 2 FIX2：lazy proxy（import 不碰 generated.json；dir 已於上方 sibling import 加入 sys.path）
 from _lazy_map import LazyMap
@@ -513,12 +536,7 @@ def _load_offpro_topic_pillars() -> tuple[list[str], str]:
 
 
 def _profile_lanes(profile_data: dict) -> dict[str, int]:
-    default = {
-        "voice_first": 7,
-        "demand_first": 2,
-        "anchor_first": 2,
-        "professional": 2,
-    }
+    default = dict(LANE_GENERATION_DEFAULT_COUNTS)
     profiles = profile_data.get("profiles") if isinstance(profile_data, dict) else None
     strong = profiles.get("strong_default") if isinstance(profiles, dict) else None
     lanes = strong.get("lanes") if isinstance(strong, dict) else None
@@ -556,7 +574,13 @@ def _plan_lock_hash(plan: list[dict]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _hybrid_allocation_report(plan: list[dict]) -> dict:
+def evaluate_hybrid_allocation(plan: list[dict]) -> dict:
+    """Return the deterministic hybrid-allocation verdict for ``plan``.
+
+    This public evaluator is pure: it performs no I/O, mutates neither the
+    input nor module state, and derives every result from the canonical
+    constants above.
+    """
     content_axis_count = _count_by(plan, "content_axis")
     lane_count = _count_by(plan, "lane")
     topic_category_count = _count_by(plan, "topic_category")
@@ -576,25 +600,29 @@ def _hybrid_allocation_report(plan: list[dict]) -> dict:
 
     infeasible: list[str] = []
     non_professional = content_axis_count.get("offpro", 0) + content_axis_count.get("personal_anchor", 0)
-    if len(plan) != 13:
-        infeasible.append(f"slot_count={len(plan)} expected=13")
-    if content_axis_count.get("offpro", 0) != 9:
-        infeasible.append(f"offpro={content_axis_count.get('offpro', 0)} expected=9")
-    if content_axis_count.get("personal_anchor", 0) != 2:
-        infeasible.append(f"personal_anchor={content_axis_count.get('personal_anchor', 0)} expected=2")
-    if non_professional != 11:
-        infeasible.append(f"non_professional={non_professional} expected=11")
-    if content_axis_count.get("professional", 0) != 2:
-        infeasible.append(f"professional={content_axis_count.get('professional', 0)} expected=2")
-    voice_first = lane_count.get("voice_first", 0)
-    if not 6 <= voice_first <= 9:
-        infeasible.append(f"voice_first={voice_first} expected_range=6..9")
-    demand_first = lane_count.get("demand_first", 0)
-    if not 2 <= demand_first <= 4:
-        infeasible.append(f"demand_first={demand_first} expected_range=2..4")
-    anchor_first = lane_count.get("anchor_first", 0)
-    if not 1 <= anchor_first <= 3:
-        infeasible.append(f"anchor_first={anchor_first} expected_range=1..3")
+    expected_slots = sum(CONTENT_AXIS_TARGET_COUNTS.values())
+    if len(plan) != expected_slots:
+        infeasible.append(f"slot_count={len(plan)} expected={expected_slots}")
+    for axis in CONTENT_AXIS_VALUES:
+        actual = content_axis_count.get(axis, 0)
+        expected = CONTENT_AXIS_TARGET_COUNTS[axis]
+        if actual != expected:
+            infeasible.append(f"{axis}={actual} expected={expected}")
+    expected_non_professional = (
+        CONTENT_AXIS_TARGET_COUNTS["offpro"]
+        + CONTENT_AXIS_TARGET_COUNTS["personal_anchor"]
+    )
+    if non_professional != expected_non_professional:
+        infeasible.append(
+            f"non_professional={non_professional} "
+            f"expected={expected_non_professional}"
+        )
+    for lane, (minimum, maximum) in LANE_FEASIBLE_RANGES.items():
+        actual = lane_count.get(lane, 0)
+        if not minimum <= actual <= maximum:
+            infeasible.append(
+                f"{lane}={actual} expected_range={minimum}..{maximum}"
+            )
     if identity_bridge_count != 1:
         infeasible.append(f"identity_bridge={identity_bridge_count} expected=1")
     if pure_emotion_count < 1:
@@ -609,11 +637,17 @@ def _hybrid_allocation_report(plan: list[dict]) -> dict:
         "lane_count": lane_count,
         "topic_category_count": topic_category_count,
         "offpro_pillar_count": offpro_pillar_count,
+        "offpro_news_count": news_count,
         "identity_bridge_present": identity_bridge_count == 1,
         "emotional_slot_present": pure_emotion_count >= 1,
         "business_leak_check": "placeholder:not_run",
         "infeasible_constraints": infeasible,
     }
+
+
+def _hybrid_allocation_report(plan: list[dict]) -> dict:
+    """Backward-compatible private entry point for allocator callers."""
+    return evaluate_hybrid_allocation(plan)
 
 
 def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dict], str, dict]:
@@ -624,12 +658,6 @@ def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dic
         + ["anchor_first"] * lanes["anchor_first"]
         + ["professional"] * lanes["professional"]
     )
-    axis_by_lane = {
-        "voice_first": "offpro",
-        "demand_first": "offpro",
-        "anchor_first": "personal_anchor",
-        "professional": "professional",
-    }
     pillars, wildcard_category = _load_offpro_topic_pillars()
     offpro_category_index = 0
 
@@ -637,7 +665,7 @@ def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dic
     for idx, item in enumerate(plan):
         out = dict(item)
         lane = lane_sequence[idx] if idx < len(lane_sequence) else "unassigned"
-        axis = axis_by_lane.get(lane, "unassigned")
+        axis = LANE_TO_CONTENT_AXIS.get(lane, "unassigned")
         flags: list[str] = []
         if idx == 0 and lane == "voice_first":
             flags.append("identity_bridge")
@@ -675,6 +703,13 @@ def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dic
 # ════════════════════════════════════════
 
 def main():
+    # UTF-8 CLI output防亂碼（Windows cp950）；import 不改呼叫端 streams。
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="題目分配機 — 自動分 13 題目方向")
     parser.add_argument("--owner",  required=True, help="業主名（瑞祥/仲豪/昀臻/叭噗_小C/阿奇）")
     parser.add_argument("--batch",  required=True, help="批次名，e.g. 第02批_2026-05-25")

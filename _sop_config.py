@@ -7,6 +7,7 @@ _sop_config.py — L0 SOP accessor（B 段 2026-06-05）
 
 API：
   load_l0_batch_spec(sop_yaml=None) -> dict
+  load_l0_batch_spec_sources(sop_yaml=None) -> dict
   load_l0_time_slots(sop_yaml=None) -> tuple[dict, ...]
   normalize_timestamp(value) -> str
   clear_sop_config_cache()
@@ -14,6 +15,7 @@ API：
 
 import sys
 import re
+import datetime as _dt
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -37,7 +39,8 @@ _FALLBACK_BATCH_SPEC: dict = {
     "main_scripts":          13,
     "fishing_script":         0,   # 釣魚部下架（澤君 2026-06-05）：fallback 同步改 0，與 L0 一致（沉默坑防護）
     "threads_posts":          7,
-    "visual_aid_scripts":     0,
+    "threads_max_codepoints": 200,
+    "threads_length_effective_from": "2026-07-13",
     "duration_seconds":      60,
     "title_max_chars":       15,
     "traffic_codes_min":      3,
@@ -46,6 +49,8 @@ _FALLBACK_BATCH_SPEC: dict = {
     "theme_diversity_min":    4,
     "cta_distribution":      {},
 }
+
+_BATCH_SPEC_SOURCE_CACHE: dict[str, dict[str, str]] = {}
 
 _FALLBACK_TIME_SLOTS: tuple = (
     {"raw_slot": "0-3秒",   "timestamp": "0-3s",   "start":  0, "end":  3, "task": "Hook 開場金句（決定觀眾留不留下）",    "note": "必須是金句，不能是問候語"},
@@ -104,6 +109,7 @@ def load_l0_batch_spec(sop_yaml: Optional[str] = None) -> dict:
     import yaml as _yaml
 
     path = Path(sop_yaml) if sop_yaml else _DEFAULT_SOP_YAML
+    cache_key = str(path.resolve())
 
     # ── 讀檔 ──
     raw_spec: dict = {}
@@ -116,6 +122,9 @@ def load_l0_batch_spec(sop_yaml: Optional[str] = None) -> dict:
             f"using hardcoded fallback for batch_spec.",
             file=sys.stderr,
         )
+        _BATCH_SPEC_SOURCE_CACHE[cache_key] = {
+            key: "fallback:_sop_config(read_error)" for key in _FALLBACK_BATCH_SPEC
+        }
         return dict(_FALLBACK_BATCH_SPEC)
 
     # ── batch_spec 必須是 mapping（Codex must-fix：malformed shape list/str → 全 fallback + WARN，不可 crash）──
@@ -125,14 +134,20 @@ def load_l0_batch_spec(sop_yaml: Optional[str] = None) -> dict:
             f"using hardcoded fallback for batch_spec.",
             file=sys.stderr,
         )
+        _BATCH_SPEC_SOURCE_CACHE[cache_key] = {
+            key: "fallback:_sop_config(batch_spec_non_mapping)"
+            for key in _FALLBACK_BATCH_SPEC
+        }
         return dict(_FALLBACK_BATCH_SPEC)
 
     # ── 每個 key 補 fallback ──
     result: dict = {}
+    sources: dict[str, str] = {}
     int_keys = {
-        "main_scripts", "fishing_script", "threads_posts", "visual_aid_scripts",
+        "main_scripts", "fishing_script", "threads_posts",
         "duration_seconds", "title_max_chars", "traffic_codes_min",
         "actor_interaction_min", "school_diversity_min", "theme_diversity_min",
+        "threads_max_codepoints",
     }
     for key, fallback_val in _FALLBACK_BATCH_SPEC.items():
         raw_val = raw_spec.get(key)
@@ -144,9 +159,28 @@ def load_l0_batch_spec(sop_yaml: Optional[str] = None) -> dict:
                 file=sys.stderr,
             )
             result[key] = fallback_val
+            sources[key] = f"fallback:_sop_config({key}:missing)"
+        elif key == "threads_max_codepoints":
+            if (
+                isinstance(raw_val, int)
+                and not isinstance(raw_val, bool)
+                and raw_val > 0
+            ):
+                result[key] = raw_val
+                sources[key] = f"L0:{path}#batch_spec.{key}"
+            else:
+                print(
+                    f"[WARN] _sop_config: batch_spec.{key} missing/invalid ({raw_val!r}); "
+                    f"using fallback value {fallback_val!r}.",
+                    file=sys.stderr,
+                )
+                result[key] = fallback_val
+                sources[key] = f"fallback:_sop_config({key}:invalid)"
         elif key in int_keys:
             try:
-                result[key] = int(raw_val)
+                parsed_int = int(raw_val)
+                result[key] = parsed_int
+                sources[key] = f"L0:{path}#batch_spec.{key}"
             except (TypeError, ValueError):
                 print(
                     f"[WARN] _sop_config: batch_spec.{key} missing/invalid ({raw_val!r}); "
@@ -154,10 +188,38 @@ def load_l0_batch_spec(sop_yaml: Optional[str] = None) -> dict:
                     file=sys.stderr,
                 )
                 result[key] = fallback_val
+                sources[key] = f"fallback:_sop_config({key}:invalid)"
+        elif key == "threads_length_effective_from":
+            try:
+                if not isinstance(raw_val, str):
+                    raise ValueError("effective_from must be an ISO date string")
+                parsed_date = _dt.date.fromisoformat(raw_val)
+                if parsed_date.isoformat() != raw_val:
+                    raise ValueError("effective_from must use canonical YYYY-MM-DD")
+                result[key] = raw_val
+                sources[key] = f"L0:{path}#batch_spec.{key}"
+            except (TypeError, ValueError):
+                print(
+                    f"[WARN] _sop_config: batch_spec.{key} missing/invalid ({raw_val!r}); "
+                    f"using fallback value {fallback_val!r}.",
+                    file=sys.stderr,
+                )
+                result[key] = fallback_val
+                sources[key] = f"fallback:_sop_config({key}:invalid)"
         else:
             result[key] = raw_val
+            sources[key] = f"L0:{path}#batch_spec.{key}"
 
+    _BATCH_SPEC_SOURCE_CACHE[cache_key] = sources
     return result
+
+
+def load_l0_batch_spec_sources(sop_yaml: Optional[str] = None) -> dict[str, str]:
+    """回傳每個 batch_spec effective value 的來源，供 validator detail 稽核。"""
+    path = Path(sop_yaml) if sop_yaml else _DEFAULT_SOP_YAML
+    cache_key = str(path.resolve())
+    load_l0_batch_spec(sop_yaml)
+    return dict(_BATCH_SPEC_SOURCE_CACHE[cache_key])
 
 
 # ════════════════════════════════════════
@@ -259,6 +321,7 @@ def load_l0_time_slots(sop_yaml: Optional[str] = None) -> tuple:
 def clear_sop_config_cache():
     """清兩個 lru_cache（測試改 temp SOP 後呼叫）。"""
     load_l0_batch_spec.cache_clear()
+    _BATCH_SPEC_SOURCE_CACHE.clear()
     load_l0_time_slots.cache_clear()
 
 
@@ -296,6 +359,10 @@ if __name__ == "__main__":
     _chk("F-SC1 main_scripts == 13",         bs.get("main_scripts") == 13, str(bs.get("main_scripts")))
     _chk("F-SC1 fishing_script == 0",         bs.get("fishing_script") == 0, str(bs.get("fishing_script")))
     _chk("F-SC1 threads_posts == 7",          bs.get("threads_posts") == 7, str(bs.get("threads_posts")))
+    _chk("F-SC1 threads_max_codepoints == 200", bs.get("threads_max_codepoints") == 200, str(bs.get("threads_max_codepoints")))
+    _chk("F-SC1 threads_length_effective_from == 2026-07-13", bs.get("threads_length_effective_from") == "2026-07-13", str(bs.get("threads_length_effective_from")))
+    bs_sources = load_l0_batch_spec_sources()
+    _chk("F-SC1 threads limit source = L0", bs_sources.get("threads_max_codepoints", "").startswith("L0:"), bs_sources.get("threads_max_codepoints", ""))
     _chk("F-SC1 duration_seconds == 60",      bs.get("duration_seconds") == 60, str(bs.get("duration_seconds")))
     _chk("F-SC1 title_max_chars == 15",       bs.get("title_max_chars") == 15, str(bs.get("title_max_chars")))
     _chk("F-SC1 traffic_codes_min == 3",      bs.get("traffic_codes_min") == 3, str(bs.get("traffic_codes_min")))
@@ -323,6 +390,8 @@ if __name__ == "__main__":
     sys.stderr = _old_err
     warn_out = _stderr_buf.getvalue()
     _chk("F-SC3 fallback main_scripts == 13", bs_miss.get("main_scripts") == 13, str(bs_miss.get("main_scripts")))
+    _chk("F-SC3 fallback threads limit == 200", bs_miss.get("threads_max_codepoints") == 200, str(bs_miss.get("threads_max_codepoints")))
+    _chk("F-SC3 fallback cutover == 2026-07-13", bs_miss.get("threads_length_effective_from") == "2026-07-13", str(bs_miss.get("threads_length_effective_from")))
     _chk("F-SC3 stderr 含 [WARN] _sop_config:", "[WARN] _sop_config:" in warn_out, repr(warn_out[:120]))
 
     # ── F-SC4：缺 key → 單 key fallback + WARN ──
@@ -333,7 +402,8 @@ if __name__ == "__main__":
             "main_scripts": 13,
             "fishing_script": 0,
             "threads_posts": 7,
-            "visual_aid_scripts": 0,
+            "threads_max_codepoints": "bad_value",
+            "threads_length_effective_from": "2026-99-99",
             "duration_seconds": 60,
             # 刻意缺 title_max_chars
             "traffic_codes_min": 3,
@@ -362,6 +432,8 @@ if __name__ == "__main__":
     warn_out2 = _stderr_buf2.getvalue()
     _chk("F-SC4 缺 title_max_chars → fallback 15", bs4.get("title_max_chars") == 15, str(bs4.get("title_max_chars")))
     _chk("F-SC4 壞 actor_interaction_min → fallback 2", bs4.get("actor_interaction_min") == 2, str(bs4.get("actor_interaction_min")))
+    _chk("F-SC4 壞 threads_max_codepoints → fallback 200", bs4.get("threads_max_codepoints") == 200, str(bs4.get("threads_max_codepoints")))
+    _chk("F-SC4 壞 threads_length_effective_from → fallback 2026-07-13", bs4.get("threads_length_effective_from") == "2026-07-13", str(bs4.get("threads_length_effective_from")))
     _chk("F-SC4 stderr 含 [WARN] _sop_config:", "[WARN] _sop_config:" in warn_out2, repr(warn_out2[:200]))
 
     # ── F-SC5：time_slots 重疊/倒序 → 全 fallback + WARN ──
@@ -509,6 +581,39 @@ if __name__ == "__main__":
     _chk("F-SC12 → fallback 6 slots", len(ts12) == 6, str(len(ts12)))
     _chk("F-SC12 stderr 訊息精準（含 script_schema 非 mapping）",
          "script_schema 非 mapping" in _b12.getvalue(), repr(_b12.getvalue()[:160]))
+
+    # ── F-SC13（W2-D10 review B1）：Threads gate keys 嚴格驗型，禁 coercion ──
+    print("\n[F-SC13] Threads gate keys 嚴格驗型 → WARN + fallback")
+    strict_cases = [
+        ("limit str '201'", "threads_max_codepoints", "201", 200),
+        ("limit float 200.5", "threads_max_codepoints", 200.5, 200),
+        ("limit bool True", "threads_max_codepoints", True, 200),
+        ("limit negative -5", "threads_max_codepoints", -5, 200),
+        ("limit zero 0", "threads_max_codepoints", 0, 200),
+        ("cutover non-str", "threads_length_effective_from", 20260713, "2026-07-13"),
+        ("cutover invalid date", "threads_length_effective_from", "2026-13-45", "2026-07-13"),
+    ]
+    for _idx13, (_label13, _key13, _raw13, _expected13) in enumerate(strict_cases):
+        _spec13 = dict(_FALLBACK_BATCH_SPEC)
+        _spec13[_key13] = _raw13
+        _tmp_path13 = os.path.join(_tmp_dir, f"sop_strict_{_idx13}.yaml")
+        with open(_tmp_path13, "w", encoding="utf-8") as f:
+            _yaml.dump({"batch_spec": _spec13}, f, allow_unicode=True)
+        clear_sop_config_cache()
+        _b13 = io.StringIO(); sys.stderr = _b13
+        _bs13 = load_l0_batch_spec(sop_yaml=_tmp_path13)
+        sys.stderr = _old_err
+        _warn13 = _b13.getvalue()
+        _chk(
+            f"F-SC13 {_label13} → fallback {_expected13!r}",
+            _bs13.get(_key13) == _expected13,
+            repr(_bs13.get(_key13)),
+        )
+        _chk(
+            f"F-SC13 {_label13} → WARN",
+            "[WARN] _sop_config:" in _warn13 and _key13 in _warn13,
+            repr(_warn13[:200]),
+        )
 
     # 清理 tempfiles
     import shutil

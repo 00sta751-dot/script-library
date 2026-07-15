@@ -4,6 +4,9 @@
 validate_deploy.py — 短影音腳本上線前驗證腳本 (17 件檢查)
 
 用途：腳本+圖卡+上線 三件齊驗證。pre-commit hook 強制執行。
+註（W2-C撤收 2026-07-14）：短影音批次圖卡「生產」已退役（R-CARD-001 在 validate_script_batch 上游擋新批圖卡欄位）；
+本檔圖卡相關 checks（check_1/2/7/8/9/12 白名單）定位＝既有 live 內容保全、非生產觸發，功能零改。
+只要 live HTML 仍含圖卡/下載按鈕區塊，本組 checks 不得刪除（刪＝失去 live 保全，非「圖卡退役收尾」）。
 
 17 件檢查（v1 5 件 + v2 新增 5 件 + v3/v4/v5/v6/v7/v8/v9 各新增 1 件）：
 1. download_href count 對齊（5/16 出包點直擊）

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 validate_script_batch.py — 腳本批次品管員（v2 — 階段 3 升級 / 含 V2 schema 守門；現役 2026-06-23 enforce-flip：5 旗標 True、§21/§22 機械化、off-pro enforce、202 fixtures）
-對齊 SOP _腳本生產SOP_v3.0.yaml §11 9 件 + §14 §15 + guardian 補 6 件 C-010 ~ C-015
+對齊 SOP _腳本生產SOP_v3.0.yaml（§11 圖卡批次段 2026-07-14 退役 tombstone）+ §15 + guardian 補件 C-010 ~ C-015（C-014 已退役、ID 保留）+ R-CARD-001（2026-07-14 起擋新批圖卡欄）
 v2 新增 5 件 V2-001 ~ V2-005（yaml schema 新欄位驗 + migration plan）
 
 用法：
@@ -138,6 +138,7 @@ try:
         sys.path.insert(0, str(_SOP_CFG_DIR))
     from _sop_config import (
         load_l0_batch_spec as _load_l0_batch_spec,
+        load_l0_batch_spec_sources as _load_l0_batch_spec_sources,
         load_l0_time_slots as _load_l0_time_slots,
         normalize_timestamp as _sop_ts_normalize,
     )
@@ -154,9 +155,16 @@ except Exception as _sop_err:
     def _load_l0_batch_spec():  # type: ignore
         return {
             "main_scripts": 13, "fishing_script": 0, "threads_posts": 7,
-            "visual_aid_scripts": 0, "duration_seconds": 60, "title_max_chars": 15,
+            "threads_max_codepoints": 200, "threads_length_effective_from": "2026-07-13",
+            "duration_seconds": 60, "title_max_chars": 15,
             "traffic_codes_min": 3, "actor_interaction_min": 2,
             "school_diversity_min": 3, "theme_diversity_min": 4, "cta_distribution": {},
+        }
+
+    def _load_l0_batch_spec_sources():  # type: ignore
+        return {
+            key: "fallback:validate_script_batch(import_error)"
+            for key in _load_l0_batch_spec()
         }
 
     def _load_l0_time_slots():  # type: ignore
@@ -1013,50 +1021,7 @@ def chk_c013b_no_fishing_when_off(yamls: list, fishing_policy: Optional[dict] = 
     return "PASS", f"C-013B：無釣魚信號（mode={mode}）"
 
 
-def chk_c014_card_style(yamls, batch_dir: Path, owner: str, batch_tag: str) -> tuple[str, str]:
-    """C-014：知識型圖卡風格 18 選 1 推薦走過（B6 2026-06-05：知識圖卡改按需 — intent-aware）。
-    判定邏輯：先看本批有沒有「知識圖卡意圖」（任一腳本填了非空「圖卡主題」）。
-      - 無意圖 + 無風格選擇檔 → PASS 跳過（本批本來就不做知識圖卡，不 WARN-spam）。
-      - 有意圖 + 無風格選擇檔 → WARN（要做知識圖卡卻沒走 18 選 1 推薦制，提醒補）。
-      - 有風格選擇檔 → 驗風格 id。
-    釣魚部 dm_card（①）不在此 check（走 C-013），其用 dm_card 欄位、非「圖卡主題」。"""
-    # B6：本批是否有知識圖卡意圖（腳本填了非空「圖卡主題」；釣魚部用 dm_card 不填此欄）
-    has_knowledge_card_intent = any(
-        str((data or {}).get("圖卡主題") or "").strip()
-        for _, data in (yamls or [])
-    )
-    # B6：無知識圖卡意圖 → 本批不做知識圖卡，直接 PASS-skip（先於 owner 目錄判斷，避免 owner 不在 map 時被 WARN-spam）
-    if not has_knowledge_card_intent:
-        return "PASS", "本批無知識圖卡意圖（無腳本填「圖卡主題」），按需跳過 C-014（B6 2026-06-05）"
-    # 以下只在「本批確實要做知識圖卡」時才走：找風格選擇檔
-    # 找業主核心檔資料夾（7 業主全列；缺漏業主走 OWNER_PREF_PATHS fallback）
-    # Phase 2 Step 4：從 projection 產（key 順序對齊原硬編：瑞祥/仲豪/昀臻/叭噗_小C/阿奇/詩婷/溫蒂）
-    owner_dir_map = {
-        owner: L2_BASE / rec["owner_dir"] / "00_業主核心檔" / "source_overlay"
-        for owner, rec in sorted(
-            _OWNER_PROJ.items(),
-            key=lambda x: ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "詩婷", "溫蒂"].index(x[0])
-            if x[0] in ["瑞祥", "仲豪", "昀臻", "叭噗_小C", "阿奇", "詩婷", "溫蒂"] else 99
-        )
-    }
-    overlay_dir = owner_dir_map.get(owner)
-    if not overlay_dir or not overlay_dir.exists():
-        return "WARN", f"本批有知識圖卡意圖但找不到業主 source_overlay 資料夾（{overlay_dir}），無法驗風格選擇檔"
-    # 抓批次編號（e.g. 第01批）
-    batch_num_m = re.search(r"第(\d+)批", batch_tag)
-    batch_num = batch_num_m.group(0) if batch_num_m else batch_tag
-    # 找 _<業主>圖卡風格選擇_<批次>.md 或 _圖卡風格_*.md
-    candidates = list(overlay_dir.glob(f"*圖卡風格*{batch_num}*.md"))
-    if not candidates:
-        candidates = list(overlay_dir.glob("*圖卡風格*.md"))
-    if not candidates:
-        return "WARN", f"本批有知識圖卡意圖（腳本填了「圖卡主題」）但找不到圖卡風格選擇檔（{overlay_dir}，批次 {batch_num}）— 要做知識圖卡請走 18 選 1 推薦制，建 _圖卡風格選擇_{batch_num}.md"
-    # 驗內容含 style-N- 或 id: N
-    for p in candidates:
-        content = p.read_text(encoding="utf-8")
-        if re.search(r"style-\d+-", content) or re.search(r"id:\s*\d+", content):
-            return "PASS", f"圖卡風格選擇檔存在：{p.name}，含風格 id"
-    return "WARN", f"圖卡風格選擇檔存在（{candidates[0].name}）但未偵測到 style-N- 格式的風格 id"
+# C-014 retired (W2-C撤收 2026-07-14) — ID reserved, 勿重編其他 check
 
 def chk_c015_hashtag_caption(data: dict, fname: str) -> tuple[str, str]:
     """C-015：hashtag 8-12 個 + caption 60-80 字
@@ -1640,28 +1605,150 @@ def chk_v2_006_required_slot(yamls: list[tuple[Path, dict]], fishing_policy: Opt
     return "PASS", f"{req_count} 強制位齊備（mode={mode}）：{counts}"
 
 
-def chk_v2_007_threads_seven(batch_dir: Path) -> tuple[str, str]:
-    """V2-007：Threads 脆文 >= threads_posts 篇存在驗 — batch-level
-    Glob *Threads*.md / *脆文*.md / threads_*.md，v2 優先。
-    B 段 2026-06-05：expected 改讀 L0 batch_spec（廢硬編 7）。
-    """
-    expected = _load_l0_batch_spec()["threads_posts"]
+_V2007_THREADS_HEADING_RE = re.compile(
+    r'^##(?!#)\s*(?:Threads|脆文)\s*(\d+).*$'
+)
+_V2007_H2_RE = re.compile(r'^##(?!#)')
+_V2007_SUBJECT_RE = re.compile(r'^主題\s*[：:]')
+_V2007_HASHTAG_ONLY_RE = re.compile(
+    r'^(?:[#＃][^\s#＃]+)(?:\s+[#＃][^\s#＃]+)*$'
+)
+
+
+def _v2007_count_threads_sections(text: str) -> list[dict]:
+    """依 D10 frozen primitive 回傳每篇 heading/section/codepoints。"""
+    sections: list[dict] = []
+    current: Optional[dict] = None
+    normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+    for raw_line in normalized.split('\n'):
+        heading_match = _V2007_THREADS_HEADING_RE.match(raw_line)
+        if heading_match:
+            if current is not None:
+                sections.append(current)
+            current = {
+                "section": heading_match.group(1),
+                "heading": raw_line,
+                "codepoints": 0,
+            }
+            continue
+        if _V2007_H2_RE.match(raw_line):
+            if current is not None:
+                sections.append(current)
+                current = None
+            continue
+        if current is None:
+            continue
+        line = raw_line.strip()
+        if not line or _V2007_SUBJECT_RE.match(line):
+            continue
+        if _V2007_HASHTAG_ONLY_RE.fullmatch(line):
+            continue
+        current["codepoints"] += len(line)
+    if current is not None:
+        sections.append(current)
+    return sections
+
+
+def _v2007_batch_date(batch_dir: Path, yamls: Optional[list] = None):
+    """批次目錄名＋批內 YAML 日期欄取最大；None 由 caller 視為 enforce。"""
+    dates = []
+    dir_date = _parse_batch_date_str(batch_dir.name)
+    if dir_date is not None:
+        dates.append(dir_date)
+    for f, data in yamls or []:
+        if isinstance(data, dict):
+            for key in ('batch_date', 'batch_tag', 'batch_label', 'generated_at', 'batch'):
+                raw = data.get(key)
+                parsed = _parse_batch_date_str(str(raw)) if raw else None
+                if parsed is not None:
+                    dates.append(parsed)
+    return max(dates) if dates else None
+
+
+def _v2007_select_threads_target(batch_dir: Path) -> tuple[Optional[Path], list[Path]]:
+    """沿用 V2-007 既有 glob 與 v2/mtime precedence，回傳 selected target。"""
     candidates = []
     for pattern in ['*Threads*.md', '*脆文*.md', 'threads_*.md']:
         candidates.extend(batch_dir.glob(pattern))
     candidates = sorted(set(candidates))
     if not candidates:
-        return "FAIL", "批次目錄找不到 Threads 脆文檔（Glob: *Threads*.md / *脆文*.md / threads_*.md）"
-    target = sorted(candidates, key=lambda p: ('v2' in p.name, p.stat().st_mtime), reverse=True)[0]
+        return None, candidates
+    target = sorted(
+        candidates,
+        key=lambda p: ('v2' in p.name, p.stat().st_mtime),
+        reverse=True,
+    )[0]
+    return target, candidates
+
+
+def chk_v2_007_threads_seven(
+    batch_dir: Path,
+    yamls: Optional[list] = None,
+) -> tuple[str, str]:
+    """V2-007：Threads 篇數＋每篇正文 Unicode code points hard gate。"""
+    spec = _load_l0_batch_spec()
+    sources = _load_l0_batch_spec_sources()
+    expected = int(spec["threads_posts"])
+    limit = int(spec["threads_max_codepoints"])
+    cutover_raw = str(spec["threads_length_effective_from"])
+    limit_source = sources.get("threads_max_codepoints", "unknown")
+    cutover_source = sources.get("threads_length_effective_from", "unknown")
+    policy = (
+        f"limit={limit}(source={limit_source}); "
+        f"cutover={cutover_raw}(source={cutover_source})"
+    )
     try:
-        text = target.read_text(encoding='utf-8')
+        cutover = _cta_dt.date.fromisoformat(cutover_raw)
+    except (TypeError, ValueError):
+        return "FAIL", f"V2-007 設定錯誤：cutover 非 ISO date；{policy}"
+
+    batch_date = _v2007_batch_date(batch_dir, yamls)
+    legacy = batch_date is not None and batch_date < cutover
+    generation = "legacy" if legacy else "enforce"
+    date_detail = batch_date.isoformat() if batch_date is not None else "unknown"
+    context = f"{policy}; batch_date={date_detail}; generation={generation}"
+
+    target, candidates = _v2007_select_threads_target(batch_dir)
+    if target is None:
+        return "FAIL", (
+            "批次目錄找不到 Threads 脆文檔"
+            "（Glob: *Threads*.md / *脆文*.md / threads_*.md）；"
+            f"{context}"
+        )
+    try:
+        text = target.read_text(encoding='utf-8-sig')
     except Exception as e:
-        return "FAIL", f"讀 {target.name} 失敗：{e}"
-    threads_sections = re.findall(r'^## (?:Threads|脆文)\s*\d+', text, re.MULTILINE)
-    count = len(threads_sections)
+        return "FAIL", f"讀 {target.name} 失敗：{e}；{context}"
+
+    sections = _v2007_count_threads_sections(text)
+    count = len(sections)
+    counts = ", ".join(
+        f"{section['section']}:{section['codepoints']}" for section in sections
+    )
+    violations = [section for section in sections if section["codepoints"] > limit]
+    violation_detail = ", ".join(
+        f"{target.name}#Threads {section['section']}={section['codepoints']}>{limit}"
+        for section in violations
+    )
+
     if count < expected:
-        return "FAIL", f"{target.name} 只找到 {count} 篇脆文（要 ≥ {expected}）"
-    return "PASS", f"{target.name} 找到 {count} 篇脆文（≥ {expected}）"
+        extra = f"；另有超標：{violation_detail}" if violations else ""
+        return "FAIL", (
+            f"{target.name} 只找到 {count} 篇脆文（要 ≥ {expected}）{extra}；"
+            f"counts=[{counts}]；{context}"
+        )
+    if violations and not legacy:
+        return "FAIL", (
+            f"Threads 正文超標：{violation_detail}；counts=[{counts}]；{context}"
+        )
+    if violations:
+        return "WARN", (
+            f"legacy Threads 正文超標：{violation_detail}；counts=[{counts}]；{context}"
+        )
+    return "PASS", (
+        f"{target.name} 找到 {count} 篇脆文（≥ {expected}），"
+        f"逐篇均 ≤ {limit}；counts=[{counts}]；{context}"
+    )
 
 
 def chk_v2_007b_standalone_threads(data: dict, fname: str) -> tuple[str, str]:
@@ -1703,6 +1790,383 @@ def _v2008_content_dup_hits(cur: list, others: list, threshold: float = 0.85) ->
     return hits
 
 
+_V2008_EMPTY_SENTINEL = "（空白 — 第一批生產後開始填）"
+_V2008_DASH_TITLE_RE = re.compile(r'^-\s*#?\d*\s*\[[^\]]+\]\s*(.+?)$')
+_V2008_NUMBERED_TITLE_RE = re.compile(r'^\s*(\d+)\s*[.．]\s+(.+?)\s*$')
+_V2008_BATCH_HEADING_RE = re.compile(
+    r'^(?:初始\s*批|第\s*(?:[0-9０-９]+|[〇零一二三四五六七八九十百兩]+)\s*批).*$'
+)
+_V2008_NON_DATA_BATCH_MENTION_RE = re.compile(r'^(?:待確認事項|下批可寫題材)(?:\s|[（(]|$)')
+_V2008_APPROVED_TABLE_SCHEMAS = {
+    ('#', 'script_id', '題目', '類型', '派系'),
+    ('#', '標題', '核心切角', '戲路', '備註'),
+    ('#', '標題', '派系', '備註'),
+}
+
+
+def _v2008_split_md_table_row(line: str) -> Optional[list[str]]:
+    """切 markdown table row；只把未 escape 的 pipe 當 delimiter。"""
+    stripped = line.strip()
+    if not (stripped.startswith('|') and stripped.endswith('|')):
+        return None
+    cells: list[str] = []
+    buf: list[str] = []
+    escaped = False
+    for ch in stripped[1:-1]:
+        if escaped:
+            if ch == '|':
+                buf.append('|')
+            else:
+                buf.extend(('\\', ch))
+            escaped = False
+        elif ch == '\\':
+            escaped = True
+        elif ch == '|':
+            cells.append(''.join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    if escaped:
+        buf.append('\\')
+    cells.append(''.join(buf).strip())
+    return cells
+
+
+def _v2008_is_table_separator(cells: Optional[list[str]], width: int) -> bool:
+    return bool(
+        cells is not None
+        and len(cells) == width
+        and all(re.fullmatch(r':?-{3,}:?', cell) for cell in cells)
+    )
+
+
+def _v2008_clean_numbered_title(raw_title: str) -> tuple[str, Optional[str]]:
+    """換題行只收新題；精確移除換題 audit suffix，不碰一般內容括號。"""
+    title = raw_title.strip()
+    if title.startswith('~~'):
+        if title.count('→') != 1:
+            return '', 'malformed_replacement'
+        replacement = re.fullmatch(r'~~(.+?)~~\s*→\s*(.+)', title)
+        if not replacement:
+            return '', 'malformed_replacement'
+        title = replacement.group(2).strip()
+        title = re.sub(
+            r'\s*[（(]\s*\d{4}-\d{2}-\d{2}[^）)]*換題\s*[）)].*$',
+            '',
+            title,
+        ).strip()
+    else:
+        title = re.sub(
+            r'\s*\[(?:R\d+\s*換題[:：]|原\s*R\d+[^\]]*已廢棄)[^\]]*\]\s*$',
+            '',
+            title,
+        ).strip()
+    if not title:
+        return '', 'empty_title'
+    return title, None
+
+
+def _v2008_parse_used_titles(raw_text: str) -> dict:
+    """解析 raw 已用題目 canonical；grammar 以批次 section 為隔離單位。"""
+    lines = raw_text.splitlines()
+    section_by_line: list[Optional[str]] = []
+    section_lines: dict[str, int] = {}
+    h2_batch: Optional[str] = None
+    h3_batch: Optional[str] = None
+    suspected_h2: Optional[tuple[int, str]] = None
+    suspected_h3: Optional[tuple[int, str]] = None
+    suspected_by_line: list[Optional[tuple[int, str]]] = []
+    suspected_immediate: set[tuple[int, str]] = set()
+
+    for line_no, line in enumerate(lines, 1):
+        heading = re.match(r'^(#{2,3})\s*(.*?)\s*$', line.strip())
+        if heading:
+            level = len(heading.group(1))
+            heading_text = heading.group(2)
+            is_batch = bool(_V2008_BATCH_HEADING_RE.match(heading_text))
+            if level == 2:
+                h2_batch = f"L{line_no}:{heading_text}" if is_batch else None
+                h3_batch = None
+                suspected_h2 = (line_no, heading_text) if not is_batch and '批' in heading_text else None
+                if suspected_h2 and not _V2008_NON_DATA_BATCH_MENTION_RE.match(heading_text):
+                    suspected_immediate.add(suspected_h2)
+                suspected_h3 = None
+                if h2_batch:
+                    section_lines[h2_batch] = line_no
+            else:
+                h3_batch = f"L{line_no}:{heading_text}" if is_batch else None
+                suspected_h3 = (line_no, heading_text) if not is_batch and '批' in heading_text else None
+                if suspected_h3 and not _V2008_NON_DATA_BATCH_MENTION_RE.match(heading_text):
+                    suspected_immediate.add(suspected_h3)
+                if h3_batch:
+                    section_lines[h3_batch] = line_no
+        suspected = suspected_h3 or suspected_h2
+        suspected_by_line.append(suspected)
+        section_by_line.append(None if suspected else (h3_batch or h2_batch))
+
+    titles: list[str] = []
+    rejected_rows: list[dict] = []
+    table_schemas: list[str] = []
+    formats_by_section: dict[str, set[str]] = {}
+    candidate_rows = 0
+    candidate_rows_anywhere = 0
+    suspected_rejected: set[tuple[int, str]] = set()
+
+    for line in lines:
+        stripped = line.strip()
+        table_cells = _v2008_split_md_table_row(line)
+        table_title_columns = (
+            [cell for cell in table_cells if cell in {'題目', '標題'}]
+            if table_cells is not None and table_cells and table_cells[0] == '#'
+            else []
+        )
+        if (
+            _V2008_DASH_TITLE_RE.match(stripped)
+            or re.match(r'^-\s*#?\d*\s*\[', stripped)
+            or _V2008_NUMBERED_TITLE_RE.match(stripped)
+            or re.match(r'^\s*\d+\s*[.．]', stripped)
+            or table_title_columns
+        ):
+            candidate_rows_anywhere += 1
+
+    def add_format(section: str, grammar: str) -> None:
+        formats_by_section.setdefault(section, set()).add(grammar)
+
+    def reject(line_no: int, reason: str, section: Optional[str] = None) -> None:
+        rejected_rows.append({"line": line_no, "reason": reason, "section": section})
+
+    for suspected in sorted(suspected_immediate):
+        if suspected not in suspected_rejected:
+            reject(suspected[0], 'suspected_batch_header', None)
+            suspected_rejected.add(suspected)
+
+    i = 0
+    while i < len(lines):
+        line_no = i + 1
+        stripped = lines[i].strip()
+        section = section_by_line[i]
+        suspected = suspected_by_line[i]
+        table_cells = _v2008_split_md_table_row(lines[i])
+        title_columns = (
+            [n for n, cell in enumerate(table_cells) if cell in {'題目', '標題'}]
+            if table_cells is not None and table_cells and table_cells[0] == '#'
+            else []
+        )
+        dash_candidate = bool(
+            _V2008_DASH_TITLE_RE.match(stripped)
+            or re.match(r'^-\s*#?\d*\s*\[', stripped)
+        )
+        numbered_candidate = bool(
+            _V2008_NUMBERED_TITLE_RE.match(stripped)
+            or re.match(r'^\s*\d+\s*[.．]', stripped)
+        )
+
+        if suspected is not None and (title_columns or dash_candidate or numbered_candidate):
+            candidate_rows += 1
+            if suspected not in suspected_rejected:
+                reject(suspected[0], 'suspected_batch_header', None)
+                suspected_rejected.add(suspected)
+            i += 1
+            continue
+
+        if table_cells is not None and table_cells and table_cells[0] == '#':
+            if not title_columns:
+                i += 1
+                continue
+            if section is None:
+                candidate_rows += 1
+                reject(line_no, 'title_table_outside_batch', None)
+                i += 1
+                continue
+            if len(title_columns) != 1:
+                candidate_rows += 1
+                reject(line_no, 'unsupported_title_table_schema', section)
+                i += 1
+                continue
+
+            add_format(section, 'table')
+            candidate_rows += 1
+            title_index = title_columns[0]
+            schema = '|'.join(table_cells)
+            separator = _v2008_split_md_table_row(lines[i + 1]) if i + 1 < len(lines) else None
+            if not _v2008_is_table_separator(separator, len(table_cells)):
+                reject(line_no, 'table_missing_or_bad_separator', section)
+                i += 1
+                continue
+            if tuple(table_cells) not in _V2008_APPROVED_TABLE_SCHEMAS:
+                reject(line_no, 'unapproved_title_table', section)
+                i += 1
+                continue
+
+            table_schemas.append(schema)
+            data_rows = 0
+            j = i + 2
+            while j < len(lines):
+                data_cells = _v2008_split_md_table_row(lines[j])
+                if data_cells is None:
+                    break
+                data_line_no = j + 1
+                candidate_rows += 1
+                if len(data_cells) != len(table_cells):
+                    reject(data_line_no, 'table_column_count_mismatch', section)
+                elif not re.fullmatch(r'\d+', data_cells[0]):
+                    reject(data_line_no, 'table_row_number_not_decimal', section)
+                elif not data_cells[title_index].strip():
+                    reject(data_line_no, 'empty_title', section)
+                else:
+                    titles.append(data_cells[title_index].strip())
+                    data_rows += 1
+                j += 1
+            if data_rows == 0:
+                reject(line_no, 'title_table_has_no_data_rows', section)
+            i = j
+            continue
+
+        if section is not None:
+            dash = _V2008_DASH_TITLE_RE.match(stripped)
+            if dash:
+                add_format(section, 'dash-bracket')
+                candidate_rows += 1
+                titles.append(dash.group(1).strip())
+                i += 1
+                continue
+            if re.match(r'^-\s*#?\d*\s*\[', stripped):
+                add_format(section, 'dash-bracket')
+                candidate_rows += 1
+                reject(line_no, 'malformed_dash_bracket', section)
+                i += 1
+                continue
+
+            numbered = _V2008_NUMBERED_TITLE_RE.match(stripped)
+            if numbered:
+                add_format(section, 'numbered-plain')
+                candidate_rows += 1
+                title, error = _v2008_clean_numbered_title(numbered.group(2))
+                if error:
+                    reject(line_no, error, section)
+                else:
+                    titles.append(title)
+                i += 1
+                continue
+            if re.match(r'^\s*\d+\s*[.．]', stripped):
+                add_format(section, 'numbered-plain')
+                candidate_rows += 1
+                reject(line_no, 'malformed_numbered_title', section)
+                i += 1
+                continue
+        i += 1
+
+    for section, grammars in formats_by_section.items():
+        if len(grammars) > 1:
+            reject(section_lines.get(section, 1), 'mixed_grammars_in_batch', section)
+
+    sentinel_lines = [
+        line_no for line_no, line in enumerate(lines, 1)
+        if line.strip() == _V2008_EMPTY_SENTINEL
+    ]
+    empty_template = False
+    if sentinel_lines:
+        if len(sentinel_lines) == 1 and not titles and candidate_rows_anywhere == 0 and not rejected_rows:
+            empty_template = True
+        else:
+            reject(sentinel_lines[0], 'stale_or_ambiguous_empty_sentinel', None)
+
+    if not titles and not empty_template:
+        reject(1, 'empty_without_sentinel' if not raw_text.strip() else 'nonempty_zero_titles', None)
+
+    section_formats = {
+        section: sorted(grammars)
+        for section, grammars in formats_by_section.items()
+    }
+    all_formats = sorted({grammar for grammars in formats_by_section.values() for grammar in grammars})
+    if empty_template:
+        parser_format = 'explicit-empty'
+    elif not all_formats:
+        parser_format = 'invalid'
+    elif len(all_formats) == 1:
+        parser_format = all_formats[0]
+    else:
+        parser_format = 'multi-section'
+    return {
+        "titles": titles,
+        "format": parser_format,
+        "parsed_rows": len(titles),
+        "rejected_rows": rejected_rows,
+        "empty_template": empty_template,
+        "table_schemas": table_schemas,
+        "formats_by_section": section_formats,
+        "candidate_rows": candidate_rows,
+        "candidate_rows_anywhere": candidate_rows_anywhere,
+    }
+
+
+def _v2008_canonical_display(path: Path) -> str:
+    """canonical provenance 採 project-root-relative；外部 fixture 只留穩定 basename。"""
+    project_root = Path(__file__).resolve().parents[3]
+    try:
+        return path.resolve().relative_to(project_root).as_posix()
+    except (OSError, ValueError):
+        return f"<external>/{path.name}"
+
+
+def _v2008_load_used_titles(owner: str) -> dict:
+    """由唯一 canonical raw 載入題目；owner unresolved 僅明示 skip，不造假 0 撞。"""
+    try:
+        pref_path = OWNER_PREF_PATHS.get(owner)
+    except Exception as exc:
+        return {
+            "titles": [], "format": "unavailable", "parsed_rows": 0,
+            "rejected_rows": [{"line": 0, "reason": f"owner_mapping_error:{type(exc).__name__}", "section": None}],
+            "empty_template": False, "table_schemas": [], "formats_by_section": {},
+            "candidate_rows": 0, "canonical": "unresolved", "owner_unresolved": False,
+        }
+    if pref_path is None:
+        return {
+            "titles": [], "format": "skipped", "parsed_rows": None,
+            "rejected_rows": [], "empty_template": False, "table_schemas": [],
+            "formats_by_section": {}, "candidate_rows": 0, "canonical": "unresolved",
+            "owner_unresolved": True,
+        }
+
+    used_titles_path = pref_path.parent / f"_{owner}已用題目.md"
+    canonical = _v2008_canonical_display(used_titles_path)
+    if not used_titles_path.exists():
+        return {
+            "titles": [], "format": "unavailable", "parsed_rows": 0,
+            "rejected_rows": [{"line": 0, "reason": "canonical_missing", "section": None}],
+            "empty_template": False, "table_schemas": [], "formats_by_section": {},
+            "candidate_rows": 0, "canonical": canonical, "owner_unresolved": False,
+        }
+    try:
+        used_text = used_titles_path.read_text(encoding='utf-8')
+    except Exception as exc:
+        return {
+            "titles": [], "format": "unavailable", "parsed_rows": 0,
+            "rejected_rows": [{"line": 0, "reason": f"canonical_unreadable:{type(exc).__name__}", "section": None}],
+            "empty_template": False, "table_schemas": [], "formats_by_section": {},
+            "candidate_rows": 0, "canonical": canonical, "owner_unresolved": False,
+        }
+    result = _v2008_parse_used_titles(used_text)
+    result["canonical"] = canonical
+    result["owner_unresolved"] = False
+    return result
+
+
+def _v2008_parser_detail(result: dict) -> str:
+    if result.get("owner_unresolved"):
+        return "title_arm=skipped(owner_unresolved); parsed=NA"
+    formats = result.get("formats_by_section") or {}
+    formats_text = ','.join(
+        f"{section}={'+'.join(grammars)}" for section, grammars in formats.items()
+    ) or '-'
+    return (
+        f"canonical={result.get('canonical', 'unknown')};parser={result.get('format', 'invalid')};"
+        f"parsed={result.get('parsed_rows', 0)};rejected={len(result.get('rejected_rows', []))};"
+        f"empty_template={str(bool(result.get('empty_template'))).lower()};"
+        f"formats_by_section={formats_text}"
+    )
+
+
 def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
     """V2-008 v2（2026-06-11 澤君拍板 TG 9755：同題開放——可以講一樣的東西，但腳本全文內容不得雷同）
     A) 標題 fuzzy ≥0.65 對已用題目 → WARN（原 FAIL 降級；同題請換切角/講法；canonical=raw `_<業主>已用題目.md`、W2-D22——derived 附錄退出讀取契約）
@@ -1713,16 +2177,11 @@ def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> 
     valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
     # ── A) 標題同題 → WARN ──
     title_hits = []
-    used_titles = []
-    pref_path = OWNER_PREF_PATHS.get(owner)
-    if pref_path:
-        used_titles_path = pref_path.parent / f"_{owner}已用題目.md"
-        if used_titles_path.exists():
-            used_text = used_titles_path.read_text(encoding='utf-8')
-            for line in used_text.split('\n'):
-                m = re.match(r'^-\s*#?\d*\s*\[[^\]]+\]\s*(.+?)$', line.strip())
-                if m:
-                    used_titles.append(m.group(1).strip())
+    title_parse = _v2008_load_used_titles(owner)
+    used_titles = list(title_parse.get("titles", []))
+    parser_rejected = title_parse.get("rejected_rows", [])
+    parser_fault = bool(parser_rejected) and not title_parse.get("owner_unresolved")
+    parser_detail = _v2008_parser_detail(title_parse)
     THRESHOLD_TITLE = 0.65
     for f, data in valid:
         title = str(data.get('title', '')).strip()
@@ -1765,11 +2224,25 @@ def chk_v2_008_used_titles_dedup(yamls: list[tuple[Path, dict]], owner: str) -> 
     dup_hits = _v2008_content_dup_hits(cur, others, 0.85)
     if dup_hits:
         a, b, r = dup_hits[0]
-        return "FAIL", f"{len(dup_hits)} 對全文台詞雷同（ratio ≥ 0.85；2026-06-11 拍板：同題可、全文雷同禁）：{a} vs {b} ratio={r}"
+        detail = f"{len(dup_hits)} 對全文台詞雷同（ratio ≥ 0.85；2026-06-11 拍板：同題可、全文雷同禁）：{a} vs {b} ratio={r}；{parser_detail}"
+        if parser_fault:
+            first_fault = parser_rejected[0]
+            detail += f"；parser-integrity FAIL: L{first_fault.get('line')} {first_fault.get('reason')}"
+        return "FAIL", detail
+    if parser_fault:
+        first_fault = parser_rejected[0]
+        return "FAIL", (
+            f"已用題目 parser-integrity FAIL: L{first_fault.get('line')} {first_fault.get('reason')}；"
+            f"{parser_detail}；全文對批內+歷史 {len(others)} 支 0 雷同"
+        )
+    if title_parse.get("owner_unresolved"):
+        return "PASS", f"{parser_detail}；全文對批內+歷史 {len(others)} 支 0 雷同（content-dup ≥0.85 擋）"
     if title_hits:
         first = title_hits[0]
-        return "WARN", f"{len(title_hits)} 件標題同題（fuzzy ≥ {THRESHOLD_TITLE}；2026-06-11 拍板開放同題——請確認已換切角/講法）：{first[0]} '{first[1][:30]}' vs 已用 '{first[2][:30]}' ratio={first[3]}；全文對歷史 {len(others)} 支 0 雷同"
-    return "PASS", f"已用題目 {len(used_titles)} 條標題 0 撞；全文對批內+歷史 {len(others)} 支 0 雷同（content-dup ≥0.85 擋；同題開放 2026-06-11 拍板）"
+        return "WARN", f"{len(title_hits)} 件標題同題（fuzzy ≥ {THRESHOLD_TITLE}；2026-06-11 拍板開放同題——請確認已換切角/講法）：{first[0]} '{first[1][:30]}' vs 已用 '{first[2][:30]}' ratio={first[3]}；{parser_detail}；全文對歷史 {len(others)} 支 0 雷同"
+    if title_parse.get("empty_template"):
+        return "PASS", f"已用題目明示空殼；{parser_detail}；全文對批內+歷史 {len(others)} 支 0 雷同（content-dup ≥0.85 擋）"
+    return "PASS", f"已用題目 {len(used_titles)} 條標題 0 撞；{parser_detail}；全文對批內+歷史 {len(others)} 支 0 雷同（content-dup ≥0.85 擋；同題開放 2026-06-11 拍板）"
 
 
 def chk_v2_009_auditor_report(batch_dir: Path, owner: str) -> tuple[str, str]:
@@ -2703,6 +3176,79 @@ def _is_v2025_legacy(data: dict, fname: str = '') -> bool:
     if batch_date is None:
         return False  # 無法判斷 → 保守當新批 FAIL
     return batch_date < _V2_025_CUTOFF
+
+
+def _rcard_all_dates_max(data: dict, fname: str = '') -> Optional[_dt.date]:
+    """R-CARD-001 專用日期判別（修訂⑪·r7-B1）：對每個候選字串窮舉**所有**日期取全域最大。
+
+    與 _extract_batch_date 差異：後者每字串只取第一個日期（.search），多日期字串
+    （如「…2026-07-13_rev2026-07-14…」）會漏掉較新日期 — r7 攻角實證繞過案例。
+    V2-025 沿用 _extract_batch_date 舊行為不受影響（變更面隔離）。
+    已知邊界（誠實揭露）：日期仍為 yaml/路徑自報值＝防呆非防偽；不可變 legacy
+    清單防偽版列 W3。
+    """
+    RE_SEP = re.compile(r'(\d{4})[-/_ ](\d{2})[-/_ ](\d{2})')
+    RE_COMPACT = re.compile(r'(?<!\d)(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)')
+    candidates: list[_dt.date] = []
+    sources = [data.get(k) for k in ('batch_date', 'batch_tag', 'batch_label', 'generated_at', 'batch')]
+    if fname:
+        sources.append(fname)
+    for val in sources:
+        if not val:
+            continue
+        s = str(val)
+        for m in RE_SEP.finditer(s):
+            try:
+                candidates.append(_dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
+            except ValueError:
+                pass
+        for m in RE_COMPACT.finditer(s):
+            try:
+                candidates.append(_dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
+            except ValueError:
+                pass
+    return max(candidates) if candidates else None
+
+
+_R_CARD_001_EFFECTIVE_FROM = _dt.date(2026, 7, 14)
+_R_CARD_001_RETIRED_FIELDS = ("圖卡主題", "visual_aid", "visual_aid_scripts")
+
+
+def chk_r_card_001_retired_card_fields(data: dict, fname: str) -> tuple[str, str]:
+    """R-CARD-001：2026-07-14 起，批次 YAML 不得再填退役圖卡欄位。
+
+    日期判別用 _rcard_all_dates_max（修訂⑪：多日期字串窮舉取最大，堵 r7 繞過案例）；
+    無法判斷日期時保守視為新批。僅讀三個退役欄位；dm_card 與任何釣魚相關 payload 一律不掃。
+    """
+    batch_date = _rcard_all_dates_max(data, fname)
+    if batch_date is not None and batch_date < _R_CARD_001_EFFECTIVE_FROM:
+        return "SKIP", (
+            f"R-CARD-001 legacy skip：歷史批次不溯及（batch_date={batch_date} "
+            f"< {_R_CARD_001_EFFECTIVE_FROM}）；dm_card 與釣魚功能不在本規則掃描範圍"
+        )
+
+    hit_fields = []
+    for field in _R_CARD_001_RETIRED_FIELDS:
+        value = data.get(field)
+        nonempty = bool(value.strip()) if isinstance(value, str) else bool(value)
+        if nonempty:
+            hit_fields.append(field)
+
+    if hit_fields:
+        date_detail = (
+            f"batch_date={batch_date}" if batch_date is not None
+            else "日期無法判斷，保守視為新批"
+        )
+        return "FAIL", (
+            "R-CARD-001：2026-07-14 起批次圖卡欄位已退役；"
+            f"非空欄位：{', '.join(hit_fields)}；一次性人令請依 L0 §14；"
+            f"dm_card 與釣魚功能不在本規則掃描範圍（{date_detail}）"
+        )
+
+    return "PASS", (
+        "R-CARD-001：退役批次圖卡欄位皆空；"
+        "dm_card 與釣魚功能不在本規則掃描範圍"
+    )
 
 
 def _load_template_index_ids() -> Optional[set]:
@@ -4319,6 +4865,128 @@ def chk_c21_2_cta_diversity(
     return "PASS", f"C-21.2 CTA 多樣 PASS：{distinct} 種 / 單一最大 {max_n}（分佈 {detail}）"
 
 
+def _w3d5_batch_max_date(yamls: list[tuple[Path, dict]]) -> Optional[_dt.date]:
+    """W3 Δ5 新閘共用（R-CTA-002 / R-QGR-001）：批次級 cutover 判別，取批內逐支
+    _rcard_all_dates_max 之最大值——與 R-CARD-001 per-file 同一天窗函式（修訂⑪·r7-B1
+    窮舉多日期字串取全域最大），只是在此聚合成批級供 batch-level checks 用。
+    """
+    dates: list[_dt.date] = []
+    for f, d in yamls:
+        if not isinstance(d, dict):
+            continue
+        dd = _rcard_all_dates_max(d, f"{f.parent.name}/{f.name}")
+        if dd is not None:
+            dates.append(dd)
+    return max(dates) if dates else None
+
+
+def chk_r_cta_001_cta_fields_complete(
+    data: dict,
+    fname: str,
+    is_skeleton: bool = False,
+) -> tuple[str, str]:
+    """R-CTA-001（W3 Δ5 補閘，D24 P4）— per-file：新批（cutover ≥2026-07-14）已填完稿
+    （非骨架 stub）缺 pattern 欄或缺/空 cta_effect 欄（schema_check.CTA類型，與 C-21.2
+    同源、不另立新欄）→ FAIL（C-21.2/C-21.1 原僅批級 >50% 缺才 SKIP，單支缺欄靜默排除
+    不擋；本規則補單支硬閘）。
+
+    is_skeleton 判別沿用 C-21.7 呼叫端邏輯（_is_placeholder(data.get("title"))，見
+    vsb run_per_file_checks 內 C-21.7 註冊行）——骨架階段（is_skeleton=True）→ SKIP。
+    cutover：沿用 R-CARD-001 同款單支日期判別（_rcard_all_dates_max）；歷史批次不溯及。
+    """
+    batch_date = _rcard_all_dates_max(data, fname)
+    if batch_date is not None and batch_date < _R_CARD_001_EFFECTIVE_FROM:
+        return "SKIP", (
+            f"R-CTA-001 legacy skip：歷史批次不溯及（batch_date={batch_date} "
+            f"< {_R_CARD_001_EFFECTIVE_FROM}）"
+        )
+
+    if is_skeleton:
+        return "SKIP", "R-CTA-001：骨架階段（is_skeleton=True），等編劇填完再驗"
+
+    missing = []
+    pattern_type = _s21_get_skeleton_type(data)
+    if pattern_type is None:
+        missing.append("pattern 欄缺/placeholder")
+
+    sc = data.get("schema_check")
+    cta_label = sc.get("CTA類型") if isinstance(sc, dict) else None
+    if cta_label is None or _is_placeholder(cta_label) or not str(cta_label).strip():
+        missing.append("cta_effect 欄缺/空（schema_check.CTA類型）")
+
+    if missing:
+        return "FAIL", "R-CTA-001：已填完稿卻缺欄——" + "；".join(missing)
+
+    return "PASS", (
+        f"R-CTA-001 PASS：pattern={pattern_type!r} / "
+        f"CTA類型={str(cta_label).split('#')[0].strip()!r}"
+    )
+
+
+def chk_r_cta_002_cta_label_resolvable(
+    yamls: list[tuple[Path, dict]],
+    pref_text: Optional[str] = None,
+) -> tuple[str, str]:
+    """R-CTA-002（W3 Δ5 補閘，D24 P5）— batch-level：cta_effect 欄存在（非缺/非
+    placeholder）但依 C-21.2 既有解析邏輯（_resolve_label 別名表 + _s21_canonical_cta_effect
+    validator 自有詞彙，同一套、不建第二套）解析不到 canonical 效果類別（garbage label）
+    → FAIL（C-21.2 原僅收進 unresolved 供 WARN 放行，不擋）。
+
+    缺欄/空欄不算「存在」，非本規則範圍（歸 R-CTA-001）；沿用 C-21.2 同款 missing 判定。
+    cutover：批次沿用 R-CARD-001 同款日期判別（_w3d5_batch_max_date 取批內 max），
+    歷史批次不溯及。
+    """
+    valid = [
+        (f, d) for f, d in yamls
+        if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d
+    ]
+    if not valid:
+        return "WARN", "R-CTA-002：批次無有效 yaml，跳過"
+
+    batch_max_date = _w3d5_batch_max_date(valid)
+    if batch_max_date is not None and batch_max_date < _R_CARD_001_EFFECTIVE_FROM:
+        return "SKIP", (
+            f"R-CTA-002 legacy skip：歷史批次不溯及（batch_max_date={batch_max_date} "
+            f"< {_R_CARD_001_EFFECTIVE_FROM}）"
+        )
+
+    _norm_items = None
+    if _MIX_PARSER_OK and _parse_mix_block is not None and pref_text:
+        try:
+            _soft_result = _parse_mix_block(pref_text, "cta_mix")
+            if _soft_result.found and _soft_result.items:
+                _norm_items = _soft_result.items
+        except Exception:
+            _norm_items = None
+
+    unresolved_files: list[tuple[str, str]] = []
+    for f, d in valid:
+        sc = d.get("schema_check")
+        label = sc.get("CTA類型") if isinstance(sc, dict) else None
+        if label is None or _is_placeholder(label) or not str(label).strip():
+            continue
+        raw_label = str(label).split("#")[0].strip()
+        canon = None
+        if _norm_items is not None and _resolve_label is not None:
+            canon = _resolve_label(raw_label, _norm_items)
+        if canon is None:
+            canon = _s21_canonical_cta_effect(raw_label)
+        if canon is None:
+            unresolved_files.append((f.name, raw_label))
+
+    if unresolved_files:
+        detail = "；".join(f"{fn}: 「{lbl}」" for fn, lbl in unresolved_files)
+        return "FAIL", (
+            f"R-CTA-002：{len(unresolved_files)} 支 CTA 標籤無法解析到正規效果類別"
+            f"（C-21.2 同款詞彙判定，不放水）——{detail}"
+        )
+
+    return "PASS", (
+        f"R-CTA-002 PASS：{len(valid)} 支 CTA 標籤全可解析或本就缺欄"
+        "（缺欄另歸 R-CTA-001）"
+    )
+
+
 def _s21_6_batch_exempt(batch_dir: Path) -> tuple[str, str]:
     """C-21.6 P1-4：讀**批次級** _batch_flags.yml 的 quality_gate 段判豁免。
 
@@ -4410,6 +5078,156 @@ def chk_c21_6_quality_gate_report(
     if _S21_6_REPORT_ENFORCE:
         return "FAIL", msg
     return "WARN", msg + "（_S21_6_REPORT_ENFORCE=False 時 WARN；現已 2026-06-23 enforce-live，此 branch 為 rollback 備用）"
+
+
+def chk_r_qgr_001_quality_gate_report_content(
+    yamls: list[tuple[Path, dict]],
+    batch_dir: Path,
+) -> tuple[str, str]:
+    """R-QGR-001（W3 Δ5 補閘，D24 P6+P8；2026-07-15 r3 B2/B3 修正——詳下方沿革段）—
+    batch-level：C-21.6 適用批（非豁免）的 _quality_gate_report.md 內容最低穩健標記
+    驗證（不 parse 完整表格格式、只驗詞面存在——scripter.md §21.6/§21.7 沿革與
+    chk_c21_6_quality_gate_report FAIL 訊息本身即為此規則的 canonical 措辭來源，
+    無法從程式碼推導出的精確表格式樣不驗、不發明新格式）：
+      ① 批內每支 script_id 字面值須出現在報告全文（script_id 欄本身缺/空/非字串
+         → fail-closed，不可靜默跳過，見下方 r3 修正）
+      ② 「R10-R20」字樣須出現（C-21.6 FAIL 訊息「須附逐支 R10-R20 命中」同款用語）
+      ③ 「R14·R15」字樣須出現（含常見分隔符變體：·／-／–／—／無分隔；C-21.6 FAIL
+         訊息「R14·R15 hard fail」同款用語）
+      ④ 「例外」字樣須出現（C-21.6 FAIL 訊息「例外清單」同款用語）
+      ⑤ 「prompt log」字樣須出現（不分大小寫；C-21.6 FAIL 訊息「GPT 打分 + prompt
+         log」同款用語）
+      ⑥ 「GPT 打分」或「GPT 分數」字樣須出現（同上 FAIL 訊息同款用語；只驗詞面、
+         不 parse 表格欄位）
+      ⑦ 批內含 content_axis=="offpro" 稿時，須另出現「offpro_concreteness_check」
+         字樣（scripter.md 沿革：§22.9 off-pro spine 落地時「§21.6 加
+         offpro_concreteness_check」）
+
+    豁免（_s21_6_batch_exempt）與報告缺失/為空 → 交給既有 C-21.6 管，本規則 SKIP、
+    不重複擋同一根因。報告存在且非空但讀取失敗（如編碼異常）→ FAIL（fail-closed，
+    見下方 r3 修正 B3②；缺此路徑等同放行讀不了的報告）。
+    cutover：批次沿用 R-CARD-001 同款日期判別（_w3d5_batch_max_date 取批內 max），
+    歷史批次不溯及。
+
+    2026-07-15 r3（codex fresh 盲審 BLOCK）B2/B3 修正沿革：
+      B2 契約縮水——W3 收斂定案 Δ5② 明定須驗全 token 集（R10-R20／R14·R15／例外／
+      GPT 分數／prompt log／off-pro concreteness），且 C-21.6 FAIL 訊息本身即為
+      canonical 措辭來源；原實作漏驗 R14·R15／例外／prompt log 三標記 → 本次補齊
+      ③④⑤ 三檢查。
+      B3 假 PASS——①script_id 缺欄/空/非字串的支原本被迴圈靜默跳過、PASS 訊息卻宣
+      稱「N 支 script_id 齊」→ 改為 fail-closed 收集清單、非空即 FAIL。②報告
+      read_text 例外原本回 SKIP，而非空報告的其他路徑已是 PASS/FAIL → 讀不了的報告
+      整批被放行 → 改為 FAIL（無法驗證＝fail-closed，不是「不驗」）。
+    """
+    valid = [
+        (f, d) for f, d in yamls
+        if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d
+    ]
+    if not valid:
+        return "WARN", "R-QGR-001：批次無有效 yaml，跳過"
+
+    batch_max_date = _w3d5_batch_max_date(valid)
+    if batch_max_date is not None and batch_max_date < _R_CARD_001_EFFECTIVE_FROM:
+        return "SKIP", (
+            f"R-QGR-001 legacy skip：歷史批次不溯及（batch_max_date={batch_max_date} "
+            f"< {_R_CARD_001_EFFECTIVE_FROM}）"
+        )
+
+    ex_state, ex_detail = _s21_6_batch_exempt(batch_dir)
+    if ex_state == "exempt":
+        return "PASS", f"R-QGR-001：批次豁免整稿閘（{ex_detail}），內容不驗"
+
+    report = batch_dir / "_quality_gate_report.md"
+    if not report.is_file():
+        return "SKIP", "R-QGR-001：無 _quality_gate_report.md（C-21.6 已管存在性，本規則不重複擋）"
+    try:
+        sz = report.stat().st_size
+    except Exception:
+        sz = -1
+    if sz <= 0:
+        return "SKIP", "R-QGR-001：報告為空（C-21.6 已管空報告，本規則不重複擋）"
+    try:
+        text = report.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return "FAIL", f"R-QGR-001：報告讀取失敗（{e}）＝無法驗證，fail-closed"
+
+    # 報告文字正規化（2026-07-15 r5 系列，偵探三輪獨立複驗逐類抓漏後一次收「隱形/相容字元」類）：
+    # 原 ASCII 識別字邊界比對 [0-9A-Za-z_] 會被三類字元繞過、冒充或切割真 script_id → 漏放行：
+    #   ①case08 半形超字串（test_99_08x 冒充 test_99_08）→ 邊界比對本身已擋（r5-C08）
+    #   ②全形拉丁英數同形字（test_99_08Ｚ，U+FF10-FF5A）→ NFKC 折回 ASCII 正規形擋（r5b-Q2）
+    #   ③零寬/格式/控制/組合字元（ZWSP U+200B 等 Cf、Cc、Mn）夾在 id 中間或尾端 → 人眼看像
+    #     另一支 id、程式把不可見字元當合法邊界 → 剝除後真相顯露（r5b-P2 偵探抓，最隱蔽：
+    #     複製貼上網頁/Word 可無意夾帶）。
+    # 處置順序：先剝 Cf(格式/零寬)+Cc(控制)+Mn(組合附加符) → 再 NFKC(相容折疊)。一次覆蓋
+    # script_id 比對與所有 marker 檢查（R10-R20／R14·R15／prompt log／offpro）。
+    # 誠實 scope（明列殘留、不宣稱零殘留）：仍未擋＝跨字集純視覺同形字（Cyrillic а U+0430／
+    # Greek ο U+03BF 等「真字母、非相容也非格式字元」）——需 UTS#39 confusables skeleton 表，
+    # 屬「刻意選同形字」威脅、非內部可信作者報告的現實失效模式（誤植會是截斷/全形/隱形字元，
+    # 已擋），明列不做、非畫窄範圍。此閘定位＝防「報告漏寫/誤植 script_id」的完稿品管網，
+    # 非防惡意對手的資安邊界。
+    import unicodedata as _uc_r_qgr
+    text = "".join(
+        ch for ch in text if _uc_r_qgr.category(ch) not in ("Cf", "Cc", "Mn")
+    )
+    text = _uc_r_qgr.normalize("NFKC", text)
+
+    missing: list[str] = []
+
+    missing_ids: list[str] = []
+    missing_script_id_field: list[str] = []
+    for f, d in valid:
+        sid = d.get("script_id")
+        if isinstance(sid, str) and sid.strip():
+            sid_val = sid.strip()
+            # r5-C08 修（2026-07-15）：原 `sid_val not in text` naive substring 比對，
+            # 會被「報告只提到相似超字串（如 test_99_08x）」矇混——真 script_id test_99_08
+            # 是 test_99_08x 的字首子字串、誤判已出現＝漏放行。收緊為識別字邊界比對：
+            # sid 前後不得為 [0-9A-Za-z_]（script_id 字元集），確保是完整 token 而非別 id 的一段。
+            if not re.search(
+                r"(?<![0-9A-Za-z_])" + re.escape(sid_val) + r"(?![0-9A-Za-z_])",
+                text,
+            ):
+                missing_ids.append(sid_val)
+        else:
+            missing_script_id_field.append(f.name)
+    if missing_ids:
+        missing.append(f"缺 script_id 標記（{len(missing_ids)} 支）：{missing_ids}")
+    if missing_script_id_field:
+        missing.append(
+            f"{len(missing_script_id_field)} 支缺 script_id 欄（無法對報告驗證）："
+            f"{missing_script_id_field}"
+        )
+
+    if "R10-R20" not in text:
+        missing.append("缺「R10-R20」字樣")
+
+    if not re.search(r"R14\s*[·\-–—]?\s*R15", text):
+        missing.append("缺「R14·R15」字樣")
+
+    if "例外" not in text:
+        missing.append("缺「例外」字樣")
+
+    if not re.search(r"prompt\s*log", text, re.IGNORECASE):
+        missing.append("缺「prompt log」字樣")
+
+    if not re.search(r"GPT\s*(打分|分數)", text):
+        missing.append("缺「GPT 打分／分數」字樣")
+
+    has_offpro = any(
+        str(d.get("content_axis", "") or "").strip().lower() == "offpro"
+        for _, d in valid
+    )
+    if has_offpro and "offpro_concreteness_check" not in text:
+        missing.append("批含 content_axis=offpro 稿，缺「offpro_concreteness_check」字樣")
+
+    if missing:
+        return "FAIL", "R-QGR-001：" + "；".join(missing)
+
+    offpro_note = "／offpro_concreteness_check" if has_offpro else ""
+    return "PASS", (
+        f"R-QGR-001：{len(valid)} 支 script_id 齊 + R10-R20／R14·R15／例外／"
+        f"GPT打分／prompt log{offpro_note} 標記齊"
+    )
 
 
 def chk_c21_7_honest_ceiling(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
@@ -6830,6 +7648,7 @@ def run_per_file_checks(
         ("L1-007", chk_l1_007_title_len(data, f.name)),
         ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
         ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
+        ("R-CARD-001", chk_r_card_001_retired_card_fields(data, _fname_with_dir)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
         ("C-017",  chk_c017_concreteness(data, f.name)),
         # §21 誠實天花板（per-file，2026-06-17 機器化 §21 落地；P1-3：傳 is_skeleton 區分骨架/已填完）
@@ -6839,6 +7658,7 @@ def run_per_file_checks(
         # 修法：某支只有「它自己的 title 是 placeholder」時才算骨架階段；title 已填（真標題）
         # 但誠實欄缺 → FAIL（過渡 WARN）。
         ("C-21.7", chk_c21_7_honest_ceiling(data, _fname_with_dir, _is_placeholder(data.get("title")))),
+        ("R-CTA-001", chk_r_cta_001_cta_fields_complete(data, _fname_with_dir, _is_placeholder(data.get("title")))),
         # v2 新增 5 件（V2-001 ~ V2-005）
         ("V2-001",  chk_v2_001_voice_lock(data, f.name, owner)),
         ("V2-001b", chk_v2_001b_banned_phrases(data, _fname_with_dir, owner)),
@@ -7012,18 +7832,18 @@ def main():
 
     all_results: list[tuple[str, str, str, str]] = []
 
-    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014 + C-013B + v3 新 6 件）──
+    # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014[RETIRED] + C-013B + v3 新 6 件）──
     batch_checks = [
         ("L1-008", chk_l1_008_batch_count(yamls, batch_dir)),
         ("L1-009", chk_l1_009_派系_coverage(valid_yamls)),
         ("C-011",  chk_c011_派系_ratio(valid_yamls, owner, pref_text)),
         ("C-012",  chk_c012_identity_ratio(valid_yamls, owner, pref_text)),
-        ("C-014",  chk_c014_card_style(valid_yamls, batch_dir, owner, batch_tag)),
+        # C-014 retired (W2-C撤收 2026-07-14) — ID reserved, 勿重編其他 check
         # C-013B batch-level 釣魚掃描（off/invalid 時 fail-closed）
         ("C-013B", chk_c013b_no_fishing_when_off(valid_yamls, fishing_policy)),
         # v3 新增 6 件 batch checks（2026-05-23 三審修補）
         ("V2-006", chk_v2_006_required_slot(valid_yamls, fishing_policy)),
-        ("V2-007", chk_v2_007_threads_seven(batch_dir)),
+        ("V2-007", chk_v2_007_threads_seven(batch_dir, valid_yamls)),
         ("V2-008", chk_v2_008_used_titles_dedup(valid_yamls, owner)),
         ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
         ("V2-010", chk_v2_010_batch_summary(batch_dir)),
@@ -7037,7 +7857,9 @@ def main():
         # §21 腳本品質公式 batch-level（2026-06-17 機器化 §21 落地）
         ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
         ("C-21.2", chk_c21_2_cta_diversity(valid_yamls, owner, pref_text, batch_tag)),
+        ("R-CTA-002", chk_r_cta_002_cta_label_resolvable(valid_yamls, pref_text)),
         ("C-21.6", chk_c21_6_quality_gate_report(valid_yamls, batch_dir)),
+        ("R-QGR-001", chk_r_qgr_001_quality_gate_report_content(valid_yamls, batch_dir)),
         # §22 選題公式 batch-level（2026-06-17 機器化 §22 落地；2026-06-23 已翻 enforce-live）
         ("C-22",   chk_c22_topic_generality(valid_yamls, owner)),
         ("C-plan-lock", chk_hybrid_plan_lock(valid_yamls, batch_dir, args.topic_plan)),
@@ -7113,10 +7935,11 @@ def main():
     fail_count = sum(1 for _, s, _, _ in all_results if s == "FAIL")
     warn_count = sum(1 for _, s, _, _ in all_results if s == "WARN")
     pass_count = sum(1 for _, s, _, _ in all_results if s == "PASS")
+    skip_count = sum(1 for _, s, _, _ in all_results if s == "SKIP")
     total = len(all_results)
 
     print(f"\n{'='*60}")
-    print(f"  品管彙總：{pass_count} PASS / {warn_count} WARN / {fail_count} FAIL（共 {total} 件）")
+    print(f"  品管彙總：{pass_count} PASS / {warn_count} WARN / {fail_count} FAIL / {skip_count} SKIP（共 {total} 件）")
     if fail_count == 0 and warn_count == 0:
         print("  ✅ 全數 PASS — 批次品管通過")
     elif fail_count == 0:
@@ -10327,6 +11150,168 @@ if __name__ == "__main__":
         _r_med_d = chk_v2_012b_threads_med_words(_d_empty, "溫蒂")
         fcheck("F-V2-012B-d 美容業主無脆文 md → WARN（非誤 PASS）",
                _r_med_d[0] == "WARN", _r_med_d[1])
+
+        # ── F-V2-008-F1：raw canonical 多格式 parser／沉默盲區 fixtures ──
+        print("[F-V2-008-F1] 已用題目 parser／loader／狀態優先級驗收")
+        import tempfile as _tf_v2008
+
+        _v2008_fixture_root = (
+            Path(__file__).resolve().parents[3]
+            / "_大整改執行_2026-07-10/state/fixtures/v2008_titleparse"
+        )
+        _v2008_matrix_path = _v2008_fixture_root / "matrix.json"
+        _v2008_manifest_path = _v2008_fixture_root / "manifest.json"
+        try:
+            _v2008_matrix = json.loads(_v2008_matrix_path.read_text(encoding="utf-8"))
+            _v2008_manifest = json.loads(_v2008_manifest_path.read_text(encoding="utf-8"))
+            fcheck("F-V2-008-F1-00 matrix/manifest JSON 可解析", True)
+        except Exception as _v2008_fixture_error:
+            _v2008_matrix = {"parser_cases": [], "loader_cases": [], "integration_cases": [], "similarity_cases": []}
+            _v2008_manifest = {"matrix": {}, "files": [], "case_ids": []}
+            fcheck("F-V2-008-F1-00 matrix/manifest JSON 可解析", False, str(_v2008_fixture_error))
+
+        _matrix_sha = hashlib.sha256(_v2008_matrix_path.read_bytes()).hexdigest() if _v2008_matrix_path.exists() else "missing"
+        fcheck(
+            "F-V2-008-F1-01 matrix SHA 鎖",
+            _matrix_sha == _v2008_manifest.get("matrix", {}).get("sha256"),
+            _matrix_sha,
+        )
+        _manifest_file_ok = True
+        _manifest_file_detail = []
+        for _entry in _v2008_manifest.get("files", []):
+            _fixture_path = _v2008_fixture_root / _entry.get("path", "")
+            _actual_sha = hashlib.sha256(_fixture_path.read_bytes()).hexdigest() if _fixture_path.is_file() else "missing"
+            if _actual_sha != _entry.get("sha256"):
+                _manifest_file_ok = False
+                _manifest_file_detail.append(f"{_entry.get('path')}={_actual_sha}")
+        fcheck("F-V2-008-F1-02 case file SHA 全鎖", _manifest_file_ok, ";".join(_manifest_file_detail))
+
+        _matrix_case_ids = [
+            case["case_id"]
+            for group in ("parser_cases", "loader_cases", "integration_cases", "similarity_cases")
+            for case in _v2008_matrix.get(group, [])
+        ]
+        fcheck(
+            "F-V2-008-F1-03 case IDs 完整且唯一",
+            len(_matrix_case_ids) == len(set(_matrix_case_ids))
+            and _matrix_case_ids == _v2008_manifest.get("case_ids", []),
+            repr(_matrix_case_ids),
+        )
+
+        _v2008_raw_by_case = {}
+        for _case in _v2008_matrix.get("parser_cases", []):
+            _raw = (_v2008_fixture_root / _case["path"]).read_text(encoding="utf-8")
+            _v2008_raw_by_case[_case["case_id"]] = _raw
+            _actual = _v2008_parse_used_titles(_raw)
+            _expected = _case["expected"]
+            _actual_reasons = [row["reason"] for row in _actual["rejected_rows"]]
+            _absent_ok = all(title not in _actual["titles"] for title in _expected.get("absent_titles", []))
+            _case_ok = bool(
+                _actual["format"] == _expected["format"]
+                and _actual["parsed_rows"] == _expected["parsed_rows"]
+                and _actual["titles"] == _expected["titles"]
+                and _actual["empty_template"] is _expected["empty_template"]
+                and _actual_reasons == _expected["rejected_reasons"]
+                and _absent_ok
+            )
+            fcheck(
+                f"F-V2-008-F1-P {_case['case_id']} exact",
+                _case_ok,
+                json.dumps({"actual": _actual, "expected": _expected}, ensure_ascii=False, sort_keys=True),
+            )
+            _crlf = _raw.replace("\n", "\r\n")
+            _no_terminal_newline = _raw.rstrip("\r\n")
+            _crlf_result = _v2008_parse_used_titles(_crlf)
+            _noeol_result = _v2008_parse_used_titles(_no_terminal_newline)
+            fcheck(
+                f"F-V2-008-F1-EOL {_case['case_id']}",
+                _crlf_result["titles"] == _actual["titles"]
+                and _noeol_result["titles"] == _actual["titles"]
+                and [r["reason"] for r in _crlf_result["rejected_rows"]] == _actual_reasons
+                and [r["reason"] for r in _noeol_result["rejected_rows"]] == _actual_reasons,
+            )
+
+        for _case in _v2008_matrix.get("similarity_cases", []):
+            _ratio = difflib.SequenceMatcher(None, _case["left"], _case["right"]).ratio()
+            fcheck(
+                f"F-V2-008-F1-RATIO {_case['case_id']}",
+                (_ratio >= 0.65) is _case["expected_hit"],
+                str(_ratio),
+            )
+
+        _v2008_original_owner_paths = OWNER_PREF_PATHS
+        try:
+            for _case in _v2008_matrix.get("loader_cases", []):
+                _owner = "V2008FixtureOwner"
+                with _tf_v2008.TemporaryDirectory() as _td:
+                    _root = Path(_td)
+                    if _case["mode"] == "unresolved":
+                        OWNER_PREF_PATHS = {}
+                    else:
+                        OWNER_PREF_PATHS = {_owner: _root / "_fixture_pref.md"}
+                        if _case["mode"] == "directory":
+                            (_root / f"_{_owner}已用題目.md").mkdir()
+                    _status, _detail = chk_v2_008_used_titles_dedup([], _owner)
+                    _loader_ok = _status == _case["expected_status"] and _case["detail_contains"] in _detail
+                    if _case.get("detail_excludes"):
+                        _loader_ok = _loader_ok and _case["detail_excludes"] not in _detail
+                    fcheck(f"F-V2-008-F1-L {_case['case_id']}", _loader_ok, f"{_status} {_detail}")
+
+            for _case in _v2008_matrix.get("integration_cases", []):
+                _owner = "V2008FixtureOwner"
+                with _tf_v2008.TemporaryDirectory() as _td:
+                    _root = Path(_td)
+                    OWNER_PREF_PATHS = {_owner: _root / "_fixture_pref.md"}
+                    if _case.get("loader_mode") != "missing":
+                        (_root / f"_{_owner}已用題目.md").write_text(
+                            _v2008_raw_by_case[_case["raw_case"]], encoding="utf-8"
+                        )
+                    _yamls = [
+                        (
+                            _root / "batch" / f"script_{idx + 1:02d}.yaml",
+                            {"title": title, "scenes": [{"台詞": _case["dialogues"][idx]}]},
+                        )
+                        for idx, title in enumerate(_case["titles"])
+                    ]
+                    _status, _detail = chk_v2_008_used_titles_dedup(_yamls, _owner)
+                    _integration_ok = _status == _case["expected_status"]
+                    if _case.get("detail_contains"):
+                        _integration_ok = _integration_ok and _case["detail_contains"] in _detail
+                    if _case.get("detail_contains_all"):
+                        _integration_ok = _integration_ok and all(
+                            needle in _detail for needle in _case["detail_contains_all"]
+                        )
+                    fcheck(f"F-V2-008-F1-I {_case['case_id']}", _integration_ok, f"{_status} {_detail}")
+        finally:
+            OWNER_PREF_PATHS = _v2008_original_owner_paths
+
+        # ── F-RCARD：退役批次圖卡欄位 fixtures（W2-C撤收 2026-07-14）──
+        print("\n[F-RCARD] R-CARD-001 新批退役欄位／dm_card 排除回歸")
+        _r_rcard_1 = chk_r_card_001_retired_card_fields(
+            {
+                "title": "F-RCARD-1",
+                "圖卡主題": "區域行情圖卡",
+                "visual_aid": {"kind": "knowledge_card"},
+                "visual_aid_scripts": ["script_01"],
+            },
+            "第99批_2026-07-14/f_rcard_1.yaml",
+        )
+        fcheck(
+            "F-RCARD-1 新批含退役圖卡欄 → FAIL 並指名三欄",
+            _r_rcard_1[0] == "FAIL"
+            and "圖卡主題, visual_aid, visual_aid_scripts" in _r_rcard_1[1],
+            _r_rcard_1[1],
+        )
+
+        _r_rcard_2 = chk_r_card_001_retired_card_fields(
+            {"title": "F-RCARD-2", "dm_card": {"headline": "私訊索取", "asset_path": "dm.png"}},
+            "第99批_2026-07-14/f_rcard_2.yaml",
+        )
+        fcheck(
+            "F-RCARD-2 新批僅含 dm_card → PASS（不掃釣魚 payload）",
+            _r_rcard_2[0] == "PASS" and "dm_card" in _r_rcard_2[1],
+            _r_rcard_2[1],
+        )
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:

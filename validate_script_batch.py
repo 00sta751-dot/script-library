@@ -11043,37 +11043,36 @@ if __name__ == "__main__":
                f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
-        # ── Delta E fixture ③（r4 防 local shadow 繞過）──
-        # AST 自掃本檔原始碼：_LANE_TO_PROOF 賦值全檔恰 1 處且位於模組層（任何函式內
-        # 同名 shadow 復歸 → 本 fixture 必紅，封「consumer 漏刪/復歸 local dict、
-        # global 斷言照綠」路徑）。
-        import ast as _ast_k11
-        _self_src_k11 = Path(__file__).read_text(encoding="utf-8")
-        _self_tree_k11 = _ast_k11.parse(_self_src_k11, filename=str(Path(__file__)))
-        def _is_lane_to_proof_binding_k11(node) -> bool:
-            # 霸告出貨審修（2026-07-16）：原僅計 ast.Assign，函式內 AnnAssign 型同名
-            # shadow（`_LANE_TO_PROOF: dict = {...}`）抓不到——補計 AnnAssign。
-            if isinstance(node, _ast_k11.Assign):
-                return any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
-            if isinstance(node, _ast_k11.AnnAssign):
-                return isinstance(node.target, _ast_k11.Name) and node.target.id == "_LANE_TO_PROOF"
+        # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 出貨審修改 symtable 法）──
+        # 霸告出貨審 r2（2026-07-16）：逐 AST 節點型別列舉是打地鼠（tuple unpack /
+        # NamedExpr / 參數綁定都會漏）。改用標準庫 symtable：module 表必須有
+        # _LANE_TO_PROOF 且已綁定；遞迴走訪所有子 scope（函式/類/lambda/推導式），
+        # 任一子 scope 對該符號 is_assigned()/is_parameter()/is_namespace() 為真
+        # → 必紅（symtable 天生涵蓋所有 binding 構式：賦值/AnnAssign/tuple 解包/
+        # walrus/參數/for-target/with-as/推導式，不必逐語法節點列舉）。
+        import symtable as _symtable_k11
+
+        def _lane_bound_in_table_k11(table) -> bool:
+            try:
+                sym = table.lookup("_LANE_TO_PROOF")
+            except KeyError:
+                return False
+            return bool(sym.is_assigned() or sym.is_parameter() or sym.is_namespace())
+
+        def _lane_bound_in_any_nested_k11(table) -> bool:
+            for child in table.get_children():
+                if _lane_bound_in_table_k11(child) or _lane_bound_in_any_nested_k11(child):
+                    return True
             return False
 
-        _lane_assigns_all_k11 = [
-            node for node in _ast_k11.walk(_self_tree_k11)
-            if _is_lane_to_proof_binding_k11(node)
-        ]
-        _lane_assigns_module_k11 = [
-            node for node in _self_tree_k11.body
-            if _is_lane_to_proof_binding_k11(node)
-        ]
-        _lane_ast_ok_k11 = (
-            len(_lane_assigns_all_k11) == 1
-            and len(_lane_assigns_module_k11) == 1
-        )
-        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 賦值全檔恰 1 處且位於模組層（防 local shadow 復歸）",
+        _self_src_k11 = Path(__file__).read_text(encoding="utf-8")
+        _module_table_k11 = _symtable_k11.symtable(_self_src_k11, str(Path(__file__)), "exec")
+        _module_bound_k11 = _lane_bound_in_table_k11(_module_table_k11)
+        _nested_bound_k11 = _lane_bound_in_any_nested_k11(_module_table_k11)
+        _lane_ast_ok_k11 = _module_bound_k11 and not _nested_bound_k11
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 模組層綁定存在＋任何巢狀 scope 零綁定（symtable 法防 shadow）",
                _lane_ast_ok_k11,
-               f"all_count={len(_lane_assigns_all_k11)} module_level_count={len(_lane_assigns_module_k11)}")
+               f"module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
 
         # Fix 2：014 binding — sharp_claim 不在台詞 → WARN（不靠 new_answer.quote 繞過）
         _claim_r3 = "原來不開口才是真正的尊重"

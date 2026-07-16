@@ -567,6 +567,7 @@ def _plan_lock_hash(plan: list[dict]) -> str:
             "content_axis": item.get("content_axis", ""),
             "lane": item.get("lane", ""),
             "derived_flags": sorted(str(x) for x in (item.get("derived_flags") or [])),
+            "proof_mode": item.get("proof_mode", ""),  # W4-K10（2026-07-16）：proof_mode 納入 hash，逐字鏡像 validate_script_batch.py:7167-7179
         }
         for item in plan
     ]
@@ -650,6 +651,24 @@ def _hybrid_allocation_report(plan: list[dict]) -> dict:
     return evaluate_hybrid_allocation(plan)
 
 
+def _proof_mode_for_hybrid_lane(item: dict) -> str | None:
+    """lane → proof_mode 映射（W4-K10 2026-07-16：同義複製
+    ``yaml_skeleton_generator.py:280-289`` 的 ``_proof_mode_for_hybrid_lane``；
+    值語義與該函式逐一等值，禁自行發明新 lane 或改映射值）。
+
+    回傳 None＝該 item 不寫 proof_mode 欄（未知 lane 或缺 content_axis 欄）。
+    """
+    if "content_axis" not in item:
+        return None
+    lane = str(item.get("lane", "") or "").strip()
+    return {
+        "voice_first": "voice_first",
+        "demand_first": "demand_first",
+        "anchor_first": "anchor_first",
+        "professional": "proof_first",
+    }.get(lane)
+
+
 def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dict], str, dict]:
     lanes = _profile_lanes(profile_data)
     lane_sequence = (
@@ -691,11 +710,152 @@ def apply_hybrid_profile(plan: list[dict], profile_data: dict) -> tuple[list[dic
         out["lane"] = lane
         out["derived_flags"] = flags
         out["topic_category"] = topic_category
+        proof_mode = _proof_mode_for_hybrid_lane(out)
+        if proof_mode is not None:
+            out["proof_mode"] = proof_mode  # W4-K10（2026-07-16）：annotated 寫入 proof_mode，供 5-key hash 與 validate derive-lock 對齊
         annotated.append(out)
 
     lock_hash = _plan_lock_hash(annotated)
     report = _hybrid_allocation_report(annotated)
     return annotated, lock_hash, report
+
+
+# ════════════════════════════════════════
+# parity 自測（W4-K10 2026-07-16；規格＝decision_cards/W4/K10_diff_packet_20260716.md
+# parity 規格 v4，兩級判準＋容忍集）
+# ════════════════════════════════════════
+
+def _extract_lane_to_proof_from_validate(source_path) -> dict:
+    """執行時解析 ``validate_script_batch.py`` 原始碼，抽取 ``_LANE_TO_PROOF``
+    dict 字面量（W4-K10 霸告裁定修正 2026-07-16：改識別字定位，不釘行號快照
+    ——行號會漂、快照本身是第四份會失真的拷貝）。
+
+    做法：讀原始碼 → ``ast.parse`` → 全樹 walk 找 ``Assign`` 節點，target 為
+    ``Name(id="_LANE_TO_PROOF")`` 且 value 為 ``Dict`` 字面量 → ``ast.literal_eval``
+    還原成真實 dict。不論該指派巢狀在哪個函式/區塊內都能找到（AST walk 不看
+    scope，只看語法樹結構）。
+
+    找不到該識別字、或找到但不是 dict 字面量、或原始碼解析失敗 → raise
+    ValueError（呼叫端視為「validate 端表消失/改形——人工查」，selftest 該
+    情況一律 exit non-zero）。
+    """
+    import ast
+
+    source = Path(source_path).read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(source_path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "_LANE_TO_PROOF":
+                    if not isinstance(node.value, ast.Dict):
+                        raise ValueError(
+                            "_LANE_TO_PROOF 識別字找到但賦值非 dict 字面量（validate 端改形）"
+                        )
+                    return ast.literal_eval(node.value)
+    raise ValueError("_LANE_TO_PROOF 識別字未找到（validate 端表消失或改名）")
+
+
+def _parity_selftest() -> int:
+    """驗證本檔 ``_proof_mode_for_hybrid_lane`` 與 sibling 兩處映射同義。
+
+    Level ① — 嚴格全等：本檔映射 ≡ ``yaml_skeleton_generator.py:280-289``
+    的 ``_proof_mode_for_hybrid_lane``（4 已知 lane 逐一等值 + unknown-lane
+    探針，探針 item 必含 ``content_axis`` 欄以避免踩 generator 的提前 None
+    分支；已知 lane 與 unknown 探針兩者皆應與 generator 完全一致）。
+
+    Level ② — 對 ``validate_script_batch.py`` 的 ``_LANE_TO_PROOF``（函式內
+    區域變數、非模組層可 import 物件，本刀禁動該檔）：**執行時解析該檔原始
+    碼抽表**（見 ``_extract_lane_to_proof_from_validate``，靠識別字定位、不
+    靠行號——防漂移也防「快照即第四份拷貝」問題）。交集鍵逐一等值（不等＝
+    FAIL）；容忍集僅兩個**具名**已知不對稱——validate 獨有鍵 ``stance``
+    （legacy alias，本檔永不產出）＝容忍＋列印；本檔獨有鍵 ``professional``
+    （validate 未鎖，已知 K11 缺口）＝容忍＋列印「K11 pending」。**任何其他
+    不在此兩個具名容忍集內的不對稱鍵（例如 validate 端某已知 lane 憑空消失）
+    一律 FAIL**——防止「非交集鍵一律放行」把真實漂移吃掉。抽表失敗（識別字
+    消失/改形）＝exit non-zero。
+
+    回傳 process exit code：0＝全通過；非 0＝任一級不符或 sibling 解析失敗。
+    """
+    ok = True
+    messages: list[str] = []
+
+    try:
+        from yaml_skeleton_generator import _proof_mode_for_hybrid_lane as _gen_proof_mode
+    except Exception as exc:
+        print(f"[parity-selftest] FAIL — yaml_skeleton_generator import error: {type(exc).__name__}: {exc}")
+        return 1
+
+    known_lanes = ["voice_first", "demand_first", "anchor_first", "professional"]
+    local_map: dict[str, str] = {}
+    for lane in known_lanes:
+        probe = {"content_axis": "offpro", "lane": lane}
+        local_val = _proof_mode_for_hybrid_lane(probe)
+        gen_val = _gen_proof_mode(probe)
+        if local_val != gen_val:
+            ok = False
+            messages.append(
+                f"[parity-selftest] FAIL — Level1 lane={lane} distributor={local_val!r} generator={gen_val!r}"
+            )
+        if local_val is not None:
+            local_map[lane] = local_val
+
+    unknown_probe = {"content_axis": "offpro", "lane": "__unknown_lane_sentinel__"}
+    local_unknown = _proof_mode_for_hybrid_lane(unknown_probe)
+    gen_unknown = _gen_proof_mode(unknown_probe)
+    if local_unknown is not None or gen_unknown is not None:
+        ok = False
+        messages.append(
+            f"[parity-selftest] FAIL — Level1 unknown-lane probe 非 None：distributor={local_unknown!r} generator={gen_unknown!r}"
+        )
+
+    validate_path = Path(__file__).resolve().parent / "validate_script_batch.py"
+    try:
+        validate_lane_to_proof = _extract_lane_to_proof_from_validate(validate_path)
+    except Exception as exc:
+        print(f"[parity-selftest] FAIL — validate _LANE_TO_PROOF 解析失敗（人工查）：{type(exc).__name__}: {exc}")
+        return 1
+
+    # 容忍集＝packet 明文點名的兩個已知不對稱（非「任何不交集鍵都容忍」——
+    # 其他不對稱一律視為漂移訊號，FAIL 讓人工查）。
+    _KNOWN_VALIDATE_ONLY = {"stance"}       # legacy alias，distributor 永不產出
+    _KNOWN_DISTRIBUTOR_ONLY = {"professional"}  # validate 未鎖，已知 K11 缺口
+
+    shared_keys = set(local_map) & set(validate_lane_to_proof)
+    for key in sorted(shared_keys):
+        if local_map[key] != validate_lane_to_proof[key]:
+            ok = False
+            messages.append(
+                f"[parity-selftest] FAIL — Level2 交集鍵 {key} distributor={local_map[key]!r} validate={validate_lane_to_proof[key]!r}"
+            )
+
+    validate_only = set(validate_lane_to_proof) - set(local_map)
+    for key in sorted(validate_only & _KNOWN_VALIDATE_ONLY):
+        messages.append(f"[parity-selftest] TOLERATE — validate 獨有鍵 {key!r}（legacy alias，distributor 永不產出）")
+    for key in sorted(validate_only - _KNOWN_VALIDATE_ONLY):
+        ok = False
+        messages.append(
+            f"[parity-selftest] FAIL — Level2 validate 獨有鍵 {key!r} 不在已知容忍清單 {sorted(_KNOWN_VALIDATE_ONLY)}"
+            "（疑似 validate 端表結構變動或本檔遺漏 lane——人工查）"
+        )
+
+    distributor_only = set(local_map) - set(validate_lane_to_proof)
+    for key in sorted(distributor_only & _KNOWN_DISTRIBUTOR_ONLY):
+        messages.append(f"[parity-selftest] TOLERATE — distributor 獨有鍵 {key!r}（validate 未鎖，K11 pending）")
+    for key in sorted(distributor_only - _KNOWN_DISTRIBUTOR_ONLY):
+        ok = False
+        messages.append(
+            f"[parity-selftest] FAIL — Level2 distributor 獨有鍵 {key!r} 不在已知容忍清單 {sorted(_KNOWN_DISTRIBUTOR_ONLY)}"
+            "（疑似 validate 端表結構變動——人工查）"
+        )
+
+    for msg in messages:
+        print(msg)
+
+    if ok:
+        print("[parity-selftest] PASS")
+        return 0
+    print("[parity-selftest] FAIL")
+    return 1
 
 
 # ════════════════════════════════════════
@@ -709,6 +869,16 @@ def main():
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+    # W4-K10（2026-07-16）：--parity-selftest 於正常生成路徑之前攔截退出，
+    # 不吃下方 --owner/--batch 必填檢查（parity 規格 v4 ③ CLI 語義）。
+    if "--parity-selftest" in sys.argv[1:]:
+        try:
+            exit_code = _parity_selftest()
+        except Exception as exc:
+            print(f"[parity-selftest] FAIL — unexpected error: {type(exc).__name__}: {exc}")
+            exit_code = 1
+        sys.exit(exit_code)
 
     parser = argparse.ArgumentParser(description="題目分配機 — 自動分 13 題目方向")
     parser.add_argument("--owner",  required=True, help="業主名（瑞祥/仲豪/昀臻/叭噗_小C/阿奇）")

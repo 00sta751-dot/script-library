@@ -7204,11 +7204,14 @@ def _resolve_time_axis_from_raw(raw: Any, batch_key: str) -> tuple[Optional[dict
     if keys != _TIME_AXIS_REQUIRED_KEYS:
         missing = _TIME_AXIS_REQUIRED_KEYS - keys
         unknown = keys - _TIME_AXIS_REQUIRED_KEYS
+        # 出貨審 r1 P0 修：raw 鍵混型時（YAML 允許非字串鍵，如 `7: x`）unknown 集合若同時
+        # 含 str 與 int 等不可比對型別，裸 sorted() 會拋 TypeError（'<' not supported between
+        # instances of 'int' and 'str'），讓 fail-closed 失控炸主流程。key=str 統一轉字串比較。
         parts = []
         if missing:
-            parts.append(f"缺鍵 {sorted(missing)}")
+            parts.append(f"缺鍵 {sorted(missing, key=str)}")
         if unknown:
-            parts.append(f"未知鍵 {sorted(unknown)}")
+            parts.append(f"未知鍵 {sorted(unknown, key=str)}")
         return None, f"time_axis 宣告非法—恰五鍵檢查未過（{'；'.join(parts)}）"
 
     # ④ duration_seconds：type(x) is int（排除 bool）且 0 < x <= 3600
@@ -11824,9 +11827,9 @@ if __name__ == "__main__":
         _k12_n_cases.append(("N16-slots-n1", _k12_mutate(time_slots=["0-90s"]), None, "段數不在 2~24"))
         _k12_n_cases.append(("N17-slots-n25", _k12_mutate(time_slots=[f"seg{i}" for i in range(25)]), None,
                               "段數不在 2~24"))
-        _k12_n_cases.append(("N18-leading-zero", _k12_mutate(time_slots=["0-3s", "03-12s"]), None, None))
-        _k12_n_cases.append(("N19-unicode-digit", _k12_mutate(time_slots=["0-3s", "０-３ｓ"]), None, None))
-        _k12_n_cases.append(("N20-trailing-ws", _k12_mutate(time_slots=["0-3s", "3-12s "]), None, None))
+        _k12_n_cases.append(("N18-leading-zero", _k12_mutate(time_slots=["0-3s", "03-12s"]), None, "段格式錯誤"))
+        _k12_n_cases.append(("N19-unicode-digit", _k12_mutate(time_slots=["0-3s", "０-３ｓ"]), None, "段格式錯誤"))
+        _k12_n_cases.append(("N20-trailing-ws", _k12_mutate(time_slots=["0-3s", "3-12s "]), None, "段格式錯誤"))
         _k12_n_cases.append(("N21-zero-length",
                               _k12_mutate(duration_seconds=10, time_slots=["0-5s", "5-5s", "5-10s"]),
                               None, "零長或逆序"))
@@ -11868,12 +11871,26 @@ if __name__ == "__main__":
         }
         _k12_n_cases.append(("N31b-digest-replay", _k12_n31b_raw, _k12_owner_a_key, "宣告內容與核准摘要不符"))
 
+        # N32：③ 恰五鍵混型鍵（出貨審 r1 P0）——unknown 集合同時含 int（YAML `7: x` 風格）
+        # 與額外 str 鍵，裸 sorted() 舊版會拋 TypeError；驗 key=str 修法後仍 controlled FAIL。
+        _k12_n32_raw = dict(_k12_good_raw())
+        _k12_n32_raw[7] = "x"          # YAML `7: x` 風格的整數鍵
+        _k12_n32_raw["額外欄位"] = "y"  # 與整數鍵同時存在，unknown 集合真正混型（str+int）
+        _k12_n_cases.append(("N32-mixed-type-unknown-key", _k12_n32_raw, None, "未知鍵"))
+
         for _case_id, _raw, _bk_override, _expect_substr in _k12_n_cases:
             _bk = _bk_override if _bk_override is not None else _k12_batch_key
-            _axis, _err = _resolve_time_axis_from_raw(_raw, _bk)
-            fcheck(f"F-K12-{_case_id} FAIL（axis=None、error 含「time_axis 宣告非法」前綴）",
-                   _axis is None and _err is not None and _err.startswith("time_axis 宣告非法—"),
-                   f"axis={_axis} err={_err}")
+            # 出貨審 r1 P0：混型鍵舊版會拋例外，這裡包 try/except 讓任何未預期例外都變成
+            # 「controlled FAIL」而非讓整個 --fixtures 進程崩潰（斷言本身也驗證絕不拋例外）。
+            try:
+                _axis, _err = _resolve_time_axis_from_raw(_raw, _bk)
+                _raised = None
+            except Exception as _k12_exc:
+                _axis, _err, _raised = None, None, _k12_exc
+            fcheck(f"F-K12-{_case_id} FAIL（axis=None、error 含「time_axis 宣告非法」前綴、絕不拋例外）",
+                   _raised is None and _axis is None and _err is not None
+                   and _err.startswith("time_axis 宣告非法—"),
+                   f"axis={_axis} err={_err} raised={_raised!r}")
             if _expect_substr is not None:
                 fcheck(f"F-K12-{_case_id} detail 含分支專屬 reason「{_expect_substr}」（釘對分支、非⑧digest遮蔽）",
                        _err is not None and _expect_substr in _err,
@@ -11899,10 +11916,16 @@ if __name__ == "__main__":
             _k12_c01a = chk_l1_006_cta(_k12_c01a_data, "c01a.yaml", cta_slot=_k12_c01_cta_slot)
             fcheck("F-K12-C01a CTA 在末段（含引導語）→ PASS", _k12_c01a[0] == "PASS", str(_k12_c01a))
 
-            _k12_c01b_data = {"scenes": [{"timestamp": _k12_c01_cta_slot, "type": "CTA",
-                                           "台詞_阿奇": "謝謝觀看下次見"}]}
+            # 出貨審 r1 形修：CTA 關鍵詞放在「非末段」（首段），末段（=cta_slot）本身無引導語。
+            # 若函式錯誤地整段掃描全文找關鍵詞（而非只看 scenes[-1]）會誤判 PASS；
+            # 正確實作只看末段 → 應 FAIL，藉此釘死 cta_slot 參數真的只檢查末段。
+            _k12_c01b_data = {"scenes": [
+                {"timestamp": _k12_p02_slots[0], "type": "一般", "台詞_阿奇": "留言告訴我你的想法"},
+                {"timestamp": _k12_c01_cta_slot, "type": "CTA", "台詞_阿奇": "謝謝觀看下次見"},
+            ]}
             _k12_c01b = chk_l1_006_cta(_k12_c01b_data, "c01b.yaml", cta_slot=_k12_c01_cta_slot)
-            fcheck("F-K12-C01b CTA 段文字無引導語關鍵詞 → FAIL", _k12_c01b[0] == "FAIL", str(_k12_c01b))
+            fcheck("F-K12-C01b CTA 關鍵詞在非末段、末段無引導語 → FAIL（釘 cta_slot 只看末段）",
+                   _k12_c01b[0] == "FAIL", str(_k12_c01b))
 
         # ── D01a：缺省差分 fixture（鍵缺席 → 零註冊 + chk 函式逐字零變）──
         import tempfile as _k12_tempfile

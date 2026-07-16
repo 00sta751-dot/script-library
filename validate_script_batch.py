@@ -397,12 +397,18 @@ def _get_canonical_scenes(data: dict) -> Optional[list]:
     return None
 
 
-def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
-    """L1-001：schema 對齊 — 6 段時間軸完整且順序正確
+def chk_l1_001_schema(data: dict, fname: str, expected_slots: Optional[list] = None) -> tuple[str, str]:
+    """L1-001：schema 對齊 — N 段時間軸完整且順序正確
     有 canonical 用 canonical（支援 markdown body 格式），沒有 fallback 舊邏輯。
     B 段 2026-06-05：expected_order 改讀 L0 time_slots（廢硬編）。
+    W4-K12（2026-07-16 Delta C）：expected_slots 選填 — None＝原 L0 60s 全域路徑逐字零變
+    （含 PASS 字面「6 段時間軸齊全且順序正確」原樣保留）；有值（來自批級 time_axis 宣告，
+    list of {"timestamp": str, ...}）＝改用宣告軸驗，PASS/FAIL detail 段數字面改實際 N。
     """
-    expected_order = [s["timestamp"] for s in _load_l0_time_slots()]
+    if expected_slots is None:
+        expected_order = [s["timestamp"] for s in _load_l0_time_slots()]
+    else:
+        expected_order = [s["timestamp"] for s in expected_slots]
     expected_len = len(expected_order)
 
     # 嘗試用 canonical
@@ -415,7 +421,9 @@ def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
         for i, (exp, got) in enumerate(zip(expected_order, actual)):
             if got != exp:
                 return "FAIL", f"scenes[{i}] timestamp = '{got}'，期望 '{exp}'（原始：{canonical_scenes[i].get('timestamp','')}）"
-        return "PASS", "6 段時間軸齊全且順序正確（canonical 層驗）"
+        if expected_slots is None:
+            return "PASS", "6 段時間軸齊全且順序正確（canonical 層驗）"
+        return "PASS", f"{expected_len} 段時間軸齊全且順序正確（canonical 層驗）"
 
     # fallback：舊邏輯（structured frontmatter）
     scenes = get_scenes(data)
@@ -425,7 +433,9 @@ def chk_l1_001_schema(data: dict, fname: str) -> tuple[str, str]:
     for i, (exp, got) in enumerate(zip(expected_order, actual)):
         if got != exp:
             return "FAIL", f"scenes[{i}] timestamp = '{got}'，期望 '{exp}'"
-    return "PASS", f"6 段時間軸齊全且順序正確"
+    if expected_slots is None:
+        return "PASS", f"6 段時間軸齊全且順序正確"
+    return "PASS", f"{expected_len} 段時間軸齊全且順序正確"
 
 def chk_l1_002_banned(data: dict, fname: str) -> tuple[str, str]:
     """L1-002：禁用詞 grep"""
@@ -568,12 +578,16 @@ def chk_l1_005_number_source(data: dict, fname: str) -> tuple[str, str]:
         return "WARN", f"偵測到非個人類數字：{non_personal[:8]}，建議標來源（如 [來源：XXX] 或 [澤君提供]）"
     return "PASS", f"業務數字 {hits[:5]}{'...' if len(hits)>5 else ''}，已有來源標記或為個人經歷數字"
 
-def chk_l1_006_cta(data: dict, fname: str) -> tuple[str, str]:
+def chk_l1_006_cta(data: dict, fname: str, cta_slot: Optional[str] = None) -> tuple[str, str]:
     """L1-006：末段（L0 time_slots 最後一段）有 CTA 引導語（純雞湯除外）
     有 canonical 用 canonical（timestamp 正規化 + dialogue），沒有 fallback 舊邏輯。
     B 段 2026-06-05：cta_slot 改讀 L0 time_slots 末段（廢硬編 '52-60s'）。
+    W4-K12（2026-07-16 Delta D）：cta_slot 選填 — None＝原 L0 60s 全域末段逐字零變；
+    有值（來自批級 time_axis 宣告末段 timestamp）＝改用宣告末段驗（N>=2 下限保證末段≠首段，
+    CTA-last 語義沿用）。
     """
-    cta_slot = _load_l0_time_slots()[-1]["timestamp"]
+    if cta_slot is None:
+        cta_slot = _load_l0_time_slots()[-1]["timestamp"]
 
     sc = data.get("schema_check", {})
     # 純雞湯豁免
@@ -7156,6 +7170,140 @@ def _batch_flags_declares_hybrid(batch_dir: Path) -> bool:
     return _load_batch_flags(batch_dir).get("batch_profile") == HYBRID_BATCH_PROFILE
 
 
+# ────────────────────────────────────────────
+# W4-K12（2026-07-16）：per-batch time_axis 選填參數化（60 秒預設保留、fail-closed）
+# 規格＝state/decision_cards/W4/K12_diff_packet_20260716.md Delta A/B（切前盲審 r8 GO）
+# ────────────────────────────────────────────
+_TIME_AXIS_REQUIRED_KEYS = {"duration_seconds", "time_slots", "approved_by", "approved_at", "approved_digest"}
+_TIME_AXIS_SLOT_RE = re.compile(r"(0|[1-9][0-9]{0,3})-(0|[1-9][0-9]{0,3})s", re.ASCII)
+
+
+def _time_axis_canonical_digest(batch_key: str, duration_seconds: int, time_slots: list) -> str:
+    """approved_digest 正典計算：sha256(canonical_json({batch,duration_seconds,time_slots}))[:16]
+    （Delta A ⑧；batch_key＝「業主/01_腳本生產/批次」三級目錄名，封跨業主同名批 replay）。
+    """
+    canonical = json.dumps(
+        {"batch": batch_key, "duration_seconds": duration_seconds, "time_slots": time_slots},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _resolve_time_axis_from_raw(raw: Any, batch_key: str) -> tuple[Optional[dict], Optional[str]]:
+    """Delta A ②-⑧ 核心驗證邏輯（batch_key 由呼叫端算好；供 _resolve_batch_time_axis 與
+    fixtures 共用純函式，不碰檔案系統）。任一失敗＝(None, "time_axis 宣告非法—<原因>")；
+    禁 fallback 禁 normalize。回傳 (axis, None) 時 axis = {"duration_seconds": int,
+    "time_slots": [{"timestamp": str, "start": int, "end": int}, ...]}。
+    """
+    # ② 值為 null／非 mapping
+    if raw is None or not isinstance(raw, dict):
+        return None, "time_axis 宣告非法—time_axis 必須是 mapping（非 null/list/str）"
+
+    # ③ 恰五鍵（缺任一或有未知鍵 → error）
+    keys = set(raw.keys())
+    if keys != _TIME_AXIS_REQUIRED_KEYS:
+        missing = _TIME_AXIS_REQUIRED_KEYS - keys
+        unknown = keys - _TIME_AXIS_REQUIRED_KEYS
+        parts = []
+        if missing:
+            parts.append(f"缺鍵 {sorted(missing)}")
+        if unknown:
+            parts.append(f"未知鍵 {sorted(unknown)}")
+        return None, f"time_axis 宣告非法—恰五鍵檢查未過（{'；'.join(parts)}）"
+
+    # ④ duration_seconds：type(x) is int（排除 bool）且 0 < x <= 3600
+    duration = raw["duration_seconds"]
+    if type(duration) is not int or not (0 < duration <= 3600):
+        return None, "time_axis 宣告非法—duration_seconds 型別非 int 或超出 (0, 3600] 範圍"
+
+    # ⑤ time_slots：type is list、2 <= N <= 24、元素 type is str
+    slots = raw["time_slots"]
+    if type(slots) is not list or not (2 <= len(slots) <= 24):
+        return None, "time_axis 宣告非法—time_slots 型別非 list 或段數不在 2~24 範圍"
+    if not all(type(s) is str for s in slots):
+        return None, "time_axis 宣告非法—time_slots 元素型別非 str"
+
+    # ⑥ 每段 fullmatch（封 Unicode 數字/前導零/尾隨空白換行/超長位數）
+    parsed: list = []
+    for s in slots:
+        m = _TIME_AXIS_SLOT_RE.fullmatch(s)
+        if not m:
+            return None, f"time_axis 宣告非法—time_slots 段格式錯誤：{s!r}"
+        parsed.append((int(m.group(1)), int(m.group(2))))
+
+    # ⑦ 區間數學：首段 start==0／每段 end>start／嚴格接續／末段 end==duration
+    if parsed[0][0] != 0:
+        return None, f"time_axis 宣告非法—首段未從 0 開始：{slots[0]!r}"
+    for (start, end), raw_s in zip(parsed, slots):
+        if end <= start:
+            return None, f"time_axis 宣告非法—段落零長或逆序：{raw_s!r}"
+    for (s1, e1), (s2, e2) in zip(parsed, parsed[1:]):
+        if e1 != s2:
+            return None, f"time_axis 宣告非法—時間軸不連續：{e1} != {s2}"
+    if parsed[-1][1] != duration:
+        return None, f"time_axis 宣告非法—末段 end({parsed[-1][1]}) != duration_seconds({duration})"
+
+    # ⑧ 授權三欄（機器閘，非密碼學核准證明——宣稱邊界見 packet Delta A ⑧）
+    approved_by = raw["approved_by"]
+    if type(approved_by) is not str or approved_by != "澤君":
+        return None, "time_axis 宣告非法—approved_by 必須恰為「澤君」"
+
+    approved_at = raw["approved_at"]
+    if type(approved_at) is not str:
+        return None, "time_axis 宣告非法—approved_at 型別非 str（YAML 無引號日期會被解析成 date 物件）"
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", approved_at):
+        return None, "time_axis 宣告非法—approved_at 格式非 YYYY-MM-DD"
+    try:
+        approved_date = _dt.datetime.strptime(approved_at, "%Y-%m-%d").date()
+    except ValueError:
+        return None, "time_axis 宣告非法—approved_at 非真實日期"
+    if approved_date > _dt.date.today():
+        return None, "time_axis 宣告非法—approved_at 為未來日期"
+
+    approved_digest = raw["approved_digest"]
+    if type(approved_digest) is not str:
+        return None, "time_axis 宣告非法—approved_digest 型別非 str"
+    expected_digest = _time_axis_canonical_digest(batch_key, duration, slots)
+    if approved_digest != expected_digest:
+        return None, "time_axis 宣告非法—宣告內容與核准摘要不符"
+
+    axis = {
+        "duration_seconds": duration,
+        "time_slots": [{"timestamp": s, "start": a, "end": b} for s, (a, b) in zip(slots, parsed)],
+    }
+    return axis, None
+
+
+def _resolve_batch_time_axis(batch_dir: Path) -> tuple[Optional[dict], Optional[str]]:
+    """Delta A ①：per-batch time_axis 選填宣告解析入口，fail-closed。
+    (None, None)＝鍵整個缺席 → 下游一律走原全域 60s 路徑（逐字零變）；
+    (axis_dict, None)＝宣告合法；(None, "time_axis 宣告非法—…")＝宣告非法（禁 fallback/normalize）。
+    _batch_flags.yml 整檔解析失敗（含 top-level falsy 經既有 `_load_batch_flags_checked`
+    的 `or {}` 吞成空 dict）由既有閘（C-plan-lock 等）處理，本刀不新增行為、time_axis 視同缺席。
+    """
+    flags, flags_error = _load_batch_flags_checked(batch_dir)
+    if flags_error:
+        return None, None
+    if "time_axis" not in flags:
+        return None, None
+    resolved = batch_dir.resolve()
+    batch_key = "/".join(p.name for p in [resolved.parent.parent, resolved.parent, resolved])
+    return _resolve_time_axis_from_raw(flags["time_axis"], batch_key)
+
+
+def chk_l1_000_time_axis(axis: Optional[dict], error: Optional[str]) -> Optional[tuple[str, str]]:
+    """L1-000-time-axis（Delta B）：批級 time_axis 宣告驗，呼叫端先跑一次
+    _resolve_batch_time_axis(batch_dir) 取得 (axis, error) 再傳入本函式判定。
+    回傳 None＝缺省（鍵缺席）、呼叫端不得註冊本 check（all_results 無此列＝零註冊）。
+    """
+    if axis is None and error is None:
+        return None
+    if error is not None:
+        return "FAIL", error
+    n = len(axis["time_slots"])
+    return "PASS", f"time_axis 宣告合法（declared {n} 段 / duration={axis['duration_seconds']}s）"
+
+
 def _load_topic_plan_checked(plan_path: Optional[Path]) -> tuple[dict, Optional[str]]:
     if not plan_path:
         return {}, None
@@ -7640,6 +7788,8 @@ def run_per_file_checks(
     fishing_policy: Optional[dict] = None,
     topic_intel_policy: Optional[dict] = None,
     hybrid_batch: bool = True,
+    time_axis: Optional[dict] = None,
+    time_axis_error: Optional[str] = None,
 ) -> list[tuple[str, str, str, str]]:
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
@@ -7648,6 +7798,11 @@ def run_per_file_checks(
     topic_intel_policy：由 load_topic_intel_policy() 算出後傳入，讓 V3-001 知道模式（off=SKIP）
     hybrid_batch：由 _is_hybrid_batch(batch_dir, yamls) 傳入（W2-D20）；預設 True=fail-closed
     （單檔直呼/harness matrix 語境一律全嚴），只有主流程判定純 legacy 批才傳 False。
+    time_axis / time_axis_error：由 main() 對整批呼叫一次 _resolve_batch_time_axis(batch_dir)
+    算出後傳入（W4-K12 2026-07-16 Delta D）。兩者皆 None＝缺省，L1-001/L1-006 走原全域路徑
+    逐字零變（外部 caller 不傳＝行為零變）；time_axis_error 非 None＝在求值前攔截，L1-001/
+    L1-006 直接回 FAIL「time_axis 非法、時間軸無法驗」，絕不落入 None→L0 全域路徑；
+    time_axis 有值（且 error 為 None）＝改用宣告軸驗。兩者互斥由 resolver 回傳結構保證。
     """
     if fishing_policy is None:
         fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
@@ -7687,15 +7842,27 @@ def run_per_file_checks(
                     "FAIL",
                     f"{f.name}: C-quote-source FAIL — {_quote_err}",
                 )
+    # W4-K12（2026-07-16 Delta D）：time_axis_error 在求值前攔截，絕不落入 chk_l1_001_schema/
+    # chk_l1_006_cta 的 None→L0 全域路徑；time_axis 有值改用宣告軸驗；兩者皆 None 原路徑零變。
+    if time_axis_error is not None:
+        _l1001_result = ("FAIL", "time_axis 非法、時間軸無法驗")
+        _l1006_result = ("FAIL", "time_axis 非法、時間軸無法驗")
+    elif time_axis is not None:
+        _l1001_result = chk_l1_001_schema(data, f.name, expected_slots=time_axis["time_slots"])
+        _l1006_result = chk_l1_006_cta(data, f.name, cta_slot=time_axis["time_slots"][-1]["timestamp"])
+    else:
+        _l1001_result = chk_l1_001_schema(data, f.name)
+        _l1006_result = chk_l1_006_cta(data, f.name)
+
     results = []
     checks = [
         # per-file checks
-        ("L1-001", chk_l1_001_schema(data, f.name)),
+        ("L1-001", _l1001_result),
         ("L1-002", chk_l1_002_banned(data, f.name)),
         ("L1-003", chk_l1_003_mirror(data, f.name)),
         ("L1-004", chk_l1_004_traffic(data, f.name)),
         ("L1-005", chk_l1_005_number_source(data, f.name)),
-        ("L1-006", chk_l1_006_cta(data, f.name)),
+        ("L1-006", _l1006_result),
         ("L1-007", chk_l1_007_title_len(data, f.name)),
         ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
         ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
@@ -7883,6 +8050,10 @@ def main():
 
     all_results: list[tuple[str, str, str, str]] = []
 
+    # ── W4-K12（2026-07-16）：批次 time_axis 選填宣告，每批 resolve 恰一次（Delta B 收刀驗證）──
+    _time_axis, _time_axis_error = _resolve_batch_time_axis(batch_dir)
+    _l1000_result = chk_l1_000_time_axis(_time_axis, _time_axis_error)
+
     # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014[RETIRED] + C-013B + v3 新 6 件）──
     batch_checks = [
         ("L1-008", chk_l1_008_batch_count(yamls, batch_dir)),
@@ -7916,6 +8087,9 @@ def main():
         ("C-plan-lock", chk_hybrid_plan_lock(valid_yamls, batch_dir, args.topic_plan)),
         ("C-taste-panel", chk_taste_panel_completeness(valid_yamls, batch_dir, args.topic_plan)),
     ]
+    # W4-K12：L1-000-time-axis 缺省零註冊（None＝鍵缺席，不 append，all_results 無此列）
+    if _l1000_result is not None:
+        batch_checks.append(("L1-000-time-axis", _l1000_result))
     # Fix A【P0】V3-002 gated：只有 policy enabled 才 append，off 時完全不註冊（零足跡）
     # off → 不 append V3-002 → batch_checks 件數、len 印出維持原值；無 SKIP 行
     # Fix P0-2：invalid → fail-closed，加 V3-000-policy FAIL（invalid ≠ off）
@@ -7976,6 +8150,8 @@ def main():
             fishing_policy=fishing_policy,
             topic_intel_policy=_topic_intel_policy,
             hybrid_batch=_hybrid_batch,
+            time_axis=_time_axis,
+            time_axis_error=_time_axis_error,
         )
         for cid, status, fname, detail in per_results:
             icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))
@@ -11525,6 +11701,274 @@ if __name__ == "__main__":
             _r_rcard_2[0] == "PASS" and "dm_card" in _r_rcard_2[1],
             _r_rcard_2[1],
         )
+
+        # ── F-K12：time_axis 選填參數化 fixtures（W4-K12 2026-07-16）──
+        # 真值表 48 執行單位中屬「沙盤直呼 fixtures」的部分：P02-P04/N01-N31/C01/D01a。
+        # P01（35 批 differential）/D01b（CLI byte-diff）/M01-M03（mutation）/R01（spike/
+        # hermetic/F-CUTOVER/selftest）歸霸告紅綠 harness 親跑，不在此列。
+        print("\n[F-K12] time_axis 選填參數化（duration_seconds/time_slots 批級宣告，60s 預設保留）")
+
+        _k12_batch_key = "K12Fixture業主/01_腳本生產/K12Fixture批"
+        _k12_today = _dt.date.today().isoformat()
+        _k12_future = (_dt.date.today() + _dt.timedelta(days=1)).isoformat()
+
+        def _k12_good_raw(duration=90, slots=None, batch_key=None):
+            if slots is None:
+                slots = ["0-15s", "15-30s", "30-45s", "45-60s", "60-75s", "75-90s"]
+            bk = batch_key if batch_key is not None else _k12_batch_key
+            return {
+                "duration_seconds": duration,
+                "time_slots": slots,
+                "approved_by": "澤君",
+                "approved_at": _k12_today,
+                "approved_digest": _time_axis_canonical_digest(bk, duration, slots),
+            }
+
+        def _k12_mutate(recompute_digest=True, **overrides):
+            """霸告令（紅綠回饋 2026-07-16）：mutation 反證要求 N 案「只違反被測那一條」，
+            預設在套用 duration_seconds/time_slots 變異後，用同公式/同 batch_key 重算
+            approved_digest，避免⑧ digest 關卡把⑦區間數學／④~⑥型別/格式檢查的失敗訊號
+            遮蔽（若⑦等檢查被 mutation 拔除，digest 仍會獨立擋下 → 反證無效）。
+            digest 專屬案（N31a 漂移／N31b replay）才需要 approved_digest 刻意不匹配，
+            顯式傳 recompute_digest=False 或直接覆寫 approved_digest（覆寫時不重算）。
+            """
+            raw = dict(_k12_good_raw())
+            raw.update(overrides)
+            if recompute_digest and "approved_digest" not in overrides:
+                raw["approved_digest"] = _time_axis_canonical_digest(
+                    _k12_batch_key, raw["duration_seconds"], raw["time_slots"]
+                )
+            return raw
+
+        # ── 合法基線自檢（先確認 mutation 前的基線本身合法，否則後面全案無意義）──
+        _k12_good_axis, _k12_good_err = _resolve_time_axis_from_raw(_k12_good_raw(), _k12_batch_key)
+        fcheck("F-K12-GOOD-BASELINE 未變異的合法宣告 → resolve 成功",
+               _k12_good_axis is not None and _k12_good_err is None,
+               f"axis={_k12_good_axis} err={_k12_good_err}")
+
+        # ── P02-P04：合法宣告軸（沙盤直呼 chk_l1_001_schema/chk_l1_006_cta/chk_l1_000_time_axis）──
+        # P02：90s 合法軸 7 段（N≠6，測段數硬鎖殘留，r2 殘掃）
+        _k12_p02_slots = ["0-13s", "13-26s", "26-39s", "39-52s", "52-65s", "65-78s", "78-90s"]
+        _k12_p02_raw = _k12_good_raw(duration=90, slots=_k12_p02_slots)
+        _k12_p02_axis, _k12_p02_err = _resolve_time_axis_from_raw(_k12_p02_raw, _k12_batch_key)
+        fcheck("F-K12-P02 90s/7段宣告合法 → resolve 成功、無 error",
+               _k12_p02_axis is not None and _k12_p02_err is None,
+               f"axis={_k12_p02_axis} err={_k12_p02_err}")
+        if _k12_p02_axis is not None:
+            _k12_p02_l1000 = chk_l1_000_time_axis(_k12_p02_axis, _k12_p02_err)
+            fcheck("F-K12-P02 L1-000 PASS、detail 含 declared 7 段",
+                   _k12_p02_l1000 is not None and _k12_p02_l1000[0] == "PASS"
+                   and "7" in _k12_p02_l1000[1],
+                   str(_k12_p02_l1000))
+            _k12_p02_data = {"scenes": [
+                {"timestamp": ts, "type": ("CTA" if i == len(_k12_p02_slots) - 1 else "一般"),
+                 "台詞_阿奇": ("留言告訴我你的想法" if i == len(_k12_p02_slots) - 1 else f"第{i}段測試台詞")}
+                for i, ts in enumerate(_k12_p02_slots)
+            ]}
+            _k12_p02_l1001 = chk_l1_001_schema(_k12_p02_data, "p02.yaml", expected_slots=_k12_p02_axis["time_slots"])
+            fcheck("F-K12-P02 L1-001 PASS、detail 段數=7",
+                   _k12_p02_l1001[0] == "PASS" and "7" in _k12_p02_l1001[1], str(_k12_p02_l1001))
+            _k12_p02_l1006 = chk_l1_006_cta(_k12_p02_data, "p02.yaml",
+                                             cta_slot=_k12_p02_axis["time_slots"][-1]["timestamp"])
+            fcheck("F-K12-P02 L1-006 PASS（末段 CTA 含引導語）", _k12_p02_l1006[0] == "PASS", str(_k12_p02_l1006))
+
+        # P03：60s 標準軸（顯式六段、五鍵齊）— 判定與缺省批同，L1-000 多一列＝申報差異
+        _k12_p03_slots = [s["timestamp"] for s in _load_l0_time_slots()]
+        _k12_p03_raw = _k12_good_raw(duration=60, slots=_k12_p03_slots)
+        _k12_p03_axis, _k12_p03_err = _resolve_time_axis_from_raw(_k12_p03_raw, _k12_batch_key)
+        fcheck("F-K12-P03 60s 標準六段宣告合法 → resolve 成功",
+               _k12_p03_axis is not None and _k12_p03_err is None,
+               f"axis={_k12_p03_axis} err={_k12_p03_err}")
+        if _k12_p03_axis is not None:
+            _k12_p03_data = {"scenes": [{"timestamp": ts, "type": "一般", "台詞_阿奇": "測試"}
+                                          for ts in _k12_p03_slots]}
+            _k12_p03_l1001_declared = chk_l1_001_schema(_k12_p03_data, "p03.yaml",
+                                                          expected_slots=_k12_p03_axis["time_slots"])
+            _k12_p03_l1001_default = chk_l1_001_schema(_k12_p03_data, "p03.yaml")
+            fcheck("F-K12-P03 L1-001 宣告分支與缺省分支判定同（PASS/PASS，60s 六段數值相同）",
+                   _k12_p03_l1001_declared[0] == "PASS" and _k12_p03_l1001_default[0] == "PASS",
+                   f"declared={_k12_p03_l1001_declared} default={_k12_p03_l1001_default}")
+
+        # P04：合法上界正例 N=24、duration=3600
+        _k12_p04_slots = [f"{i*150}-{(i+1)*150}s" for i in range(24)]
+        _k12_p04_raw = _k12_good_raw(duration=3600, slots=_k12_p04_slots)
+        _k12_p04_axis, _k12_p04_err = _resolve_time_axis_from_raw(_k12_p04_raw, _k12_batch_key)
+        fcheck("F-K12-P04 N=24/duration=3600 上界正例 → resolve 成功",
+               _k12_p04_axis is not None and _k12_p04_err is None, f"err={_k12_p04_err}")
+
+        # ── N01-N31：非法宣告（fail-closed，逐案斷言 FAIL + 訊息前綴 + 分支專屬 reason substring）──
+        # 霸告紅綠回饋（2026-07-16）：分支 substring 釘死「被測的是哪一條檢查」——若 mutation 反證
+        # 拔掉某條檢查後 detail 仍含指定 substring，代表反證沒有命中該檢查（已被別條檢查或⑧digest
+        # 遮蔽）；substring 消失才代表該條檢查是唯一擋下這案的原因，反證才有鑑別力。
+        _k12_n_cases = []  # (case_id, raw_value, batch_key_override_or_None, expected_substring_or_None)
+
+        _k12_n_cases.append(("N01-null", None, None, None))
+        _k12_n_cases.append(("N02a-str", "not-a-mapping", None, None))
+        _k12_n_cases.append(("N02b-list", ["not", "a", "mapping"], None, None))
+        for _missing_key in sorted(_TIME_AXIS_REQUIRED_KEYS):
+            _raw = dict(_k12_good_raw())
+            del _raw[_missing_key]
+            _k12_n_cases.append((f"N03-07-missing-{_missing_key}", _raw, None, "缺鍵"))
+        _k12_n_cases.append(("N08-unknown-key", _k12_mutate(extra_field="x"), None, "未知鍵"))
+        _k12_n_cases.append(("N09-duration-bool", _k12_mutate(duration_seconds=True), None,
+                              "duration_seconds 型別非 int 或超出"))
+        _k12_n_cases.append(("N10-duration-0", _k12_mutate(duration_seconds=0), None,
+                              "duration_seconds 型別非 int 或超出"))
+        _k12_n_cases.append(("N11-duration-neg", _k12_mutate(duration_seconds=-1), None,
+                              "duration_seconds 型別非 int 或超出"))
+        _k12_n_cases.append(("N12-duration-over", _k12_mutate(duration_seconds=3601), None,
+                              "duration_seconds 型別非 int 或超出"))
+        _k12_n_cases.append(("N13-slots-notlist", _k12_mutate(time_slots="0-90s"), None, "段數不在 2~24"))
+        _k12_n_cases.append(("N14-slots-elem-notstr", _k12_mutate(time_slots=["0-45s", 45]), None, None))
+        _k12_n_cases.append(("N15-slots-empty", _k12_mutate(time_slots=[]), None, "段數不在 2~24"))
+        _k12_n_cases.append(("N16-slots-n1", _k12_mutate(time_slots=["0-90s"]), None, "段數不在 2~24"))
+        _k12_n_cases.append(("N17-slots-n25", _k12_mutate(time_slots=[f"seg{i}" for i in range(25)]), None,
+                              "段數不在 2~24"))
+        _k12_n_cases.append(("N18-leading-zero", _k12_mutate(time_slots=["0-3s", "03-12s"]), None, None))
+        _k12_n_cases.append(("N19-unicode-digit", _k12_mutate(time_slots=["0-3s", "０-３ｓ"]), None, None))
+        _k12_n_cases.append(("N20-trailing-ws", _k12_mutate(time_slots=["0-3s", "3-12s "]), None, None))
+        _k12_n_cases.append(("N21-zero-length",
+                              _k12_mutate(duration_seconds=10, time_slots=["0-5s", "5-5s", "5-10s"]),
+                              None, "零長或逆序"))
+        _k12_n_cases.append(("N22-overlap",
+                              _k12_mutate(duration_seconds=15, time_slots=["0-10s", "5-15s"]),
+                              None, "不連續"))
+        _k12_n_cases.append(("N23-gap",
+                              _k12_mutate(duration_seconds=25, time_slots=["0-10s", "15-25s"]),
+                              None, "不連續"))
+        _k12_n_cases.append(("N24-reverse",
+                              _k12_mutate(duration_seconds=30, time_slots=["0-10s", "20-30s", "10-20s"]),
+                              None, "不連續"))
+        _k12_n_cases.append(("N25-first-nonzero",
+                              _k12_mutate(duration_seconds=15, time_slots=["5-10s", "10-15s"]),
+                              None, "首段未從 0"))
+        _k12_n_cases.append(("N26-last-ne-duration",
+                              _k12_mutate(duration_seconds=20, time_slots=["0-10s", "10-15s"]),
+                              None, "末段 end"))
+        _k12_n_cases.append(("N27-approved-by-wrong", _k12_mutate(approved_by="別人"), None, None))
+        _k12_n_cases.append(("N28-fake-date", _k12_mutate(approved_at="2026-13-40"), None, None))
+        _k12_n_cases.append(("N29-date-object", _k12_mutate(approved_at=_dt.date(2026, 7, 16)), None, None))
+        _k12_n_cases.append(("N30-future-date", _k12_mutate(approved_at=_k12_future), None, None))
+
+        # N31a：漂移（改 slots、digest 刻意不重算 → 仍是原 6 段的，故意跟新 slots 對不上）
+        _k12_n31a_raw = _k12_mutate(time_slots=["0-30s", "30-60s", "60-90s"], recompute_digest=False)
+        _k12_n_cases.append(("N31a-digest-drift", _k12_n31a_raw, None, "宣告內容與核准摘要不符"))
+
+        # N31b：replay（他批 digest 照搬 — 不同業主、相同批名，r5 要求）
+        _k12_owner_a_key = "阿奇/01_腳本生產/第14批"
+        _k12_owner_b_key = "瑞祥/01_腳本生產/第14批"
+        _k12_replay_slots = ["0-45s", "45-90s"]
+        _k12_replay_digest_for_b = _time_axis_canonical_digest(_k12_owner_b_key, 90, _k12_replay_slots)
+        _k12_n31b_raw = {
+            "duration_seconds": 90,
+            "time_slots": _k12_replay_slots,
+            "approved_by": "澤君",
+            "approved_at": _k12_today,
+            "approved_digest": _k12_replay_digest_for_b,  # 瑞祥批的合法 digest，照搬到阿奇批
+        }
+        _k12_n_cases.append(("N31b-digest-replay", _k12_n31b_raw, _k12_owner_a_key, "宣告內容與核准摘要不符"))
+
+        for _case_id, _raw, _bk_override, _expect_substr in _k12_n_cases:
+            _bk = _bk_override if _bk_override is not None else _k12_batch_key
+            _axis, _err = _resolve_time_axis_from_raw(_raw, _bk)
+            fcheck(f"F-K12-{_case_id} FAIL（axis=None、error 含「time_axis 宣告非法」前綴）",
+                   _axis is None and _err is not None and _err.startswith("time_axis 宣告非法—"),
+                   f"axis={_axis} err={_err}")
+            if _expect_substr is not None:
+                fcheck(f"F-K12-{_case_id} detail 含分支專屬 reason「{_expect_substr}」（釘對分支、非⑧digest遮蔽）",
+                       _err is not None and _expect_substr in _err,
+                       f"err={_err}")
+
+        # ── L1-000 批級 check：缺省零註冊 vs 宣告分支 ──
+        _k12_l1000_absent = chk_l1_000_time_axis(None, None)
+        fcheck("F-K12-L1000-ABSENT 鍵缺席 → None（不得註冊）",
+               _k12_l1000_absent is None, str(_k12_l1000_absent))
+        _k12_l1000_fail = chk_l1_000_time_axis(None, "time_axis 宣告非法—測試錯誤")
+        fcheck("F-K12-L1000-ERROR 宣告非法 → FAIL",
+               _k12_l1000_fail is not None and _k12_l1000_fail[0] == "FAIL", str(_k12_l1000_fail))
+        _k12_l1000_pass = chk_l1_000_time_axis(_k12_p02_axis, None)
+        fcheck("F-K12-L1000-PASS 宣告合法 → PASS",
+               _k12_l1000_pass is not None and _k12_l1000_pass[0] == "PASS", str(_k12_l1000_pass))
+
+        # ── C01：CTA 在末段判定（沿用 P02 已驗證合法的 90s/7段 axis）──
+        _k12_c01_axis = _k12_p02_axis
+        if _k12_c01_axis is not None:
+            _k12_c01_cta_slot = _k12_c01_axis["time_slots"][-1]["timestamp"]
+            _k12_c01a_data = {"scenes": [{"timestamp": _k12_c01_cta_slot, "type": "CTA",
+                                           "台詞_阿奇": "歡迎留言告訴我你的想法"}]}
+            _k12_c01a = chk_l1_006_cta(_k12_c01a_data, "c01a.yaml", cta_slot=_k12_c01_cta_slot)
+            fcheck("F-K12-C01a CTA 在末段（含引導語）→ PASS", _k12_c01a[0] == "PASS", str(_k12_c01a))
+
+            _k12_c01b_data = {"scenes": [{"timestamp": _k12_c01_cta_slot, "type": "CTA",
+                                           "台詞_阿奇": "謝謝觀看下次見"}]}
+            _k12_c01b = chk_l1_006_cta(_k12_c01b_data, "c01b.yaml", cta_slot=_k12_c01_cta_slot)
+            fcheck("F-K12-C01b CTA 段文字無引導語關鍵詞 → FAIL", _k12_c01b[0] == "FAIL", str(_k12_c01b))
+
+        # ── D01a：缺省差分 fixture（鍵缺席 → 零註冊 + chk 函式逐字零變）──
+        import tempfile as _k12_tempfile
+        with _k12_tempfile.TemporaryDirectory() as _k12_tmp:
+            _k12_empty_batch_dir = Path(_k12_tmp) / "某業主" / "01_腳本生產" / "第99批"
+            _k12_empty_batch_dir.mkdir(parents=True, exist_ok=True)
+            _k12_d01a_axis1, _k12_d01a_err1 = _resolve_batch_time_axis(_k12_empty_batch_dir)
+            fcheck("F-K12-D01a 無 _batch_flags.yml → (None, None) 缺省零註冊",
+                   _k12_d01a_axis1 is None and _k12_d01a_err1 is None,
+                   f"axis={_k12_d01a_axis1} err={_k12_d01a_err1}")
+
+            (_k12_empty_batch_dir / "_batch_flags.yml").write_text("batch_profile: hybrid\n", encoding="utf-8")
+            _k12_d01a_axis2, _k12_d01a_err2 = _resolve_batch_time_axis(_k12_empty_batch_dir)
+            fcheck("F-K12-D01a 有 _batch_flags.yml 但無 time_axis 鍵 → (None, None) 缺省零註冊",
+                   _k12_d01a_axis2 is None and _k12_d01a_err2 is None,
+                   f"axis={_k12_d01a_axis2} err={_k12_d01a_err2}")
+
+            _k12_d01a_l1000 = chk_l1_000_time_axis(_k12_d01a_axis2, _k12_d01a_err2)
+            fcheck("F-K12-D01a L1-000 缺省 → None（all_results 無此列）",
+                   _k12_d01a_l1000 is None, str(_k12_d01a_l1000))
+
+        # ── 缺省差分：chk_l1_001_schema / chk_l1_006_cta / run_per_file_checks 不傳新參數 = 逐字零變 ──
+        _k12_default_slots = [s["timestamp"] for s in _load_l0_time_slots()]
+        _k12_default_data = {"scenes": [{"timestamp": ts, "type": "一般", "台詞_阿奇": "測試"}
+                                          for ts in _k12_default_slots]}
+        _k12_default_data["scenes"][-1]["type"] = "CTA"
+        _k12_default_data["scenes"][-1]["台詞_阿奇"] = "歡迎留言告訴我"
+
+        _r_default_l1001 = chk_l1_001_schema(_k12_default_data, "default.yaml")
+        _r_explicit_none_l1001 = chk_l1_001_schema(_k12_default_data, "default.yaml", expected_slots=None)
+        fcheck("F-K12-DEFAULT-DIFF chk_l1_001_schema 不傳參數 == 顯式傳 None（逐字零變）",
+               _r_default_l1001 == _r_explicit_none_l1001,
+               f"default={_r_default_l1001} explicit_none={_r_explicit_none_l1001}")
+        fcheck("F-K12-DEFAULT-DIFF chk_l1_001_schema PASS 字面保留「6 段時間軸齊全且順序正確」",
+               _r_default_l1001[0] == "PASS" and "6 段時間軸齊全且順序正確" in _r_default_l1001[1],
+               str(_r_default_l1001))
+
+        _r_default_l1006 = chk_l1_006_cta(_k12_default_data, "default.yaml")
+        _r_explicit_none_l1006 = chk_l1_006_cta(_k12_default_data, "default.yaml", cta_slot=None)
+        fcheck("F-K12-DEFAULT-DIFF chk_l1_006_cta 不傳參數 == 顯式傳 None（逐字零變）",
+               _r_default_l1006 == _r_explicit_none_l1006,
+               f"default={_r_default_l1006} explicit_none={_r_explicit_none_l1006}")
+        fcheck("F-K12-DEFAULT-DIFF chk_l1_006_cta PASS（60s 缺省末段 CTA 判定不變）",
+               _r_default_l1006[0] == "PASS", str(_r_default_l1006))
+
+        # run_per_file_checks 不傳 time_axis/time_axis_error = 行為零變（外部 caller 零變契約）
+        _k12_rpf_default = run_per_file_checks(Path("批次資料夾/default.yaml"), _k12_default_data, "阿奇")
+        _k12_rpf_explicit_none = run_per_file_checks(
+            Path("批次資料夾/default.yaml"), _k12_default_data, "阿奇", time_axis=None, time_axis_error=None,
+        )
+        fcheck("F-K12-DEFAULT-DIFF run_per_file_checks 不傳 == 顯式傳雙 None（逐字零變）",
+               _k12_rpf_default == _k12_rpf_explicit_none,
+               f"len_default={len(_k12_rpf_default)} len_explicit={len(_k12_rpf_explicit_none)}")
+
+        # ── run_per_file_checks 錯誤通道 cascade（Delta D：time_axis_error 在求值前攔截）──
+        _k12_cascade_results = run_per_file_checks(
+            Path("批次資料夾/cascade.yaml"), _k12_default_data, "阿奇",
+            time_axis=None, time_axis_error="time_axis 宣告非法—測試錯誤",
+        )
+        _k12_cascade_map = {cid: (status, detail) for cid, status, _fn, detail in _k12_cascade_results}
+        fcheck("F-K12-CASCADE L1-001 FAIL「time_axis 非法、時間軸無法驗」（求值前攔截）",
+               _k12_cascade_map.get("L1-001") == ("FAIL", "time_axis 非法、時間軸無法驗"),
+               str(_k12_cascade_map.get("L1-001")))
+        fcheck("F-K12-CASCADE L1-006 FAIL「time_axis 非法、時間軸無法驗」（求值前攔截）",
+               _k12_cascade_map.get("L1-006") == ("FAIL", "time_axis 非法、時間軸無法驗"),
+               str(_k12_cascade_map.get("L1-006")))
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:

@@ -2770,6 +2770,10 @@ _HYBRID_PLAN_LOCK_ENFORCE = True
 _HYBRID_METHOD_ENFORCE = True
 _HYBRID_FRIEND_CLOSE_ENFORCE = True
 _HYBRID_PROFESSIONAL_ENFORCE = True
+# K11（2026-07-16）：professional lane proof_mode 誤填觀察態旗標。False＝WARN 觀察
+# （chk_hybrid_plan_lock prof_signals 合流／chk_d20_proof_mode_enum LANE_MISMATCH）；
+# 存量 WARN 實跑證據落檔後翻 True（另令）。
+_D20_PROFESSIONAL_LANE_ENFORCE = True
 _TASTE_PANEL_ENFORCE = True
 # TEXT_CEILING ACK（澤君 2026-06-24 拍板啟用）：純文字稿（true_material_source=="none" AND
 # score_type∈{"script","angle"}）若 5 維全≥80 但有維度 <90 → TEXT_CEILING WARN（非 FAIL）。
@@ -6121,6 +6125,18 @@ def _should_check_c22_offpro_angle(data: dict) -> bool:
 # ── D20 proof_mode 四型白名單（W2-D20 2026-07-13；決策卡=state\decision_cards\W2-D20\card.md）──
 _D20_PROOF_MODE_CANONICAL = ("proof_first", "demand_first", "anchor_first", "voice_first")
 
+# ── K11（2026-07-16）：lane → proof_mode derive-lock 映射，提升為 module-level 常數
+# （原為 chk_hybrid_plan_lock 函式內區域 dict；同 dict 同值＝行為零變的單檔內重構）。
+# 補回 "professional": "proof_first"（撤刻意排除）——本業稿 proof_mode 現由此表統一鎖
+# proof_first，供 chk_hybrid_plan_lock derive-lock 消費段與 fixtures 直接斷言真常數。
+_LANE_TO_PROOF = {
+    "voice_first": "voice_first",
+    "stance": "voice_first",
+    "demand_first": "demand_first",
+    "anchor_first": "anchor_first",
+    "professional": "proof_first",  # K11：撤刻意排除，professional lane 統一鎖 proof_first
+}
+
 
 def _is_hybrid_batch(batch_dir: Path, yamls: list[tuple]) -> bool:
     """D20 批次級世代偵測（照 _is_skeleton_mode 同模式，批級算一次傳入 per-file checks）。
@@ -6143,7 +6159,8 @@ def _is_hybrid_batch(batch_dir: Path, yamls: list[tuple]) -> bool:
 
 
 def _d20_resolve_proof_mode(data: dict) -> tuple[str, str]:
-    """D20 純函式 resolver：回 (verdict, detail_core)；verdict ∈ PASS / DERIVED / FAIL。
+    """D20 純函式 resolver：回 (verdict, detail_core)；verdict ∈ PASS / DERIVED / FAIL / LANE_MISMATCH
+    （K11 2026-07-16 新增 LANE_MISMATCH：professional lane 但 proof_mode≠proof_first）。
     零 normalize：不 strip、不 lower——canonical 值由 allocator/skeleton 機器寫入，
     出現空白/大小寫變體＝上游壞掉，該擋。derive 僅限「鍵整個缺」且 lane 精確 == professional
     （產有效值 proof_first、只驗不回寫）；null / 空字串 / 非字串型別永不 derive。
@@ -6156,6 +6173,11 @@ def _d20_resolve_proof_mode(data: dict) -> tuple[str, str]:
     if not isinstance(val, str):
         return "FAIL", f"proof_mode 非字串型別（{type(val).__name__}）— 四型白名單外硬 FAIL"
     if val in _D20_PROOF_MODE_CANONICAL:
+        # K11：白名單內但 lane=professional 且值≠proof_first → LANE_MISMATCH（不是 PASS）
+        if data.get("lane") == "professional" and val != "proof_first":
+            return "LANE_MISMATCH", (
+                f"proof_mode={val} 與 lane=professional 不符; expected=proof_first（K11）"
+            )
         return "PASS", f"proof_mode={val}"
     return "FAIL", (
         f"proof_mode={val!r} 不在四型白名單 {list(_D20_PROOF_MODE_CANONICAL)}"
@@ -6170,7 +6192,9 @@ def chk_d20_proof_mode_enum(
     file_title_is_placeholder: bool,
     batch_skeleton_mode: bool,
 ) -> tuple[str, str]:
-    """D20-proof-mode-enum：proof_mode 唯一 enum 機械閘（無 enforce 旗標、直接 FAIL）。
+    """D20-proof-mode-enum：proof_mode 唯一 enum 機械閘；四型白名單本身無 enforce 旗標、
+    直接 FAIL。K11（2026-07-16）：professional lane 但值≠proof_first（LANE_MISMATCH）
+    → FAIL/WARN 依 `_D20_PROFESSIONAL_LANE_ENFORCE` 旗標（觀察態 WARN、翻旗標後 FAIL）。
     骨架窄 SKIP 三條件缺一不可：批級骨架模式＋本支 title placeholder＋proof_mode 恰為 '[編劇填]'。
     """
     if not hybrid_batch:
@@ -6182,7 +6206,10 @@ def chk_d20_proof_mode_enum(
     ):
         return "SKIP", f"{fname}: 骨架階段跳過（proof_mode=[編劇填] 佔位、title 未填）— 填完後 fail-closed"
     verdict, core = _d20_resolve_proof_mode(data)
-    status = "FAIL" if verdict == "FAIL" else "PASS"
+    if verdict == "LANE_MISMATCH":
+        status = "FAIL" if _D20_PROFESSIONAL_LANE_ENFORCE else "WARN"
+    else:
+        status = "FAIL" if verdict == "FAIL" else "PASS"
     return status, f"{fname}: {core}"
 
 
@@ -7214,6 +7241,7 @@ def chk_hybrid_plan_lock(
         return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), "C-plan-lock FAIL — hybrid 批缺 topic_plan.json"
 
     problems: list[str] = []
+    prof_signals: list[str] = []  # K11 Delta B：professional derive-lock 觀察訊號（獨立於 problems，見旗標判準）
     if _plan_lock_hash(plan) != plan_data.get("plan_lock_hash"):
         problems.append("plan_lock_hash mismatch")
     by_id = {str(item.get("script_id")): item for item in plan if isinstance(item, dict)}
@@ -7239,22 +7267,28 @@ def chk_hybrid_plan_lock(
                 problems.append(f"{f.name}: derived_flags yaml={yaml_flags} plan={plan_flags}")
             # Codex R2 P1.3 修（2026-06-24）：proof_mode derive-lock
             # 從 plan 的 lane 推導 expected proof_mode，有 expected 才比（避免 legacy 稿恆 FAIL）
-            # 只鎖 off-pro lanes（proof_mode==lane 的型別）；
-            # professional 不列入：本業稿用 proof_first，proof_mode 與 lane 不同，不適用 derive-lock
-            _LANE_TO_PROOF = {
-                "voice_first": "voice_first",
-                "stance": "voice_first",
-                "demand_first": "demand_first",
-                "anchor_first": "anchor_first",
-                # "professional": 不鎖（proof_mode=proof_first，≠ lane name）
-                # "proof_first": 不鎖（這是 proof_mode 值而非 lane 名）
-            }
+            # K11（2026-07-16）：_LANE_TO_PROOF 提升為 module-level 常數且補回 "professional"
+            # （撤刻意排除）；professional 分支改走獨立 key-presence 判準（含 falsy）收進
+            # prof_signals，由 _D20_PROFESSIONAL_LANE_ENFORCE 旗標決定是否成 problem——
+            # 非 professional lane 維持原 truthiness 碼路 byte 級零變（禁泛化，真值表案 G3）。
             plan_lane_pm = plan_item.get("lane", "")
             plan_proof_mode = plan_item.get("proof_mode")  # plan 顯式宣告
             # R3 Fix 1（2026-06-24）：lane-derived expected 永遠權威；
             # 若 plan 也有顯式 proof_mode 但與 lane 推導不一致 → FAIL（plan 本身寫錯）
             _lane_derived_pm = _LANE_TO_PROOF.get(plan_lane_pm)
-            if _lane_derived_pm:
+            if plan_lane_pm == "professional":
+                # K11 Delta B：professional 專用 key-presence 判準（含 falsy：null/""/false/[]）
+                expected_pm = _lane_derived_pm  # = "proof_first"（Delta A 已補鍵）
+                if "proof_mode" in plan_item and plan_item["proof_mode"] != expected_pm:
+                    prof_signals.append(
+                        f"{f.name}: topic_plan proof_mode={plan_item['proof_mode']!r} 與 lane=professional 推導值 {expected_pm} 衝突"
+                    )
+                yaml_pm = data.get("proof_mode")
+                if yaml_pm != expected_pm:
+                    prof_signals.append(
+                        f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane=professional 推導）"
+                    )
+            elif _lane_derived_pm:
                 if plan_proof_mode and plan_proof_mode != _lane_derived_pm:
                     problems.append(
                         f"{f.name}: topic_plan proof_mode={plan_proof_mode} 與 lane={plan_lane_pm} 推導值 {_lane_derived_pm} 衝突"
@@ -7265,6 +7299,12 @@ def chk_hybrid_plan_lock(
                     problems.append(
                         f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane={plan_lane_pm} 推導）"
                     )
+    # K11 Delta B：迴圈結束後第一步——enforce=True 時 prof 訊號直接成 problem、走原 FAIL
+    # 路徑（無論其他 problem 有無）。下方 allocator fail-fast 早退路徑（try/except）在
+    # problems 完成此次合流「之後」才執行，其早退 return 本就不讀 problems，不受影響、
+    # 也不申報 professional-observe 段（該批已 FAIL，觀察訊號無意義）。
+    if _D20_PROFESSIONAL_LANE_ENFORCE:
+        problems.extend(prof_signals)
     # W2-D27：allocator 是唯一 allocation canonical；lazy 單向 import，失敗即 fail-closed。
     try:
         from topic_distributor import evaluate_hybrid_allocation
@@ -7301,6 +7341,17 @@ def chk_hybrid_plan_lock(
     yaml_prof = [d.get("script_id") for _, d in yamls if isinstance(d, dict) and d.get("content_axis") == "professional"]
     if sorted(str(x) for x in yaml_prof) != sorted(str(x) for x in prof_slots if x in set(yaml_prof)):
         problems.append("professional YAML slots do not match reserved plan slots")
+
+    # K11 Delta B 尾段合流（enforce=False 觀察態兩新格；enforce=True 全格＋
+    # enforce=False∧prof_signals=0 的兩格＝原路徑 byte 級零變，落入下方原判準）：
+    if not _D20_PROFESSIONAL_LANE_ENFORCE and prof_signals:
+        _prof_observe = "; ".join(prof_signals[:3])
+        if problems:
+            return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
+                f"C-plan-lock FAIL — {'; '.join(problems[:10])}; {allocation_summary}; "
+                f"professional-observe: {len(prof_signals)} 條（{_prof_observe}）"
+            )
+        return "WARN", f"C-plan-lock WARN — professional 觀察: {_prof_observe}（共 {len(prof_signals)} 條）"
 
     if problems:
         return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
@@ -10914,19 +10965,15 @@ if __name__ == "__main__":
                    _r[0] == _EXP_ANG and "007" in _r[1], _r[1])
 
         # F-C22-R2-PLAN-LOCK-PROOF：proof_mode derive-lock 推導邏輯輕量單元測試
-        # professional 不在 LANE_TO_PROOF（本業稿 proof_mode=proof_first，≠ lane name，不受 derive-lock）
-        _LANE_TO_PROOF_TEST = {
-            "voice_first": "voice_first", "stance": "voice_first",
-            "demand_first": "demand_first", "anchor_first": "anchor_first",
-            # professional 不列（不鎖）
-        }
-        _r_pm_vf = _LANE_TO_PROOF_TEST.get("voice_first") == "voice_first"
-        _r_pm_pro_skip = _LANE_TO_PROOF_TEST.get("professional") is None  # professional 不在表 → skip
-        _r_pm_mismatch = _LANE_TO_PROOF_TEST.get("voice_first") != "demand_first"
+        # K11（2026-07-16）：斷言真模組常數 _LANE_TO_PROOF（非本地快照）——professional
+        # 已補回 proof_first，Delta A 漏改或回退時本 fixture 必紅（根治自證）。
+        _r_pm_vf = _LANE_TO_PROOF.get("voice_first") == "voice_first"
+        _r_pm_pro_lock = _LANE_TO_PROOF.get("professional") == "proof_first"  # K11：professional 在表且鎖 proof_first
+        _r_pm_mismatch = _LANE_TO_PROOF.get("voice_first") != "demand_first"
         fcheck("F-C22-R2-PLAN-LOCK-PROOF voice_first→voice_first 推導正確",
-               _r_pm_vf, f"voice_first→{_LANE_TO_PROOF_TEST.get('voice_first')}")
-        fcheck("F-C22-R2-PLAN-LOCK-PROOF-PRO-SKIP professional 不在 LANE_TO_PROOF（不鎖）",
-               _r_pm_pro_skip, f"professional→{_LANE_TO_PROOF_TEST.get('professional')}")
+               _r_pm_vf, f"voice_first→{_LANE_TO_PROOF.get('voice_first')}")
+        fcheck("F-C22-R2-PLAN-LOCK-PROOF-PRO-LOCK professional 在 _LANE_TO_PROOF 且鎖 proof_first（K11）",
+               _r_pm_pro_lock, f"professional→{_LANE_TO_PROOF.get('professional')}")
         fcheck("F-C22-R2-PLAN-LOCK-PROOF-MISMATCH voice_first vs demand_first 應偵測到不符",
                _r_pm_mismatch, "mismatch check")
 
@@ -10964,11 +11011,7 @@ if __name__ == "__main__":
         # ── R3 fixtures（2026-06-24）──
 
         # Fix 1：plan_lock_hash 含 proof_mode，且 lane-derived 永遠權威
-        # 測：LANE_TO_PROOF 表不含 professional（lane-derived 為 None → skip）
-        _LANE_TO_PROOF_R3 = {
-            "voice_first": "voice_first", "stance": "voice_first",
-            "demand_first": "demand_first", "anchor_first": "anchor_first",
-        }
+        # K11：LANE_TO_PROOF 表含 professional（lane-derived = proof_first → 鎖，非 skip）
         # R4 Fix 3（2026-06-24）：清掉死斷言 or True
         # 真實測試：有 proof_mode 欄的 plan 和沒有 proof_mode 的 plan 給出不同 hash
         _h_with_pm = _plan_lock_hash([{"script_id": "x", "content_axis": "offpro",
@@ -10986,8 +11029,44 @@ if __name__ == "__main__":
         fcheck("F-R3-PLAN-LOCK-HASH-PROOF_MODE proof_mode 不同 → hash 不同",
                _h1 != _h2, f"h1={_h1[:8]} h2={_h2[:8]}")
 
-        fcheck("F-R3-PLAN-LOCK-LANE-AUTHORITATIVE lane-derived professional=None → skip（不鎖）",
-               _LANE_TO_PROOF_R3.get("professional") is None, f"pro→{_LANE_TO_PROOF_R3.get('professional')}")
+        fcheck("F-R3-PLAN-LOCK-LANE-AUTHORITATIVE-PRO-LOCK lane-derived professional=proof_first → 鎖（K11 撤排除）",
+               _LANE_TO_PROOF.get("professional") == "proof_first", f"pro→{_LANE_TO_PROOF.get('professional')}")
+
+        _offpro_map_ok = (
+            _LANE_TO_PROOF.get("voice_first") == "voice_first"
+            and _LANE_TO_PROOF.get("stance") == "voice_first"
+            and _LANE_TO_PROOF.get("demand_first") == "demand_first"
+            and _LANE_TO_PROOF.get("anchor_first") == "anchor_first"
+        )
+        fcheck("F-R3-PLAN-LOCK-LANE-AUTHORITATIVE-OFFPRO-MAP 四 off-pro lane 映射逐鍵等值（K11 零變基線）",
+               _offpro_map_ok,
+               f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
+               f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
+
+        # ── Delta E fixture ③（r4 防 local shadow 繞過）──
+        # AST 自掃本檔原始碼：_LANE_TO_PROOF 賦值全檔恰 1 處且位於模組層（任何函式內
+        # 同名 shadow 復歸 → 本 fixture 必紅，封「consumer 漏刪/復歸 local dict、
+        # global 斷言照綠」路徑）。
+        import ast as _ast_k11
+        _self_src_k11 = Path(__file__).read_text(encoding="utf-8")
+        _self_tree_k11 = _ast_k11.parse(_self_src_k11, filename=str(Path(__file__)))
+        _lane_assigns_all_k11 = [
+            node for node in _ast_k11.walk(_self_tree_k11)
+            if isinstance(node, _ast_k11.Assign)
+            and any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
+        ]
+        _lane_assigns_module_k11 = [
+            node for node in _self_tree_k11.body
+            if isinstance(node, _ast_k11.Assign)
+            and any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
+        ]
+        _lane_ast_ok_k11 = (
+            len(_lane_assigns_all_k11) == 1
+            and len(_lane_assigns_module_k11) == 1
+        )
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 賦值全檔恰 1 處且位於模組層（防 local shadow 復歸）",
+               _lane_ast_ok_k11,
+               f"all_count={len(_lane_assigns_all_k11)} module_level_count={len(_lane_assigns_module_k11)}")
 
         # Fix 2：014 binding — sharp_claim 不在台詞 → WARN（不靠 new_answer.quote 繞過）
         _claim_r3 = "原來不開口才是真正的尊重"
@@ -11315,17 +11394,17 @@ if __name__ == "__main__":
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:
-            fcheck("F-CUTOVER 6/24 enforce flags 全 True（_S22/ANCHOR/PLACEHOLDER/LEAK/_S21_6）",
+            fcheck("F-CUTOVER 6/24 enforce flags 全 True（_S22/ANCHOR/PLACEHOLDER/LEAK/_S21_6/D20-PRO-LANE）",
                    bool(_S22_ENFORCE and ANCHOR_FIRST_ENFORCE and _OFFPRO_PLACEHOLDER_ENFORCE
                         and _OFFPRO_LEAK_ENFORCE and _S21_6_REPORT_ENFORCE
                         and _HYBRID_PLAN_LOCK_ENFORCE and _HYBRID_METHOD_ENFORCE
                         and _HYBRID_FRIEND_CLOSE_ENFORCE and _HYBRID_PROFESSIONAL_ENFORCE
-                        and _TASTE_PANEL_ENFORCE),
+                        and _TASTE_PANEL_ENFORCE and _D20_PROFESSIONAL_LANE_ENFORCE),
                    f"S22={_S22_ENFORCE} ANCHOR={ANCHOR_FIRST_ENFORCE} PH={_OFFPRO_PLACEHOLDER_ENFORCE} "
                    f"LEAK={_OFFPRO_LEAK_ENFORCE} S216={_S21_6_REPORT_ENFORCE} "
                    f"HPLAN={_HYBRID_PLAN_LOCK_ENFORCE} HMETHOD={_HYBRID_METHOD_ENFORCE} "
                    f"HFRIEND={_HYBRID_FRIEND_CLOSE_ENFORCE} HPRO={_HYBRID_PROFESSIONAL_ENFORCE} "
-                   f"TASTE={_TASTE_PANEL_ENFORCE}")
+                   f"TASTE={_TASTE_PANEL_ENFORCE} D20PROLANE={_D20_PROFESSIONAL_LANE_ENFORCE}")
 
         # 總結
         total = PASS_COUNT + FAIL_COUNT

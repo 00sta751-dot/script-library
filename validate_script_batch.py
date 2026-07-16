@@ -11050,15 +11050,22 @@ if __name__ == "__main__":
         import ast as _ast_k11
         _self_src_k11 = Path(__file__).read_text(encoding="utf-8")
         _self_tree_k11 = _ast_k11.parse(_self_src_k11, filename=str(Path(__file__)))
+        def _is_lane_to_proof_binding_k11(node) -> bool:
+            # 霸告出貨審修（2026-07-16）：原僅計 ast.Assign，函式內 AnnAssign 型同名
+            # shadow（`_LANE_TO_PROOF: dict = {...}`）抓不到——補計 AnnAssign。
+            if isinstance(node, _ast_k11.Assign):
+                return any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
+            if isinstance(node, _ast_k11.AnnAssign):
+                return isinstance(node.target, _ast_k11.Name) and node.target.id == "_LANE_TO_PROOF"
+            return False
+
         _lane_assigns_all_k11 = [
             node for node in _ast_k11.walk(_self_tree_k11)
-            if isinstance(node, _ast_k11.Assign)
-            and any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
+            if _is_lane_to_proof_binding_k11(node)
         ]
         _lane_assigns_module_k11 = [
             node for node in _self_tree_k11.body
-            if isinstance(node, _ast_k11.Assign)
-            and any(isinstance(t, _ast_k11.Name) and t.id == "_LANE_TO_PROOF" for t in node.targets)
+            if _is_lane_to_proof_binding_k11(node)
         ]
         _lane_ast_ok_k11 = (
             len(_lane_assigns_all_k11) == 1

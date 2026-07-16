@@ -11043,13 +11043,54 @@ if __name__ == "__main__":
                f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
+        # F-K11-IMPORT-EXACT-MAP（K11 出貨審 r6）：fresh 子進程 import 本模組（只在
+        # __name__=="__main__" 才跑的 main block 不執行），拿到 import 消費者實際
+        # 看到的 _LANE_TO_PROOF 終值，斷言 exact 等於正典五鍵字典（keyset＋值完全
+        # 相等——封 main block 之後重綁時序洞／rogue 鍵洞）。
+        import subprocess as _subprocess_k11
+
+        _script_dir_k11 = str(Path(__file__).resolve().parent)
+        _import_probe_src_k11 = (
+            "import sys, json\n"
+            f"sys.path.insert(0, {_script_dir_k11!r})\n"
+            "import validate_script_batch as V\n"
+            "print(json.dumps(V._LANE_TO_PROOF, sort_keys=True))\n"
+        )
+        _canonical_lane_map_k11 = {
+            "anchor_first": "anchor_first",
+            "demand_first": "demand_first",
+            "professional": "proof_first",
+            "stance": "voice_first",
+            "voice_first": "voice_first",
+        }
+        try:
+            _import_probe_cp_k11 = _subprocess_k11.run(
+                [sys.executable, "-c", _import_probe_src_k11],
+                capture_output=True, text=True, timeout=120,
+            )
+            _import_probe_ok_k11 = (
+                _import_probe_cp_k11.returncode == 0
+                and json.loads(_import_probe_cp_k11.stdout.strip()) == _canonical_lane_map_k11
+            )
+            _import_probe_detail_k11 = (
+                f"rc={_import_probe_cp_k11.returncode} "
+                f"stdout={_import_probe_cp_k11.stdout.strip()[:300]!r} "
+                f"stderr={_import_probe_cp_k11.stderr.strip()[-300:]!r}"
+            )
+        except Exception as exc:
+            _import_probe_ok_k11 = False
+            _import_probe_detail_k11 = f"subprocess 失敗/超時：{type(exc).__name__}: {exc}"
+        fcheck("F-K11-IMPORT-EXACT-MAP fresh 子進程 import 終值 _LANE_TO_PROOF exact 等於正典五鍵字典（封 main-block 後重綁時序洞／rogue 鍵洞）",
+               _import_probe_ok_k11, _import_probe_detail_k11)
+
         # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一；
         # r4 AST 軌改 binding-context 判定；r5 出貨審裁定＝guard 邏輯零改、只改
-        # 契約宣稱與註解——計數完備是無底洞，防護力其實已夠，錯在 fcheck 宣稱過頭）──
+        # 契約宣稱與註解；r6 出貨審裁定＝新增 F-K11-IMPORT-EXACT-MAP 收斂 L1 真防線）──
         #
-        # 防線分層（K11 出貨審 r5 裁定）：
-        # L1 真防線＝PRO-LOCK 內容斷言——任何 module-scope 重綁（match capture/decorator walrus/
-        #    comprehension walrus 等）若內容≠正典映射，runtime 常數即變、內容斷言必紅；內容相同＝無害重複。
+        # 防線分層（K11 出貨審 r6 裁定）：
+        # L1 真防線＝post-import exact-map 斷言（F-K11-IMPORT-EXACT-MAP：fresh 子進程
+        #    import 終值 ≡ 正典五鍵 exact；任何 module-scope 重綁若終值≠正典必紅、
+        #    含多鍵/型別）＋PRO-LOCK 逐鍵內容斷言。
         # L2 shadow 防線＝symtable 巢狀 scope 零綁定（is_assigned/parameter/namespace/imported）——
         #    唯一能讓「chk 用表 ≠ 模組常數」的路徑，已完備封死。
         # L3 輔助啟發式＝module-scope Store-ctx 計數（抓常見重複定義；已知不計 match pattern/

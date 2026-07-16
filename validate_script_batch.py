@@ -11043,21 +11043,49 @@ if __name__ == "__main__":
                f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
-        # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 出貨審修改 symtable 法）──
-        # 霸告出貨審 r2（2026-07-16）：逐 AST 節點型別列舉是打地鼠（tuple unpack /
-        # NamedExpr / 參數綁定都會漏）。改用標準庫 symtable：module 表必須有
-        # _LANE_TO_PROOF 且已綁定；遞迴走訪所有子 scope（函式/類/lambda/推導式），
-        # 任一子 scope 對該符號 is_assigned()/is_parameter()/is_namespace() 為真
-        # → 必紅（symtable 天生涵蓋所有 binding 構式：賦值/AnnAssign/tuple 解包/
-        # walrus/參數/for-target/with-as/推導式，不必逐語法節點列舉）。
+        # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一）──
+        # 霸告出貨審 r3（2026-07-16）：symtable 巢狀 scope 天生涵蓋所有 binding 構式
+        # 但不計數——加回 AST 軌只掃 module.body 頂層節點，計「_LANE_TO_PROOF 綁定
+        # 恰 1 處」（Assign／AnnAssign／Import-ImportFrom alias，含 tuple/list/Starred
+        # 展開內的 Name）；symtable 軌補 is_imported() 封巢狀 `import x as
+        # _LANE_TO_PROOF`。三判準全立才綠：①AST 模組層綁定恰 1 ②symtable module
+        # 表綁定存在 ③symtable 任何巢狀 scope 零綁定（含 imported）。
+        import ast as _ast_k11
         import symtable as _symtable_k11
+
+        def _count_name_target_k11(target) -> int:
+            if isinstance(target, _ast_k11.Name):
+                return 1 if target.id == "_LANE_TO_PROOF" else 0
+            if isinstance(target, (_ast_k11.Tuple, _ast_k11.List)):
+                return sum(_count_name_target_k11(elt) for elt in target.elts)
+            if isinstance(target, _ast_k11.Starred):
+                return _count_name_target_k11(target.value)
+            return 0
+
+        def _count_module_level_lane_bindings_k11(module_node) -> int:
+            count = 0
+            for node in module_node.body:
+                if isinstance(node, _ast_k11.Assign):
+                    for target in node.targets:
+                        count += _count_name_target_k11(target)
+                elif isinstance(node, _ast_k11.AnnAssign):
+                    if isinstance(node.target, _ast_k11.Name) and node.target.id == "_LANE_TO_PROOF":
+                        count += 1
+                elif isinstance(node, (_ast_k11.Import, _ast_k11.ImportFrom)):
+                    for alias in node.names:
+                        bound = alias.asname if alias.asname else alias.name.split(".")[0]
+                        if bound == "_LANE_TO_PROOF":
+                            count += 1
+            return count
 
         def _lane_bound_in_table_k11(table) -> bool:
             try:
                 sym = table.lookup("_LANE_TO_PROOF")
             except KeyError:
                 return False
-            return bool(sym.is_assigned() or sym.is_parameter() or sym.is_namespace())
+            return bool(
+                sym.is_assigned() or sym.is_parameter() or sym.is_namespace() or sym.is_imported()
+            )
 
         def _lane_bound_in_any_nested_k11(table) -> bool:
             for child in table.get_children():
@@ -11066,13 +11094,19 @@ if __name__ == "__main__":
             return False
 
         _self_src_k11 = Path(__file__).read_text(encoding="utf-8")
+        _module_ast_tree_k11 = _ast_k11.parse(_self_src_k11, filename=str(Path(__file__)))
+        _module_ast_count_k11 = _count_module_level_lane_bindings_k11(_module_ast_tree_k11)
         _module_table_k11 = _symtable_k11.symtable(_self_src_k11, str(Path(__file__)), "exec")
         _module_bound_k11 = _lane_bound_in_table_k11(_module_table_k11)
         _nested_bound_k11 = _lane_bound_in_any_nested_k11(_module_table_k11)
-        _lane_ast_ok_k11 = _module_bound_k11 and not _nested_bound_k11
-        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 模組層綁定存在＋任何巢狀 scope 零綁定（symtable 法防 shadow）",
+        _lane_ast_ok_k11 = (
+            _module_ast_count_k11 == 1
+            and _module_bound_k11
+            and not _nested_bound_k11
+        )
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 模組層綁定恰 1 處＋symtable 模組綁定存在＋任何巢狀 scope 零綁定（雙軌合一防 shadow）",
                _lane_ast_ok_k11,
-               f"module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
+               f"module_ast_count={_module_ast_count_k11} module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
 
         # Fix 2：014 binding — sharp_claim 不在台詞 → WARN（不靠 new_answer.quote 繞過）
         _claim_r3 = "原來不開口才是真正的尊重"

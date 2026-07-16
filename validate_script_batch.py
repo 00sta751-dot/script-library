@@ -11043,40 +11043,63 @@ if __name__ == "__main__":
                f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
-        # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一）──
-        # 霸告出貨審 r3（2026-07-16）：symtable 巢狀 scope 天生涵蓋所有 binding 構式
-        # 但不計數——加回 AST 軌只掃 module.body 頂層節點，計「_LANE_TO_PROOF 綁定
-        # 恰 1 處」（Assign／AnnAssign／Import-ImportFrom alias，含 tuple/list/Starred
-        # 展開內的 Name）；symtable 軌補 is_imported() 封巢狀 `import x as
-        # _LANE_TO_PROOF`。三判準全立才綠：①AST 模組層綁定恰 1 ②symtable module
-        # 表綁定存在 ③symtable 任何巢狀 scope 零綁定（含 imported）。
+        # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一；
+        # r4 出貨審修＝AST 軌改 binding-context 判定）──
+        # 霸告出貨審 r4（2026-07-16）：逐語句型別列舉（Assign/AnnAssign/Import 頂層）
+        # 仍漏 if/for/while/try/with 包裹內的第二賦值、module 層 walrus、module
+        # for-target、同名 def/class。改用「module-scope 限定走訪」：從 tree 根遞迴
+        # iter_child_nodes，遇新 scope 節點（FunctionDef/AsyncFunctionDef/ClassDef/
+        # Lambda/ListComp/SetComp/DictComp/GeneratorExp）不進入其內部（該內部歸
+        # symtable 軌管）；但 def/class 節點本身 `.name` 若等於目標名仍要計 1（名字
+        # 綁在外層）。走訪中計數：① `ast.Name(id=目標名, ctx=Store/Del)`（涵蓋
+        # Assign/AnnAssign/AugAssign/walrus/for-target/with-as，不論被 if/for/while/
+        # try 包幾層）②Import/ImportFrom alias（asname 或無 asname 頂層名）③
+        # ExceptHandler.name。symtable 軌補 is_imported() 封巢狀 `import x as
+        # _LANE_TO_PROOF`。三判準全立才綠：①module-scope 綁定計數恰 1（Store-ctx
+        # 全構式）②symtable module 表綁定存在 ③symtable 任何巢狀 scope 零綁定
+        # （is_assigned/is_parameter/is_namespace/is_imported）。
         import ast as _ast_k11
         import symtable as _symtable_k11
 
-        def _count_name_target_k11(target) -> int:
-            if isinstance(target, _ast_k11.Name):
-                return 1 if target.id == "_LANE_TO_PROOF" else 0
-            if isinstance(target, (_ast_k11.Tuple, _ast_k11.List)):
-                return sum(_count_name_target_k11(elt) for elt in target.elts)
-            if isinstance(target, _ast_k11.Starred):
-                return _count_name_target_k11(target.value)
-            return 0
+        _SCOPE_BOUNDARY_TYPES_K11 = (
+            _ast_k11.FunctionDef,
+            _ast_k11.AsyncFunctionDef,
+            _ast_k11.ClassDef,
+            _ast_k11.Lambda,
+            _ast_k11.ListComp,
+            _ast_k11.SetComp,
+            _ast_k11.DictComp,
+            _ast_k11.GeneratorExp,
+        )
+
+        def _walk_module_scope_count_k11(node, target_name: str) -> int:
+            # 具名 scope 節點：名字本身綁在外層 scope（要計），但不進入其內部
+            # （body/args/decorator 等——內部一律歸 symtable 軌管）。
+            if isinstance(node, (_ast_k11.FunctionDef, _ast_k11.AsyncFunctionDef, _ast_k11.ClassDef)):
+                return 1 if node.name == target_name else 0
+            # 無名 scope 節點（lambda／推導式）：整個子樹不進入。
+            if isinstance(node, _SCOPE_BOUNDARY_TYPES_K11):
+                return 0
+
+            count = 0
+            if isinstance(node, _ast_k11.Name):
+                if node.id == target_name and isinstance(node.ctx, (_ast_k11.Store, _ast_k11.Del)):
+                    count += 1
+            elif isinstance(node, (_ast_k11.Import, _ast_k11.ImportFrom)):
+                for alias in node.names:
+                    bound = alias.asname if alias.asname else alias.name.split(".")[0]
+                    if bound == target_name:
+                        count += 1
+            elif isinstance(node, _ast_k11.ExceptHandler):
+                if node.name == target_name:
+                    count += 1
+
+            for child in _ast_k11.iter_child_nodes(node):
+                count += _walk_module_scope_count_k11(child, target_name)
+            return count
 
         def _count_module_level_lane_bindings_k11(module_node) -> int:
-            count = 0
-            for node in module_node.body:
-                if isinstance(node, _ast_k11.Assign):
-                    for target in node.targets:
-                        count += _count_name_target_k11(target)
-                elif isinstance(node, _ast_k11.AnnAssign):
-                    if isinstance(node.target, _ast_k11.Name) and node.target.id == "_LANE_TO_PROOF":
-                        count += 1
-                elif isinstance(node, (_ast_k11.Import, _ast_k11.ImportFrom)):
-                    for alias in node.names:
-                        bound = alias.asname if alias.asname else alias.name.split(".")[0]
-                        if bound == "_LANE_TO_PROOF":
-                            count += 1
-            return count
+            return _walk_module_scope_count_k11(module_node, "_LANE_TO_PROOF")
 
         def _lane_bound_in_table_k11(table) -> bool:
             try:
@@ -11104,7 +11127,7 @@ if __name__ == "__main__":
             and _module_bound_k11
             and not _nested_bound_k11
         )
-        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 模組層綁定恰 1 處＋symtable 模組綁定存在＋任何巢狀 scope 零綁定（雙軌合一防 shadow）",
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF module-scope 綁定恰 1（Store-ctx 全構式）＋symtable 模組綁定存在＋任何巢狀 scope 零綁定（雙軌合一防 shadow）",
                _lane_ast_ok_k11,
                f"module_ast_count={_module_ast_count_k11} module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
 

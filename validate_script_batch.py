@@ -11054,7 +11054,12 @@ if __name__ == "__main__":
             "import sys, json\n"
             f"sys.path.insert(0, {_script_dir_k11!r})\n"
             "import validate_script_batch as V\n"
-            "print(json.dumps(V._LANE_TO_PROOF, sort_keys=True))\n"
+            "result = {\n"
+            "    'map': V._LANE_TO_PROOF,\n"
+            "    'is_exact_dict': type(V._LANE_TO_PROOF) is dict,\n"
+            "    'get_professional': V._LANE_TO_PROOF.get('professional'),\n"
+            "}\n"
+            "print(json.dumps(result, sort_keys=True))\n"
         )
         _canonical_lane_map_k11 = {
             "anchor_first": "anchor_first",
@@ -11068,9 +11073,12 @@ if __name__ == "__main__":
                 [sys.executable, "-c", _import_probe_src_k11],
                 capture_output=True, text=True, timeout=120,
             )
+            _import_probe_parsed_k11 = json.loads(_import_probe_cp_k11.stdout.strip())
             _import_probe_ok_k11 = (
                 _import_probe_cp_k11.returncode == 0
-                and json.loads(_import_probe_cp_k11.stdout.strip()) == _canonical_lane_map_k11
+                and _import_probe_parsed_k11.get("map") == _canonical_lane_map_k11
+                and _import_probe_parsed_k11.get("is_exact_dict") is True
+                and _import_probe_parsed_k11.get("get_professional") == "proof_first"
             )
             _import_probe_detail_k11 = (
                 f"rc={_import_probe_cp_k11.returncode} "
@@ -11080,7 +11088,9 @@ if __name__ == "__main__":
         except Exception as exc:
             _import_probe_ok_k11 = False
             _import_probe_detail_k11 = f"subprocess 失敗/超時：{type(exc).__name__}: {exc}"
-        fcheck("F-K11-IMPORT-EXACT-MAP fresh 子進程 import 終值 _LANE_TO_PROOF exact 等於正典五鍵字典（封 main-block 後重綁時序洞／rogue 鍵洞）",
+        fcheck("F-K11-IMPORT-EXACT-MAP fresh 子進程 import 終值：map exact 等於正典五鍵字典＋type 為精確 dict"
+               "（非 subclass）＋.get('professional') API 語義正確（封 main-block 後重綁時序洞／rogue 鍵洞／"
+               "dict subclass 覆寫 .get 洞）",
                _import_probe_ok_k11, _import_probe_detail_k11)
 
         # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一；
@@ -11088,9 +11098,10 @@ if __name__ == "__main__":
         # 契約宣稱與註解；r6 出貨審裁定＝新增 F-K11-IMPORT-EXACT-MAP 收斂 L1 真防線）──
         #
         # 防線分層（K11 出貨審 r6 裁定）：
-        # L1 真防線＝post-import exact-map 斷言（F-K11-IMPORT-EXACT-MAP：fresh 子進程
-        #    import 終值 ≡ 正典五鍵 exact；任何 module-scope 重綁若終值≠正典必紅、
-        #    含多鍵/型別）＋PRO-LOCK 逐鍵內容斷言。
+        # L1 真防線＝post-import exact-map＋型別/.get 語義探針（F-K11-IMPORT-EXACT-MAP：
+        #    fresh 子進程 import 終值 map ≡ 正典五鍵 exact ∧ type 為精確 dict（非 subclass）
+        #    ∧ .get('professional') API 語義正確；任何 module-scope 重綁或 dict subclass
+        #    覆寫若終值/型別/.get 語義≠正典必紅）＋PRO-LOCK 逐鍵內容斷言。
         # L2 shadow 防線＝symtable 巢狀 scope 零綁定（is_assigned/parameter/namespace/imported）——
         #    唯一能讓「chk 用表 ≠ 模組常數」的路徑，已完備封死。
         # L3 輔助啟發式＝module-scope Store-ctx 計數（抓常見重複定義；已知不計 match pattern/
@@ -11111,7 +11122,8 @@ if __name__ == "__main__":
 
         def _walk_module_scope_count_k11(node, target_name: str) -> int:
             # 具名 scope 節點：名字本身綁在外層 scope（要計），但不進入其內部
-            # （body/args/decorator 等——內部一律歸 symtable 軌管）。
+            # （body/args 等歸 symtable 軌管；decorator/default 內 walrus 綁 module
+            # scope＝由 L1 import 終值探針兜底，非本 L3 計數軌職責）。
             if isinstance(node, (_ast_k11.FunctionDef, _ast_k11.AsyncFunctionDef, _ast_k11.ClassDef)):
                 return 1 if node.name == target_name else 0
             # 無名 scope 節點（lambda／推導式）：整個子樹不進入。

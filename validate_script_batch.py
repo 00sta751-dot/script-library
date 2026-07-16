@@ -11044,20 +11044,16 @@ if __name__ == "__main__":
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
         # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一；
-        # r4 出貨審修＝AST 軌改 binding-context 判定）──
-        # 霸告出貨審 r4（2026-07-16）：逐語句型別列舉（Assign/AnnAssign/Import 頂層）
-        # 仍漏 if/for/while/try/with 包裹內的第二賦值、module 層 walrus、module
-        # for-target、同名 def/class。改用「module-scope 限定走訪」：從 tree 根遞迴
-        # iter_child_nodes，遇新 scope 節點（FunctionDef/AsyncFunctionDef/ClassDef/
-        # Lambda/ListComp/SetComp/DictComp/GeneratorExp）不進入其內部（該內部歸
-        # symtable 軌管）；但 def/class 節點本身 `.name` 若等於目標名仍要計 1（名字
-        # 綁在外層）。走訪中計數：① `ast.Name(id=目標名, ctx=Store/Del)`（涵蓋
-        # Assign/AnnAssign/AugAssign/walrus/for-target/with-as，不論被 if/for/while/
-        # try 包幾層）②Import/ImportFrom alias（asname 或無 asname 頂層名）③
-        # ExceptHandler.name。symtable 軌補 is_imported() 封巢狀 `import x as
-        # _LANE_TO_PROOF`。三判準全立才綠：①module-scope 綁定計數恰 1（Store-ctx
-        # 全構式）②symtable module 表綁定存在 ③symtable 任何巢狀 scope 零綁定
-        # （is_assigned/is_parameter/is_namespace/is_imported）。
+        # r4 AST 軌改 binding-context 判定；r5 出貨審裁定＝guard 邏輯零改、只改
+        # 契約宣稱與註解——計數完備是無底洞，防護力其實已夠，錯在 fcheck 宣稱過頭）──
+        #
+        # 防線分層（K11 出貨審 r5 裁定）：
+        # L1 真防線＝PRO-LOCK 內容斷言——任何 module-scope 重綁（match capture/decorator walrus/
+        #    comprehension walrus 等）若內容≠正典映射，runtime 常數即變、內容斷言必紅；內容相同＝無害重複。
+        # L2 shadow 防線＝symtable 巢狀 scope 零綁定（is_assigned/parameter/namespace/imported）——
+        #    唯一能讓「chk 用表 ≠ 模組常數」的路徑，已完備封死。
+        # L3 輔助啟發式＝module-scope Store-ctx 計數（抓常見重複定義；已知不計 match pattern/
+        #    外層運算式 walrus 等罕見構式——該類由 L1 兜底，不宣稱完備）。
         import ast as _ast_k11
         import symtable as _symtable_k11
 
@@ -11127,7 +11123,8 @@ if __name__ == "__main__":
             and _module_bound_k11
             and not _nested_bound_k11
         )
-        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF module-scope 綁定恰 1（Store-ctx 全構式）＋symtable 模組綁定存在＋任何巢狀 scope 零綁定（雙軌合一防 shadow）",
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 防線三層：runtime 內容斷言（PRO-LOCK 兩 fixture）＋"
+               "symtable 巢狀 scope 零綁定（shadow 完備防線）＋module-scope 綁定計數啟發式（>1 必紅；=1 不宣稱構式完備）",
                _lane_ast_ok_k11,
                f"module_ast_count={_module_ast_count_k11} module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
 

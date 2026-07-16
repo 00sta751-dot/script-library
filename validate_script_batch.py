@@ -11043,10 +11043,21 @@ if __name__ == "__main__":
                f"voice_first={_LANE_TO_PROOF.get('voice_first')} stance={_LANE_TO_PROOF.get('stance')} "
                f"demand_first={_LANE_TO_PROOF.get('demand_first')} anchor_first={_LANE_TO_PROOF.get('anchor_first')}")
 
-        # F-K11-IMPORT-EXACT-MAP（K11 出貨審 r6）：fresh 子進程 import 本模組（只在
-        # __name__=="__main__" 才跑的 main block 不執行），拿到 import 消費者實際
-        # 看到的 _LANE_TO_PROOF 終值，斷言 exact 等於正典五鍵字典（keyset＋值完全
-        # 相等——封 main block 之後重綁時序洞／rogue 鍵洞）。
+        # ── 威脅模型邊界（K11 出貨審 r8 裁定）──
+        # 本 guard（含下方 L1-L3）防護對象＝意外與工具錯誤級回歸（誤刪鍵/誤改值/
+        # 誤加 shadow/誤重綁）；**同檔惡意編輯不在 scope**——惡意編輯者可同時改掉
+        # fixtures 本身，該類威脅由 git commit 審查鏈＋W4 SHA 卡外部錨定防護。
+
+        # F-K11-IMPORT-EXACT-MAP（K11 出貨審 r6 建、r8 改活物件求值）：fresh 子進程
+        # import 本模組（只在 __name__=="__main__" 才跑的 main block 不執行），在
+        # 子進程「內部」對活的 _LANE_TO_PROOF 物件求值四個布林（不把物件序列化
+        # 運回母端比對——JSON 只運回布林結果）：
+        #   ok_map          ＝內容等於正典五鍵字面
+        #   ok_container    ＝type(...) is dict（exact，subclass 不算）
+        #   ok_value_types  ＝逐鍵逐值 type(k) is str and type(v) is str（exact str，
+        #                     str 子類覆寫 __eq__ 塞值＝封 AlwaysStr 類反例）
+        #   ok_get          ＝.get('professional') API 語義正確
+        # 母端只驗證四布林皆 True＋輸出可解析 JSON。
         import subprocess as _subprocess_k11
 
         _script_dir_k11 = str(Path(__file__).resolve().parent)
@@ -11054,20 +11065,28 @@ if __name__ == "__main__":
             "import sys, json\n"
             f"sys.path.insert(0, {_script_dir_k11!r})\n"
             "import validate_script_batch as V\n"
+            "_canon = {\n"
+            "    'anchor_first': 'anchor_first',\n"
+            "    'demand_first': 'demand_first',\n"
+            "    'professional': 'proof_first',\n"
+            "    'stance': 'voice_first',\n"
+            "    'voice_first': 'voice_first',\n"
+            "}\n"
+            "ok_map = (V._LANE_TO_PROOF == _canon)\n"
+            "ok_container = type(V._LANE_TO_PROOF) is dict\n"
+            "ok_value_types = all(\n"
+            "    type(k) is str and type(v) is str\n"
+            "    for k, v in V._LANE_TO_PROOF.items()\n"
+            ")\n"
+            "ok_get = (V._LANE_TO_PROOF.get('professional') == 'proof_first')\n"
             "result = {\n"
-            "    'map': V._LANE_TO_PROOF,\n"
-            "    'is_exact_dict': type(V._LANE_TO_PROOF) is dict,\n"
-            "    'get_professional': V._LANE_TO_PROOF.get('professional'),\n"
+            "    'ok_map': ok_map,\n"
+            "    'ok_container': ok_container,\n"
+            "    'ok_value_types': ok_value_types,\n"
+            "    'ok_get': ok_get,\n"
             "}\n"
             "print(json.dumps(result, sort_keys=True))\n"
         )
-        _canonical_lane_map_k11 = {
-            "anchor_first": "anchor_first",
-            "demand_first": "demand_first",
-            "professional": "proof_first",
-            "stance": "voice_first",
-            "voice_first": "voice_first",
-        }
         try:
             _import_probe_cp_k11 = _subprocess_k11.run(
                 [sys.executable, "-c", _import_probe_src_k11],
@@ -11076,21 +11095,22 @@ if __name__ == "__main__":
             _import_probe_parsed_k11 = json.loads(_import_probe_cp_k11.stdout.strip())
             _import_probe_ok_k11 = (
                 _import_probe_cp_k11.returncode == 0
-                and _import_probe_parsed_k11.get("map") == _canonical_lane_map_k11
-                and _import_probe_parsed_k11.get("is_exact_dict") is True
-                and _import_probe_parsed_k11.get("get_professional") == "proof_first"
+                and _import_probe_parsed_k11.get("ok_map") is True
+                and _import_probe_parsed_k11.get("ok_container") is True
+                and _import_probe_parsed_k11.get("ok_value_types") is True
+                and _import_probe_parsed_k11.get("ok_get") is True
             )
             _import_probe_detail_k11 = (
                 f"rc={_import_probe_cp_k11.returncode} "
-                f"stdout={_import_probe_cp_k11.stdout.strip()[:300]!r} "
+                f"parsed={_import_probe_parsed_k11!r} "
                 f"stderr={_import_probe_cp_k11.stderr.strip()[-300:]!r}"
             )
         except Exception as exc:
             _import_probe_ok_k11 = False
             _import_probe_detail_k11 = f"subprocess 失敗/超時：{type(exc).__name__}: {exc}"
-        fcheck("F-K11-IMPORT-EXACT-MAP fresh 子進程 import 終值：map exact 等於正典五鍵字典＋type 為精確 dict"
-               "（非 subclass）＋.get('professional') API 語義正確（封 main-block 後重綁時序洞／rogue 鍵洞／"
-               "dict subclass 覆寫 .get 洞）",
+        fcheck("F-K11-IMPORT-EXACT-MAP fresh 子進程內對活物件求值四布林皆真：ok_map（內容等於正典）＋"
+               "ok_container（type is dict、非 subclass）＋ok_value_types（逐鍵逐值 exact str、封 "
+               "AlwaysStr 覆寫 __eq__ 類）＋ok_get（.get('professional') API 語義正確）",
                _import_probe_ok_k11, _import_probe_detail_k11)
 
         # ── Delta E fixture ③（r4 防 local shadow 繞過；r2 symtable 法；r3 雙軌合一；
@@ -11098,10 +11118,10 @@ if __name__ == "__main__":
         # 契約宣稱與註解；r6 出貨審裁定＝新增 F-K11-IMPORT-EXACT-MAP 收斂 L1 真防線）──
         #
         # 防線分層（K11 出貨審 r6 裁定）：
-        # L1 真防線＝post-import exact-map＋型別/.get 語義探針（F-K11-IMPORT-EXACT-MAP：
-        #    fresh 子進程 import 終值 map ≡ 正典五鍵 exact ∧ type 為精確 dict（非 subclass）
-        #    ∧ .get('professional') API 語義正確；任何 module-scope 重綁或 dict subclass
-        #    覆寫若終值/型別/.get 語義≠正典必紅）＋PRO-LOCK 逐鍵內容斷言。
+        # L1 真防線＝F-K11-IMPORT-EXACT-MAP（fresh 子進程內對活物件求值 import 終值/
+        #    容器型別/值型別/.get 四布林，ok_map∧ok_container∧ok_value_types∧ok_get
+        #    皆真才綠；任何 module-scope 重綁或 dict/str subclass 偽裝若四布林任一
+        #    為假必紅）＋PRO-LOCK 逐鍵內容斷言。
         # L2 shadow 防線＝symtable 巢狀 scope 零綁定（is_assigned/parameter/namespace/imported）——
         #    唯一能讓「chk 用表 ≠ 模組常數」的路徑，已完備封死。
         # L3 輔助啟發式＝module-scope Store-ctx 計數（抓常見重複定義；已知不計 match pattern/
@@ -11176,8 +11196,9 @@ if __name__ == "__main__":
             and _module_bound_k11
             and not _nested_bound_k11
         )
-        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 防線三層：runtime 內容斷言（PRO-LOCK 兩 fixture）＋"
-               "symtable 巢狀 scope 零綁定（shadow 完備防線）＋module-scope 綁定計數啟發式（>1 必紅；=1 不宣稱構式完備）",
+        fcheck("F-K11-AST-SHADOW-GUARD _LANE_TO_PROOF 防線三層：L1＝F-K11-IMPORT-EXACT-MAP（import 終值/"
+               "容器型別/值型別/.get 活物件四布林）＋PRO-LOCK 逐鍵＋L2＝symtable 巢狀 scope 零綁定"
+               "（shadow 完備防線）＋L3＝module-scope 綁定計數啟發式（>1 必紅；=1 不宣稱構式完備）",
                _lane_ast_ok_k11,
                f"module_ast_count={_module_ast_count_k11} module_bound={_module_bound_k11} nested_bound={_nested_bound_k11}")
 

@@ -3,13 +3,13 @@
     "generated": true,
     "do_not_edit": true,
     "generator": "gen_owner_projection_cache.py",
-    "generated_at": "2026-06-14T15:26:55Z",
-    "owner_discovery_py_sha256": "21006bdaa7ae35d53c6771740984a41fb6a384182b9ef52cb9c04bf70921d01b",
+    "generated_at": "2026-07-30T19:46:55Z",
+    "owner_discovery_py_sha256": "bddea242de439e7e05c61b2e34d9d8f466a629477c881c08fbc371085a9a0591",
     "kb_rule_parser_py_sha256": "8834e224f6efc1b630f423e826e958ed33e71f5e085b4041dbf12070421c2fb6",
-    "generator_py_sha256": "5b14a35e15fde620e47a916585d297d610dfd3f88d38c5953196de9c42b7c857",
+    "generator_py_sha256": "b4eac8881735d27577447f592a18f5362ce219905897b22db832297bfadc80bd",
     "runtime_overrides_sha256": "012158fa9c7cb9ddd88d60990ed71be4c3a31ce3e3a0a264a18099f4b2b31964",
     "discovery_fingerprint": "13739498468e143038ccde07f1d0033a44dc36ebd69c1f0ae554bd1483ddf10c",
-    "projection_fingerprint": "ecc4f05f4706cc15fbe8478670d587f6648cc2f61120ca1f2bb0558d8ace7656"
+    "projection_fingerprint": "d17b5b5b2b1772f2e1f5c7e535c49bf0b6835404a1306045bd6b00530d63e5f0"
   },
   "runtime_aliases": {
     "叭噗": "叭噗_小C"
@@ -23,7 +23,7 @@
         "房仲"
       ],
       "owner_dir": "房仲_仲豪",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_仲豪/00_業主核心檔/source_overlay/_仲豪偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_仲豪/00_業主核心檔/source_overlay/_仲豪偏好.md",
       "owner_code": "zhonghao",
       "html_file": "kenny.html",
       "build_script": "build_all.py",
@@ -39,7 +39,7 @@
         "情侶"
       ],
       "owner_dir": "情侶_叭噗_小C",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/情侶_叭噗_小C/00_業主核心檔/source_overlay/_叭噗_小C偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/情侶_叭噗_小C/00_業主核心檔/source_overlay/_叭噗_小C偏好.md",
       "owner_code": "bappu",
       "html_file": "bappu-cc/index.html",
       "build_script": "build_bappu.py",
@@ -55,7 +55,7 @@
         "美容"
       ],
       "owner_dir": "美容_昀臻",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/美容_昀臻/00_業主核心檔/source_overlay/_昀臻偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/美容_昀臻/00_業主核心檔/source_overlay/_昀臻偏好.md",
       "owner_code": "yunzhen",
       "html_file": "beauty.html",
       "build_script": "build_beauty.py",
@@ -71,7 +71,7 @@
         "房仲"
       ],
       "owner_dir": "房仲_楷甯",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_楷甯/00_業主核心檔/source_overlay/_楷甯偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_楷甯/00_業主核心檔/source_overlay/_楷甯偏好.md",
       "owner_code": "kaining",
       "html_file": "kaining.html",
       "build_script": "build_kaining.py",
@@ -87,7 +87,7 @@
         "美容"
       ],
       "owner_dir": "美容_溫蒂",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/美容_溫蒂/00_業主核心檔/source_overlay/_溫蒂偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/美容_溫蒂/00_業主核心檔/source_overlay/_溫蒂偏好.md",
       "owner_code": "wendi",
       "html_file": "wendi.html",
       "build_script": "build_wendi.py",
@@ -103,7 +103,7 @@
         "房仲"
       ],
       "owner_dir": "房仲_瑞祥",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_瑞祥/00_業主核心檔/source_overlay/_瑞祥偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_瑞祥/00_業主核心檔/source_overlay/_瑞祥偏好.md",
       "owner_code": "ruixiang",
       "html_file": "index.html",
       "build_script": "build_index.py",
@@ -119,7 +119,7 @@
         "房仲"
       ],
       "owner_dir": "房仲_詩婷",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_詩婷/00_業主核心檔/source_overlay/_詩婷偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_詩婷/00_業主核心檔/source_overlay/_詩婷偏好.md",
       "owner_code": "shihting",
       "html_file": "shihting.html",
       "build_script": "build_shihting.py",
@@ -136,7 +136,7 @@
         "房仲"
       ],
       "owner_dir": "餐飲_阿奇",
-      "l2_path": "C:/Users/00sta/Documents/Claude/Projects/短影音系統/L2_業主層/餐飲_阿奇/00_業主核心檔/source_overlay/_阿奇偏好.md",
+      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/餐飲_阿奇/00_業主核心檔/source_overlay/_阿奇偏好.md",
       "owner_code": "achi",
       "html_file": "achi.html",
       "build_script": "build_achi.py",

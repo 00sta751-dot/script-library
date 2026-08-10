@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0759B8">
+<meta property="og:title" content="澤君 · 短影音腳本庫">
+<meta property="og:image" content="./og-image.png">
+<link rel="apple-touch-icon" href="./favicon.ico">
+<title>澤君 · 短影音腳本庫</title>
+<style>
+/* ===== 業主主題色（init_owner_website.py 自動替換） ===== */
+:root{
+  --owner-primary:#F2B705;
+  --paper:#F4EFE6;
+  --paper-2:#FAF7EF;
+  --ink:#1A1814;
+  --ink-2:#3D362F;
+  --ink-3:#6F665C;
+  --ink-4:#A8A096;
+  --line:#D9D2C5;
+  --line-soft:#E8E1D3;
+  --accent:#F2B705;
+  --serif-en:'Playfair Display',Georgia,serif;
+  --serif:'Noto Serif TC','Songti TC',serif;
+  --sans-en:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;line-height:1.78;
+  letter-spacing:.012em;
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"palt";
+  padding-bottom:80px;
+}
+img{display:block;max-width:100%}
+
+/* ========== HEADER ========== */
+.masthead{
+  position:relative;z-index:2;
+  text-align:center;
+  padding:48px 24px 20px;
+  border-bottom:1.5px solid var(--ink);
+}
+.masthead h1{
+  font-family:var(--serif-en);
+  font-weight:900;font-style:italic;
+  font-size:clamp(36px,10vw,72px);
+  line-height:.95;letter-spacing:-.02em;
+  color:var(--ink);
+  margin:6px 0 6px;
+}
+.masthead .sub{
+  font-family:var(--serif);
+  font-weight:500;font-size:clamp(14px,2.2vw,17px);
+  color:var(--ink-2);
+  margin-bottom:14px;
+}
+.masthead .meta-row{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;
+  font-family:var(--sans-en);
+  font-size:11px;letter-spacing:.18em;color:var(--ink-3);
+  text-transform:uppercase;
+  padding-top:14px;
+  border-top:1px dashed var(--line);
+  max-width:560px;margin:0 auto;
+}
+.masthead .meta-row span b{color:var(--ink);font-weight:600}
+
+/* ========== STICKY FILTER ========== */
+.filter{
+  position:sticky;top:0;z-index:50;
+  background:rgba(244,239,230,.94);
+  backdrop-filter:blur(14px);
+  border-bottom:1.5px solid var(--ink);
+  padding:12px 14px;
+  margin:24px 0 0;
+}
+.filter-inner{
+  max-width:1080px;margin:0 auto;
+  display:flex;gap:8px;flex-wrap:wrap;
+  align-items:center;justify-content:center;
+}
+.search-wrap{
+  position:relative;width:100%;max-width:480px;margin:0 auto;
+}
+.search{
+  display:block;width:100%;
+  padding:10px 56px 10px 16px;
+  border:1px solid var(--line);
+  border-radius:2px;
+  background:var(--paper-2);
+  font-family:var(--sans);font-size:14px;
+  color:var(--ink);
+  outline:none;
+  letter-spacing:.04em;
+}
+.search:focus{border-color:var(--ink)}
+.search::placeholder{color:var(--ink-4)}
+.search-hint{
+  position:absolute;top:50%;right:10px;transform:translateY(-50%);
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.1em;
+  padding:3px 7px;border:1px solid var(--line);border-radius:3px;
+  color:var(--ink-3);background:var(--paper);
+  pointer-events:none;
+}
+.search-wrap.is-focused .search-hint{display:none}
+
+/* ========== STATS ========== */
+.stats{
+  position:relative;z-index:1;
+  max-width:1080px;margin:0 auto;
+  padding:20px 24px 12px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-bottom:1px solid var(--line);
+}
+.stat{text-align:center;padding:8px 4px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:none}
+.stat .n{
+  font-family:var(--serif-en);font-style:italic;font-weight:900;
+  font-size:36px;color:var(--ink);line-height:1;
+}
+.stat .l{
+  font-family:var(--sans-en);font-size:10px;letter-spacing:.18em;
+  color:var(--ink-3);text-transform:uppercase;
+  margin-top:6px;
+}
+
+/* ========== GROUP / SECTION ========== */
+.group{border-bottom:1px solid var(--line-soft);position:relative;z-index:1;}
+.group-head{
+  max-width:1080px;margin:0 auto;
+  padding:16px 24px;
+  display:flex;align-items:center;gap:14px;
+  cursor:pointer;user-select:none;
+  transition:background .15s;
+}
+.group-head:hover{background:rgba(26,24,20,.03)}
+.gh-roman{font-family:var(--serif-en);font-style:italic;font-weight:500;font-size:28px;color:var(--accent);line-height:1;min-width:36px}
+.gh-label{font-family:var(--serif);font-weight:700;font-size:18px;color:var(--ink);flex:1}
+.gh-count{font-family:var(--sans-en);font-size:11px;letter-spacing:.16em;color:var(--ink-3);text-transform:uppercase}
+.gh-icon{font-size:12px;color:var(--ink-3);transition:transform .2s}
+.group.collapsed .gh-icon{transform:rotate(-90deg)}
+.group.collapsed .section-head{display:none}
+.group.collapsed .cards{display:none}
+.group.collapsed > .threads-grid{display:none}
+.section-head{
+  max-width:1080px;margin:24px auto 12px;
+  padding:0 24px;
+  display:flex;align-items:flex-end;gap:14px;
+}
+.section-head .roman{font-family:var(--serif-en);font-style:italic;font-weight:500;font-size:28px;color:var(--accent);line-height:1}
+.section-head .label{font-family:var(--serif);font-weight:700;font-size:20px;color:var(--ink);line-height:1.2}
+.section-head .label .en{display:block;font-family:var(--sans-en);font-style:italic;font-weight:400;font-size:11px;letter-spacing:.18em;color:var(--ink-3);text-transform:uppercase;margin-top:4px}
+.section-head .rule{flex:1;height:1px;background:var(--ink);margin-bottom:6px}
+.section-head .count{font-family:var(--sans-en);font-size:11px;letter-spacing:.16em;color:var(--ink-3);text-transform:uppercase;padding-bottom:6px}
+
+/* ========== CARDS ========== */
+.cards{
+  max-width:1080px;margin:0 auto;
+  padding:0 16px 24px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:16px;
+}
+article.card{
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:4px;
+  overflow:hidden;
+  transition:box-shadow .15s;
+}
+article.card:hover{box-shadow:0 2px 12px rgba(26,24,20,.08)}
+article.card.open .card-body{display:block}
+.card-head{
+  padding:16px;
+  cursor:pointer;
+  border-left:3px solid var(--pie,var(--accent));
+}
+.card-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+.card-meta .pie{font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--ink-3);background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:2px 7px}
+.card-meta .num{font-family:var(--sans-en);font-size:10px;letter-spacing:.1em;color:var(--ink-4)}
+.card-meta .batch{font-family:var(--sans-en);font-size:10px;letter-spacing:.12em;color:var(--ink-4);text-transform:uppercase}
+.card-meta-extra{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.platform{font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--ink-3);background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:2px 7px}
+.po-time{font-family:var(--sans);font-size:11px;font-weight:500;letter-spacing:.04em;color:var(--ink-4)}
+.title{font-family:var(--serif);font-weight:700;font-size:16px;line-height:1.4;color:var(--ink);margin-bottom:6px}
+.insight{font-size:13.5px;color:var(--ink-2);line-height:1.65;font-style:italic}
+.card-body{display:none;padding:16px;border-top:1px solid var(--line-soft)}
+.scene{font-size:13px;color:var(--ink-3);margin-bottom:12px;padding-left:8px;border-left:2px solid var(--line)}
+.ref-link{margin-bottom:12px}
+.timeline{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.timeline .row{display:grid;grid-template-columns:72px 1fr;gap:4px 10px;align-items:start}
+.timeline .time{font-family:var(--sans-en);font-size:11px;letter-spacing:.06em;color:var(--ink-4);padding-top:2px}
+.timeline .say{font-size:14px;line-height:1.6;color:var(--ink)}
+.timeline .sub{grid-column:2;font-size:11.5px;color:var(--ink-3);font-style:italic}
+.timeline .mirror{grid-column:1/-1;background:rgba(26,24,20,.04);border-radius:3px;padding:6px 10px;font-size:12.5px;color:var(--ink-2);font-style:italic}
+.cta{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-2);font-weight:600;margin-bottom:8px}
+.cta-arrow{color:var(--accent);font-size:16px}
+.hashtag-pool{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;margin-bottom:4px}
+.hashtag{background:var(--paper-2);color:var(--ink-3);padding:3px 9px;border-radius:12px;font-size:12px;font-family:var(--sans-en)}
+.copy-btn{
+  display:block;width:100%;
+  margin-top:12px;
+  padding:10px;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--sans);font-size:13px;font-weight:600;
+  border:none;border-radius:3px;
+  cursor:pointer;transition:background .15s;
+  letter-spacing:.06em;
+}
+.copy-btn:hover{background:var(--ink-2)}
+.copy-btn.copied{background:var(--accent)}
+.shot-toggle{
+  font-size:10px;color:var(--ink-4);
+  background:transparent;border:1px solid var(--line);
+  border-radius:3px;padding:2px 6px;
+  cursor:pointer;font-family:var(--sans);
+  transition:all .15s;
+}
+article.card.shot .shot-toggle{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* ========== THREADS ========== */
+.threads-grid{
+  max-width:1080px;margin:0 auto;
+  padding:0 16px 24px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:16px;
+}
+.thread-card{
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:16px;
+}
+.thread-meta{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.thread-id{font-family:var(--sans-en);font-size:11px;color:var(--ink-4);letter-spacing:.1em}
+.thread-label{font-size:12px;color:var(--ink-3);background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:2px 6px}
+.thread-text{font-size:14px;line-height:1.75;color:var(--ink);white-space:pre-wrap;margin-bottom:8px}
+.thread-hash{font-size:12px;color:var(--ink-3);margin-bottom:10px}
+
+/* ========== LIGHTBOX ========== */
+.lightbox-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.88);
+  align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.lightbox-overlay.open{display:flex}
+.lightbox-overlay img{
+  max-width:90vw;max-height:90vh;
+  object-fit:contain;
+  border-radius:4px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+
+/* ========== EMPTY / FOOTER ========== */
+.empty{display:none;text-align:center;padding:60px 24px;color:var(--ink-3);font-size:15px}
+.empty.show{display:block}
+footer{
+  border-top:1.5px solid var(--ink);
+  padding:32px 24px;
+  text-align:center;
+  position:relative;z-index:2;
+  margin-top:48px;
+}
+.colophon{font-family:var(--serif-en);font-style:italic;font-size:14px;color:var(--ink-3);margin-bottom:8px}
+.lines{font-family:var(--sans);font-size:12px;color:var(--ink-3)}
+.bagao-sig{font-family:var(--sans-en);font-size:10px;letter-spacing:.18em;color:var(--ink-4);text-transform:uppercase;margin-top:6px}
+
+/* ========== RWD ========== */
+@media(max-width:768px){
+  .cards{grid-template-columns:1fr;padding:0 12px 16px}
+  .threads-grid{grid-template-columns:1fr;padding:0 12px 16px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .card-meta-extra{gap:6px}
+  .hashtag-pool{gap:4px}
+  .hashtag{font-size:11px;padding:2px 7px}
+  .platform{font-size:10px;padding:2px 6px}
+  .po-time{font-size:10px}
+}
+@media(max-width:640px){
+  .stat .n{font-size:28px}
+  .title{font-size:15px}
+  .hashtag{font-size:10px;padding:2px 6px}
+  .platform,.po-time,.batch{font-size:9px}
+}
+
+/* ===== 工程師工作台｜澤君 r1 ===== */
+:root{--owner-primary:#0759B8;--paper:#F4F8FC;--paper-2:#FFFFFF;--ink:#10243B;--ink-2:#31506D;--ink-3:#5D7892;--ink-4:#90A7BA;--line:#B6CCE0;--line-soft:#DCE8F2;--accent:#F2B705;--mono:"SFMono-Regular",Consolas,"Liberation Mono","Noto Sans Mono CJK TC",monospace;--sans:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;--sans-en:var(--mono);--serif:var(--mono);--serif-en:var(--mono)}
+body{background-color:var(--paper);background-image:linear-gradient(rgba(7,89,184,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(7,89,184,.10) 1px,transparent 1px),linear-gradient(rgba(7,89,184,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(7,89,184,.035) 1px,transparent 1px);background-size:24px 24px,24px 24px,6px 6px,6px 6px;color:var(--ink);padding-bottom:0}
+.masthead{max-width:1180px;margin:0 auto;padding:28px 18px 20px;text-align:left;border:0;border-bottom:2px solid var(--owner-primary);display:grid;gap:10px;background:rgba(244,248,252,.72)}
+.masthead:before{content:"ZEJUN / FIELD NOTES / 2026";font:700 10px/1 var(--mono);letter-spacing:.16em;color:var(--owner-primary)}
+.masthead h1{font:800 clamp(30px,9vw,66px)/.95 var(--mono);font-style:normal;letter-spacing:-.08em;color:var(--owner-primary);margin:0;text-transform:uppercase}.masthead .sub{font:700 14px/1.5 var(--sans);color:var(--ink);margin:0}.masthead .meta-row{justify-content:flex-start;max-width:none;margin:0;padding-top:12px;border-top:1px dashed var(--line);font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.filter{top:0;margin:0;padding:12px 14px;background:rgba(244,248,252,.94);border-bottom:1px solid var(--line)}.filter-inner{max-width:1180px}.search-wrap{max-width:720px}.search{border:1px solid var(--owner-primary);border-radius:0;background:#fff;font-family:var(--mono);font-size:13px;box-shadow:4px 4px 0 rgba(7,89,184,.12)}.search:focus{outline:2px solid var(--accent);outline-offset:2px}.search-hint{border-radius:0;border-color:var(--line);font-family:var(--mono)}
+.workbench-tabs{max-width:1180px;margin:16px auto 0;padding:0 14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.series-tab{appearance:none;border:1px solid var(--owner-primary);border-radius:0;background:rgba(255,255,255,.72);color:var(--owner-primary);font:700 11px/1.2 var(--sans);padding:10px 8px;cursor:pointer;text-align:left}.series-tab:before{content:"□ ";font-family:var(--mono)}.series-tab.active,.series-tab:hover{background:var(--owner-primary);color:#fff}.series-tab.active:before{content:"■ "}
+.stats{max-width:1180px;padding:16px 14px 10px;border-bottom:1px dashed var(--line);background:rgba(244,248,252,.68)}.stat{text-align:left;border-right:1px solid var(--line);padding:8px 10px}.stat .n{font:800 30px/1 var(--mono);font-style:normal;color:var(--owner-primary)}.stat .l{font:700 9px/1.4 var(--mono);color:var(--ink-3)}
+.group{max-width:1180px;margin:0 auto;border-bottom:1px dashed var(--line);background:rgba(244,248,252,.46)}.group-head{padding:15px 14px;gap:10px}.group-head:hover{background:rgba(7,89,184,.06)}.gh-roman{font:800 13px/1 var(--mono);font-style:normal;color:var(--accent);min-width:28px}.gh-label{font:800 14px/1.3 var(--mono);color:var(--owner-primary)}.gh-label:before{content:"WORK ORDER // ";font-size:9px;color:var(--ink-3)}.gh-count,.gh-icon{font-family:var(--mono)}.section-head{margin:14px auto 10px;padding:0 14px}.section-head .roman{font-family:var(--mono);font-style:normal;font-size:18px;color:var(--accent)}.section-head .label{font-family:var(--mono);font-size:15px;color:var(--owner-primary)}.section-head .rule{background:var(--owner-primary)}
+.cards{max-width:1180px;padding:0 14px 20px;gap:12px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}article.card{border:1px solid var(--owner-primary);border-radius:0;background:rgba(255,255,255,.93);box-shadow:4px 4px 0 rgba(7,89,184,.16);overflow:visible}article.card:hover{box-shadow:7px 7px 0 rgba(7,89,184,.22);transform:translate(-1px,-1px)}.card-head{padding:15px;border-left:6px solid var(--pie,var(--owner-primary))}.card-meta{gap:6px;border-bottom:1px dashed var(--line);padding-bottom:8px}.card-meta .pie,.platform,.shot-toggle{border-radius:0;font-family:var(--mono);font-size:10px}.card-meta .pie{color:var(--owner-primary);border-color:var(--owner-primary);background:#fff}.card-meta .num,.card-meta .batch,.po-time{font-family:var(--mono);font-size:10px;color:var(--ink-3)}.series-stamp{margin-left:auto;border:1px solid var(--accent);background:#fff8d8;color:#715600;padding:3px 6px;font:700 9px/1 var(--mono);letter-spacing:.04em}.title{font-family:var(--sans);font-size:17px;color:var(--ink);margin:10px 0 6px}.insight{font-style:normal;font-size:13px;color:var(--ink-2)}.card-body{border-top:1px dashed var(--line);padding:15px}.scene{border-left:3px solid var(--accent);color:var(--ink-2)}.timeline .time{font-family:var(--mono);color:var(--owner-primary)}.timeline .mirror{border-radius:0;background:#EEF6FF;border-left:3px solid var(--owner-primary);font-style:normal}.hashtag{border-radius:0;background:#EEF6FF;color:var(--owner-primary);font-family:var(--mono)}.copy-btn{border-radius:0;background:var(--owner-primary);font-family:var(--mono)}.copy-btn:hover{background:#063D7C}.copy-btn.copied{background:var(--accent);color:var(--ink)}
+.threads-grid{max-width:1180px;padding:0 14px 20px;gap:12px}.thread-card{border-radius:0;border-color:var(--owner-primary);background:rgba(255,255,255,.93);box-shadow:4px 4px 0 rgba(7,89,184,.13)}.thread-id,.thread-label,.thread-hash{font-family:var(--mono)}.thread-label{border-radius:0}.empty{font-family:var(--mono)}footer{margin-top:32px;border-top:2px solid var(--owner-primary);background:var(--owner-primary);color:#fff;padding:24px 16px;text-align:left}footer .colophon{display:none}footer .lines{font:700 clamp(17px,5vw,26px)/1.35 var(--sans);color:#fff}footer .lines span:not(:first-child){display:none}.bagao-sig{font-family:var(--mono);color:#D8EAFE;margin-top:8px}.bagao-sig:before{content:"SYSTEM STATUS: READY · "}
+@media(min-width:680px){.workbench-tabs{grid-template-columns:repeat(5,1fr)}.masthead{padding:40px 28px 24px}.series-tab{text-align:center}.cards{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <h1>Zejun & Co.</h1>
+  <div class="sub">澤君 · 短影音腳本誌</div>
+  <div class="meta-row">
+    <span>共 <b id="totalCount">0</b> 部</span>
+    <span id="sectionCount">0</span> 主題
+    <span><b>2026-08-10</b> 更新</span>
+  </div>
+</header>
+
+<nav class="filter" aria-label="篩選">
+  <div class="search-wrap" id="searchWrap">
+    <input type="text" class="search" id="searchInput" placeholder="搜尋腳本標題..." oninput="filterCards()">
+    <span class="search-hint" id="searchHint">⌘ K</span>
+  </div>
+</nav>
+
+<nav class="workbench-tabs" aria-label="腳本系列篩選">
+  <button class="series-tab active" type="button" data-series="all">全部工單</button>
+  <button class="series-tab" type="button" data-series="先別急著簽">先別急著簽</button>
+  <button class="series-tab" type="button" data-series="澤君走給你看">澤君走給你看</button>
+  <button class="series-tab" type="button" data-series="工程師眼睛看房">工程師眼睛看房</button>
+  <button class="series-tab" type="button" data-series="月薪8萬房仲日記">月薪8萬房仲日記＋專業區</button>
+</nav>
+
+<section class="stats">
+  <div class="stat"><div class="n" id="statScripts">0</div><div class="l">Total scripts</div></div>
+  <div class="stat"><div class="n" id="statSections">0</div><div class="l">Sections</div></div>
+  <div class="stat"><div class="n" id="statBatches">01</div><div class="l">Batches</div></div>
+  <div class="stat"><div class="n">′60</div><div class="l">Avg. duration</div></div>
+</section>
+
+<!-- SECTIONS_PLACEHOLDER — build_zejun.py 負責替換此區塊 -->
+
+<header class="section-head" id="sect-b_new_2">
+  <span class="roman"></span>
+  <span class="label">第 02 批 · 2026-08-10<span class="en">第 02 批 · 2026-08-10</span></span>
+  <span class="rule"></span>
+  <span class="count">13 scripts</span>
+</header>
+<div class="cards">
+<article class="card" id="zej14" data-series="月薪8萬房仲日記" data-caption="剛入行沒人帶的那半年，最熟的地方是公司旁的炒飯店。第一年業績掛蛋，轉機不是自己多強，是有人願意伸手。現在換我伸手帶新人。" data-hashtags="#房仲日記 #轉行 #帶新人 #職場 #高雄 #心情 #日常 #成長 #房仲 #工作">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 14</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週四晚 8PM</span>
+    </div>
+    <h3 class="title">換我伸手的那一天</h3>
+    <div class="insight">辦公室清晨，桌上兩杯咖啡</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　辦公室清晨，桌上兩杯咖啡</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：現在換我帶新人。 （辦公室清晨，桌上兩杯咖啡）</div><div class="mirror">藏鏡人　'這中間差多少年'</div><div class="sub">辦公室清晨，桌上兩杯咖啡</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：那半年沒人帶，最熟的是公司旁那間炒飯店。月薪八萬變年薪八萬。 （炒飯店門口街景（不入他人臉、不露招牌））</div><div class="sub">炒飯店門口街景（不入他人臉、不露招牌）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：轉機不是我多強，是有人願意伸手——被另一間店的主管撈過去，才真正學會怎麼當房仲。 （與資深者並肩走廊背影）</div><div class="sub">與資深者並肩走廊背影</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：現在閉著眼都知道商圈行情，換我伸手帶新人。這行最缺的，就是有人肯先講一句。 （帶新人看資料的背影（不露臉））</div><div class="mirror">藏鏡人　'有人拉一把差很多'</div><div class="sub">帶新人看資料的背影（不露臉）</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：會的人多一個，走冤枉路的人就少一個。伸手這件事，是會傳下去的。 （看鏡頭，語氣穩不悲情）</div><div class="sub">看鏡頭，語氣穩不悲情</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你也有被誰伸手拉過一把嗎？底下說說那個人。找家的路漫長　澤君陪你扛。 （轉身繼續走，畫面淡出）</div><div class="sub">轉身繼續走，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你也有被誰伸手拉過一把嗎？底下說說那個人。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#房仲日記</span>
+      <span class="hashtag">#轉行</span>
+      <span class="hashtag">#帶新人</span>
+      <span class="hashtag">#職場</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#房仲</span>
+      <span class="hashtag">#工作</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej15" data-series="月薪8萬房仲日記" data-caption="裝潢好該不該加價，先分兩類：固定在牆上地上的會留下，家具家電窗簾多半會被帶走（以契約附贈設備清單為準）。再問：留下的那些是不是你本來就會做的。" data-hashtags="#買房 #裝潢 #購屋 #房地產知識 #首購 #居家 #高雄 #看房 #房仲分享 #實用">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 15</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM</span>
+    </div>
+    <h3 class="title">裝潢好的房子該不該加價</h3>
+    <div class="insight">站在空屋客廳環顧</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　站在空屋客廳環顧</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：裝潢好，該不該加價買？ （站在空屋客廳環顧）</div><div class="mirror">藏鏡人　'這題我也想過'</div><div class="sub">站在空屋客廳環顧</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人說裝潢好就是省事，搬進去能住，加一點也合理。這有道理，重做一次確實花時間。 （滑手機看物件照片牆（去識別））</div><div class="sub">滑手機看物件照片牆（去識別）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：我的看法是：先分這裝潢會不會留下。固定在牆上、地上、天花板的會留下；家具、家電、窗簾，交屋前多半會被帶走。 （手指牆面、地板示意固定裝修）</div><div class="sub">手指牆面、地板示意固定裝修</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：分完再問第二句：留下來的那些，是不是你本來就會做的。是，那對你有價值；不是，那是替別人的品味付錢。哪些會留，最後以契約的附贈設備清單為準。 （示意家具窗簾（不露品牌））</div><div class="mirror">藏鏡人　'原來要這樣分'</div><div class="sub">示意家具窗簾（不露品牌）</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：加價買的不是漂亮，是你本來就要花的那筆被人先做完了。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你看過最想加價買的裝潢是什麼？底下說說。找家的路漫長　澤君陪你扛。 （收手機，微笑收尾）</div><div class="sub">收手機，微笑收尾</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你看過最想加價買的裝潢是什麼？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#裝潢</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej16" data-series="月薪8萬房仲日記" data-caption="帶長輩看房是多一雙眼睛，不是多一個裁判。出發前先講好三件事：誰付錢、誰住、最後誰拍板。長輩負責提醒細節，不負責做最後決定。" data-hashtags="#看房 #買房 #家庭 #長輩 #首購 #購屋 #高雄 #生活 #房仲分享 #日常">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 16</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週日晚 8PM</span>
+    </div>
+    <h3 class="title">看房到底要不要帶長輩</h3>
+    <div class="insight">空屋玄關，兩三人背影（不露臉）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　空屋玄關，兩三人背影（不露臉）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：看房要不要帶長輩？ （空屋玄關，兩三人背影（不露臉））</div><div class="mirror">藏鏡人　'每次都吵這個'</div><div class="sub">空屋玄關，兩三人背影（不露臉）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：有人說一定要帶，長輩看得多、經驗夠。這不是沒道理，很多細節年輕人第一次真的看不到。 （客廳環顧）</div><div class="sub">客廳環顧</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但也常常變成另一種狀況：現場三個人三種意見，最後誰都沒決定，房子被別人簽走。 （三人各看不同方向的示意畫面）</div><div class="sub">三人各看不同方向的示意畫面</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：我的看法是：帶，但先講好誰做決定。出發前把話說清楚——誰付錢、誰住、最後誰拍板。長輩負責提醒，不負責決定。 （出發前在車上講話的背影）</div><div class="mirror">藏鏡人　'原來可以先講好'</div><div class="sub">出發前在車上講話的背影</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：帶長輩是多一雙眼睛，不是多一個裁判。 （看鏡頭，語氣緩）</div><div class="sub">看鏡頭，語氣緩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，下次帶長輩出門前先看一次。找家的路漫長　澤君陪你扛。 （轉身走出玄關）</div><div class="sub">轉身走出玄關</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，下次帶長輩出門前先看一次。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#家庭</span>
+      <span class="hashtag">#長輩</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#日常</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej17" data-series="月薪8萬房仲日記" data-caption="第一次買房，多數人漏掉的不是預算是時間表。先寫三個時間點：什麼時候搬、什麼時候要備好錢、幾月開始看房。從搬家日往回推，不是從今天往前算。" data-hashtags="#首購 #買房 #購屋準備 #房地產知識 #新手 #生活 #高雄 #看房 #房仲分享 #實用">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 17</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM</span>
+    </div>
+    <h3 class="title">第一次買房漏掉的不是錢</h3>
+    <div class="insight">桌上攤開行事曆</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　桌上攤開行事曆</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：第一次買房，漏掉的不是錢。 （桌上攤開行事曆）</div><div class="mirror">藏鏡人　'不是預算喔？'</div><div class="sub">桌上攤開行事曆</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：多數人準備買房，第一件事是算預算。算預算當然要，沒有這個什麼都不用談。 （計算機與紙筆特寫）</div><div class="sub">計算機與紙筆特寫</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：真正被漏掉的是時間表。從看房到交屋有一連串要排的事，每一件都卡到下一件。沒有時間表的人，會在最後一刻被迫決定。 （手指行事曆往回劃三個點）</div><div class="sub">手指行事曆往回劃三個點</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：做法很簡單：先把三個時間點寫下來——什麼時候搬、什麼時候要備好錢、幾月開始看房。從搬家日往回推，不是從今天往前算。 （行事曆寫下日期特寫）</div><div class="mirror">藏鏡人　'這個真的沒想過'</div><div class="sub">行事曆寫下日期特寫</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：預算決定你買得起哪一間，時間表決定你能不能好好挑。 （看鏡頭，語氣穩）</div><div class="sub">看鏡頭，語氣穩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，今天就從搬家日往回推三個時間點。找家的路漫長　澤君陪你扛。 （闔上行事曆）</div><div class="sub">闔上行事曆</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，今天就從搬家日往回推三個時間點。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#購屋準備</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#新手</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej18" data-series="月薪8萬房仲日記" data-caption="這三句這行的人都講過：很多人在看、屋主很有誠意、這個價位很難找。單憑一句都還不夠下判斷，因為是把形容詞當結論用。你要做的是把形容詞換成問句。" data-hashtags="#看房 #買房 #房地產知識 #購屋 #首購 #高雄 #房仲分享 #實用 #生活 #知識">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 18</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週五晚 8PM</span>
+    </div>
+    <h3 class="title">仲介這三句話的意思</h3>
+    <div class="insight">坐在辦公桌前看鏡頭</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　坐在辦公桌前看鏡頭</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：這三句話，這行的人都講過。 （坐在辦公桌前看鏡頭）</div><div class="mirror">藏鏡人　'我真的常聽到'</div><div class="sub">坐在辦公桌前看鏡頭</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：第一句：這間很多人在看。這常常是真的，但在看不等於要出價，看跟談是兩件事。 （手指比一）</div><div class="sub">手指比一</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：第二句：屋主很有誠意。誠意是形容詞，你可以問具體的：屋主為什麼賣、什麼時候要交屋、什麼條件下願意談。 （手指比二）</div><div class="sub">手指比二</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第三句：這個價位很難找。難找是跟什麼比？請對方講清楚比較的範圍——同一區、同樣屋齡、同樣格局，範圍講清楚，這句話才有意義。 （手指比三）</div><div class="mirror">藏鏡人　'原來是這個意思'</div><div class="sub">手指比三</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：這三句話單憑一句都還不夠下判斷，因為它們是把形容詞當結論用。你要做的不是不信，是把形容詞換成問句。 （看鏡頭，語氣直不激動）</div><div class="sub">看鏡頭，語氣直不激動</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你最常聽到哪一句？底下說說。找家的路漫長　澤君陪你扛。 （收手，微笑）</div><div class="sub">收手，微笑</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你最常聽到哪一句？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#知識</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej19" data-series="月薪8萬房仲日記" data-caption="照片跟現場的落差多半不是修圖：廣角把空間拉長、物件照挑最亮時段、空屋沒有家具當比例尺讓人誤判大小。現場自己找參照物，用腳步量一次。" data-hashtags="#看房 #買房 #房地產知識 #購屋 #攝影 #首購 #高雄 #房仲分享 #實用 #生活">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 19</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM</span>
+    </div>
+    <h3 class="title">照片跟現場為什麼差這麼多</h3>
+    <div class="insight">手機看物件照片牆（去識別）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　手機看物件照片牆（去識別）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：照片很美，現場差在哪？ （手機看物件照片牆（去識別））</div><div class="mirror">藏鏡人　'每次都這樣'</div><div class="sub">手機看物件照片牆（去識別）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人以為是照騙。其實多數落差不是修圖，是三件很物理的事。 （比出廣角手勢）</div><div class="sub">比出廣角手勢</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：第一是廣角，鏡頭會把空間拉長，同一個客廳就是看起來比較大。第二是光線，物件照多半挑一天中最亮的時段拍。 （窗邊光線變化示意）</div><div class="sub">窗邊光線變化示意</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第三是空屋沒有家具當比例尺，你的眼睛判斷不了實際大小。解法是現場自己找參照物——用腳步量一次，或問一句這間放得下幾人座沙發。 （空屋客廳環顧）</div><div class="mirror">藏鏡人　'原來是鏡頭問題'</div><div class="sub">空屋客廳環顧</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：照片不會說謊，但它只說了它想說的那一面。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：分享給正在用照片篩房子的那個人。找家的路漫長　澤君陪你扛。 （放下手機）</div><div class="sub">放下手機</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>分享給正在用照片篩房子的那個人。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#攝影</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+      <span class="hashtag">#生活</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej20" data-series="月薪8萬房仲日記" data-caption="同一條路白天走一次、晚上八點再走一次。要住附近的話建議自己走一次夜路：停車位置走回家那段、最後一盞路燈到大門、晚上會去的店幾點關。" data-hashtags="#走給你看 #高雄 #生活機能 #看房 #買房 #日常 #實走 #租屋 #生活 #夜晚">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 20</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六晚 8PM</span>
+    </div>
+    <h3 class="title">同一條路，我走了兩次</h3>
+    <div class="insight">白天路口起點（不露門牌）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　白天路口起點（不露門牌）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：這條路，我走了兩次。 （白天路口起點（不露門牌））</div><div class="mirror">藏鏡人　'晚上差很多嗎'</div><div class="sub">白天路口起點（不露門牌）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：白天走的時候【現場填：白天第一印象，一句，例如人多不多、店有沒有開】。同一條路，我晚上八點又走了一次。 （白天行走 POV）</div><div class="sub">白天行走 POV</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：晚上最明顯的差別是【現場填：夜間差異點 1，路燈／人流／店家鐵門】。第二個差別是【現場填：夜間差異點 2，聲音／車速／照明死角】。 （夜晚同一路口對照）</div><div class="sub">夜晚同一路口對照</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：要住這附近，建議自己走一次夜路，看三個地方：停車位置走回家那段、最後一盞路燈到大門、你晚上會去那家店幾點關。 （夜晚行走 POV，路燈入鏡）</div><div class="mirror">藏鏡人　'這個真的要走才知道'</div><div class="sub">夜晚行走 POV，路燈入鏡</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：白天漂亮不算，晚上還走得舒服才算。 （站定看鏡頭，夜景背景）</div><div class="sub">站定看鏡頭，夜景背景</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你住的那條路，晚上是什麼樣子？底下說說。找家的路漫長　澤君陪你扛。 （轉身繼續走，畫面淡出）</div><div class="sub">轉身繼續走，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你住的那條路，晚上是什麼樣子？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#走給你看</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#生活機能</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#實走</span>
+      <span class="hashtag">#租屋</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#夜晚</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej21" data-series="月薪8萬房仲日記" data-caption="生活機能方便是形容詞，走幾分鐘才是事實。用你平常的速度從物件走到最近的超市計時一次，記得真正要記的是提著東西回來的那趟回程。" data-hashtags="#走給你看 #生活機能 #高雄 #看房 #買房 #實測 #日常 #租屋 #生活 #步行">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 21</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六上午 11AM</span>
+    </div>
+    <h3 class="title">走到超市要幾分鐘，我走給你看</h3>
+    <div class="insight">起點站定，手機碼表歸零</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　起點站定，手機碼表歸零</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：方便是幾分鐘？我走給你看。 （起點站定，手機碼表歸零）</div><div class="mirror">藏鏡人　'這個我想知道'</div><div class="sub">起點站定，手機碼表歸零</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：物件說明常寫生活機能方便。方便是形容詞，走幾分鐘才是事實。所以我從這裡出發，計時。 （行走 POV，碼表偶爾入鏡）</div><div class="sub">行走 POV，碼表偶爾入鏡</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：走到最近的超市：【現場填：實測分鐘數】。中間會經過【現場填：路口／坡度／人行道有無，一句】。 （經過路口示意（不露門牌））</div><div class="sub">經過路口示意（不露門牌）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：提醒兩件事：一是要用你平常的速度走，不是趕路的速度；二是提東西回來的時候會比去的時候慢，所以真正該記的是回程。 （超市門口停錶特寫（不露招牌））</div><div class="mirror">藏鏡人　'原來不只五分鐘'</div><div class="sub">超市門口停錶特寫（不露招牌）</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：機能方不方便，用腳量比用眼睛看準。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，你家走到超市幾分鐘？底下說說。找家的路漫長　澤君陪你扛。 （收手機轉身）</div><div class="sub">收手機轉身</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，你家走到超市幾分鐘？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#走給你看</span>
+      <span class="hashtag">#生活機能</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#實測</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#租屋</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#步行</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej22" data-series="月薪8萬房仲日記" data-caption="很多東西只有下雨才看得到。自己看記三個地方：大門進出那段會不會積水、陽台落水口有沒有回堵、窗框下緣有沒有水痕。看到痕跡交給專業驗屋判斷。" data-hashtags="#走給你看 #看房 #買房 #驗屋 #雨天 #高雄 #實測 #居家 #房仲分享 #生活">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 22</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 機動（雨天當日）</span>
+    </div>
+    <h3 class="title">下雨天我又去了一次</h3>
+    <div class="insight">雨中撐傘走向物件（不露門牌）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　雨中撐傘走向物件（不露門牌）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：晴天看過，下雨天再來一次。 （雨中撐傘走向物件（不露門牌））</div><div class="mirror">藏鏡人　'下雨才看得出來'</div><div class="sub">雨中撐傘走向物件（不露門牌）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多東西只有下雨才看得到。晴天什麼都好，雨一下，你知道水往哪裡走嗎？ （地面積水特寫）</div><div class="sub">地面積水特寫</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：今天現場看到的第一件是【現場填：排水狀況，例如積水位置／退水速度】。第二件是【現場填：外牆或天花板痕跡／窗邊滲水跡象】。 （陽台落水口特寫）</div><div class="sub">陽台落水口特寫</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：你也想自己看的話，記三個地方：大門進出那段會不會積水、陽台落水口有沒有回堵、窗框下緣有沒有水痕。看到痕跡交給專業驗屋判斷。 （窗框下緣水痕特寫）</div><div class="mirror">藏鏡人　'這個一般人不會等'</div><div class="sub">窗框下緣水痕特寫</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：晴天看格局，雨天看體質。 （雨中看鏡頭，語氣直）</div><div class="sub">雨中看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，下次下雨那天拿出來看。找家的路漫長　澤君陪你扛。 （收傘進門，畫面淡出）</div><div class="sub">收傘進門，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，下次下雨那天拿出來看。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#走給你看</span>
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#驗屋</span>
+      <span class="hashtag">#雨天</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#實測</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#生活</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej23" data-series="月薪8萬房仲日記" data-caption="牆上有痕跡不一定是問題：細如髮絲、零散分布多半是收縮；斜向、貫穿、集中一角或有水痕就要找人。你的工作是發現不是診斷，拍照交專業驗屋。" data-hashtags="#看房 #買房 #驗屋 #屋況 #房地產知識 #首購 #高雄 #居家 #房仲分享 #實用">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 23</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM</span>
+    </div>
+    <h3 class="title">哪些屋況是小事，哪些要找人</h3>
+    <div class="insight">空屋牆面環顧</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　空屋牆面環顧</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：牆上有痕跡，不一定是問題。 （空屋牆面環顧）</div><div class="mirror">藏鏡人　'我看到就想跑'</div><div class="sub">空屋牆面環顧</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人看到痕跡第一個反應是跑。看得仔細是好事，但全部都當地雷，你會什麼都買不了。 （細裂紋特寫（示意））</div><div class="sub">細裂紋特寫（示意）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：分辨看位置跟形狀。漆面細如髮絲、分布零散，多半是收縮。但斜向的、貫穿的、集中同一個角落，或摸起來潮濕有水痕，那就不是小事。 （斜向裂紋與角落水痕特寫（示意））</div><div class="sub">斜向裂紋與角落水痕特寫（示意）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第二種你不用自己判斷，也不該自己判斷——記下位置、拍照，交給專業驗屋。你的工作是發現，不是診斷。 （手機拍照記錄動作）</div><div class="mirror">藏鏡人　'原來要看位置'</div><div class="sub">手機拍照記錄動作</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：看得懂的人不是什麼都不怕，是知道哪一種要找人。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你看過最猶豫的屋況是什麼？底下說說。找家的路漫長　澤君陪你扛。 （收手機）</div><div class="sub">收手機</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你看過最猶豫的屋況是什麼？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#驗屋</span>
+      <span class="hashtag">#屋況</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej24" data-series="月薪8萬房仲日記" data-caption="看房帶三樣不用錢的：充電頭測插座（先跟帶看的人講一聲）、瓶蓋測客廳房間地面（浴室陽台有洩水坡會滾是正常）、關門靜聽三十秒。這是初篩不是驗屋。" data-hashtags="#看房 #買房 #驗屋初篩 #房地產知識 #首購 #實測 #高雄 #居家 #房仲分享 #實用">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 24</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六下午 3PM</span>
+    </div>
+    <h3 class="title">三樣不用錢的，我測給你看</h3>
+    <div class="insight">進門前掏出三樣東西特寫（充電頭、瓶蓋）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　進門前掏出三樣東西特寫（充電頭、瓶蓋）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：三樣都不用錢，我測給你看。 （進門前掏出三樣東西特寫（充電頭、瓶蓋））</div><div class="mirror">藏鏡人　'這個我可以學'</div><div class="sub">進門前掏出三樣東西特寫（充電頭、瓶蓋）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：看房兩手空空最可惜。今天帶三樣：充電頭、一個瓶蓋、自己的耳朵。你猜哪樣最準？ （三樣道具攤在手上：充電頭、瓶蓋，再指自己耳朵）</div><div class="sub">三樣道具攤在手上：充電頭、瓶蓋，再指自己耳朵</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：第一樣，充電頭。先跟帶看的人講一聲，然後每個房間找一個插座插上手機，看會不會充電。現場結果：【現場填：插座測試結果，例如哪幾間充得進去、有沒有鬆或不會充】。 （先向帶看者示意徵得同意 → 插座插充電頭特寫（不露門牌））</div><div class="sub">先向帶看者示意徵得同意 → 插座插充電頭特寫（不露門牌）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第二樣，瓶蓋，放客廳跟房間的地上——浴室陽台本來就有洩水坡、會滾是正常的，別測那裡。現場：【現場填：瓶蓋是否滾動、往哪個方向】。第三樣，門窗全關站著安靜三十秒：【現場填：關門後還聽得到什麼】。 （瓶蓋放客廳地上滾動特寫 → 轉關門後靜止畫面，字幕倒數三十秒）</div><div class="mirror">藏鏡人　'真的不用花錢'</div><div class="sub">瓶蓋放客廳地上滾動特寫 → 轉關門後靜止畫面，字幕倒數三十秒</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：這三樣是初篩，不是驗屋。真的要買，還是要找專業驗屋。 （看鏡頭，語氣直不誇大）</div><div class="sub">看鏡頭，語氣直不誇大</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，這週末看房前拿出來看一次。找家的路漫長　澤君陪你扛。 （三樣收進口袋）</div><div class="sub">三樣收進口袋</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，這週末看房前拿出來看一次。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#驗屋初篩</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#實測</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej25" data-series="月薪8萬房仲日記" data-caption="看房影片通常都剪過，剪過的房子每一間都很好走。這支從進門到出門不剪，順序就是實際走的順序：玄關動線、客廳、房間、廚房、衛浴。你敢看嗎？" data-hashtags="#看房 #帶看 #買房 #實走 #房地產 #高雄 #購屋 #居家 #房仲分享 #日常">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 25</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週日下午 3PM</span>
+    </div>
+    <h3 class="title">從進門到出門，這次不剪</h3>
+    <div class="insight">玄關前推門 POV</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　玄關前推門 POV</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：從進門到出門，這次不剪。 （玄關前推門 POV）</div><div class="mirror">藏鏡人　'想看沒剪過的'</div><div class="sub">玄關前推門 POV</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：看房影片通常都剪過，剪過的房子每一間都好走。這支不剪，你敢不敢看真實動線？ （進門站定環顧 POV）</div><div class="sub">進門站定環顧 POV</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：進門第一件事我會先站著看動線：門一開，第一眼看到什麼、包包放哪裡？現場：【現場填：玄關與第一眼所見，一句】。 （依序走過客廳與房間 POV）</div><div class="sub">依序走過客廳與房間 POV</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：接著我會照同一套順序走：客廳、最大的房間、廚房、衛浴，最後回到窗邊看外面。中間值得停下來的是【現場填：本間最值得停下來看的一處】。不值得的地方我也不會跳過，你會看到我走過去。 （停在值得看的一處 POV）</div><div class="mirror">藏鏡人　'這樣才看得出動線'</div><div class="sub">停在值得看的一處 POV</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：剪過的房子都好走。動線好不好不是用看的，是用走的——你上次看房，走完記得幾步？ （窗邊回身看鏡頭）</div><div class="sub">窗邊回身看鏡頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：這樣的不剪版，你想看哪一種房型？底下說說。找家的路漫長　澤君陪你扛。 （走出玄關關門，畫面淡出）</div><div class="sub">走出玄關關門，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>這樣的不剪版，你想看哪一種房型？底下說說。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#帶看</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#實走</span>
+      <span class="hashtag">#房地產</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#日常</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej26" data-series="月薪8萬房仲日記" data-caption="進門先看三個角落：配電箱（先跟帶看的人講一聲）、廚房水槽下方水痕、陽台落水口有沒有回堵。這三個角落是初篩不是驗屋，看到異狀拍照交給專業驗屋判斷。" data-hashtags="#看房 #買房 #開箱 #屋況 #房地產知識 #首購 #高雄 #居家 #房仲分享 #實用">
+  <div class="card-head" style="--pie:#444">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 26</span>
+      <span class="batch">第 02 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六晚 9PM</span>
+    </div>
+    <h3 class="title">最容易被忽略的三個角落</h3>
+    <div class="insight">進門越過客廳往內走 POV</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　進門越過客廳往內走 POV</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：大家都看客廳，我先看這裡。 （進門越過客廳往內走 POV）</div><div class="mirror">藏鏡人　'我從來沒看過那裡'</div><div class="sub">進門越過客廳往內走 POV</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：客廳是最會被整理的地方，也最不容易看出問題。那該先看哪裡？我會先去三個角落。 （配電箱打開特寫）</div><div class="sub">配電箱打開特寫</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：第一個是配電箱。先跟帶看的人講一聲，再打開看一眼迴路夠不夠、標示清不清楚。現場：【現場填：配電箱狀況一句】。 （蹲下看水槽下方特寫）</div><div class="sub">蹲下看水槽下方特寫</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第二個是廚房水槽下面，蹲下來看有沒有水痕：【現場填：水槽下狀況一句】。第三個是陽台落水口：【現場填：落水口狀況一句】。這三個角落是初篩、不是驗屋，看到異狀拍照交給專業驗屋判斷。 （陽台落水口特寫）</div><div class="mirror">藏鏡人　'這三個角落好實用'</div><div class="sub">陽台落水口特寫</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：看客廳知道它被整理得多好，看角落才知道它平常過得怎麼樣。你上次看了嗎？ （站起身看鏡頭）</div><div class="sub">站起身看鏡頭</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：分享給下次要一起去看房的那個人。找家的路漫長　澤君陪你扛。 （轉身走回客廳）</div><div class="sub">轉身走回客廳</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>分享給下次要一起去看房的那個人。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#買房</span>
+      <span class="hashtag">#開箱</span>
+      <span class="hashtag">#屋況</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#首購</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+</div>
+
+<header class="section-head" id="sect-b_new_1">
+  <span class="roman"></span>
+  <span class="label">第 01 批 · 2026-08-10<span class="en">第 01 批 · 2026-08-10</span></span>
+  <span class="rule"></span>
+  <span class="count">13 scripts</span>
+</header>
+<div class="cards">
+<article class="card" id="zej1" data-series="月薪8萬房仲日記" data-caption="很多人以為自己在忍，其實是在等它自己消失。忍有兩種：一種在準備，一種在等它自己不見。分辨只要一個問題——這半年為它做了什麼具體動作。" data-hashtags="#人生觀察 #自我覺察 #拖延 #成長 #生活感悟 #人生選擇 #高雄 #日常觀察 #心情 #自我對話">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 01</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM</span>
+    </div>
+    <h3 class="title">你以為在忍，其實在等它自己消失</h3>
+    <div class="insight">直視鏡頭，語速慢，停一拍</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直視鏡頭，語速慢，停一拍</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：很多人以為自己在忍。 （直視鏡頭，語速慢，停一拍）</div><div class="mirror">藏鏡人　'我那件事拖多久了？'</div><div class="sub">直視鏡頭，語速慢，停一拍</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：但其實是在等它自己消失。忍一下、時機到了就順了，這句話有它的道理，先想清楚再動確實少踩雷。 （坐著，手上轉筆，語氣平）</div><div class="sub">坐著，手上轉筆，語氣平</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但忍有兩種：一種在準備，一種在等它自己不見。分辨只要一個問題——這半年，我為它做了什麼具體動作。 （身體前傾，手比二，眼神直）</div><div class="sub">身體前傾，手比二，眼神直</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：示意例：有人想調部門想了半年，主管都換兩任，履歷還是沒更新，每天中午就一句再看看。那不是忍，是在等位子自己空出來。 （說故事語氣，帶苦笑）</div><div class="mirror">藏鏡人　'對耶，我好像什麼都沒做，只是一直在想'</div><div class="sub">說故事語氣，帶苦笑</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：我的看法是：趁還輸得起的時候動一下，成本比想像小。等它自己消失，最後不是你決定，是別人幫你決定。 （收斂，看鏡頭不煽情）</div><div class="sub">收斂，看鏡頭不煽情</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：那件拖著的事，你這個月做了哪一個動作？答不出來，就今天寫下要講的那一句話。澤君。 （放鬆靠椅背，語氣輕）</div><div class="sub">放鬆靠椅背，語氣輕</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>那件拖著的事，你這個月做了哪一個動作？答不出來，就今天寫下要講的那一句話。澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#人生觀察</span>
+      <span class="hashtag">#自我覺察</span>
+      <span class="hashtag">#拖延</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#人生選擇</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#日常觀察</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#自我對話</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej2" data-series="月薪8萬房仲日記" data-caption="省的東西分兩類：一類省了就是省到，一類只是把帳單延後而且會加價。判準是問一句：這筆延後了，之後會變貴嗎。會被時間放大的，別省。" data-hashtags="#金錢觀 #省錢 #理財 #生活感悟 #人生選擇 #日常觀察 #高雄 #消費 #成長 #心情">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 02</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM</span>
+    </div>
+    <h3 class="title">省下來的那筆，後來花更多</h3>
+    <div class="insight">對鏡頭，語氣平但重</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　對鏡頭，語氣平但重</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：省下來的那筆，後來花更多。 （對鏡頭，語氣平但重）</div><div class="mirror">藏鏡人　'有點刺，但是真的'</div><div class="sub">對鏡頭，語氣平但重</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人從小被教能省則省，小錢積起來就是大錢。這件事本身沒錯，記帳、比價、不亂買，都是基本功。 （手拿收據翻一下）</div><div class="sub">手拿收據翻一下</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但省的東西分兩類：一類省了就是省到，一類只是把帳單延後，而且會加價。判準是問一句——這筆延後了，之後會變貴嗎。 （手比二，兩根手指分開）</div><div class="sub">手比二，兩根手指分開</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有人牙齒有點酸，拖了兩年不看，後來變成根管加牙套，花的錢是當初補一顆的十幾倍，還請了三天假躺著。 （說故事語氣，皺眉）</div><div class="mirror">藏鏡人　'我也有一個拖到後來花更多的'</div><div class="sub">說故事語氣，皺眉</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：會被時間放大的東西，就不要省。那種省法省的不是錢，是幫它加價分期。 （看鏡頭，語氣收）</div><div class="sub">看鏡頭，語氣收</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你有沒有一個省到後來花更多的？底下說說，我想看看大家都栽在哪一種。澤君。 （輕鬆，微笑攤手）</div><div class="sub">輕鬆，微笑攤手</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你有沒有一個省到後來花更多的？底下說說，我想看看大家都栽在哪一種。澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#金錢觀</span>
+      <span class="hashtag">#省錢</span>
+      <span class="hashtag">#理財</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#人生選擇</span>
+      <span class="hashtag">#日常觀察</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#消費</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#心情</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej3" data-series="月薪8萬房仲日記" data-caption="先付錢逼自己會失敗，是因為錢只痛一次，你要做的事每週都痛一次。要推動的不是付款，是把它接在一個你本來就會做的事後面。先排位置，再談意志力。" data-hashtags="#習慣養成 #自我管理 #生活觀察 #時間管理 #成長 #日常 #高雄 #心情 #人生選擇 #效率">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 03</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM</span>
+    </div>
+    <h3 class="title">報名了就會去？你少算一件事</h3>
+    <div class="insight">對鏡頭，語氣快</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　對鏡頭，語氣快</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：很多人報名了，然後沒去。 （對鏡頭，語氣快）</div><div class="mirror">藏鏡人　'我健身房卡也是'</div><div class="sub">對鏡頭，語氣快</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人相信先付錢就會逼自己去，沉沒成本會推著自己走。短期確實有效，付了錢是真的會心疼。 （手機畫面拍報名頁（去識別））</div><div class="sub">手機畫面拍報名頁（去識別）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但你少算了頻率。錢只痛一次，你要做的事每週都痛一次。一次性的痛，推不動每週要重複的動作。真正能推動的是位置——把它接在一個你本來就會做的事後面。 （手比在桌上畫時間格）</div><div class="sub">手比在桌上畫時間格</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有人一月刷了一年期會員，前三週去了五次，第四週加班一次就斷了，之後每次經過都說下週開始。他缺的不是決心，是那個時段本來就有別的事。 （說故事語氣，聳肩）</div><div class="mirror">藏鏡人　'真的，我都停在第二堂'</div><div class="sub">說故事語氣，聳肩</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：先排位置，再談意志力。排不進去的行程，你刷再多錢也去不了。 （看鏡頭，語氣篤定）</div><div class="sub">看鏡頭，語氣篤定</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：覺得有用就收藏起來，下次手指停在報名頁的時候再看一次。你有沒有一張還沒去過的卡？澤君。 （輕鬆，指向螢幕上方）</div><div class="sub">輕鬆，指向螢幕上方</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>覺得有用就收藏起來，下次手指停在報名頁的時候再看一次。你有沒有一張還沒去過的卡？澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#習慣養成</span>
+      <span class="hashtag">#自我管理</span>
+      <span class="hashtag">#生活觀察</span>
+      <span class="hashtag">#時間管理</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#人生選擇</span>
+      <span class="hashtag">#效率</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej4" data-series="月薪8萬房仲日記" data-caption="不講心事的人多半講過，是那幾次被回想太多、別想那麼多，講一次收一次。要接住只要一個動作：前三十秒不給建議，先把他說的事實重複一次。" data-hashtags="#關係 #溝通 #家人 #傾聽 #生活感悟 #情緒 #日常觀察 #高雄 #心情 #人際">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 04</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週日晚 9PM</span>
+    </div>
+    <h3 class="title">他不是不說，是說了沒被接住</h3>
+    <div class="insight">低角度餐桌前，語氣輕</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　低角度餐桌前，語氣輕</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：很多人被問到不想講。 （低角度餐桌前，語氣輕）</div><div class="mirror">藏鏡人　'我好像也這樣回過'</div><div class="sub">低角度餐桌前，語氣輕</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：家裡那個人越來越安靜，你問他怎麼了，他說沒事。多數人會覺得他就是個性內向——這也不算錯，有人天生話少。 （餐桌邊坐著，手撐下巴）</div><div class="sub">餐桌邊坐著，手撐下巴</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但很多不講的人，以前講過。是那幾次被回一句你想太多、別想那麼多。講一次收一次，講到第三次就不講了。要接住只要一個動作：前三十秒不給建議、不判斷對錯，先把他說的事實重複一次。 （身體前傾，手掌向上做接的動作）</div><div class="sub">身體前傾，手掌向上做接的動作</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有人講到被主管唸，才講兩句就被回一句你就是想太多。隔週你再問他，他只會說還好。他不是忘了，他是學會不講了。 （說故事語氣，語速慢）</div><div class="mirror">藏鏡人　'我媽就是這樣，後來什麼都不說了'</div><div class="sub">說故事語氣，語速慢</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：沉默不是個性，是回應累積出來的結果。等到他完全不說了，要重新打開比當初接住難十倍。 （看鏡頭，語氣柔但不煽情）</div><div class="sub">看鏡頭，語氣柔但不煽情</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：覺得像你家的，收藏起來，晚餐前看一次。你家那個人，最近說了幾次沒事？澤君。 （輕鬆收，看向鏡頭）</div><div class="sub">輕鬆收，看向鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>覺得像你家的，收藏起來，晚餐前看一次。你家那個人，最近說了幾次沒事？澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#關係</span>
+      <span class="hashtag">#溝通</span>
+      <span class="hashtag">#家人</span>
+      <span class="hashtag">#傾聽</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#情緒</span>
+      <span class="hashtag">#日常觀察</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#人際</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej5" data-series="月薪8萬房仲日記" data-caption="撐是策略，不是品德。撐之前先寫下兩個數字：撐到什麼時候、看到什麼訊號就停。沒有上限的撐不叫韌性——放在心裡的停損，永遠不會真的觸發。" data-hashtags="#人生選擇 #停損 #自我覺察 #成長 #生活感悟 #人生觀察 #日常 #高雄 #心情 #決策">
+  <div class="card-head" style="--pie:#2A2A6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 05</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週四晚 8PM</span>
+    </div>
+    <h3 class="title">撐得久不是強，是沒設停損</h3>
+    <div class="insight">直視鏡頭，不笑，語速慢</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　直視鏡頭，不笑，語速慢</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：撐得久不是強，是沒設停損。 （直視鏡頭，不笑，語速慢）</div><div class="mirror">藏鏡人　'有點痛，我在聽'</div><div class="sub">直視鏡頭，不笑，語速慢</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人聽過堅持就會贏，撐過去就是你的。這在很多故事裡是真的，成果常常出現在撐過去之後。 （靠牆站，手插口袋）</div><div class="sub">靠牆站，手插口袋</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但那些故事都少講一句：他們有在看儀表板。撐要設兩個上限——撐到什麼時候，看到什麼訊號就停。時間到、訊號沒出現，就走。寫下來才有效，放在心裡的停損永遠不會觸發。 （拿紙筆寫下兩行字（特寫紙面））</div><div class="sub">拿紙筆寫下兩行字（特寫紙面）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有人做副業兩年，每個月都說再一季看看。兩年來他從沒寫下要看到什麼數字才算成功，所以每一季都可以再一季。 （說故事語氣，語氣平）</div><div class="mirror">藏鏡人　'我那件事撐兩年了，好像沒在看訊號'</div><div class="sub">說故事語氣，語氣平</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：撐是策略，不是品德。我的看法是：沒有上限的撐，不叫韌性，是把自己套在裡面。 （看鏡頭，句尾停一拍）</div><div class="sub">看鏡頭，句尾停一拍</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：今天就寫那兩行：撐到哪一天，看到什麼就停。你呢，你那件事撐多久了？澤君。 （低頭寫完把紙轉向鏡頭）</div><div class="sub">低頭寫完把紙轉向鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>今天就寫那兩行：撐到哪一天，看到什麼就停。你呢，你那件事撐多久了？澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#人生選擇</span>
+      <span class="hashtag">#停損</span>
+      <span class="hashtag">#自我覺察</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#人生觀察</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#決策</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej6" data-series="月薪8萬房仲日記" data-caption="記帳只管得住流出，管不住流入。每季多記一欄：這一季我為了讓自己更值錢花了多少、換到什麼。那一欄長期是空的，你守的是一個不會長大的池子。" data-hashtags="#金錢觀 #記帳 #理財 #自我投資 #生活感悟 #成長 #日常觀察 #高雄 #心情 #人生選擇">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 06</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週二晚 8PM</span>
+    </div>
+    <h3 class="title">會記帳的人，常常最不敢花</h3>
+    <div class="insight">坐咖啡桌前，語氣平</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　坐咖啡桌前，語氣平</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：會記帳的人，常常最不敢花。 （坐咖啡桌前，語氣平）</div><div class="mirror">藏鏡人　'被說中了'</div><div class="sub">坐咖啡桌前，語氣平</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人帳記得很細，連五十塊的飲料都有分類。這是好事，看得見流向才不會亂花。 （翻記帳 App（畫面去識別））</div><div class="sub">翻記帳 App（畫面去識別）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但記帳只記流出，不記流入的變化。它讓你越來越會守，沒讓你變得更值錢。做法很簡單：每季多記一欄——這一季我為了讓自己更值錢花了多少、換到什麼。 （手指在紙上畫出一欄）</div><div class="sub">手指在紙上畫出一欄</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有人記帳三年，分類細到嚇人，可是三年裡沒有一筆是花在讓自己變值錢的東西上。他守得很好，池子沒長大。 （說故事語氣，微笑）</div><div class="mirror">藏鏡人　'我那欄真的長期是空的'</div><div class="sub">說故事語氣，微笑</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：帳面漂亮不等於變強。那一欄長期是空的，你守的是一個不會長大的池子。 （看鏡頭，語氣穩）</div><div class="sub">看鏡頭，語氣穩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你那一欄這季有東西嗎？底下說說你填了什麼。澤君。 （攤手，輕鬆邀請）</div><div class="sub">攤手，輕鬆邀請</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你那一欄這季有東西嗎？底下說說你填了什麼。澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#金錢觀</span>
+      <span class="hashtag">#記帳</span>
+      <span class="hashtag">#理財</span>
+      <span class="hashtag">#自我投資</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#日常觀察</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#人生選擇</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej7" data-series="月薪8萬房仲日記" data-caption="沉默分兩種：一種是沒話可說，一種是不用說話也不尷尬。安靜的時候你會想離開，還是覺得可以就這樣坐著？分得出來，就不用急著把它治好。" data-hashtags="#關係 #日常 #陪伴 #生活感悟 #情緒 #人間觀察 #高雄 #吃飯 #心情 #家人">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 07</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週日晚 9PM</span>
+    </div>
+    <h3 class="title">一起吃飯不講話，不一定是壞事</h3>
+    <div class="insight">小吃店座位對坐視角，暖光</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　小吃店座位對坐視角，暖光</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：吃飯不講話，不一定是壞事。 （小吃店座位對坐視角，暖光）</div><div class="mirror">藏鏡人　'我常擔心這個'</div><div class="sub">小吃店座位對坐視角，暖光</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人會擔心：我們是不是沒話講了。這個擔心不是沒道理，很多關係確實是從不講話開始走遠的。 （端碗，語氣慢）</div><div class="sub">端碗，語氣慢</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但沉默分兩種。一種是沒話可說，一種是不用說話也不尷尬。分辨方法很簡單：安靜的時候，你會想離開，還是覺得可以就這樣坐著。想離開就找話講，覺得可以坐著，就別急著填滿。 （兩碗麵並排空鏡，環境音）</div><div class="sub">兩碗麵並排空鏡，環境音</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：舉個示意例：有兩個人在小吃店坐一整餐沒講幾句，一個人把辣椒推過去，另一個就知道要加多少。那不是沒話講，那是不用講。 （推辣椒罐的手部特寫）</div><div class="mirror">藏鏡人　'我跟他就是可以一起安靜那種'</div><div class="sub">推辣椒罐的手部特寫</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：有些安靜是冷掉，有些安靜是求了很久才有的。你分得出來，就不用急著把它治好。 （看鏡頭，語氣柔）</div><div class="sub">看鏡頭，語氣柔</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：今天吃飯安靜的時候，先問自己想不想離開。澤君。 （低頭吃一口，畫面淡出）</div><div class="sub">低頭吃一口，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>今天吃飯安靜的時候，先問自己想不想離開。澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#關係</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#陪伴</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#情緒</span>
+      <span class="hashtag">#人間觀察</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#吃飯</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#家人</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej8" data-series="月薪8萬房仲日記" data-caption="排十件做三件，等於每天發一張不及格考卷給自己。改法：每天只鎖三件，其餘丟候補區，三件做完才准往候補拿。一週後會看到，卡住的永遠是同兩件。" data-hashtags="#時間管理 #待辦清單 #自我管理 #效率 #生活感悟 #成長 #日常 #高雄 #心情 #習慣">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 08</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週一晚 8PM</span>
+    </div>
+    <h3 class="title">計畫寫太滿，是怕面對做不到</h3>
+    <div class="insight">桌前俯拍空白便條紙</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　桌前俯拍空白便條紙</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：計畫寫太滿，多半是怕做不到。 （桌前俯拍空白便條紙）</div><div class="mirror">藏鏡人　'我清單天天紅一半'</div><div class="sub">桌前俯拍空白便條紙</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人早上列十件事，晚上打勾三件。列出來確實比放在腦袋好，清單能降低焦慮，這是對的。 （寫下十行清單（快動作））</div><div class="sub">寫下十行清單（快動作）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但排十件做三件，等於每天發一張不及格考卷給自己。改法很簡單：每天只鎖三件，其餘全部丟候補區，三件做完才准往候補拿。 （劃掉七行只留三行（特寫））</div><div class="sub">劃掉七行只留三行（特寫）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：示意例：有人照這樣做一週，發現每天被推掉的永遠是同兩件。那兩件不是沒時間，是不想碰，清單排滿剛好把它們藏得很好。 （翻週記，指出重複被推的兩行）</div><div class="mirror">藏鏡人　'真的耶，卡住的永遠是同兩件'</div><div class="sub">翻週記，指出重複被推的兩行</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：清單不是用來裝滿的，是用來逼你承認今天只能做三件。 （看鏡頭，語氣穩）</div><div class="sub">看鏡頭，語氣穩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，明天早上列清單前看一次。你有沒有一張每天都紅一半的清單？澤君。 （把三行清單轉向鏡頭）</div><div class="sub">把三行清單轉向鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，明天早上列清單前看一次。你有沒有一張每天都紅一半的清單？澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#時間管理</span>
+      <span class="hashtag">#待辦清單</span>
+      <span class="hashtag">#自我管理</span>
+      <span class="hashtag">#效率</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#習慣</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej9" data-series="月薪8萬房仲日記" data-caption="比價真正被用掉的不是時間，是耐性。耐性一天就那麼多，小額比完一小時，輪到大額那筆只剩三分鐘。排順序：大額先比、比到夠；小額設一個預設款固定買。" data-hashtags="#消費 #決策 #金錢觀 #時間管理 #生活感悟 #日常觀察 #理財 #高雄 #心情 #效率">
+  <div class="card-head" style="--pie:#2A4F6B">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 09</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週三晚 8PM</span>
+    </div>
+    <h3 class="title">小的比一小時，大的三分鐘</h3>
+    <div class="insight">筆電前開多分頁（畫面去識別）</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　筆電前開多分頁（畫面去識別）</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：小東西比一小時，大錢三分鐘。 （筆電前開多分頁（畫面去識別））</div><div class="mirror">藏鏡人　'我昨天開六個分頁'</div><div class="sub">筆電前開多分頁（畫面去識別）</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人為了一個小東西開六個分頁，比了一小時。這不是壞習慣，價差有時候真的不小，比了也買得踏實。 （手撐頭滑價格頁）</div><div class="sub">手撐頭滑價格頁</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但被用掉的不只是時間，是耐性。耐性一天就那麼多，小額比完一小時，輪到大額那筆就只剩三分鐘。所以不是別比，是排順序——大額的先比、比到夠；小額的設一個預設，固定買同一款。 （畫一條線分兩邊（紙筆特寫））</div><div class="sub">畫一條線分兩邊（紙筆特寫）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：示意例：有人為了洗髮精差三十塊比了半小時，同一週買家電三分鐘就決定。小的比到爛，大的憑感覺，順序剛好反了。 （說故事語氣，笑一下）</div><div class="mirror">藏鏡人　'大的那筆我反而三分鐘就決定'</div><div class="sub">說故事語氣，笑一下</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：省得到的錢是真的，被用掉的耐性也是真的。把耐性留給金額大的那幾筆。 （看鏡頭，語氣穩）</div><div class="sub">看鏡頭，語氣穩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你最近哪一筆比最久？底下說說，多半不是最貴的那一筆吧，澤君。 （攤手，輕鬆邀請）</div><div class="sub">攤手，輕鬆邀請</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你最近哪一筆比最久？底下說說，多半不是最貴的那一筆吧，澤君。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#消費</span>
+      <span class="hashtag">#決策</span>
+      <span class="hashtag">#金錢觀</span>
+      <span class="hashtag">#時間管理</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#日常觀察</span>
+      <span class="hashtag">#理財</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#效率</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej10" data-series="月薪8萬房仲日記" data-caption="第一年整年掛蛋，月薪八萬變年薪八萬，半年沒人帶。零回饋的那段時間，如果重來，我會先給自己訂一個小到不會失敗的指標。指標不是成績，是有沒有動。" data-hashtags="#成長 #轉職 #低谷 #人生選擇 #自我覺察 #生活感悟 #高雄 #心情 #日常 #堅持">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 10</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週四晚 8PM</span>
+    </div>
+    <h3 class="title">月薪八萬變年薪八萬，第一年掛蛋</h3>
+    <div class="insight">深夜辦公室獨坐，桌上空白業績表</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　深夜辦公室獨坐，桌上空白業績表</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：第一年業績掛蛋。 （深夜辦公室獨坐，桌上空白業績表）</div><div class="mirror">藏鏡人　'真的會懷疑自己'</div><div class="sub">深夜辦公室獨坐，桌上空白業績表</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：月薪八萬變年薪八萬。那半年沒有人帶我，最熟的地方是公司旁邊那間炒飯店。多數人會說，沒成績就是還不夠努力，再加把勁就會有。 （炒飯店門口街景（不入他人臉、不露招牌））</div><div class="sub">炒飯店門口街景（不入他人臉、不露招牌）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：如果重來，我會先給自己訂一個小指標，小到不會失敗。指標不是成績，是有沒有動——今天有沒有多認識一條街、多問一個問題。你可以記在手機備忘錄，每天記一行。 （手機備忘錄打字特寫）</div><div class="sub">手機備忘錄打字特寫</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：我沒有靠自己撐出來。是另一間店的主管把我撈過去的。 （街道走路背影，日光）</div><div class="mirror">藏鏡人　'有人拉一把，跟自己硬撐差很多'</div><div class="sub">街道走路背影，日光</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：撐過來的人不是比較勇敢，是手上有東西可以抓。等外面給你回饋，多數人撐不到那天。 （看鏡頭，語氣穩不悲情）</div><div class="sub">看鏡頭，語氣穩不悲情</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：你現在那件事，有沒有一個今天就能打勾的小指標？你有的話，今天就記下來。找家的路漫長　澤君陪你扛。 （轉身繼續走，畫面淡出）</div><div class="sub">轉身繼續走，畫面淡出</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>你現在那件事，有沒有一個今天就能打勾的小指標？你有的話，今天就記下來。找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#轉職</span>
+      <span class="hashtag">#低谷</span>
+      <span class="hashtag">#人生選擇</span>
+      <span class="hashtag">#自我覺察</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#堅持</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej11" data-series="月薪8萬房仲日記" data-caption="不懂就問沒錯，但問法決定你拿到什麼。問怎麼做只換到一個答案，問對方當時為什麼這樣選，換到的是判斷方式。答案會過期，判斷不會。" data-hashtags="#成長 #學習方法 #職場 #新人 #自我覺察 #生活感悟 #高雄 #心情 #日常 #提問">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 11</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週五晚 8PM</span>
+    </div>
+    <h3 class="title">沒人帶的那半年，問法比努力重要</h3>
+    <div class="insight">辦公室角落一個人看資料</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　辦公室角落一個人看資料</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：沒人帶的那半年。 （辦公室角落一個人看資料）</div><div class="mirror">藏鏡人　'我也不敢問'</div><div class="sub">辦公室角落一個人看資料</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：最可惜的是問法。很多人講不懂就問，這句話沒錯，肯問的人確實學得快。 （街邊走路背影，早晨光）</div><div class="sub">街邊走路背影，早晨光</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但問法決定你拿到什麼。問這個怎麼做，只會拿到一個答案；問對方當時為什麼這樣選，拿到的是判斷方式。如果你身邊有人可以問，這三句可以直接用：你當時考慮過哪幾個做法、為什麼選這個、重來會不會改。 （手寫三句問句在便條紙（特寫））</div><div class="sub">手寫三句問句在便條紙（特寫）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：後來是另一間店的主管把我撈過去，我才真正學會怎麼做這行。轉機不是我多強，是有人願意伸手。會問問題這件事，是被帶之後才慢慢長出來的。 （與資深者並肩走廊談話（背影，不露臉））</div><div class="mirror">藏鏡人　'有人拉一把，跟自己硬撐差很多'</div><div class="sub">與資深者並肩走廊談話（背影，不露臉）</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：答案會過期，判斷不會。你問的方式，決定你能不能自己走下去。 （看鏡頭，語氣穩）</div><div class="sub">看鏡頭，語氣穩</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：明天要問誰？先想好那三句怎麼開口。你有沒有一個想問很久的人？找家的路漫長　澤君陪你扛。 （收起便條紙，點頭）</div><div class="sub">收起便條紙，點頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>明天要問誰？先想好那三句怎麼開口。你有沒有一個想問很久的人？找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#成長</span>
+      <span class="hashtag">#學習方法</span>
+      <span class="hashtag">#職場</span>
+      <span class="hashtag">#新人</span>
+      <span class="hashtag">#自我覺察</span>
+      <span class="hashtag">#生活感悟</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#心情</span>
+      <span class="hashtag">#日常</span>
+      <span class="hashtag">#提問</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej12" data-series="月薪8萬房仲日記" data-caption="決定要賣的第一個動作不是找人，是自己先拍三張：大門口往室內、最大的空間、採光最好的角落。拍完當買方看一遍，不會想來就先處理再拍。" data-hashtags="#賣房準備 #房屋照片 #居家整理 #房地產知識 #購屋 #房仲分享 #高雄 #美術館 #生活 #實用">
+  <div class="card-head" style="--pie:#6B2A1F">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 12</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六上午 11AM</span>
+    </div>
+    <h3 class="title">賣房前先拍這三張，別急著找人</h3>
+    <div class="insight">站在大門口，手機舉起</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　站在大門口，手機舉起</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：別急著找人，先拍三張。 （站在大門口，手機舉起）</div><div class="mirror">藏鏡人　'沒想過先自己拍'</div><div class="sub">站在大門口，手機舉起</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：很多人決定要賣，第一件事就是趕快找人來看、趕快上架。我懂那個心情，想早點開始沒有錯。 （滑手機看物件照片牆（去識別））</div><div class="sub">滑手機看物件照片牆（去識別）</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：但照片是買方第一個看到的東西。所以先自己拍三張：第一張從大門口往室內，第二張家裡最大的那個空間站角落拍全景，第三張挑一天中最亮的時段拍採光最好的角落。 （門口往室內拍的示範動作）</div><div class="sub">門口往室內拍的示範動作</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：三張拍完，你自己當買方看一遍。如果這三張不會讓你想來，那就先處理再拍——通常要處理的不是裝潢，是地上的東西太多、窗簾沒拉開、燈沒全開。 （拉開窗簾、開燈的動作特寫）</div><div class="mirror">藏鏡人　'這三張我家好像都不及格'</div><div class="sub">拉開窗簾、開燈的動作特寫</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：沒整理就拍，等於用最差的樣子見最多的人。這三張你自己就能拍，今天就能拍。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，決定要賣的那天照著拍一次。你家這三張，拍得出來嗎？找家的路漫長　澤君陪你扛。 （把手機畫面轉向鏡頭）</div><div class="sub">把手機畫面轉向鏡頭</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，決定要賣的那天照著拍一次。你家這三張，拍得出來嗎？找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#賣房準備</span>
+      <span class="hashtag">#房屋照片</span>
+      <span class="hashtag">#居家整理</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#美術館</span>
+      <span class="hashtag">#生活</span>
+      <span class="hashtag">#實用</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+<article class="card" id="zej13" data-series="月薪8萬房仲日記" data-caption="裝潢會被搬走，感覺會被燈光影響。看房帶三樣不用錢的：充電頭測插座、瓶蓋測客廳房間地面、關上門安靜三十秒聽隔音。這三樣是初篩，不取代專業驗屋。" data-hashtags="#看房 #購屋 #房地產知識 #買房準備 #居家 #房仲分享 #高雄 #美術館 #實用 #生活">
+  <div class="card-head" style="--pie:#444">
+    <div class="card-meta">
+      <button class="shot-toggle" type="button" aria-label="切換已拍過">已拍過</button>
+      <span class="num">No. 13</span>
+      <span class="batch">第 01 批 · 2026-08-10</span>
+      <span class="series-stamp">月薪8萬房仲日記</span>
+    </div>
+    <div class="card-meta-extra">
+      <span class="platform">▶ IG Reels</span>
+      <span class="po-time">⏰ 週六上午 11AM</span>
+    </div>
+    <h3 class="title">看房帶這三樣，比看裝潢有用</h3>
+    <div class="insight">手心攤開放充電頭與瓶蓋</div>
+  </div>
+  <div class="card-body">
+    <div class="scene"><b>場景</b>　手心攤開放充電頭與瓶蓋</div>
+    <div class="timeline">
+        <div class="row"><div class="time">0-3秒 Hook</div><div class="say">澤君：看房帶三樣，比看裝潢有用。 （手心攤開放充電頭與瓶蓋）</div><div class="mirror">藏鏡人　'我只顧著看廚房'</div><div class="sub">手心攤開放充電頭與瓶蓋</div></div>
+        <div class="row"><div class="time">3-12秒 破題</div><div class="say">澤君：多數人去看房，兩手空空，回家只記得裝潢很漂亮。感覺當然重要，但裝潢會被搬走，感覺會被燈光影響。 （走進空屋玄關，環顧）</div><div class="sub">走進空屋玄關，環顧</div></div>
+        <div class="row"><div class="time">12-25秒 核心論述</div><div class="say">澤君：帶三樣就好，都不用花錢。第一樣，手機充電頭——先跟帶看的人講一聲，每個房間找一個插座插上手機，看會不會充電、插頭會不會鬆。 （插座插充電頭特寫（示意空間，不露門牌））</div><div class="sub">插座插充電頭特寫（示意空間，不露門牌）</div></div>
+        <div class="row"><div class="time">25-40秒 案例轉折</div><div class="say">澤君：第二樣，一個瓶蓋，放客廳跟房間的地上，看它會不會自己滾——浴室陽台本來就有洩水坡、會滾是正常的，別測那裡。第三樣是你的耳朵：門窗全關，站著安靜三十秒，聽外面還剩多少聲音。 （瓶蓋放地上滾動特寫→關門靜止畫面）</div><div class="mirror">藏鏡人　'關門聽三十秒，這個好用'</div><div class="sub">瓶蓋放地上滾動特寫→關門靜止畫面</div></div>
+        <div class="row"><div class="time">40-52秒 收束金句</div><div class="say">澤君：跟著你住進去的不是裝潢，是插座、地面跟關上門之後的聲音。這三樣是初篩、不是驗屋——真的要買，還是要找專業驗屋。 （看鏡頭，語氣直）</div><div class="sub">看鏡頭，語氣直</div></div>
+        <div class="row"><div class="time">52-60秒 CTA</div><div class="say">澤君：收藏起來，這週末看房前拿出來看一次。你這週要去看幾間？找家的路漫長　澤君陪你扛。 （把三樣東西收進口袋）</div><div class="sub">把三樣東西收進口袋</div></div>
+    </div>
+    <div class="cta">
+      <span class="cta-arrow">→</span>
+      <span>收藏起來，這週末看房前拿出來看一次。你這週要去看幾間？找家的路漫長　澤君陪你扛。</span>
+    </div>
+    <div class="hashtag-pool">
+      <span class="hashtag">#看房</span>
+      <span class="hashtag">#購屋</span>
+      <span class="hashtag">#房地產知識</span>
+      <span class="hashtag">#買房準備</span>
+      <span class="hashtag">#居家</span>
+      <span class="hashtag">#房仲分享</span>
+      <span class="hashtag">#高雄</span>
+      <span class="hashtag">#美術館</span>
+      <span class="hashtag">#實用</span>
+      <span class="hashtag">#生活</span>
+    </div>
+    <button class="copy-btn" onclick="copyScript(this)">複製文案</button>
+  </div>
+</article>
+</div>
+
+<!-- THREADS_PLACEHOLDER — build_zejun.py 負責替換此區塊 -->
+
+<header class="section-head" id="sect-threads">
+  <span class="roman">✦</span>
+  <span class="label">脆文 Threads<span class="en">第 02 批 · 2026-08-10 · 13 篇</span></span>
+  <span class="rule"></span>
+  <span class="count">13 posts</span>
+</header>
+<div class="threads-grid">
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T01</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">剛入行那半年沒人帶，最熟的地方是公司旁那間炒飯店。
+
+被晾著的人，最想要的其實只是有人講一句話。
+
+現在換我伸手帶新人。這行最缺的，就是有人肯先講一句。
+
+會的人多一個，走冤枉路的人就少一個。</div>
+  <div class="thread-hash"># Threads 脆文 — 澤君第 02 批</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T02</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">裝潢好該不該加價，先分兩類。
+
+固定在牆上、地上、天花板的，會留下來。家具、家電、窗簾，交屋前多半會被帶走——哪些會留，最後以契約附贈設備清單為準。
+
+分完問第二句：留下的那些，是不是你本來就會做的。
+
+是，那對你有價值。不是，那是替別人的品味付錢。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T03</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">帶長輩看房，是多一雙眼睛，不是多一個裁判。
+
+現場三個人三種意見，最後誰都沒決定，房子被別人簽走——這種比意見不合更常見。
+
+出發前先講好三件事：誰付錢、誰住、最後誰拍板。
+
+長輩負責提醒，不負責決定。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T04</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">第一次買房，多數人漏掉的不是預算，是時間表。
+
+從看房到交屋，中間一連串要排的事，每一件都卡到下一件。
+
+先寫三個時間點：什麼時候搬、什麼時候要備好錢、幾月開始看房。
+
+從搬家日往回推，不是從今天往前算。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T05</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">「這間很多人在看」「屋主很有誠意」「這個價位很難找」——這三句這行的人都講過。
+
+單憑一句都還不夠下判斷，因為它們是把形容詞當結論用。
+
+你要做的不是不信，是把形容詞換成問句：屋主為什麼賣、什麼時候要交屋、什麼條件下願意談。
+
+問完，形容詞就變成資訊了。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T06</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">照片跟現場的落差，多半不是修圖。
+
+廣角會把空間拉長，物件照多半挑一天中最亮的時段拍，空屋又沒有家具當比例尺，眼睛判斷不了大小。
+
+看照片先問一句：這張站在哪裡拍的。到現場自己找參照物，用腳步量一次。
+
+照片不會說謊，但它只說了它想說的那一面。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T07</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">白天走過的路，晚上再走一次，常常是兩條路。
+
+要住一個地方之前，我建議自己走一次夜路，看三個地方：
+
+停車的位置走回家那一段、最後一盞路燈到大門之間、你晚上會去的那家店幾點關。
+
+白天漂亮不算，晚上還走得舒服才算。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T08</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">「生活機能方便」是形容詞，走幾分鐘才是事實。
+
+用你平常的速度走一趟到最近的超市，計時。
+
+真正該記的不是去程，是提著東西回來的那一趟——那個才是你每天要走的。
+
+機能方不方便，用腳量比用眼睛看準。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T09</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">晴天看格局，雨天看體質。
+
+很多東西只有下雨那天看得到：水往哪裡走、哪裡會積、哪裡退得慢。
+
+下次下雨，繞去正在考慮的那間看三處：大門進出那段會不會積水、陽台落水口有沒有回堵、窗框下緣有沒有水痕。
+
+看到痕跡不用自己判斷，那是專業驗屋的事。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T10</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">牆上有痕跡，不一定是問題。
+
+漆面細如髮絲、分布零散，多半是收縮。斜向的、貫穿的、集中在同一個角落，或摸起來潮濕有水痕，那就不是小事。
+
+第二種你不用自己判斷，也不該自己判斷。
+
+你的工作是發現，不是診斷。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T11</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">看房帶三樣，都不用錢。
+
+手機充電頭：先跟帶看的人講一聲，每個房間找一個插座插上手機，看會不會充電。
+
+一個瓶蓋：放客廳跟房間的地上（浴室陽台本來就有洩水坡，會滾是正常的）。
+
+還有自己的耳朵：門窗全關，站著安靜三十秒。
+
+這三樣是初篩，不是驗屋。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T12</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">看房影片通常都剪過。剪過的房子，每一間都很好走。
+
+真正要看的是動線：門一開第一眼看到什麼、包包放哪裡、從玄關到廚房要繞幾步。
+
+這些東西剪一刀就沒了。
+
+下次看房自己走一次固定順序，中間不跳過，你會看到不一樣的房子。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+<div class="thread-card">
+  <div class="thread-meta"><span class="thread-id">T13</span><span class="thread-label">觀點型</span></div>
+  <div class="thread-text">客廳是最會被整理的地方，也是最不容易看出問題的地方。
+
+進門先去三個角落：配電箱（要開之前先跟帶看的人講一聲）、廚房水槽下面看有沒有水痕、陽台落水口看有沒有回堵。
+
+這三個角落是初篩，不是驗屋。
+
+看到異狀記下位置、拍照，交給專業驗屋判斷。</div>
+  <button class="copy-btn" onclick="copyThread(this)">複製脆文</button>
+</div>
+</div>
+
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<div class="empty" id="empty">沒有符合條件的腳本</div>
+
+<footer>
+  <div class="lines">
+    <span>找家的路漫長　澤君陪你扛</span>
+  </div>
+  <div class="bagao-sig">ZEJUN SCRIPT WORKBENCH</div>
+</footer>
+
+<script>
+(function(){
+
+// ====== 1. 主題分組 DOM 殼子（從 section-head DOM 讀，不 hardcode）======
+var sectionHeads = document.querySelectorAll('.section-head');
+sectionHeads.forEach(function(sh){
+  var next = sh.nextElementSibling;
+  if (!next || (!next.classList.contains('cards') && !next.classList.contains('threads-grid'))) return;
+  var romanEl = sh.querySelector('.roman');
+  var labelEl = sh.querySelector('.label');
+  var roman = romanEl ? romanEl.textContent.trim() : '';
+  var labelText = '';
+  if (labelEl) {
+    labelEl.childNodes.forEach(function(node){
+      if (node.nodeType === 3) labelText += node.textContent;
+    });
+    labelText = labelText.trim();
+  }
+  var count = next.querySelectorAll('.card, .thread-card').length;
+  var unit = next.classList.contains('threads-grid') ? ' posts' : ' scripts';
+  var group = document.createElement('div');
+  group.className = 'group';
+  group.innerHTML =
+    '<div class="group-head">' +
+      '<span class="gh-roman">' + roman + '</span>' +
+      '<span class="gh-label">' + labelText + '</span>' +
+      '<span class="gh-count">' + count + unit + '</span>' +
+      '<span class="gh-icon">▼</span>' +
+    '</div>';
+  sh.parentNode.insertBefore(group, sh);
+  group.appendChild(sh);
+  group.appendChild(next);
+  group.querySelector('.group-head').addEventListener('click', function(){
+    group.classList.toggle('collapsed');
+  });
+});
+
+// ====== 2. 全部主題預設折疊 ======
+document.querySelectorAll('.group').forEach(function(g){
+  g.classList.add('collapsed');
+});
+
+// ====== 3. Stats 動態計算 ======
+var totalScripts = document.querySelectorAll('article.card:not([data-clone])').length;
+var totalSections = document.querySelectorAll('.group').length;
+var statScripts = document.getElementById('statScripts');
+var statSections = document.getElementById('statSections');
+var totalCount = document.getElementById('totalCount');
+var sectionCount = document.getElementById('sectionCount');
+if (statScripts) statScripts.textContent = totalScripts;
+if (statSections) statSections.textContent = totalSections;
+if (totalCount) totalCount.textContent = totalScripts;
+if (sectionCount) sectionCount.textContent = totalSections;
+
+// ====== 4. 卡片展開 (card-head click) ======
+document.querySelectorAll('.card').forEach(function(card){
+  var head = card.querySelector('.card-head');
+  if (!head) return;
+  head.addEventListener('click', function(){
+    card.classList.toggle('open');
+  });
+});
+
+// ====== 5. 搜尋 ======
+var search = document.getElementById('searchInput');
+var empty = document.getElementById('empty');
+var searchWrap = document.getElementById('searchWrap');
+var searchHint = document.getElementById('searchHint');
+
+function filterCards(){
+  var q = (search ? search.value : '').toLowerCase().trim();
+  var activeTab = document.querySelector('.series-tab.active');
+  var series = activeTab ? activeTab.dataset.series : 'all';
+  var any = false;
+  document.querySelectorAll('article.card:not([data-clone])').forEach(function(c){
+    var seriesOk = series === 'all' || c.dataset.series === series;
+    var ok = seriesOk && (!q || c.textContent.toLowerCase().indexOf(q) >= 0);
+    c.style.display = ok ? '' : 'none';
+    if (ok) any = true;
+  });
+  document.querySelectorAll('.group').forEach(function(g){
+    if (q || series !== 'all') g.classList.remove('collapsed');
+  });
+  document.querySelectorAll('.group').forEach(function(g){
+    var cards = g.querySelectorAll('article.card:not([data-clone])');
+    var anyVisible = false;
+    cards.forEach(function(c){ if(c.style.display !== 'none') anyVisible = true; });
+    g.style.display = anyVisible || !q ? '' : 'none';
+  });
+  if (empty) empty.classList.toggle('show', !any);
+}
+
+window.filterCards = filterCards;
+
+if (search) search.addEventListener('input', filterCards);
+document.querySelectorAll('.series-tab').forEach(function(tab){
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.series-tab').forEach(function(t){ t.classList.remove('active'); });
+    tab.classList.add('active');
+    filterCards();
+  });
+});
+
+// ====== 6. cmd+K / ctrl+K / '/' 捷徑 ======
+var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+if (searchHint) searchHint.textContent = isMac ? '⌘ K' : 'Ctrl K';
+document.addEventListener('keydown', function(e){
+  var isMod = (isMac && e.metaKey) || (!isMac && e.ctrlKey);
+  var inField = ['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement ? document.activeElement.tagName : '') >= 0;
+  if (isMod && (e.key === 'k' || e.key === 'K')){
+    e.preventDefault();
+    if (search){ search.focus(); search.select(); }
+  } else if (e.key === '/' && !inField){
+    e.preventDefault();
+    if (search) search.focus();
+  } else if (e.key === 'Escape' && document.activeElement === search){
+    search.blur();
+  }
+});
+if (search){
+  search.addEventListener('focus', function(){ if(searchWrap) searchWrap.classList.add('is-focused'); });
+  search.addEventListener('blur', function(){ if(searchWrap) searchWrap.classList.remove('is-focused'); });
+}
+
+// ====== 7. 已拍過 toggle（localStorage）======
+var SHOT_KEY = 'zejun.shot.v1';
+var shotData = {};
+try {
+  var raw = localStorage.getItem(SHOT_KEY);
+  shotData = raw ? JSON.parse(raw) : {};
+} catch(e){ shotData = {}; }
+
+function saveShot(){ try{ localStorage.setItem(SHOT_KEY, JSON.stringify(shotData)); }catch(e){} }
+
+function initShotToggle(card){
+  var id = card.id;
+  if (!id) return;
+  var realId = card.dataset.clone || id;
+  if (shotData[realId]) card.classList.add('shot');
+  var btn = card.querySelector('.shot-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (shotData[realId]){
+      delete shotData[realId];
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.remove('shot'); });
+    } else {
+      shotData[realId] = true;
+      document.querySelectorAll('#'+realId+', [data-clone="'+realId+'"]')
+        .forEach(function(el){ el.classList.add('shot'); });
+    }
+    saveShot();
+  });
+}
+document.querySelectorAll('article.card').forEach(initShotToggle);
+
+// ====== 8. Lightbox ======
+var overlay = document.getElementById('lightboxOverlay');
+var lbImg = document.getElementById('lightboxImg');
+
+function openLightbox(img){
+  if (!overlay || !lbImg) return;
+  lbImg.src = img.src;
+  lbImg.alt = img.alt;
+  overlay.classList.add('open');
+}
+if (overlay){
+  overlay.addEventListener('click', function(){
+    overlay.classList.remove('open');
+  });
+}
+window.openLightbox = openLightbox;
+
+// ====== 9. 複製文案（caption + hashtag，iOS fallback）======
+function copyScript(btn){
+  var article = btn.closest('article.card');
+  if (!article) return;
+  var caption = article.dataset.caption;
+  var hashtagsRaw = article.dataset.hashtags || '';
+  var hashtags = hashtagsRaw.trim() ? hashtagsRaw.trim() : '';
+  var originalLabel = btn.textContent;
+  var text;
+  if (caption) {
+    text = caption;
+    if (hashtags) text = text + '\n\n' + hashtags;
+  } else {
+    var title = article.querySelector('.title');
+    var rows = article.querySelectorAll('.timeline .row');
+    var cta = article.querySelector('.cta span:last-child');
+    var lines = [];
+    if (title) lines.push('【' + title.textContent.trim() + '】\n');
+    rows.forEach(function(row){
+      var say = row.querySelector('.say');
+      if (say) lines.push(say.textContent.trim());
+    });
+    if (cta) lines.push('\nCTA：' + cta.textContent.trim());
+    text = lines.join('\n');
+    if (hashtags) text = text + '\n\n' + hashtags;
+  }
+  function doCopy(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopy(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = originalLabel; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = originalLabel; }, 2000);
+  });
+}
+window.copyScript = copyScript;
+
+// ====== 10. 複製脆文 ======
+function copyThread(btn){
+  var card = btn.closest('.thread-card');
+  if (!card) return;
+  var textEl = card.querySelector('.thread-text');
+  var hashEl = card.querySelector('.thread-hash');
+  var text = (textEl ? textEl.textContent.trim() : '') +
+             (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+  function doCopyThread(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t);
+    }
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  doCopyThread(text).then(function(){
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = '複製脆文'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    btn.textContent = '複製失敗';
+    setTimeout(function(){ btn.textContent = '複製脆文'; }, 2000);
+  });
+}
+window.copyThread = copyThread;
+
+})();
+</script>
+
+</body>
+</html>

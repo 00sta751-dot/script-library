@@ -3,6 +3,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 LIB = os.path.dirname(os.path.abspath(__file__))
 # 2026-08-17 shell 註記：<body> 後有「聊天體試拍批」入口橫幅（chat-trial-20260817.html），本腳本為 marker splice、不重生 shell，橫幅可存活重建。
 # 2026-08-17 shell 註記2：頁面另含手插「聊天體試拍批」section（sect-chattrial，13 卡原生格式）；splice 不會動它。
+# 2026-08-18 shell 註記3：sect-chattrial 內容已換裝「聊天體第01批」26 支中之 13 卡（大整改新法首批，舊試拍批依澤君 TG20654「撤掉」令移除）；splice 不會動它。
 if LIB not in sys.path:
     sys.path.insert(0, LIB)
 from _html_escape_utils import esc_text, esc_attr, safe_img_src

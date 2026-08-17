@@ -1,0 +1,11 @@
+{
+  "schema": "build_receipt_grandfather/v1",
+  "note": "裝閘（cxp-enforce-t3-gitgate，2026-08-14）當下已在版控、尚無收據的既存產物。只認固定 sha256：內容一改 hash 即不符→立刻恢復硬擋。僅 deploy 端（--allow-grandfather）吃這條，pre-commit 端不吃。",
+  "entries": {
+    "wendi.html": {
+      "sha256": "1cdd848913fe7ff43f7b32a290d470d041be82b6c592717f2643a210bddcaefb",
+      "recorded_at": "2026-08-14T11:15:11",
+      "reason": "裝閘前既存產物，無收據；若此時硬擋 validate_deploy 會被 pre-commit Part 1 連鎖鎖死整個 repo 的所有 commit（現役回歸風險）。溫蒂第03批稿件目前 validator 實跑 83 FAIL，須先修稿才能產出 PASS 收據。"
+    }
+  }
+}

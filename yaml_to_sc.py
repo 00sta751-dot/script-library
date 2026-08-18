@@ -570,6 +570,7 @@ def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> di
 
     return {
         'num': num,
+        'template': original_yaml.get('template', ''),
         'title': original_yaml['title'],
         'pie': original_yaml['派系'],
         'platforms': platforms,
@@ -807,9 +808,9 @@ if __name__ == '__main__':
     import html as html_mod
 
     YAML_DIR = (
-        r'C:\Users\00sta\Documents\Claude\Projects\短影音系統'
-        r'\L2_業主層\情侶_叭噗_小C\02_腳本生產'
-        r'\第04批_試水批_2026-05-21'
+        '/Users/chenzejun/Documents/Claude/Projects/短影音系統'
+        '/L2_業主層/情侶_叭噗_小C/02_腳本生產'
+        '/第04批_試水批_2026-05-21'
     )
 
     # 需要 sc_article 做 case 1/2 測試，動態 import（同目錄）
@@ -1114,8 +1115,8 @@ if __name__ == '__main__':
     # --- Case 15：新格式 markdown body → parse_markdown_body → scenes/caption/hashtag ---
     print('\n[Case 15] 新格式 markdown body → parse_markdown_body 解析正確')
     RUX34_DIR = (
-        r'C:\Users\00sta\Documents\Claude\Projects\短影音系統'
-        r'\L2_業主層\房仲_瑞祥\01_腳本生產\第34批_試水批_2026-05-23'
+        '/Users/chenzejun/Documents/Claude/Projects/短影音系統'
+        '/L2_業主層/房仲_瑞祥/01_腳本生產/第34批_試水批_2026-05-23'
     )
     try:
         rux34_articles = load_yaml_articles(RUX34_DIR)
@@ -1160,8 +1161,8 @@ if __name__ == '__main__':
 
         # 確認舊格式 yaml（阿奇）backward compatible
         ACHI01_DIR = (
-            r'C:\Users\00sta\Documents\Claude\Projects\短影音系統'
-            r'\L2_業主層\餐飲_阿奇\01_腳本生產\第01批_2026-05-22'
+            '/Users/chenzejun/Documents/Claude/Projects/短影音系統'
+            '/L2_業主層/餐飲_阿奇/01_腳本生產/第01批_2026-05-22'
         )
         achi_articles = load_yaml_articles(ACHI01_DIR)
         achi_01 = achi_articles[0]

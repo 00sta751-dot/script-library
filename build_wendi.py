@@ -194,6 +194,7 @@ def wendi_yaml_adapter(yaml_data: dict, num: int) -> dict:
 
     return dict(
         no=str(num).zfill(2),
+        template=str(yaml_data.get('template', '') or ''),
         title=title,
         force=force,
         pie=pie,
@@ -396,6 +397,7 @@ def render_card(s):
     hook = s['timeline'][0][1] if s['timeline'] else ''
 
     # 時間軸 rows（藏鏡人按時間段對應內嵌）
+    is_chat = str(s.get('template', '')).startswith('聊天體')
     rows = ''
     for seg, line in s['timeline']:
         tkey = _norm_time(seg)
@@ -408,8 +410,13 @@ def render_card(s):
         if tkey in s['mirrors']:
             mir = ('<div class="mirror"><span class="mc">🎭 藏鏡人</span>'
                    f'<span class="mt">{esc(s["mirrors"][tkey])}</span></div>')
-        rows += (f'<div class="row"><div class="ts">{ts_html}</div>'
-                 f'<div class="rc"><div class="ln">{esc(line)}</div>{mir}</div></div>')
+        if is_chat:
+            # 聊天體：不掛 0-3s/Hook 唸稿標籤，一段一段講話（2026-08-18 澤君換殼令）
+            rows += (f'<div class="row chat">'
+                     f'<div class="rc"><div class="ln">{esc(line)}</div>{mir}</div></div>')
+        else:
+            rows += (f'<div class="row"><div class="ts">{ts_html}</div>'
+                     f'<div class="rc"><div class="ln">{esc(line)}</div>{mir}</div></div>')
 
     # 小資訊
     minfo = ''

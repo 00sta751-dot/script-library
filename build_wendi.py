@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 build_wendi.py — 溫蒂腳本庫 build（便當格原創版型 / yaml-driven）
+# 2026-08-18 shell 註記：第03批依溫蒂本人回饋手改（03_01/03_08 換題、03_13 追星脫鉤皮膚、13 支 CTA 簡化、觸及支藏鏡人壞行修復）；L2 yaml 源檔已同步；splice 不會動它。
 
 ※ 本檔為 parser + 模板渲染程式；解析的腳本台詞是業主原文（已過編劇/算盤/御史驗證），
   非霸告對使用者的狀態宣稱，遮羞詞規則不適用解析到的台詞內容。
 
 設計：
   - 版型＝便當格 Bento（vs 詩婷置中單欄）；配色草木綠＋珊瑚＋奶油；無襯線
-  - 藏鏡人＝機械化：從 yaml 藏鏡人欄位對應到時間軸段（每支需 ≥2）
+  - 藏鏡人＝機械化：從 yaml 藏鏡人欄位對應到時間軸段（每支需 ≥1，長度配額見 L0 §9.4）
   - C-016：data-cat=""、0 派系名、無派系篩選列、可收合日期群組
   - yaml-driven（§6.5 SOP）：--mode yaml --yaml-dir 為標準模式
 
@@ -705,10 +706,10 @@ def main():
         if len(scripts) != 13:
             print(f'WARNING: 腳本數 {len(scripts)} != 13（非標準批次，請確認）', file=sys.stderr)
 
-        # 藏鏡人完整性（SOP §2.5 / L0 §9 每支 >=2）
-        miss = [s['no'] for s in scripts if len(s['mirrors']) < 2]
+        # 藏鏡人完整性（SOP §2.5 / L0 §9.4 長度配額；60 秒下限 1，舊 >=2 已退場 2026-08-12）
+        miss = [s['no'] for s in scripts if len(s['mirrors']) < 1]
         if miss:
-            print(f'ERROR: 以下腳本藏鏡人 <2，中止出貨：{miss}', file=sys.stderr)
+            print(f'ERROR: 以下腳本藏鏡人 <1，中止出貨：{miss}', file=sys.stderr)
             sys.exit(1)
 
         print(f'  解析 {len(scripts)} 腳本 OK')
@@ -891,6 +892,34 @@ def main():
         f.write(nc)
     size = os.path.getsize(out_path)
     print(f'\nHTML 已生成：{out_path}  ({size} bytes)')
+
+    # ==== build 收據（G1，2026-08-14 cxp-enforce-t3-gitgate）====
+    # 實跑 validate_script_batch.py，把「來源稿 hash + validator 結果 + 產物 hash + 時間戳」
+    # 寫成 _build_receipts/wendi.html.receipt.json；pre-commit Part 7 / validate_deploy check 19 會驗它。
+    # 寫不出來 = 沒收據 = commit 會被擋（fail-closed，不在這裡吞掉錯誤靜默放行）。
+    try:
+        from _build_receipt import write_build_receipt
+        _rp, _receipt = write_build_receipt(
+            output_path=out_path,
+            owner=OWNER,
+            source_dirs=[os.path.abspath(d) for d in _yaml_dirs],
+            builder='build_wendi.py',
+        )
+        _vres = (_receipt.get('validator') or {}).get('result')
+        print(f'build 收據已寫：{_rp}')
+        print(f'  validator（validate_script_batch.py --strict）實跑結果：{_vres}')
+        if _vres != 'PASS':
+            for _run in (_receipt.get('validator') or {}).get('runs', []):
+                if _run.get('result') != 'PASS':
+                    print(f'  ↳ {os.path.basename(_run.get("batch_dir", "?"))}: '
+                          f'rc={_run.get("returncode")} {_run.get("summary") or _run.get("error", "")}',
+                          file=sys.stderr)
+            print('  ⚠ 收據記為非 PASS — 此產物 commit 時會被 pre-commit Part 7 擋下（先修稿再重跑 build）',
+                  file=sys.stderr)
+    except Exception as _e:
+        print(f'ERROR: build 收據寫入失敗（{type(_e).__name__}: {_e}）— '
+              f'沒有收據就無法 commit 本產物，請修好再重跑', file=sys.stderr)
+        raise
 
     # ==== assertions ====
     arts = re.findall(r'<article\b', nc)

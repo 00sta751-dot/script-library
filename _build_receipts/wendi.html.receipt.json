@@ -1,15 +1,15 @@
 {
   "schema": "build_receipt/v1",
-  "generated_at": "2026-08-18T11:49:15",
-  "generated_at_epoch": 1787024955.788596,
+  "generated_at": "2026-08-21T23:24:25",
+  "generated_at_epoch": 1787325865.479214,
   "builder": "build_wendi.py",
   "owner": "溫蒂",
   "python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
   "output": {
     "name": "wendi.html",
     "path": "/Users/chenzejun/AI/40-projects/Claude/Projects/短影音系統/L4_工具腳本/_部署系統/script-library/wendi.html",
-    "sha256": "5fd22d647927a42372cae0db66bea17fd4a58e459cb2f5cf8f0780b20c398f56",
-    "size": 150142
+    "sha256": "5596fa96e7ccc0d980af7c5372bbc5148be52300ef7b56989f4891adf82296e8",
+    "size": 150147
   },
   "source_dirs": [
     "/Users/chenzejun/AI/40-projects/Claude/Projects/短影音系統/L2_業主層/美容_溫蒂/01_腳本生產/第02批_2026-06-03",
@@ -281,6 +281,6 @@
         "result": "PASS"
       }
     ],
-    "ran_at": "2026-08-18T11:49:15"
+    "ran_at": "2026-08-21T23:24:25"
   }
 }

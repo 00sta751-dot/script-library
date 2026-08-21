@@ -4,7 +4,6 @@ build_zejun.py — 澤君 腳本庫 build script
 # 2026-08-17 shell 註記：<body> 後有「聊天體試拍批」入口橫幅（chat-trial-20260817.html），本腳本為 marker splice、不重生 shell，橫幅可存活重建。
 # 2026-08-17 shell 註記2：頁面另含手插「聊天體試拍批」section（sect-chattrial，13 卡原生格式）；splice 不會動它。
 # 2026-08-18 shell 註記3：sect-chattrial 內容已換裝「聊天體第01批」26 支中之 13 卡（大整改新法首批，舊試拍批依澤君 TG20654「撤掉」令移除）；splice 不會動它。
-# 2026-08-21 shell 註記：sect 內加掛聊天體第02批 13 卡（批_20260821）；splice 不會動它。
 
 對齊：
   - SOP_腳本上線_統一版_v2.md §5.2 新業主 build script 必含 7 件（圖卡兩件 2026-07-11 退役後 9→7；validate_deploy 側仍 9=待 C 決策）

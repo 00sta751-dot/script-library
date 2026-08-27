@@ -77,6 +77,71 @@ def _invalid(detail: str) -> dict:
     }
 
 
+# ════════════════════════════════════════════════════════════════════
+# W1-W5（cxp-gapfix-w1／2026-08-13）：_batch_flags.yml **唯一** canonical loader
+# 規格＝Codex 體檢洞 08：validator:7585 / taste_panel_gate:98 / 本檔:131 三處
+# 各自寫 `yaml.safe_load(...) or {}`，於是檔案內容為 falsy（`false` / `0` /
+# `null` / 空檔 / `[]`）時 raw 被 `or {}` 洗成空 dict，後面的
+# `isinstance(raw, dict)` 永遠成立 → 錯誤路徑永不觸發 → 靜默關閉
+# hybrid / taste / time_axis / topic_intel 四道閘。
+#
+# 本 loader 的契約（三處消費端一律共用，不得各自再寫一份）：
+#   檔案不存在            → ({}, None)          ＝合法「本批未宣告 flags」
+#   讀取或 YAML 解析失敗   → ({}, error_str)     ＝fail-closed
+#   解析結果非 mapping     → ({}, error_str)     ＝fail-closed（含 None/False/0/[]）
+#   解析結果為 mapping     → (raw, None)
+# 絕不在本函式內做 `or {}`——那正是本洞的根因。
+# ════════════════════════════════════════════════════════════════════
+
+BATCH_FLAGS_LOAD_ERROR = "_batch_flags.yml 讀取/解析失敗，無法確認 batch flags（fail-closed）"
+
+
+def resolve_batch_flags_path(batch_dir_or_flag_path: Union[str, "Path", None]):
+    """把「批次目錄／_batch_flags.yml 直接路徑／批內其他檔路徑」正規化成 flag 檔路徑。
+
+    回傳 Path 或 None（傳入 None 時）。判定順序與 load_topic_intel_policy 原有邏輯一致。
+    """
+    if batch_dir_or_flag_path is None:
+        return None
+    p = Path(batch_dir_or_flag_path)
+    if p.is_dir():
+        return p / "_batch_flags.yml"
+    if p.name == "_batch_flags.yml":
+        return p
+    if p.is_file():
+        # 傳了批內其他檔案路徑 → 用其父目錄
+        return p.parent / "_batch_flags.yml"
+    # 路徑不存在 → 視為 batch_dir 且 flag 尚未建立
+    return p / "_batch_flags.yml"
+
+
+def load_batch_flags_strict(
+    batch_dir_or_flag_path: Union[str, "Path", None],
+) -> tuple[dict, Optional[str]]:
+    """canonical `_batch_flags.yml` 讀取器（洞 08 修；三處共用唯一真源）。
+
+    回傳 (flags_dict, error_or_None)。契約見上方區塊註解。
+    error 非 None 時 flags_dict 固定為 {}，消費端**必須**把 error 當 FAIL 處理，
+    不得退回「當作沒有 flags」繼續跑（那就是本洞本身）。
+    """
+    flag_path = resolve_batch_flags_path(batch_dir_or_flag_path)
+    if flag_path is None:
+        return {}, None
+    if not flag_path.exists():
+        return {}, None
+    try:
+        import yaml as _yaml_mod
+        raw = _yaml_mod.safe_load(flag_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {}, f"{BATCH_FLAGS_LOAD_ERROR}：{e}"
+    if not isinstance(raw, dict):
+        return {}, (
+            f"{BATCH_FLAGS_LOAD_ERROR}：top-level 非 mapping"
+            f"（{type(raw).__name__}={str(raw)[:40]!r}；檔案存在即不得為 falsy 空值）"
+        )
+    return raw, None
+
+
 def load_topic_intel_policy(
     batch_dir_or_flag_path: Union[str, Path, None],
 ) -> dict:
@@ -105,37 +170,17 @@ def load_topic_intel_policy(
     if batch_dir_or_flag_path is None:
         return _disabled("未提供 batch_dir，WP-B topic_intel_closure 未啟用")
 
-    p = Path(batch_dir_or_flag_path)
-
-    # 決定 flag_path
-    if p.is_dir():
-        flag_path = p / "_batch_flags.yml"
-    elif p.name == "_batch_flags.yml":
-        flag_path = p
-    elif p.is_file():
-        # 傳了其他檔案路徑 → 試用其父目錄
-        flag_path = p.parent / "_batch_flags.yml"
-    else:
-        # 路徑不存在或其他情況：視為 batch_dir 且 flag 不存在
-        flag_path = p / "_batch_flags.yml"
-
-    # 2. flag 檔不存在 → disabled
+    # 2-3. flag 路徑正規化＋讀取（W5：統一走 canonical loader，不再自己 safe_load or {}）
+    flag_path = resolve_batch_flags_path(batch_dir_or_flag_path)
     if not flag_path.exists():
         return _disabled(
             f"無 _batch_flags.yml（{flag_path}），WP-B topic_intel_closure 未啟用"
         )
-
-    # 3. 解析 yaml
-    try:
-        import yaml as _yaml_mod
-        raw = _yaml_mod.safe_load(flag_path.read_text(encoding="utf-8")) or {}
-    except Exception as e:
-        return _invalid(f"_batch_flags.yml 解析失敗：{e}")
-
-    if not isinstance(raw, dict):
-        return _invalid(
-            f"_batch_flags.yml top-level 非 mapping（{type(raw).__name__}）"
-        )
+    raw, flags_error = load_batch_flags_strict(flag_path)
+    if flags_error:
+        # W5（洞 08）：檔案存在但壞損／falsy（false/0/null/[]／空檔）→ invalid，
+        # 絕不再被 `or {}` 洗成「無 flags」而靜默關閉 WP-B。
+        return _invalid(flags_error)
 
     # 4. topic_intel_closure 區塊
     closure_cfg = raw.get("topic_intel_closure")

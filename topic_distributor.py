@@ -7,7 +7,7 @@ Canonical machine source for the hybrid content-axis allocation contract.
 Consumers must call ``evaluate_hybrid_allocation(plan)`` instead of mirroring
 the constants or acceptance rules declared in this module.
 
-自動分 13 題目方向（按業主流派比例 + 去重已用主題）
+自動分 14 題目方向（Q1-Q8 配額 + 去重已用主題）
 
 用法：
   python topic_distributor.py --owner 阿奇 --batch 第02批_2026-05-25
@@ -24,6 +24,7 @@ import re
 import json
 import argparse
 import hashlib
+import unicodedata
 import yaml
 from pathlib import Path
 from typing import Optional
@@ -60,8 +61,8 @@ except Exception as _ip_err:
     _parse_identity_mix = None  # type: ignore
 
 # ── 路徑常數 ──
-L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
-SOP_YAML = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L0_跨行業公版\_腳本生產SOP_v3.0.yaml")
+L2_BASE = Path(r"/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層")
+SOP_YAML = Path(r"/Users/chenzejun/Documents/Claude/Projects/短影音系統/L0_跨行業公版/_腳本生產SOP_v3.0.yaml")
 
 # ── Hybrid allocation canonical contract（W2-D27）──
 CONTENT_AXIS_VALUES = ("offpro", "personal_anchor", "professional")
@@ -69,6 +70,19 @@ CONTENT_AXIS_TARGET_COUNTS = {
     "offpro": 9,
     "personal_anchor": 2,
     "professional": 2,
+}
+# Q1-Q8 是 2026-08-26 起的新批次主題配額。content_axis 契約保留在上方，
+# 只供已寫入舊 plan hash 的批次驗證；新批不得再以它分配槽位。
+TOPIC_TYPE_VALUES = ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8")
+TOPIC_TYPE_TARGET_COUNTS = {
+    "Q1": 2,
+    "Q2": 2,
+    "Q3": 2,
+    "Q4": 2,
+    "Q5": 2,
+    "Q6": 2,
+    "Q7": 1,
+    "Q8": 1,
 }
 LANE_GENERATION_DEFAULT_COUNTS = {
     "voice_first": 7,
@@ -87,6 +101,472 @@ LANE_TO_CONTENT_AXIS = {
     "anchor_first": "personal_anchor",
     "professional": "professional",
 }
+
+# ════════════════════════════════════════
+# 題目鎖 canonical contract（cxp-fullimport-s r2，2026-08-12）
+#   源＝得標定稿 §4「題目鎖」＋站 0 診斷 §3 假說 5（空題交接·缺陷存在）＋§8-2。
+#   舊法真刪：`direction: "[編劇填] — {school}方向 {seq}"` 空題殼已移除。
+#   新法：direction 留 TOPIC_UNLOCKED 待鎖；真題資訊一律寫進 topic_lock 五個必填欄。
+#   分工邊界（不重做既有閘）：topic_id/provenance 仍由 source_topic_intel 那條路走
+#   （validate_script_batch V3-001），本鎖只管「這一槽的題是不是真題」。
+# ════════════════════════════════════════
+TOPIC_UNLOCKED = "[待鎖題]"   # 題目層尚未鎖題；骨架機/寫稿端看到此值＝不得開工
+
+# 必填真題欄（缺任一＝題未鎖）
+# r9 Q4（2026-08-13）：補 topic_id / traffic_candidates 兩欄——得標定稿 §4 原文
+#   「龍蝦交 topic_id/真題/題源/受眾場景/能拍∩想拍/流量候選/重複檢查」，
+#   原實作只落地五欄，topic_id 與流量候選漏收。
+TOPIC_LOCK_REQUIRED_FIELDS = (
+    "topic_statement",   # 真題一句話（不是「XX派方向 3」這種殼）
+    "topic_source",      # 題從哪來（情報池 topic_id / 業主訪談 / 客戶問題 / 時事）
+    "topic_id",          # r9 Q4：情報池 / 題庫的題目識別碼（存在且非占位；真偽比對仍歸 V3-001）
+    "audience_scene",    # 受眾＋場景（講給誰、在什麼情境下有用）
+    "can_shoot",         # 能拍（業主拍得到的素材／場景）
+    "want_shoot",        # 想拍（業主本人願意講）
+    "traffic_candidates",  # r9 Q4：流量候選（非空清單；這題打算走哪些流量點）
+)
+# 清單型必填欄（非空 list／非空字串才算填；空 list＝未鎖）
+TOPIC_LOCK_LIST_FIELDS = ("traffic_candidates",)
+TOPIC_LOCK_TEMPLATE = {
+    f: ([] if f in TOPIC_LOCK_LIST_FIELDS else "")
+    for f in TOPIC_LOCK_REQUIRED_FIELDS
+}
+TOPIC_LOCK_TEMPLATE["locked_by"] = ""    # 誰鎖的（題目層負責人）
+TOPIC_LOCK_TEMPLATE["locked_at"] = ""    # 何時鎖的
+
+# 敘述欄（必須是人話，不得是布林／true-false 字面）
+_TOPIC_NARRATIVE_FIELDS = ("topic_statement", "topic_source", "audience_scene")
+
+# r11 T1（2026-08-13）型別收緊：以下四欄**型別必須是 str**。
+#   舊法漏洞：判定只走 _topic_field_is_placeholder（看「形」不看型別），
+#   `topic_id: True` / `topic_source: 123` / `audience_scene: {}` 皆判已鎖 →
+#   骨架機 str() 一轉就落地成 "True"/"123"/"{}"，題目層等於沒鎖。
+#   新法：非 str（bool／int／float／dict／list／None）一律未鎖，不做型別轉換救援。
+_TOPIC_STR_FIELDS = ("topic_statement", "topic_source", "topic_id", "audience_scene")
+# 能拍／想拍：型別限 **bool 或 str**（bool 須為 True；str 走真值判定＝非空非占位非否定字樣）。
+#   非此兩型（數字／dict／list／None）一律未鎖——「1」「{}」不是「業主願意講」的宣告。
+_TOPIC_BOOLSTR_FIELDS = ("can_shoot", "want_shoot")
+
+# 寫稿端（愛馬仕）拿到未鎖/不合用題目時的唯一合法回應：不得自行換題
+TOPIC_REJECT = "TOPIC_REJECT"
+
+
+# 占位／空殼字樣（r6 P5 收緊）：命中任一＝該欄視同未填。
+# 依據＝Codex 三審阻擋項 1：舊法只驗「轉字串後非空」，`[待填]`／`[編劇填]` 全被判已鎖。
+_TOPIC_PLACEHOLDER_TOKENS = (
+    "[待填]", "[待定]", "[編劇填]", "[題目層填]", "[填]", "[TBD]", "TBD",
+    "待填", "待定", "未定", "N/A", "NA", "-", "—", "?", "？",
+)
+# can_shoot／want_shoot 的否定值（＝業主拍不到／不想講）：不是「已鎖」，該題應退回題目層。
+_TOPIC_SHOOT_NEGATIVE = (
+    "不能拍", "不可拍", "拍不到", "不想拍", "不願", "不行", "否", "無", "沒有",
+    "no", "false", "n",
+)
+# r11 T1：布林字面字串（值本身在講 true/false 而不是在描述素材）。
+#   命中此集合者一律走白名單判定，不吃「非否定即真」那條寬鬆路。
+_TOPIC_SHOOT_BOOL_LITERALS = frozenset({
+    "true", "false", "yes", "no", "y", "n", "1", "0", "t", "f",
+    "是", "否", "有", "無", "能", "不能", "可", "不可", "要", "不要",
+})
+# 真值白名單（僅適用於上面那組布林字面）
+_TOPIC_SHOOT_TRUE_TOKENS = frozenset({
+    "true", "yes", "y", "1", "t", "是", "有", "能", "可", "要",
+})
+
+
+def _topic_field_is_placeholder(value) -> bool:
+    """欄值是否為空／占位殼（不看語意，只看形）。布林 True 不算占位。"""
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return not value          # True＝有宣告；False＝等同未填
+    s = str(value).strip()
+    if not s:
+        return True
+    if s == TOPIC_UNLOCKED:
+        return True
+    su = s.upper()
+    for tok in _TOPIC_PLACEHOLDER_TOKENS:
+        t = tok.upper()
+        if su == t or su.startswith(t):
+            return True
+    # 純方括號殼：[任何內容] 且長度不超過 20 → 視同占位（例：[編劇自己想]）
+    if s.startswith("[") and s.endswith("]") and len(s) <= 20:
+        return True
+    return False
+
+
+def _topic_shoot_is_truthy(value) -> bool:
+    """can_shoot／want_shoot 是否為真值（能拍／想拍）。
+
+    False、否定字樣（不能拍／不想拍／否…）皆判非真值＝題未鎖（r6 P5）。
+    r11 T1：型別已由 topic_lock_status 先擋（限 bool／str）；本函式再管內容。
+      - bool → 只有 True 算真值
+      - 布林字面字串（true/false/yes/no/1/0/是/否…）→ 走 **真值白名單** _TOPIC_SHOOT_TRUE_TOKENS，
+        不在白名單的布林字面（"false"/"0"/"no"）＝非真值
+      - 敘述字串（「自家車庫」「願意講」）→ 非占位且非否定字樣即算真值
+        （敘述欄本來就是講「拍得到什麼素材」，不能要求逐字命中白名單；
+         r6 契約與既有 fixtures 皆為敘述值）
+    """
+    if _topic_field_is_placeholder(value):
+        return False
+    if isinstance(value, bool):
+        return value
+    s = str(value).strip()
+    sl = s.lower()
+    if sl in _TOPIC_SHOOT_BOOL_LITERALS:
+        return sl in _TOPIC_SHOOT_TRUE_TOKENS
+    for neg in _TOPIC_SHOOT_NEGATIVE:
+        n = neg.lower()
+        if sl == n or sl.startswith(n):
+            return False
+    return True
+
+
+def _topic_list_field_is_empty(value) -> bool:
+    """清單型必填欄（traffic_candidates）是否視同未填。
+
+    r9 Q4：非空 list/tuple 且至少一個元素非占位＝已填。
+    r11 T1 型別收緊：**必須是 list/tuple**，且**每個元素都要是非空非占位 str**。
+      - 0 / True / {} / "字串" → 未填（非清單型別，不做單值救援；舊法接受單一字串）
+      - [] / [""] / ["待填"] / [1] / [{}] → 未填（元素型別或內容不合格）
+    理由：流量候選是「要打哪些流量點」的清單，數字／布林／dict 進來一定是資料錯，
+    舊法 str() 一轉就會落地成 "1"、"True"，等於用假值騙過鎖。
+    """
+    if not isinstance(value, (list, tuple)):
+        return True
+    if not value:
+        return True
+    for v in value:
+        if not isinstance(v, str) or _topic_field_is_placeholder(v):
+            return True
+    return False
+
+
+def normalize_topic_statement(value) -> str:
+    """真題正規化（供同批重複檢查用）。
+
+    r9 Q4：全形→半形（NFKC）、去頭尾空白、去所有空白字元、去常見標點、轉小寫。
+    僅供 exact-match 去重；不做語意比對。
+    """
+    if value is None:
+        return ""
+    s = unicodedata.normalize("NFKC", str(value)).strip().lower()
+    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"[，,。.、；;：:！!？?「」『』\"'（）()\[\]【】~～\-—_/\\|]+", "", s)
+    return s
+
+
+def topic_lock_status(item) -> tuple[bool, list]:
+    """判斷 plan 單槽的題是否已鎖 →（is_locked, 缺欄清單）。
+
+    已鎖條件（全滿足）：
+      ① direction 非 TOPIC_UNLOCKED、非空、非占位殼（[待填]／[編劇填]…）
+      ② TOPIC_LOCK_REQUIRED_FIELDS 各欄逐一非空且非占位
+         （r9 Q4 起含 topic_id 存在、traffic_candidates 非空清單）
+      ③ can_shoot／want_shoot 需為真值（False／「不能拍」「不想拍」＝未鎖）
+      ④ **型別逐欄驗**（r11 T1，2026-08-13）：
+         topic_id／topic_statement／topic_source／audience_scene → 限 str
+         can_shoot／want_shoot → 限 bool（須 True）或 str（真值判定）
+         traffic_candidates → 限非空 list/tuple 且每元素為非空非占位 str
+         非法型別（bool／dict／數字／None）一律**未鎖**，不做 str() 轉換救援
+         ——舊法只驗「形」不驗「型」，`topic_id: True`、`traffic_candidates: 0`
+         會被判已鎖，骨架機再 str() 一轉就落地成假值。
+
+    **不驗**（r9 Q4 明標）：direction 與 topic_lock.topic_statement 的**語意一致性**
+    ＝人工把關（題目層鎖題人／審查席）。程式只驗「欄位是否為真題形狀」，
+    不做語意比對——避免用字串相似度假裝語意驗證（誤判會擋掉合法改寫）。
+
+    r6 P5 收緊（Codex 阻擋項 1）：非 dict 的 item／topic_lock **不拋例外**，一律判未鎖。
+    純判定函式，不改資料、不擲例外（供 distributor / 骨架機 / 審查共用一套判準）。
+    """
+    missing: list[str] = []
+    if not isinstance(item, dict):
+        return False, [f"plan item 型別非 dict（{type(item).__name__}）＝未鎖"]
+
+    direction = item.get("direction", "")
+    if _topic_field_is_placeholder(direction):
+        missing.append("direction（真題未寫回／仍是占位殼）")
+
+    lock = item.get("topic_lock")
+    if not isinstance(lock, dict):
+        missing.append(f"topic_lock（整塊缺或型別非 dict：{type(lock).__name__}）")
+        return False, missing
+
+    for field in TOPIC_LOCK_REQUIRED_FIELDS:
+        v = lock.get(field)
+        if field in TOPIC_LOCK_LIST_FIELDS:
+            # r9 Q4：流量候選必須非空（空清單＝這題還沒想過怎麼吃流量＝未鎖）
+            # r11 T1：型別亦收緊（非 list／元素非 str 皆未鎖，見 _topic_list_field_is_empty）
+            if _topic_list_field_is_empty(v):
+                missing.append(
+                    f"topic_lock.{field}（流量候選須為非空 list 且每元素為非空 str；"
+                    f"實得 {type(v).__name__}={str(v)[:20]!r}＝未鎖）")
+            continue
+        # ── r11 T1 型別閘（先於「形」的判定）──
+        if field in _TOPIC_STR_FIELDS and not isinstance(v, str):
+            missing.append(
+                f"topic_lock.{field}（型別須為 str，實得 {type(v).__name__}="
+                f"{str(v)[:20]!r}＝未鎖）")
+            continue
+        if field in _TOPIC_BOOLSTR_FIELDS and not isinstance(v, (bool, str)):
+            missing.append(
+                f"topic_lock.{field}（型別須為 bool 或 str，實得 {type(v).__name__}="
+                f"{str(v)[:20]!r}＝未鎖）")
+            continue
+        if _topic_field_is_placeholder(v):
+            missing.append(f"topic_lock.{field}（空／占位）")
+        elif field in ("can_shoot", "want_shoot"):
+            if not _topic_shoot_is_truthy(v):
+                missing.append(f"topic_lock.{field}（非真值：{str(v)[:20]!r}＝業主拍不到/不想講，請退回題目層換題）")
+        elif field in _TOPIC_NARRATIVE_FIELDS:
+            if isinstance(v, bool) or str(v).strip().lower() in ("true", "false", "yes", "no"):
+                # r6 P5：敘述欄（真題一句話／題從哪來／受眾場景）必須是敘述，
+                # 布林或 true/false 字面＝殼（Codex 阻擋項 1 實測案例）。
+                missing.append(f"topic_lock.{field}（布林／true-false 字面不是敘述：{str(v)[:20]!r}）")
+    return (not missing), missing
+
+
+def duplicate_topic_statements(plan) -> list:
+    """同批重複真題檢查 →[(normalized, [seq, ...]), ...]（r9 Q4）。
+
+    得標定稿 §4 原文含「重複檢查」：同一批兩槽鎖同一句真題＝題目層失誤，
+    照樣派工會產出兩支同題腳本。判準＝topic_statement 正規化後 **exact-match**
+    （全形/空白/標點差異視為同一句）；語意近似**不驗**（人工把關）。
+    空／占位的 topic_statement 不納入比對（那由必填欄檢查擋）。
+    """
+    if not isinstance(plan, list):
+        return []
+    seen: dict[str, list] = {}
+    for idx, item in enumerate(plan, start=1):
+        if not isinstance(item, dict):
+            continue
+        lock = item.get("topic_lock")
+        raw = lock.get("topic_statement") if isinstance(lock, dict) else None
+        if _topic_field_is_placeholder(raw):
+            continue
+        key = normalize_topic_statement(raw)
+        if not key:
+            continue
+        seen.setdefault(key, []).append(item.get("seq", idx))
+    return [(k, seqs) for k, seqs in seen.items() if len(seqs) > 1]
+
+
+def assert_topics_locked(plan) -> tuple[bool, list]:
+    """整份 plan 的題目鎖檢查 →（all_locked, [(seq, 缺欄), ...]）。
+    消費端（骨架機 / 寫稿派工）在開工前呼叫；未鎖＝退回題目層，禁自行補題。
+    r6 P5：plan 非 list 或元素非 dict 皆判未鎖（不拋例外）。
+    r9 Q4：同批重複真題＝**未鎖級**（與缺欄同級，消費端一律非零退出），
+           以 seq=None 的合成項回報，避免消費端要多接一個 API。"""
+    if not isinstance(plan, list):
+        return False, [(None, [f"plan 型別非 list（{type(plan).__name__}）"])]
+    unlocked = []
+    for idx, item in enumerate(plan, start=1):
+        ok, missing = topic_lock_status(item)
+        if not ok:
+            seq = item.get("seq") if isinstance(item, dict) else idx
+            unlocked.append((seq, missing))
+    for key, seqs in duplicate_topic_statements(plan):
+        unlocked.append((
+            None,
+            [f"同批重複真題（正規化後 exact-match）：seq {seqs} 鎖到同一句「{key[:30]}…」"
+             f"＝未鎖級，請題目層換題後重跑"],
+        ))
+    return (not unlocked), unlocked
+
+
+# ════════════════════════════════════════════════════════════════════
+# W3（cxp-gapfix-w1／2026-08-13）：topic_id 題源真實性解析（假 topic_id 關死）
+# 規格＝龍蝦堵法表 P0-1：「在 plan 的七欄填自造值與假 topic_id，再直接進骨架」
+#   實測 forged_rc=0（骨架機不會發現）。根因：topic_lock_status 只驗「形」與
+#   「型」，不驗 topic_id 是否真的存在於題池／projection record。
+# 修法：新增本解析器，骨架機開工前逐槽呼叫，無命中 → exit 2。
+#
+# 兩條合法來源（其一）：
+#   ① projection record：topic_id 命中 owner 的 _projections/by_owner/<code>/active.json
+#      candidates[].topic_id（不可手填——該檔由 gen_topic_intel_projection.py 產）。
+#   ② typed 人工 namespace：topic_id 以 `MANUAL-` 前綴開頭（工單 W3 明訂），
+#      且 topic_lock.locked_by 有具名鎖定人（非空、非占位）。人工題留給
+#      「業主訪談／客戶當場問的問題」這類本來就不在情報池的題，但必須具名負責。
+# 其餘一律 unresolved＝假 topic_id。
+# ════════════════════════════════════════════════════════════════════
+
+MANUAL_TOPIC_ID_PREFIX = "MANUAL-"
+
+
+def _projection_active_path(owner: str):
+    """回傳 owner 的 projection active.json 路徑（Path）或 None（owner 未知／設定缺）。"""
+    try:
+        rec = _OWNER_PROJECTION.get(owner) if owner else None
+    except SystemExit:
+        raise
+    except Exception:
+        return None
+    if not rec:
+        return None
+    owner_code = str(rec.get("owner_code", "") or "")
+    if not owner_code:
+        return None
+    cfg_path = Path("/Users/chenzejun/claude-state/topic_intel_paths.json")
+    if not cfg_path.exists():
+        return None
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    proj_dir = cfg.get("topic_intel_projection_dir", "")
+    if not proj_dir:
+        return None
+    return Path(proj_dir) / "by_owner" / owner_code / "active.json"
+
+
+def load_projection_topic_ids(owner: str) -> tuple[Optional[set], Optional[str]]:
+    """載 owner 的 projection topic_id 集合 →(ids_set, error)。
+
+    (set, None)   ＝ cache 在場且可解析（可能為空集合）
+    (None, error) ＝ cache 不在場／不可解析（呼叫端 fail-closed，禁當作「無限制」）
+    """
+    active = _projection_active_path(owner)
+    if active is None:
+        return None, f"owner={owner!r} 無法解析 projection 路徑（owner 未登錄或 topic_intel_paths.json 缺）"
+    if not active.exists():
+        return None, f"owner={owner!r} projection cache 不存在：{active}"
+    try:
+        data = json.loads(active.read_text(encoding="utf-8"))
+    except Exception as e:
+        return None, f"owner={owner!r} projection cache 解析失敗：{e}"
+    cands = data.get("candidates")
+    if not isinstance(cands, list):
+        return None, f"owner={owner!r} projection cache candidates 非 list"
+    ids = {
+        str(c.get("topic_id", "") or "")
+        for c in cands
+        if isinstance(c, dict) and c.get("topic_id")
+    }
+    return ids, None
+
+
+def resolve_topic_id_source(topic_id, owner: str, lock=None,
+                            projection_ids: Optional[set] = None,
+                            projection_error: Optional[str] = None) -> tuple[bool, str, str]:
+    """單一 topic_id 的題源真實性解析 →(ok, kind, detail)。
+
+    kind ∈ {"projection", "manual", "unresolved"}。
+    projection_ids/projection_error 可由呼叫端先載一次再逐槽傳入（省 IO）；
+    未傳則本函式自行載入。
+    fail-closed：cache 不在場 → 一律 unresolved（不放行），因為此時無法證明題真。
+    """
+    tid = topic_id if isinstance(topic_id, str) else None
+    if not tid or not tid.strip():
+        return False, "unresolved", "topic_id 為空或型別非 str"
+    tid = tid.strip()
+
+    # ① typed 人工 namespace
+    if tid.startswith(MANUAL_TOPIC_ID_PREFIX):
+        body = tid[len(MANUAL_TOPIC_ID_PREFIX):].strip()
+        if not body:
+            return False, "unresolved", f"topic_id={tid!r} 只有 {MANUAL_TOPIC_ID_PREFIX} 前綴、無識別碼本體"
+        locked_by = (lock or {}).get("locked_by") if isinstance(lock, dict) else None
+        if not isinstance(locked_by, str) or _topic_field_is_placeholder(locked_by):
+            return False, "unresolved", (
+                f"topic_id={tid!r} 為人工題（{MANUAL_TOPIC_ID_PREFIX} namespace）"
+                f"但 topic_lock.locked_by 未具名鎖定人（實得 {locked_by!r}）"
+            )
+        return True, "manual", f"人工題 namespace 合法（locked_by={locked_by!r}）"
+
+    # ② projection record
+    if projection_ids is None and projection_error is None:
+        projection_ids, projection_error = load_projection_topic_ids(owner)
+    if projection_error:
+        return False, "unresolved", (
+            f"topic_id={tid!r} 無法驗真來源（{projection_error}）；"
+            f"若為人工題請改用 {MANUAL_TOPIC_ID_PREFIX} 前綴＋具名 locked_by"
+        )
+    if tid in (projection_ids or set()):
+        return True, "projection", f"topic_id={tid!r} 命中 owner={owner!r} projection record"
+    return False, "unresolved", (
+        f"topic_id={tid!r} 不在 owner={owner!r} 的 projection record 中（假題／已失效／打錯）；"
+        f"人工題請用 {MANUAL_TOPIC_ID_PREFIX} 前綴＋具名 locked_by"
+    )
+
+
+def assert_topic_ids_resolvable(plan, owner: str) -> tuple[bool, list]:
+    """整份 plan 的 topic_id 題源解析 →(all_ok, [(seq, detail), ...])。
+
+    骨架機在 assert_topics_locked 通過後呼叫；任一槽 unresolved → 消費端 exit 2。
+    """
+    if not isinstance(plan, list):
+        return False, [(None, f"plan 型別非 list（{type(plan).__name__}）")]
+    proj_ids, proj_err = load_projection_topic_ids(owner)
+    bad: list = []
+    for idx, item in enumerate(plan, start=1):
+        seq = item.get("seq", idx) if isinstance(item, dict) else idx
+        lock = item.get("topic_lock") if isinstance(item, dict) else None
+        tid = lock.get("topic_id") if isinstance(lock, dict) else None
+        ok, _kind, detail = resolve_topic_id_source(
+            tid, owner, lock, projection_ids=proj_ids, projection_error=proj_err
+        )
+        if not ok:
+            bad.append((seq, detail))
+    return (not bad), bad
+
+
+# ════════════════════════════════════════════════════════════════════
+# W1（cxp-gapfix-w1／2026-08-13）：topic_lock 正典雜湊
+# 用途＝把「plan 鎖到的題」綁死，validator C-TOPIC-LOCK 重算比對，
+#   任何人事後手改 plan 或稿件的 topic_lock 都會 hash mismatch。
+# 設計注意（不打紅現役）：**另立 `topic_lock_hash` 欄位**，不改既有
+#   `_plan_lock_hash`（hybrid 5-key）算式——現役 18 份 plan 皆已寫入舊 hash，
+#   改算式會讓它們全部 mismatch。舊 plan 無本欄 → validator SKIP（grandfather）。
+# ════════════════════════════════════════════════════════════════════
+
+# 納入雜湊的鎖欄（順序固定；locked_by/locked_at 屬簽署欄，一併納入防事後改人）
+TOPIC_LOCK_HASH_FIELDS = TOPIC_LOCK_REQUIRED_FIELDS + ("locked_by", "locked_at")
+
+
+def _canonical_lock_value(v):
+    """雜湊用正規化：list → 逐元素字串化後保序；bool/str/None → 字串化（None→""）。"""
+    if isinstance(v, (list, tuple)):
+        return [str(x) for x in v]
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v)
+    return str(v)
+
+
+def topic_lock_hash(plan) -> str:
+    """整份 plan 的 topic_lock 正典雜湊（sha256 hex）。
+
+    對每槽取 script_id ＋ TOPIC_LOCK_HASH_FIELDS 逐欄正規化值，按 script_id 排序後
+    canonical JSON → sha256。plan 非 list／槽非 dict → 該槽以空鎖計（不拋例外）。
+    """
+    rows = []
+    if isinstance(plan, list):
+        for idx, item in enumerate(plan, start=1):
+            if not isinstance(item, dict):
+                rows.append({"script_id": f"__invalid_{idx}", "lock": {}})
+                continue
+            lock = item.get("topic_lock")
+            lock = lock if isinstance(lock, dict) else {}
+            rows.append({
+                "script_id": str(item.get("script_id", "") or ""),
+                "lock": {f: _canonical_lock_value(lock.get(f)) for f in TOPIC_LOCK_HASH_FIELDS},
+            })
+    rows.sort(key=lambda r: r["script_id"])
+    raw = json.dumps(rows, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def script_topic_lock_hash(script_id, lock) -> str:
+    """單支腳本的 topic_lock 雜湊（與 topic_lock_hash 同一正規化契約，單槽版）。"""
+    lock = lock if isinstance(lock, dict) else {}
+    row = {
+        "script_id": str(script_id or ""),
+        "lock": {f: _canonical_lock_value(lock.get(f)) for f in TOPIC_LOCK_HASH_FIELDS},
+    }
+    raw = json.dumps([row], ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 # Phase 2 FIX2：lazy proxy（import 不碰 generated.json；dir 已於上方 sibling import 加入 sys.path）
 from _lazy_map import LazyMap
@@ -309,11 +789,11 @@ def load_sop_batch_spec() -> dict:
     except Exception as e:
         print(f"[WARN] topic_distributor: _sop_config import/load failed ({e}); using hardcoded fallback",
               file=sys.stderr)
-        return {"main_scripts": 13, "cta_distribution": {}}
+        return {"main_scripts": 14, "cta_distribution": {}}
 
 
 # ════════════════════════════════════════
-# 7. 分配 13 題目方向
+# 7. 分配題目方向
 # ════════════════════════════════════════
 
 def distribute_topics(
@@ -325,10 +805,10 @@ def distribute_topics(
     batch: str,
 ) -> list[dict]:
     """
-    按流派比例分配 13 個題目方向（skeleton）
+    按流派比例分配 batch_spec.main_scripts 個題目方向（skeleton）
     每題只含：方向 + 流派 + 雙身份 — 不寫內文
     """
-    main_count = batch_spec.get("main_scripts", 13)
+    main_count = batch_spec.get("main_scripts", 14)
 
     # ── 正規化流派比例（只計非禁用派系）──
     total_pct = sum(school_ratios.values())
@@ -338,19 +818,19 @@ def distribute_topics(
         school_ratios = {s: 100 // len(schools) for s in schools}
         total_pct = 100
 
-    # 計算每流派配幾支（按比例四捨五入，最後湊滿 main_count）
-    slots: dict[str, int] = {}
-    for name, pct in sorted(school_ratios.items(), key=lambda x: -x[1]):
-        n = round(main_count * pct / total_pct)
-        slots[name] = max(1, n)
-
-    # 調整總數 = main_count
-    current_total = sum(slots.values())
-    diff = main_count - current_total
-    if diff != 0:
-        # 從比例最高的流派加減
-        top_school = max(slots, key=lambda k: school_ratios.get(k, 0))
-        slots[top_school] = max(1, slots[top_school] + diff)
+    # 最大餘數法：先取整數部分，再按餘數補格，嚴格保證總數恰為 main_count。
+    # 舊 round()+只調最高派在 8 派等權時會因最低 1 格限制多出第 15 槽。
+    raw_slots = {
+        name: main_count * pct / total_pct
+        for name, pct in school_ratios.items()
+    }
+    slots = {name: int(raw) for name, raw in raw_slots.items()}
+    remaining = main_count - sum(slots.values())
+    for name in sorted(
+        slots,
+        key=lambda key: (-(raw_slots[key] - slots[key]), -school_ratios[key], key),
+    )[:remaining]:
+        slots[name] += 1
 
     # ── 正規化雙身份比例 ──
     id_total = sum(identity_ratios.values())
@@ -361,6 +841,14 @@ def distribute_topics(
 
     # ── 產 plan list ──
     # 依流派 slot 展開
+    #
+    # 題目鎖（cxp-fullimport-s r2，2026-08-12）：舊法真刪。
+    #   舊：direction = "[編劇填] — {school}方向 {seq}" —— 派工出去就是一個空題殼，
+    #       編劇拿到「拆解派方向 3」等於沒題目，題從寫稿當下才生，四錨點第一錨（題目）落空。
+    #   新：direction 一律留白待鎖（TOPIC_UNLOCKED），另立 topic_lock 必填真題欄。
+    #       骨架機／validator 只接受已鎖真題；愛馬仕（寫稿端）不可自行換題，
+    #       題目對不上只能回 TOPIC_REJECT 退回題目層，不得就地改題（得標定稿 §4）。
+    #   保留：既有 topic_id / provenance 閘（source_topic_intel）不重做、不改行為。
     plan: list[dict] = []
     seq = 1
     for school, count in slots.items():
@@ -370,7 +858,8 @@ def distribute_topics(
             plan.append({
                 "seq": seq,
                 "script_id": f"{_owner_code(owner)}_{_batch_code(batch)}_{seq:02d}",
-                "direction": f"[編劇填] — {school}方向 {seq}",
+                "direction": TOPIC_UNLOCKED,
+                "topic_lock": dict(TOPIC_LOCK_TEMPLATE),
                 "派系": school,
                 "雙身份": id_choice,
                 "owner": owner,
@@ -646,6 +1135,47 @@ def evaluate_hybrid_allocation(plan: list[dict]) -> dict:
     }
 
 
+def evaluate_q8_allocation(plan: list[dict]) -> dict:
+    """Return the deterministic Q1-Q8 quota verdict for a new batch plan."""
+    topic_type_count = _count_by(plan, "topic_type")
+    infeasible: list[str] = []
+    expected_slots = sum(TOPIC_TYPE_TARGET_COUNTS.values())
+    if len(plan) != expected_slots:
+        infeasible.append(f"slot_count={len(plan)} expected={expected_slots}")
+    for topic_type in TOPIC_TYPE_VALUES:
+        actual = topic_type_count.get(topic_type, 0)
+        expected = TOPIC_TYPE_TARGET_COUNTS[topic_type]
+        if actual != expected:
+            infeasible.append(f"{topic_type}={actual} expected={expected}")
+    invalid = sorted(set(topic_type_count) - set(TOPIC_TYPE_VALUES))
+    if invalid:
+        infeasible.append(f"invalid_topic_types={invalid}")
+    return {
+        "topic_type_count": topic_type_count,
+        "expected_topic_type_count": dict(TOPIC_TYPE_TARGET_COUNTS),
+        "infeasible_constraints": infeasible,
+    }
+
+
+def apply_q8_quota(plan: list[dict]) -> tuple[list[dict], dict]:
+    """Annotate a new plan with the canonical Q1-Q8 slot sequence.
+
+    This deliberately does not touch content_axis/lane or _plan_lock_hash: those
+    are the legacy hybrid contract and old plans must keep validating unchanged.
+    """
+    sequence = [
+        topic_type
+        for topic_type in TOPIC_TYPE_VALUES
+        for _ in range(TOPIC_TYPE_TARGET_COUNTS[topic_type])
+    ]
+    annotated: list[dict] = []
+    for idx, item in enumerate(plan):
+        out = dict(item)
+        out["topic_type"] = sequence[idx] if idx < len(sequence) else ""
+        annotated.append(out)
+    return annotated, evaluate_q8_allocation(annotated)
+
+
 def _hybrid_allocation_report(plan: list[dict]) -> dict:
     """Backward-compatible private entry point for allocator callers."""
     return evaluate_hybrid_allocation(plan)
@@ -880,7 +1410,7 @@ def main():
             exit_code = 1
         sys.exit(exit_code)
 
-    parser = argparse.ArgumentParser(description="題目分配機 — 自動分 13 題目方向")
+    parser = argparse.ArgumentParser(description="題目分配機 — 自動分 14 題目方向（Q1-Q8 配額）")
     parser.add_argument("--owner",  required=True, help="業主名（瑞祥/仲豪/昀臻/叭噗_小C/阿奇）")
     parser.add_argument("--batch",  required=True, help="批次名，e.g. 第02批_2026-05-25")
     parser.add_argument("--output", help="輸出 JSON 路徑（預設同目錄 topic_plan_<owner>_<batch>.json）")
@@ -950,20 +1480,29 @@ def main():
 
     # 讀 SOP batch_spec
     batch_spec = load_sop_batch_spec()
-    main_count = batch_spec.get("main_scripts", 13)
+    main_count = batch_spec.get("main_scripts", 14)
     print(f"[OK] SOP batch_spec.main_scripts = {main_count}")
 
-    # 分配 13 題目方向
+    # 分配題目方向，並為新批次固定填入 Q1-Q8 配額。
     plan, dedup_info = distribute_topics(
         school_ratios, identity_ratios, used_topics, batch_spec, owner, batch
     )
+    plan, q8_allocation_report = apply_q8_quota(plan)
+    if q8_allocation_report["infeasible_constraints"]:
+        print(
+            "[ERROR] Q1-Q8 配額不合，拒絕寫入 topic plan："
+            + "; ".join(q8_allocation_report["infeasible_constraints"]),
+            file=sys.stderr,
+        )
+        sys.exit(1)
     ratio_validation = build_ratio_validation(plan, school_ratios, identity_ratios)
 
     plan_lock_hash: Optional[str] = None
     allocation_report: Optional[dict] = None
     if batch_profile == HYBRID_BATCH_PROFILE:
-        profile_data = _load_owner_content_profile()
-        plan, plan_lock_hash, allocation_report = apply_hybrid_profile(plan, profile_data)
+        # 舊 hybrid profile 僅保留 CLI 相容性；新批一律走 Q1-Q8，不重新套
+        # content_axis 9/2/2（該函式仍保留供既有 plan grandfather 驗證）。
+        allocation_report = q8_allocation_report
 
     # WP-B Step 5：assign_topic_sources（flag-gated，--batch-dir 缺省=off）
     # 零足跡鐵律：off 時不 import、不讀池、不新增 key、stdout 無 [WP-B] 行
@@ -977,7 +1516,7 @@ def main():
             # 找 owner projection path（走 config）
             try:
                 import json as _json_m
-                _ti_cfg_path = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
+                _ti_cfg_path = Path(r"/Users/chenzejun/claude-state/topic_intel_paths.json")
                 _ti_cfg = _json_m.loads(_ti_cfg_path.read_text(encoding="utf-8")) if _ti_cfg_path.exists() else {}
                 _proj_dir = _ti_cfg.get("topic_intel_projection_dir", "")
                 owner_code_val = _owner_code(owner)
@@ -1041,11 +1580,21 @@ def main():
         "plan": plan,
         "dedup_info": dedup_info,
         "ratio_validation": ratio_validation,
+        "q8_allocation_report": q8_allocation_report,
     }
     if batch_profile == HYBRID_BATCH_PROFILE:
         output_data["meta"]["batch_profile"] = batch_profile
-        output_data["plan_lock_hash"] = plan_lock_hash
         output_data["allocation_report"] = allocation_report
+    # W1（cxp-gapfix-w1 2026-08-13）：題目鎖正典雜湊。
+    # 只有整份 plan 都已鎖題才寫入——寫了本欄＝宣告「新格式（題目鎖世代）」，
+    # validator C-TOPIC-LOCK 會逐欄比對＋重算 hash；未鎖的 plan 不寫（維持舊格式
+    # grandfather 路徑，不打紅 351 支歷史稿）。
+    try:
+        _all_locked, _ = assert_topics_locked(plan)
+    except Exception:
+        _all_locked = False
+    if _all_locked:
+        output_data["topic_lock_hash"] = topic_lock_hash(plan)
     if assign_report is not None:
         output_data["assign_report"] = assign_report
 
@@ -1068,6 +1617,16 @@ def main():
         print(f"    [{ok_mark}] {name}: 目標 {v['target_pct']}% → 實際 {v['actual_pct']}% ({v['actual_count']} 支)")
     print(f"\n  已用主題去重：{dedup_info['used_title_count']} 筆歷史 title 已載入")
     print(f"  (去重邏輯：編劇填題目時請參考 dedup_info.used_titles_sample 避免重複)\n")
+
+    # ── 題目鎖狀態（cxp r2 2026-08-12）：新產 plan 一律未鎖，明講下一步是誰的事 ──
+    _all_locked, _unlocked = assert_topics_locked(plan)
+    if _all_locked:
+        print(f"  題目鎖：全 {len(plan)} 槽已鎖真題（topic_lock 五欄齊）")
+    else:
+        print(f"  🔒 題目鎖：{len(_unlocked)}/{len(plan)} 槽未鎖題 — 本 plan **尚不可派去寫稿**。")
+        print(f"     下一步＝題目層逐槽補 direction 真題 + topic_lock 五欄"
+              f"（{'/'.join(TOPIC_LOCK_REQUIRED_FIELDS)}）。")
+        print(f"     寫稿端不得自行補題或換題；題不合用只能回 {TOPIC_REJECT} 退回題目層。\n")
 
     print(f"{'='*60}\n")
     sys.exit(0)

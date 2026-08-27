@@ -36,7 +36,8 @@ _DEFAULT_SOP_YAML = Path(__file__).resolve().parents[3] / "L0_跨行業公版" /
 # ════════════════════════════════════════
 
 _FALLBACK_BATCH_SPEC: dict = {
-    "main_scripts":          13,
+    # L0 讀取失敗仍維持 2026-08-26 起的 14 支 Q1-Q8 新制，禁回退 13 支。
+    "main_scripts":          14,
     "fishing_script":         0,   # 釣魚部下架（澤君 2026-06-05）：fallback 同步改 0，與 L0 一致（沉默坑防護）
     "threads_posts":          7,
     "threads_max_codepoints": 200,
@@ -44,7 +45,7 @@ _FALLBACK_BATCH_SPEC: dict = {
     "duration_seconds":      60,
     "title_max_chars":       15,
     "traffic_codes_min":      3,
-    "actor_interaction_min":  2,
+    "actor_interaction_min":  1,   # 舊值 2 已退場（L0 §9.8 沿革）：fallback 同步改 1，與 SOP yaml 一致（沉默坑防護，保鏢 r4 家族）
     "school_diversity_min":   3,
     "theme_diversity_min":    4,
     "cta_distribution":      {},
@@ -356,7 +357,7 @@ if __name__ == "__main__":
     print("\n[F-SC1] 正常讀取 batch_spec（讀真實 L0）")
     clear_sop_config_cache()
     bs = load_l0_batch_spec()
-    _chk("F-SC1 main_scripts == 13",         bs.get("main_scripts") == 13, str(bs.get("main_scripts")))
+    _chk("F-SC1 main_scripts == 14",         bs.get("main_scripts") == 14, str(bs.get("main_scripts")))
     _chk("F-SC1 fishing_script == 0",         bs.get("fishing_script") == 0, str(bs.get("fishing_script")))
     _chk("F-SC1 threads_posts == 7",          bs.get("threads_posts") == 7, str(bs.get("threads_posts")))
     _chk("F-SC1 threads_max_codepoints == 200", bs.get("threads_max_codepoints") == 200, str(bs.get("threads_max_codepoints")))
@@ -366,7 +367,7 @@ if __name__ == "__main__":
     _chk("F-SC1 duration_seconds == 60",      bs.get("duration_seconds") == 60, str(bs.get("duration_seconds")))
     _chk("F-SC1 title_max_chars == 15",       bs.get("title_max_chars") == 15, str(bs.get("title_max_chars")))
     _chk("F-SC1 traffic_codes_min == 3",      bs.get("traffic_codes_min") == 3, str(bs.get("traffic_codes_min")))
-    _chk("F-SC1 actor_interaction_min == 2",  bs.get("actor_interaction_min") == 2, str(bs.get("actor_interaction_min")))
+    _chk("F-SC1 actor_interaction_min == 1",  bs.get("actor_interaction_min") == 1, str(bs.get("actor_interaction_min")))
     _chk("F-SC1 school_diversity_min == 3",   bs.get("school_diversity_min") == 3, str(bs.get("school_diversity_min")))
     _chk("F-SC1 theme_diversity_min == 4",    bs.get("theme_diversity_min") == 4, str(bs.get("theme_diversity_min")))
 
@@ -389,7 +390,7 @@ if __name__ == "__main__":
     bs_miss = load_l0_batch_spec(sop_yaml="/nonexistent/sop.yaml")
     sys.stderr = _old_err
     warn_out = _stderr_buf.getvalue()
-    _chk("F-SC3 fallback main_scripts == 13", bs_miss.get("main_scripts") == 13, str(bs_miss.get("main_scripts")))
+    _chk("F-SC3 fallback main_scripts == 14", bs_miss.get("main_scripts") == 14, str(bs_miss.get("main_scripts")))
     _chk("F-SC3 fallback threads limit == 200", bs_miss.get("threads_max_codepoints") == 200, str(bs_miss.get("threads_max_codepoints")))
     _chk("F-SC3 fallback cutover == 2026-07-13", bs_miss.get("threads_length_effective_from") == "2026-07-13", str(bs_miss.get("threads_length_effective_from")))
     _chk("F-SC3 stderr 含 [WARN] _sop_config:", "[WARN] _sop_config:" in warn_out, repr(warn_out[:120]))
@@ -431,7 +432,7 @@ if __name__ == "__main__":
     sys.stderr = _old_err
     warn_out2 = _stderr_buf2.getvalue()
     _chk("F-SC4 缺 title_max_chars → fallback 15", bs4.get("title_max_chars") == 15, str(bs4.get("title_max_chars")))
-    _chk("F-SC4 壞 actor_interaction_min → fallback 2", bs4.get("actor_interaction_min") == 2, str(bs4.get("actor_interaction_min")))
+    _chk("F-SC4 壞 actor_interaction_min → fallback 1", bs4.get("actor_interaction_min") == 1, str(bs4.get("actor_interaction_min")))
     _chk("F-SC4 壞 threads_max_codepoints → fallback 200", bs4.get("threads_max_codepoints") == 200, str(bs4.get("threads_max_codepoints")))
     _chk("F-SC4 壞 threads_length_effective_from → fallback 2026-07-13", bs4.get("threads_length_effective_from") == "2026-07-13", str(bs4.get("threads_length_effective_from")))
     _chk("F-SC4 stderr 含 [WARN] _sop_config:", "[WARN] _sop_config:" in warn_out2, repr(warn_out2[:200]))
@@ -509,7 +510,7 @@ if __name__ == "__main__":
         bs8 = {}; _crash8 = True
     sys.stderr = _old_err
     _chk("F-SC8 非dict batch_spec 不 crash", not _crash8, "crashed")
-    _chk("F-SC8 → fallback main_scripts 13", bs8.get("main_scripts") == 13, str(bs8.get("main_scripts")))
+    _chk("F-SC8 → fallback main_scripts 14", bs8.get("main_scripts") == 14, str(bs8.get("main_scripts")))
     _chk("F-SC8 stderr 含 [WARN] _sop_config:", "[WARN] _sop_config:" in _b8.getvalue(), repr(_b8.getvalue()[:160]))
 
     # ── F-SC9（Codex must-fix）：time_slots slot 非 dict（str）→ 全 fallback + WARN，不 crash ──

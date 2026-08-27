@@ -630,7 +630,12 @@ def _get_dialogue_parts(sc: dict) -> list:
     for k, v in sc.items():
         if k.startswith('台詞_') and v:
             speaker = k[len('台詞_'):]  # e.g. '阿奇', '叭噗', '小C'
-            parts.append(f'{speaker}：{v}')
+            # 2026-08-28：speaker='旁白' 或空 ＝ 無說話人前綴（供 html 反解回填的手插批用；
+            # 既有四業主資料零使用此 key，向後相容）
+            if speaker in ('旁白', ''):
+                parts.append(str(v))
+            else:
+                parts.append(f'{speaker}：{v}')
     return parts
 
 

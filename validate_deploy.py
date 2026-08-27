@@ -53,6 +53,11 @@ validate_deploy.py — 短影音腳本上線前驗證腳本 (17 件檢查)
 16. threads_presence 與最新批一致（check_16_threads_presence_matches_latest_batch）
 --- v9 新增（2026-06-15 WP2 B-9 — pre-commit C-016 守門涵蓋 anti-regression）---
 17. owner coverage gate（check_17_gate_owner_coverage）
+--- v11 新增（2026-08-14 cxp-enforce-t3-gitgate G3 — build 收據閘）---
+19. build 收據閘（check_19_build_receipts）：管制名單產物須有新鮮 + validator=PASS 的
+    _build_receipts/<檔名>.receipt.json；邏輯在獨立 verify_build_receipt.py。
+    這是 `git commit --no-verify` 的第二道（本機 hook 跳得過，上站前這關跳不過）。
+    （編號 18 已被 check_18 shadow 佔用，故新硬擋件沿用 19；對外件數 = 18 件齊）
 
 失敗 exit 2，通過 exit 0。
 緊急逃生：--force-skip-validation（強迫寫 log + 7 天內補 incident memory）
@@ -64,7 +69,8 @@ v6 升級：2026-06-07 加第 14 件 owner-scoped 成品禁詞掃描
 v7 升級：2026-06-12 加第 15 件 PWA 三件驗證（零留尾戰役 WP-D）+ 第 11 件描述對齊實碼（F-8）
 v8 升級：2026-06-15 WP2 加第 16 件 脆文 source→對外頁數量一致性（第10洞）
 v9 升級：2026-06-15 WP2 加第 17 件 owner coverage gate（B-9 anti-regression）
-        —— main() 實跑 check_1~check_17、成功訊息「✅ 全部通過 — 17 件齊」（2026-06-23 doc 對齊：原檔頭/CLAUDE.md/rules 寫 14-15 為 v8/v9 前快照）
+v11 升級：2026-08-14 加 check 19 build 收據閘（硬擋）
+        —— main() 實跑 check_1~check_17 + check_19、成功訊息「✅ 全部通過 — 18 件齊」
 """
 
 import os
@@ -903,7 +909,7 @@ def check_12_no_faction_group_head():
     #   build: build_template_*.py（範本工具，非業主 build script）
     _HTML_EXCLUDE_PREFIXES = ('_',)
     _HTML_EXCLUDE_SUBSTRINGS = ('_preview', '_selfcontained', '_test')
-    _HTML_STATIC_WHITELIST = {'tax-2026.html'}  # 非業主靜態資訊頁，已知合法
+    _HTML_STATIC_WHITELIST = {'tax-2026.html', 'chat-trial-20260817.html'}  # 非業主靜態資訊頁，已知合法
     _BUILD_TOOL_PREFIXES = ('build_template',)   # 範本工具腳本，非業主 build
 
     def _is_excluded_html(name: str) -> bool:
@@ -1048,7 +1054,7 @@ def check_13_owner_projection_cache_freshness():
     if not verifier:
         kb_dir = os.environ.get('KB_RESOLVER_DIR', '')
         verifier = (str(Path(kb_dir) / 'validate_owner_projection_cache.py') if kb_dir
-                    else r'C:\Users\00sta\Documents\my-assistant\tools\kb_resolver\validate_owner_projection_cache.py')
+                    else '/Users/chenzejun/Documents/my-assistant/tools/kb_resolver/validate_owner_projection_cache.py')
     if not Path(verifier).exists():
         if optional:
             log(f'  ⚠ Gate B: 找不到 verifier（{verifier}）— OPTIONAL 模式跳過（Gate A 已驗自包含新鮮度）')
@@ -1135,7 +1141,7 @@ def check_14_owner_forbidden_terms():
             # KB_RESOLVER_DIR 是 tools/kb_resolver/，往上一層到 tools/validators/
             validator_path = str(Path(kb_dir).parent / 'validators' / 'forbidden_terms_validator.py')
         else:
-            validator_path = r'C:\Users\00sta\Documents\my-assistant\tools\validators\forbidden_terms_validator.py'
+            validator_path = '/Users/chenzejun/Documents/my-assistant/tools/validators/forbidden_terms_validator.py'
     if not Path(validator_path).exists():
         msg = (f'❌ Check 14: 找不到 forbidden_terms_validator.py（{validator_path}）'
                f' — 修 validator/KB，不要 --no-verify 放行')
@@ -1186,9 +1192,28 @@ def check_14_owner_forbidden_terms():
     import tempfile
 
     # 找 L0 path（從任一業主的 manifest 推導，所有業主共用同一 L0）
-    # 用 check_13 裡已知的 my-assistant 路徑慣例推導
-    _ma_root = str(Path(validator_path).parent.parent.parent)  # my-assistant root
-    _short_root = str(Path(_ma_root).parent / 'Claude' / 'Projects' / '短影音系統')
+    # 2026-08-27 p4exec1 r7 改指：原推導 = my-assistant 同層 Claude/Projects/短影音系統，
+    # 該樹已於 0826 搬遷（現樹 = .../短影音系統v3/00_系統本體），造成 L0/L1 全數指向不存在路徑，
+    # validator KB resolve 直接 ERROR（Check 14 九業主全紅＝守門整條跑不起來）。
+    # 改法：以 owner_projection 記的 l2_path 反推系統根（<ROOT>/L2_業主層/... → <ROOT>），
+    # 與 owner_discovery.DEFAULT_ROOT 同源，不再靠跨 repo 目錄慣例硬猜。
+    # 檢查邏輯（fail-closed 判定、hard-block 條件）一字未動，只改「檢查對象的路徑指針」。
+    _short_root = ''
+    for _rec in owners_rec.values():
+        _l2 = _rec.get('l2_path', '')
+        if not _l2:
+            continue
+        _p = Path(_l2)
+        for _anc in _p.parents:
+            if _anc.name == 'L2_業主層':
+                _short_root = str(_anc.parent)
+                break
+        if _short_root:
+            break
+    if not _short_root:
+        # fallback：舊慣例推導（保留原行為，路徑不存在時下方仍會 fail-closed 報錯）
+        _ma_root = str(Path(validator_path).parent.parent.parent)  # my-assistant root
+        _short_root = str(Path(_ma_root).parent / 'Claude' / 'Projects' / '短影音系統')
     _l0_path = str(Path(_short_root) / 'L0_跨行業公版' / '_生成方法論.md')
     _l1_root = str(Path(_short_root) / 'L1_行業層')
 
@@ -1488,12 +1513,56 @@ def check_17_gate_owner_coverage():
     return fails
 
 
+def check_19_build_receipts():
+    """check 19（2026-08-14 cxp-enforce-t3-gitgate G3）：build 收據閘 —— 上站前二次驗。
+    管制名單（_build_receipts/enforced_outputs.txt）內的產物，必須有新鮮且 validator=PASS
+    的 build 收據。這是對 `git commit --no-verify` 的真正對策：本機 hook 跳得過，
+    但上站前跑 validate_deploy.py 這關跳不過。
+    邏輯全在獨立 verify_build_receipt.py（與 pre-commit Part 7 同一支，single source of truth）。
+    回退：刪本函式 + main() 內一行呼叫（.bak_gitgate_20260814 留原版）。
+    """
+    log('[check 19] build 收據閘（交稿必附驗證證明；--no-verify 的第二道）')
+    fails = []
+    verifier = LIB / 'verify_build_receipt.py'
+    if not verifier.exists():
+        msg = '❌ check 19: verify_build_receipt.py 不存在 — 收據守門失效，hard-block（禁 silent-skip）'
+        log(f'  {msg}')
+        fails.append(msg)
+        return fails
+    try:
+        proc = subprocess.run(
+            [sys.executable, '-X', 'utf8', str(verifier), '--all-enforced', '--allow-grandfather'],
+            cwd=str(LIB), capture_output=True, text=True,
+            encoding='utf-8', errors='replace', timeout=300,
+        )
+    except Exception as e:
+        msg = f'❌ check 19: 收據驗證器執行失敗（{type(e).__name__}: {e}）'
+        log(f'  {msg}')
+        fails.append(msg)
+        return fails
+    for line in (proc.stdout or '').splitlines():
+        if line.strip():
+            log(f'  {line}')
+    for line in (proc.stderr or '').splitlines():
+        if line.strip():
+            log(f'  [stderr] {line}')
+    if proc.returncode != 0:
+        msg = f'❌ check 19: build 收據閘不過（verify_build_receipt.py exit {proc.returncode}）— 產物缺新鮮的 validator PASS 證明'
+        log(f'  {msg}')
+        fails.append(msg)
+    elif 'grandfathered' in (proc.stdout or ''):
+        log('  ⚠ check 19: 通過，但含 grandfather 放行項（見上方留痕）— 該產物尚未有真收據，重跑 build 後即恢復硬擋')
+    else:
+        log('  ✅ check 19: 管制名單產物收據齊備（新鮮 + validator PASS）')
+    return fails
+
+
 def check_18_ai_residue_secrets_shadow():
     """check 18（2026-07-07 立制度 v2 C2 — shadow 模式，不影響 exit code；澤君 /goal 授權掛載）：
     掃 LIB 下 *.html / build_*.py 找 AI 殘留（ChatGPT/Claude 匯出殘留）與 secrets（BLOCK 級子集）。
     **永遠回傳 []**（不進 all_fails、不影響 sys.exit）；命中只 log 出來供人工事後查閱。
     全函式 try/except 保護，內部任何例外都不外洩（新 check 掛掉不得拖垮整支驗證腳本）。
-    急停：建檔 C:/Users/00sta/claude-state/flags/disable_check18_shadow 即整段跳過。
+    急停：建檔 /Users/chenzejun/claude-state/flags/disable_check18_shadow 即整段跳過。
     升級路徑：3 次乾淨部署後才考慮 secrets 子集轉硬擋（獨立變更、需重過保鏢＋澤君）。
     回退：刪本函式＋main() 內兩行呼叫即可（.bak_v2c2_20260707 留原版）。
     """
@@ -1501,7 +1570,7 @@ def check_18_ai_residue_secrets_shadow():
     import os as _os
 
     try:
-        if _os.path.exists(r'C:/Users/00sta/claude-state/flags/disable_check18_shadow'):
+        if _os.path.exists(r'/Users/chenzejun/claude-state/flags/disable_check18_shadow'):
             log('[check 18][SHADOW] 已由急停 flag 停用，跳過')
             return []
     except Exception:
@@ -1630,6 +1699,9 @@ def main():
     # v9 新增（2026-06-15 WP2 B-9 — pre-commit C-016 守門涵蓋 anti-regression）
     all_fails += check_17_gate_owner_coverage()
     log('')
+    # v11 新增（2026-08-14 cxp-enforce-t3-gitgate G3 — build 收據閘，硬擋；件數 17 → 18 件齊）
+    all_fails += check_19_build_receipts()
+    log('')
     # v10 新增（2026-07-07 立制度 v2 C2 — check 18 shadow 模式，觀察期不影響 exit code；
     # 故意不寫 all_fails +=，回傳值丟棄＝100% 不影響現行 sys.exit 邏輯；件數對外仍稱 17 件）
     check_18_ai_residue_secrets_shadow()
@@ -1645,7 +1717,7 @@ def main():
         log('嚴禁 git commit --no-verify 繞過')
         sys.exit(2)
     else:
-        log('✅ 全部通過 — 17 件齊')
+        log('✅ 全部通過 — 18 件齊')
         sys.exit(0)
 
 

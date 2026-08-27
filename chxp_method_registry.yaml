@@ -32,10 +32,10 @@ mode_counts:
   conditional: 60
   audited: 18
 layer_counts:
-  none: 111
+  none: 119
   receipt: 5
   manual: 3
-  gate: 8
+  gate: 0
   blocked_entry: 1
 methods:
 - id: '001'
@@ -380,20 +380,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-041
-    trigger:
-      kind: enum
-      field: chxp_method_selection.041.type
-      enum:
-      - POV
-      - 熱門梗
-      - 生活觀察
-    require_fields:
-    - chxp_method_selection.041.段落安排
-    require_evidence: true
-    note: 劇情三式：選了哪一式才驗「段落安排」欄在不在；不判段落寫得好不好。
+  layer: none
 - id: '042'
   名稱: 黃金企劃／100題系列
   出處: 第四章／直播01／02
@@ -490,16 +477,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-053
-    trigger:
-      kind: bool_true
-      field: chxp_method_selection.053.used
-    require_fields:
-    - chxp_method_selection.053.回憶點
-    require_evidence: true
-    note: 懷舊題：宣告走懷舊才驗「回憶點」有沒有具名寫進骨架；不判回憶點動不動人。
+  layer: none
 - id: '054'
   名稱: 流量密碼⑨ 吐槽
   出處: 第五章
@@ -515,19 +493,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-055
-    trigger:
-      kind: enum
-      field: chxp_method_selection.055.type
-      enum:
-      - 吸睛外型
-      - 氣氛
-    require_fields:
-    - chxp_method_selection.055.同意紀錄
-    require_evidence: true
-    note: 吸睛外型／氣氛：選了才驗「取得同意的紀錄」欄在不在；不判素材好壞。
+  layer: none
 - id: '056'
   名稱: 流量密碼⑪ 光講不做／直接用畫面證明
   出處: 第五章
@@ -601,17 +567,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-064
-    trigger:
-      kind: bool_true
-      field: chxp_method_selection.064.used
-    require_fields:
-    - chxp_method_selection.064.不為人知的規則
-    - chxp_method_selection.064.原因
-    require_evidence: true
-    note: 行業揭秘：宣告走此型才驗骨架兩欄齊；不判揭得夠不夠猛。
+  layer: none
 - id: '065'
   名稱: 知識萃取：問題→舊答案→打破→新答案
   出處: 第九章／直播05
@@ -643,20 +599,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-068
-    trigger:
-      kind: enum
-      field: chxp_method_selection.068.type
-      enum:
-      - 正推
-      - 反推
-    require_fields:
-    - chxp_method_selection.068.理由
-    - chxp_method_selection.068.結論
-    require_evidence: true
-    note: 推薦題：選正推／反推才驗理由與結論兩欄齊；不判推得有無說服力。
+  layer: none
 - id: '069'
   名稱: 資訊整理腳本
   出處: 第九章
@@ -664,17 +607,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-069
-    trigger:
-      kind: bool_true
-      field: chxp_method_selection.069.used
-    require_fields:
-    - chxp_method_selection.069.分類
-    - chxp_method_selection.069.順序
-    require_evidence: true
-    note: 資訊整理：宣告走此型才驗分類與順序欄在不在；不判分類分得對不對。
+  layer: none
 - id: '070'
   名稱: 成就故事完整結構
   出處: 第九章／直播04
@@ -934,18 +867,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-101
-    trigger:
-      kind: enum
-      field: chxp_method_selection.101.mode
-      enum:
-      - 整理既有資料
-    require_fields:
-    - chxp_method_selection.101.sources
-    require_evidence: true
-    note: 記錄不創造：宣告整理型才驗 sources 清單非空＋證據指標可解回；不判來源權威度。
+  layer: none
 - id: '102'
   名稱: 濃縮大於縮短、講完整可拍長
   出處: 直播03
@@ -961,17 +883,7 @@ methods:
   適用條件: 產物命中此方法的適用情境時，由驗證器重算；不能自行填不適用。
   驗法: 依選型重算是否適用；適用時查欄位、選項與證據是否齊全。
   現況: 沒做
-  layer: gate
-  gate:
-    check_id: C-CXP-103
-    trigger:
-      kind: duration_60s
-    kind: char_count
-    char_count:
-      min: 240
-      max: 300
-    require_evidence: false
-    note: 一分鐘稿 240-300 字（龍蝦 R2 收緊意見：只對**新世代批**FAIL、舊稿 SKIP；非 60 秒稿不驗，避免未校準比例誤殺）。純數字區間，不判文字品質。
+  layer: none
 - id: '104'
   名稱: 行業×主題對照大全
   出處: 直播06

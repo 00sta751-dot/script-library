@@ -1,0 +1,5 @@
+# build 收據管制名單（G1-G3，2026-08-14 cxp-enforce-t3-gitgate）
+# 一行一個「產物檔名」；commit 這些檔時，pre-commit Part 7 與 validate_deploy check 19
+# 會要求 _build_receipts/<檔名>.receipt.json 存在＋新鮮＋validator=PASS。
+# 加業主 = 先讓該業主的 build_*.py 接上 _build_receipt.write_build_receipt，再把產物名加進來。
+wendi.html

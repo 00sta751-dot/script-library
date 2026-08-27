@@ -1,0 +1,257 @@
+{
+  "schema_id": "v2008_titleparse.fixture.v1",
+  "contract": {
+    "canonical": "raw _<owner>已用題目.md only",
+    "grammar_scope": "batch_section",
+    "title_threshold": 0.65,
+    "content_threshold": 0.85,
+    "nonempty_zero_parse": "FAIL",
+    "owner_unresolved": "PASS_WITH_SKIPPED_PROVENANCE",
+    "normalization": "outer_whitespace_only_except_replacement_audit_suffix",
+    "dedupe_rows": false
+  },
+  "parser_cases": [
+    {
+      "case_id": "dash_bracket_valid",
+      "path": "cases/01_dash_bracket_valid.md",
+      "expected": {
+        "format": "dash-bracket",
+        "parsed_rows": 3,
+        "titles": ["第一個既有題目", "第二個既有題目", "無編號仍沿用既有 grammar"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "numbered_h2_h3_reset",
+      "path": "cases/02_numbered_h2_h3_reset.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 4,
+        "titles": ["第一批第一題", "第一批第二題", "第二批第一題", "第二批脆文題"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "yunzhen_threads_included",
+      "path": "cases/03_yunzhen_threads_included.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 2,
+        "titles": ["短影音題目", "脆文也要收"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "zhonghao_replacement_new_only",
+      "path": "cases/04_zhonghao_replacement_new_only.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 3,
+        "titles": ["議價前不要做的三件事", "辦公桌上的招財貓", "30 歲還不買房的人，我幫你說一句（毒舌正能量）"],
+        "absent_titles": ["三個看屋前沒想到的成本", "中華藝校商圈吃什麼", "30歲說買不起房"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "table_achi_title_column",
+      "path": "cases/05_table_achi_title_column.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 2,
+        "titles": ["阿奇表格第一題", "阿奇表格第二題"],
+        "absent_titles": ["achi_01_01", "故事", "直球派"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "table_bapu_stats_and_candidates_ignored",
+      "path": "cases/06_table_bapu_traps.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 2,
+        "titles": ["叭噗五欄標題", "叭噗四欄標題"],
+        "absent_titles": ["第 01 批", "這不是已用標題", "長情", "直球派"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "table_escaped_pipe",
+      "path": "cases/07_table_escaped_pipe.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 1,
+        "titles": ["標題含 | 符號"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "explicit_empty_template_pass",
+      "path": "cases/08_explicit_empty.md",
+      "expected": {
+        "format": "explicit-empty",
+        "parsed_rows": 0,
+        "titles": [],
+        "empty_template": true,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "empty_without_sentinel_fail",
+      "path": "cases/09_empty_without_sentinel.md",
+      "expected": {
+        "format": "invalid",
+        "parsed_rows": 0,
+        "titles": [],
+        "empty_template": false,
+        "rejected_reasons": ["nonempty_zero_titles"]
+      }
+    },
+    {
+      "case_id": "unknown_nonempty_fail",
+      "path": "cases/10_unknown_nonempty.md",
+      "expected": {
+        "format": "invalid",
+        "parsed_rows": 0,
+        "titles": [],
+        "empty_template": false,
+        "rejected_reasons": ["nonempty_zero_titles"]
+      }
+    },
+    {
+      "case_id": "stale_empty_with_data_fail",
+      "path": "cases/11_stale_empty_with_data.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 1,
+        "titles": ["已有正式題目"],
+        "empty_template": false,
+        "rejected_reasons": ["stale_or_ambiguous_empty_sentinel"]
+      }
+    },
+    {
+      "case_id": "table_missing_separator_fail",
+      "path": "cases/12_table_missing_separator.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 0,
+        "titles": [],
+        "empty_template": false,
+        "rejected_reasons": ["table_missing_or_bad_separator", "nonempty_zero_titles"]
+      }
+    },
+    {
+      "case_id": "table_partial_bad_row_fail",
+      "path": "cases/13_table_partial_bad_row.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 1,
+        "titles": ["合法第一題"],
+        "empty_template": false,
+        "rejected_reasons": ["table_column_count_mismatch"]
+      }
+    },
+    {
+      "case_id": "numbered_then_table_next_batch_pass",
+      "path": "cases/14_numbered_then_table_next_batch.md",
+      "expected": {
+        "format": "multi-section",
+        "parsed_rows": 2,
+        "titles": ["舊批編號格式", "新批表格格式"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "numbered_and_table_same_batch_fail",
+      "path": "cases/15_numbered_and_table_same_batch.md",
+      "expected": {
+        "format": "multi-section",
+        "parsed_rows": 2,
+        "titles": ["同批編號格式", "同批表格格式"],
+        "empty_template": false,
+        "rejected_reasons": ["mixed_grammars_in_batch"]
+      }
+    },
+    {
+      "case_id": "batch_header_colon_variant_pass",
+      "path": "cases/17_batch_header_colon_variant.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 3,
+        "titles": ["compact colon 標頭題", "初始批任意後綴題", "全形數字緊湊題"],
+        "empty_template": false,
+        "rejected_reasons": []
+      }
+    },
+    {
+      "case_id": "suspected_batch_header_fail",
+      "path": "cases/18_suspected_batch_header.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 1,
+        "titles": ["已解析的合法題"],
+        "absent_titles": ["此題不得沉默消失"],
+        "empty_template": false,
+        "rejected_reasons": ["suspected_batch_header"]
+      }
+    },
+    {
+      "case_id": "stale_sentinel_with_dash_row_fail",
+      "path": "cases/19_stale_sentinel_with_dash_row.md",
+      "expected": {
+        "format": "invalid",
+        "parsed_rows": 0,
+        "titles": [],
+        "absent_titles": ["sentinel 下的 dash 候選列"],
+        "empty_template": false,
+        "rejected_reasons": ["stale_or_ambiguous_empty_sentinel", "nonempty_zero_titles"]
+      }
+    },
+    {
+      "case_id": "double_arrow_replacement_fail",
+      "path": "cases/20_double_arrow_replacement.md",
+      "expected": {
+        "format": "numbered-plain",
+        "parsed_rows": 1,
+        "titles": ["合法對照題"],
+        "absent_titles": ["新題 → 第三題", "舊題"],
+        "empty_template": false,
+        "rejected_reasons": ["malformed_replacement"]
+      }
+    },
+    {
+      "case_id": "unapproved_title_table_fail",
+      "path": "cases/21_unapproved_title_table.md",
+      "expected": {
+        "format": "table",
+        "parsed_rows": 0,
+        "titles": [],
+        "absent_titles": ["未核准 schema 題"],
+        "empty_template": false,
+        "rejected_reasons": ["unapproved_title_table", "nonempty_zero_titles"]
+      }
+    }
+  ],
+  "loader_cases": [
+    {"case_id": "missing_raw_fail", "mode": "missing", "expected_status": "FAIL", "detail_contains": "canonical_missing"},
+    {"case_id": "unreadable_raw_fail", "mode": "directory", "expected_status": "FAIL", "detail_contains": "canonical_unreadable:"},
+    {"case_id": "owner_unresolved_pass", "mode": "unresolved", "path": "cases/16_owner_unresolved.md", "expected_status": "PASS", "detail_contains": "title_arm=skipped(owner_unresolved); parsed=NA", "detail_excludes": "0 條標題 0 撞"}
+  ],
+  "integration_cases": [
+    {"case_id": "same_title_different_dialogue_warn", "raw_case": "dash_bracket_valid", "titles": ["第一個既有題目"], "dialogues": ["完全不同的內文甲"], "expected_status": "WARN"},
+    {"case_id": "different_title_unique_dialogue_pass", "raw_case": "dash_bracket_valid", "titles": ["不相似的新題"], "dialogues": ["完全不同的內文乙"], "expected_status": "PASS"},
+    {"case_id": "same_dialogue_fail", "raw_case": "dash_bracket_valid", "titles": ["新題甲", "新題乙"], "dialogues": ["兩支完全相同的全文台詞", "兩支完全相同的全文台詞"], "expected_status": "FAIL", "detail_contains": "全文台詞雷同"},
+    {"case_id": "parser_fault_plus_content_hit_reports_both", "loader_mode": "missing", "titles": ["新題甲", "新題乙"], "dialogues": ["兩支完全相同的全文台詞", "兩支完全相同的全文台詞"], "expected_status": "FAIL", "detail_contains_all": ["全文台詞雷同", "parser-integrity FAIL"]}
+  ],
+  "similarity_cases": [
+    {"case_id": "title_ratio_below_065", "left": "aaaaaaaaaaaaBBBBBBBB", "right": "aaaaaaaaaaaaCCCCCCCC", "expected_hit": false},
+    {"case_id": "title_ratio_at_065", "left": "aaaaaaaaaaaaaBBBBBBB", "right": "aaaaaaaaaaaaaCCCCCCC", "expected_hit": true}
+  ]
+}

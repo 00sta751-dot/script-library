@@ -46,6 +46,18 @@ from taste_panel_relative import (
     is_relative_enabled,
 )
 
+# L0 §1.1.8：Q1-Q8 是批次主題配額；不得與 schema_check 的標題型 T1-T6
+# 或已退役的 content_axis 9/2/2 混用。
+TOPIC_TYPE_VALUES = ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8")
+TOPIC_TYPE_TARGET_COUNTS = {
+    "Q1": 2, "Q2": 2, "Q3": 2, "Q4": 2,
+    "Q5": 2, "Q6": 2, "Q7": 1, "Q8": 1,
+}
+ORIGIN_SOURCE_VALUES = {
+    "source_1_comment", "source_2_reference", "source_3_owner",
+    "source_4_created", "aux",
+}
+
 # ── 共用派系解析器（第一刀 2026-06-05）──
 try:
     _FP_DIR = Path(__file__).resolve().parent
@@ -151,13 +163,20 @@ except Exception as _sop_err:
     )
     _SOP_CONFIG_OK = False
 
-    # fallback 函式（回舊硬編值，守門不失效）
+    # fallback 函式（回硬編值，守門不失效）
+    # ⚠ 本字典必須與現役 `L0_跨行業公版/_腳本生產SOP_v3.0.yaml` 的 batch_spec 逐鍵同步（保鏢 r4）。
+    #    SOP 改值而此處沒跟 → 只有 _sop_config import 失敗時才會暴露（沉默坑）。改 SOP 請一併改這裡。
+    #    例外兩鍵（刻意與 SOP yaml 字面不同，非漏同步）：
+    #      - fishing_script：SOP yaml 已無此鍵（釣魚部下架 2026-06-05），0 = 主路徑 _sop_config 缺鍵時的同值 fallback。
+    #      - cta_distribution：SOP yaml 值為 {owner_defined/source/chicken_soup_min}，但該處自註
+    #        「現役消費者(topic_distributor/validate/_sop_config) 預設讀 {}、不吃此值」，故與 _sop_config
+    #        的 _FALLBACK_BATCH_SPEC 一致保持 {}。
     def _load_l0_batch_spec():  # type: ignore
         return {
-            "main_scripts": 13, "fishing_script": 0, "threads_posts": 7,
+            "main_scripts": 14, "fishing_script": 0, "threads_posts": 7,  # 14＝2026-08-26 拍板（TG22401），同步 SOP yaml batch_spec
             "threads_max_codepoints": 200, "threads_length_effective_from": "2026-07-13",
             "duration_seconds": 60, "title_max_chars": 15,
-            "traffic_codes_min": 3, "actor_interaction_min": 2,
+            "traffic_codes_min": 3, "actor_interaction_min": 1,  # r4：2→1，同步 SOP §batch_spec（舊值 2 已退場，L0 §9.8）
             "school_diversity_min": 3, "theme_diversity_min": 4, "cta_distribution": {},
         }
 
@@ -193,7 +212,7 @@ except Exception:
     pass
 
 # ── 業主偏好.md 路徑表（動態 lookup，不硬寫比例數字）──
-L2_BASE = Path(r"C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層")
+L2_BASE = Path(r"/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層")
 
 # Phase 2 FIX2：lazy proxy（import 不碰 generated.json；dir 已於上方 sibling import 加入 sys.path）
 from _lazy_map import LazyMap
@@ -455,37 +474,429 @@ def chk_l1_002_banned(data: dict, fname: str) -> tuple[str, str]:
         return "FAIL", "禁用詞命中：" + "、".join(hits) + " — " + "；".join(locs[:5])
     return "PASS", "無禁用詞"
 
-def chk_l1_003_mirror(data: dict, fname: str) -> tuple[str, str]:
-    """L1-003：藏鏡人互動點 >= actor_interaction_min
-    有 canonical 用 canonical（offscreen_interaction 欄位），沒有 fallback 舊邏輯。
-    §14 P0：mirror 要吃 canonical，不是舊貪婪 regex。
-    B 段 2026-06-05：min_count 改讀 L0 batch_spec（廢硬編）。
-    """
-    min_count = _load_l0_batch_spec()["actor_interaction_min"]
+# ════════════════════════════════════════════
+# L1-003 藏鏡人｜長度感知配額 + 業主接球 + S0-S2 酸度（cxp-fullimport-s r2，2026-08-12）
+# 舊法真刪：「每支 >= actor_interaction_min（2）、上不封頂」硬配額已廢
+#   （源：站 0 診斷 §3 假說 1「限制互撞」支持 + 得標定稿 §5 長度感知配額）。
+# 新法：時長 → 建議點數上限；下限固定 1（結構級，FAIL）；超上限＝品質級（WARN，不擋批）。
+# ════════════════════════════════════════════
 
-    # 嘗試用 canonical
+# 長度感知配額表（得標定稿 §5，澤君 TG19759/19761/19763 + TG19765 拍板）
+#   d <= 25s → 1 點；26-70s → 2 點；> 70s → 3 點。上限＝建議值，非硬閘。
+#   ⚠️ 本表共四處落地，改一處要四處同步：①L0 §9.4 表（正本）
+#      ②SOP yaml batch_spec.actor_interaction_quota
+#      ③本檔 _MIRROR_QUOTA_TABLE ④yaml_skeleton_generator._MIRROR_QUOTA_TABLE
+_MIRROR_QUOTA_TABLE = ((25, 2), (70, 3))   # TG19773 各檔 +1（舊 (25,1),(70,2)）
+_MIRROR_QUOTA_LONG = 4                     # TG19773 +1（舊 3）
+_MIRROR_MIN = 1  # 結構下限：一支至少 1 個藏鏡人（低於此＝FAIL，取代舊 >=2）
+
+# 業主接球欄 enforce 旗標（shadow → enforce 慣例，同本檔 _S22_ENFORCE 等）：
+#   False = shadow（缺接球欄只 WARN）。翻 True 需①全業主現役批遷移完成②主持人/澤君拍板。
+#   理由：得標定稿 §5 要求「每點必有業主接球」，但現役 130+ 支生產稿無此欄，
+#   直接 enforce 會讓既有批全紅＝把品質規則當硬閘用（違施工工單【禁止事項】）。
+#
+# ⚠️ T1（cxp-enforce-t1 r1，2026-08-13）起本旗標**降為 legacy 預設值**：
+#   真正的判準改成「批次世代」——見 _resolve_enforce_generation()。
+#   新格式批（帶 topic_lock 世代）→ enforce=True（缺接球＝FAIL）；
+#   舊稿批 → 沿用本旗標（False＝WARN，grandfather 不追溯）。
+#   本旗標仍保留：①單檔直呼/外部 caller 不傳世代時的預設 ②全域一次翻死的總開關。
+_MIRROR_REPLY_ENFORCE = False
+
+
+# ════════════════════════════════════════════════════════════════════
+# T1 世代判準（cxp-enforce-t1；r1 2026-08-13 建立／**r2 2026-08-13 大修**）
+#   源＝得標定稿【霸告】「新批生效＋舊稿 grandfather」＋【愛馬仕】「現成 enum 翻 FAIL
+#   ＋『整欄缺只 WARN』逆向誘因洞首修」＋【Codex 終審 r1 兩阻擋項】。
+#
+# 🔴 r2 修正一（Codex 阻擋項 1／F1）：**世代判準只有這一個函式**。
+#   C-TOPIC-LOCK（W1）不再自行重算世代，改呼叫本函式（見 chk_topic_lock_consistency）；
+#   主流程每批算一次、同一組 (bool, reason) 同時餵三閘與 C-TOPIC-LOCK。
+#   壞 JSON plan 這類異常兩邊行為必須一致——由「同一份回傳值」保證，不靠兩處寫法巧合相同。
+#
+# 🔴 r2 修正二（Codex 阻擋項 2／F2）：**防自降級**。
+#   r1 只看 topic_lock 是否存在 → 把新稿的 topic_lock 欄刪掉就能自降成 grandfather。
+#   r2 改為**明列 allowlist 制**（得標骨架原文要求）：
+#     批次目錄在 legacy_batch_allowlist.yaml 內 ＝ legacy（今日為界盤點的現役既有批）；
+#     **不在 allowlist ＝ new 世代**，缺 topic_lock／缺欄一律 FAIL。刪欄不再能逃鎖。
+#   allowlist 檔案缺失／壞格式／schema 不符 ＝ **fail-closed：全部當 new**（不是全部放行）。
+#
+# 判準優先序（**由嚴到寬，正向訊號永遠勝過 allowlist**）：
+#   ① 批內任一稿帶 topic_lock（dict）           → NEW（已遷移批，即使誤列 allowlist 也算新）
+#   ② topic_plan 存在但讀不動／結構壞           → NEW（fail-closed；壞檔不得換 grandfather）
+#   ③ topic_plan 帶 topic_lock_hash             → NEW
+#   ④ 批次目錄命中 legacy allowlist 且 allowlist 本身健康 → LEGACY（唯一的舊稿路徑）
+#   ⑤ 其餘（含 batch_dir 不明、allowlist 壞掉） → NEW（fail-closed）
+#
+# **零誤殺契約（T1d／r2 實測背書）**：allowlist 內的現役舊批走本函式必回 False，
+#   三閘對舊批的 PASS/WARN/FAIL 三數與 T1 施工前逐字相同（新增的 enforce 件在舊批一律
+#   SKIP 明標，只動 SKIP 數）。誤殺任何一支舊稿＝立即停手回滾（工單【失敗處理】）。
+#
+# 過渡件說明：梯 2 的 batch_manifest 上線後，本 allowlist 轉為過渡件（見 yaml 檔頭註解）。
+# ════════════════════════════════════════════════════════════════════
+
+# 專案根（用來把 allowlist 內的相對路徑解析成絕對路徑）：
+#   validate_script_batch.py → script-library → _部署系統 → L4_工具腳本 → 短影音系統
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_LEGACY_ALLOWLIST_PATH = Path(__file__).resolve().parent / "legacy_batch_allowlist.yaml"
+
+# 快取：(frozenset[str] 已解析絕對路徑, error_or_None)
+_LEGACY_ALLOWLIST_CACHE: Optional[tuple[frozenset, Optional[str]]] = None
+
+
+class _DuplicateKeyError(yaml.YAMLError):
+    """allowlist YAML 內出現重複鍵（見 _NoDupSafeLoader）。"""
+
+
+class _NoDupSafeLoader(yaml.SafeLoader):
+    """SafeLoader ＋ **拒絕重複鍵**（Codex r2 阻擋項：allowlist 重複鍵旁路）。
+
+    PyYAML 預設對 `legacy_batches: []` 後面再寫一次 `legacy_batches: [...]`
+    是**默默採最後一鍵**——攻擊者只要在檔尾補一個同名鍵，就能把整包批次
+    塞進 allowlist 拿到 grandfather（實測：0/33 new、33/33 legacy）。
+    這裡在 construct_mapping 階段對**任一層級**的 mapping 檢查鍵重複，
+    命中即拋 _DuplicateKeyError → 呼叫端當格式異常 → fail-closed 全部當 new
+    （與語法錯誤／型別錯誤同一條路）。
+    """
+
+    def construct_mapping(self, node, deep=False):  # type: ignore[override]
+        if isinstance(node, yaml.MappingNode):
+            seen = set()
+            for key_node, _ in node.value:
+                try:
+                    key = self.construct_object(key_node, deep=deep)
+                except Exception:
+                    key = getattr(key_node, "value", None)
+                try:
+                    hash(key)
+                    hashable = key
+                except TypeError:  # 不可雜湊的鍵（極罕見）→ 用文字面比對
+                    hashable = repr(key)
+                if hashable in seen:
+                    raise _DuplicateKeyError(f"重複鍵 {key!r}（{node.start_mark}）")
+                seen.add(hashable)
+        return super().construct_mapping(node, deep=deep)
+
+
+def _load_legacy_batch_allowlist(force_reload: bool = False) -> tuple[frozenset, Optional[str]]:
+    """讀 legacy_batch_allowlist.yaml → (已解析絕對路徑集合, 錯誤訊息或 None)。
+
+    **fail-closed 契約**：檔案不存在／YAML 壞／**任一層級重複鍵**／schema 不符
+    → 回 (空集合, 錯誤訊息)，呼叫端據此把**所有**批次當 new 世代（不是全部放行）。
+    schema：頂層 dict，必含 legacy_batches: list[str]（相對專案根或絕對路徑）。
+    """
+    global _LEGACY_ALLOWLIST_CACHE
+    if _LEGACY_ALLOWLIST_CACHE is not None and not force_reload:
+        return _LEGACY_ALLOWLIST_CACHE
+    result: tuple[frozenset, Optional[str]]
+    try:
+        if not _LEGACY_ALLOWLIST_PATH.exists():
+            result = (frozenset(), f"legacy allowlist 檔案不存在（{_LEGACY_ALLOWLIST_PATH.name}）")
+        else:
+            raw = yaml.load(  # noqa: S506 — 自訂 SafeLoader 子類，未放寬安全性
+                _LEGACY_ALLOWLIST_PATH.read_text(encoding="utf-8"),
+                Loader=_NoDupSafeLoader,
+            )
+            if not isinstance(raw, dict):
+                result = (frozenset(), "legacy allowlist 頂層結構非 dict")
+            elif not isinstance(raw.get("legacy_batches"), list):
+                result = (frozenset(), "legacy allowlist 缺 legacy_batches 清單（或型別非 list）")
+            else:
+                entries = raw["legacy_batches"]
+                bad = [e for e in entries if not isinstance(e, str) or not e.strip()]
+                if bad:
+                    result = (frozenset(), f"legacy allowlist 有 {len(bad)} 筆非字串/空白項")
+                else:
+                    resolved = set()
+                    for e in entries:
+                        p = Path(e.strip())
+                        if not p.is_absolute():
+                            p = _PROJECT_ROOT / p
+                        resolved.add(str(p.resolve()))
+                    result = (frozenset(resolved), None)
+    except Exception as e:  # 讀檔/解析任何異常 → fail-closed
+        result = (frozenset(), f"legacy allowlist 讀取異常（{type(e).__name__}: {e}）")
+    _LEGACY_ALLOWLIST_CACHE = result
+    return result
+
+
+def _resolve_enforce_generation(
+    batch_dir: Optional[Path],
+    valid_yamls: list[tuple],
+    topic_plan_arg: Optional[str] = None,
+) -> tuple[bool, str]:
+    """回 (is_new_generation, 判定理由)。**全系統唯一的世代真源**（F1）。
+
+    True＝new 世代（T1 三閘 enforce、C-TOPIC-LOCK 逐欄驗）；
+    False＝legacy 世代（僅限命中 allowlist 的現役既有批 → 三閘 SKIP／C-TOPIC-LOCK SKIP）。
+    """
+    # ① 稿內 topic_lock ＝ 已遷移的正向訊號，勝過 allowlist
+    try:
+        locked = [
+            f for f, d in valid_yamls
+            if isinstance(d, dict) and isinstance(d.get("topic_lock"), dict)
+        ]
+    except Exception as e:
+        return True, (
+            f"new 世代（fail-closed）— 稿件世代掃描異常（{type(e).__name__}）；"
+            f"異常不得換 grandfather"
+        )
+    if locked:
+        return True, (
+            f"new 世代（{len(locked)}/{len(valid_yamls)} 支帶 topic_lock 欄）"
+            f"— T1 三閘 enforce：零件庫三欄／流量密碼整欄／藏鏡人接球缺欄＝FAIL"
+        )
+
+    # ②③ topic_plan：壞檔 fail-closed 當 new；帶 lock hash 也是 new
+    if batch_dir is not None:
+        try:
+            plan_path = _find_topic_plan(batch_dir, topic_plan_arg)
+            plan_data, plan_error = _load_topic_plan_checked(plan_path)
+            if plan_error:
+                return True, (
+                    f"new 世代（fail-closed）— topic_plan 存在但讀不動／結構壞："
+                    f"{plan_error}；壞檔不得換 grandfather"
+                )
+            if plan_data.get("topic_lock_hash"):
+                return True, (
+                    "new 世代（topic_plan 帶 topic_lock_hash）"
+                    "— T1 三閘 enforce：零件庫三欄／流量密碼整欄／藏鏡人接球缺欄＝FAIL"
+                )
+        except Exception as e:
+            return True, (
+                f"new 世代（fail-closed）— topic_plan 世代判定異常（{type(e).__name__}）"
+            )
+
+    # ④ legacy allowlist（唯一的舊稿路徑）
+    allow, allow_error = _load_legacy_batch_allowlist()
+    if allow_error:
+        return True, (
+            f"new 世代（fail-closed）— {allow_error}；"
+            f"allowlist 不可信時一律當新世代驗，不得整批放行"
+        )
+    if batch_dir is None:
+        return True, (
+            "new 世代（fail-closed）— 未提供批次目錄，無法比對 legacy allowlist；"
+            "判不出來一律當新世代驗"
+        )
+    try:
+        key = str(Path(batch_dir).resolve())
+    except Exception as e:
+        return True, f"new 世代（fail-closed）— 批次路徑解析異常（{type(e).__name__}）"
+    if key in allow:
+        return False, (
+            "legacy 世代（批次目錄明列於 legacy_batch_allowlist.yaml，"
+            "2026-08-13 盤點的現役既有批）— T1 三閘 grandfather 不追溯"
+        )
+
+    # ⑤ 其餘一律 new（**防自降級**：刪 topic_lock 欄不再能逃鎖）
+    return True, (
+        "new 世代（批次不在 legacy_batch_allowlist.yaml）— 未列管批次一律驗；"
+        "刪除 topic_lock 欄不能自降為 grandfather（Codex r1 阻擋項 2）"
+    )
+
+
+# T1 三閘對 legacy 批的 SKIP 明標（**不得**改成靜默略過：SKIP 要看得見才叫 grandfather）
+_T1_SKIP_LEGACY = (
+    "legacy 世代 grandfather — 僅 legacy_batch_allowlist.yaml 明列的現役既有批走此路徑；"
+    "未列管批次一律當 new 世代 enforce"
+)
+
+# 酸度分級合法值（得標定稿 §5；S0 中性替問 / S1 直球點破 / S2 嘴賤最大檔）
+_SOURNESS_LEVELS = ("S0", "S1", "S2")
+
+# 藏鏡人接球欄的可能鍵名（canonical 英文 / 生產中文）
+_MIRROR_REPLY_KEYS = ("offscreen_reply", "藏鏡人接球", "業主接球", "接球")
+_MIRROR_SOURNESS_KEYS = ("offscreen_sourness", "藏鏡人酸度", "酸度")
+
+
+def _mirror_quota_for_duration(duration_seconds: Optional[int]) -> int:
+    """時長 → 藏鏡人建議點數上限（L0 §9.4 新配額表）。時長不明＝回 60s 檔（2）。"""
+    if not isinstance(duration_seconds, int) or duration_seconds <= 0:
+        duration_seconds = 60
+    for upper, quota in _MIRROR_QUOTA_TABLE:
+        if duration_seconds <= upper:
+            return quota
+    return _MIRROR_QUOTA_LONG
+
+
+def _resolve_script_duration(data: dict, duration_seconds: Optional[int] = None) -> int:
+    """取本支時長：①呼叫端傳入（批級 time_axis 宣告）②yaml duration/duration_seconds
+    ③L0 batch_spec 預設。純讀值不 normalize，解析不出就回 L0 預設。"""
+    if isinstance(duration_seconds, int) and duration_seconds > 0:
+        return duration_seconds
+    for key in ("duration_seconds", "duration"):
+        v = data.get(key)
+        if type(v) is int and v > 0:
+            return v
+        if isinstance(v, str):
+            m = re.match(r"^\s*(\d{1,4})\s*s?\s*$", v)
+            if m:
+                n = int(m.group(1))
+                if n > 0:
+                    return n
+    try:
+        return int(_load_l0_batch_spec().get("duration_seconds", 60))
+    except Exception:
+        return 60
+
+
+def _collect_mirror_points(data: dict) -> tuple[list, str]:
+    """收本支所有藏鏡人點 → ([scene_or_block, ...], 來源層標記)。
+    canonical 優先（offscreen_interaction），否則 fallback 中文鍵/頂層 block。
+
+    r6 P7（Codex 阻擋項 3）：canonical scene 不帶「藏鏡人接球／藏鏡人酸度」欄
+    （yaml_to_sc 正規化只保留 offscreen_interaction），若直接回 canonical dict，
+    新骨架會被誤判「接球酸度全缺」。改為：canonical 決定**哪些段有藏鏡人**，
+    回傳時把同 slot 的 raw scene 欄位合併回去（raw 有才合併），
+    使接球/酸度欄讀得到、同時保有 canonical 對 markdown 稿的解析力。
+    **同一支只算一套來源**（canonical 命中就不再累加 scene 層/頂層 block）。
+    """
     canonical_scenes = _get_canonical_scenes(data)
     if canonical_scenes is not None:
-        count = sum(1 for s in canonical_scenes if s.get('offscreen_interaction'))
-        if count < min_count:
-            return "FAIL", f"藏鏡人互動點 = {count}，需要 >= {min_count}（canonical 層驗）"
-        return "PASS", f"藏鏡人互動點 = {count}（canonical 層驗）"
-
-    # fallback：舊邏輯
-    count = 0
-    scenes = get_scenes(data)
-    for scene in scenes:
-        if scene.get("藏鏡人"):
-            count += 1
-    # 也看 data 頂層 藏鏡人 block
+        raw_scenes = get_scenes(data)
+        merged: list = []
+        for cs in canonical_scenes:
+            if not isinstance(cs, dict) or not cs.get("offscreen_interaction"):
+                continue
+            point = dict(cs)
+            slot = cs.get("slot")
+            if isinstance(slot, int) and isinstance(raw_scenes, list) and 1 <= slot <= len(raw_scenes):
+                raw = raw_scenes[slot - 1]
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        point.setdefault(k, v)
+            merged.append(point)
+        return merged, "canonical 層"
+    points = [s for s in get_scenes(data) if isinstance(s, dict) and s.get("藏鏡人")]
+    if points:
+        return points, "scene 層"
     top_mirror = data.get("藏鏡人", {})
     if isinstance(top_mirror, dict):
-        top_count = sum(1 for k in top_mirror if k.startswith("位置"))
-        if top_count > count:
-            count = top_count
-    if count < min_count:
-        return "FAIL", f"藏鏡人互動點 = {count}，需要 >= {min_count}"
-    return "PASS", f"藏鏡人互動點 = {count}"
+        return [v for k, v in top_mirror.items() if str(k).startswith("位置")], "頂層 block"
+    return [], "無"
+
+
+def chk_l1_003_mirror(
+    data: dict,
+    fname: str,
+    duration_seconds: Optional[int] = None,
+    enforce_generation: Optional[bool] = None,
+) -> tuple[str, str]:
+    """L1-003：藏鏡人＝長度感知配額 + 每點業主接球 + S0-S2 酸度（2026-08-12 改版）
+
+    判定分層（口語/品質一律 WARN、結構才 FAIL）：
+      - 點數 < 1                → FAIL（結構：沒有藏鏡人）
+      - 點數 > 時長配額上限      → WARN（品質：擠爆 60 秒＝卡卡根因，站 0 診斷假說 1）
+      - 缺業主接球欄            → 新格式批 FAIL／舊稿批 WARN（T1c，見下）
+      - 酸度欄缺                → 新格式批 FAIL／舊稿批 WARN（T1c）
+      - 酸度值非法              → 新格式批 FAIL／舊稿批 WARN（T1c）
+      - 宣告 >= 2 點卻無任何 S2  → WARN（r6 P9；全篇溫吞，建議至少一句點破）
+      - S2 > 2 點               → WARN（r6 P9；嘴賤過量，建議降檔）
+
+    **T1c（cxp-enforce-t1 r1，2026-08-13）世代分流**：
+      enforce_generation=True（新格式批，帶 topic_lock 世代）→ 缺接球／缺酸度／酸度值非法＝FAIL；
+      False（舊稿批）→ 沿用 shadow WARN，351 支歷史稿零誤殺；
+      None（外部 caller／單檔直呼未傳）→ 退回模組全域 _MIRROR_REPLY_ENFORCE，**行為與 T1 前逐字相同**。
+      「S2 數量建議」（>= 2 點無 S2／S2 > 2）**永遠 WARN**，新批也不升 FAIL——
+      那是品質建議不是結構契約（工單 T1c 明列）。
+
+    ⚠️ **L2 業主酸度天花板的機械比對＝未實作（r6 P9 據實記載）**。
+       本檢查不讀 L2 偏好檔的天花板宣告、不做「本支酸度 <= 該業主天花板」比對；
+       天花板目前**由人工把關**（編劇/算盤覆核時對照 L2 業主檔的「藏鏡人酸度天花板」一行）。
+       機械化待 precedence sheet 承接天花板欄後再接（backlog，非本輪範圍）。
+       ——本段為現況陳述，不得被引用為「已有天花板硬閘」。
+
+    duration_seconds：呼叫端可傳批級 time_axis 宣告時長；不傳＝從 yaml/L0 推。
+    """
+    enforce = _MIRROR_REPLY_ENFORCE if enforce_generation is None else bool(enforce_generation)
+    dur = _resolve_script_duration(data, duration_seconds)
+    quota = _mirror_quota_for_duration(dur)
+    points, layer = _collect_mirror_points(data)
+    count = len(points)
+
+    if count < _MIRROR_MIN:
+        return "FAIL", (
+            f"藏鏡人互動點 = {count}，需要 >= {_MIRROR_MIN}（{layer}驗；"
+            f"L0 §9.4 長度感知配額：{dur}s → 建議 {quota} 點）"
+        )
+
+    warns: list[str] = []
+    if count > quota:
+        warns.append(
+            f"藏鏡人 {count} 點 > {dur}s 建議配額 {quota} 點"
+            f"（L0 §9.4；擠爆版型＝結構痕跡外露主因，建議減點或改長版型）"
+        )
+
+    # 每點接球欄 + 酸度欄（欄位級檢查；點的內容不做關鍵詞計數）
+    missing_reply, missing_sour, bad_sour = 0, 0, []
+    sour_levels: list = []
+    for p in points:
+        if not isinstance(p, dict):
+            # 頂層 block 的字串點：無法帶接球/酸度欄 → 一律計入缺欄
+            missing_reply += 1
+            missing_sour += 1
+            continue
+        if not any(str(p.get(k, "")).strip() for k in _MIRROR_REPLY_KEYS):
+            missing_reply += 1
+        sour = ""
+        for k in _MIRROR_SOURNESS_KEYS:
+            if str(p.get(k, "")).strip():
+                sour = str(p[k]).strip().upper()
+                break
+        if not sour:
+            missing_sour += 1
+        elif sour not in _SOURNESS_LEVELS:
+            bad_sour.append(sour)
+        else:
+            sour_levels.append(sour)
+
+    # ── T1c 世代分流：新格式批的欄位級缺漏＝結構違規（FAIL），舊稿沿用 WARN ──
+    hard: list[str] = []   # 新格式批：升 FAIL 的項
+    if missing_reply:
+        msg = (f"{missing_reply}/{count} 個藏鏡人點缺業主接球欄"
+               f"（{'/'.join(_MIRROR_REPLY_KEYS[:2])}；L0 §9.4「每點必附接球」）")
+        if enforce:
+            hard.append(msg)
+        else:
+            warns.append(msg + "［shadow：舊稿世代 grandfather，遷移完成前不擋批］")
+    if missing_sour:
+        msg = f"{missing_sour}/{count} 個點缺酸度欄（S0/S1/S2；L0 §9.7）"
+        if enforce:
+            hard.append(msg)
+        else:
+            warns.append(msg)
+    if bad_sour:
+        msg = f"酸度值非法 {bad_sour[:3]}（合法＝{'/'.join(_SOURNESS_LEVELS)}）"
+        if enforce:
+            hard.append(msg)
+        else:
+            warns.append(msg)
+
+    # ── 酸度分佈 WARN（r6 P9，Codex 阻擋項 4）──
+    # 一律 WARN，永不 FAIL（工單【禁止事項】：品質類不升 FAIL）：
+    #   ①宣告點 >= 2 時全無 S2 → 全篇溫吞、沒有一句真的點破（得標定稿 §5 偏離記錄：
+    #     「S2 每支至少 1」已弱化為「>= 2 點時建議」）
+    #   ②S2 > 2 → 嘴賤過量，超出多數業主可接受範圍
+    # 天花板（L2 業主檔）機械比對**未實作**，見本 docstring 說明。
+    s2_count = sour_levels.count("S2")
+    if len(sour_levels) >= 2 and s2_count == 0:
+        warns.append(
+            f"宣告 {len(sour_levels)} 點酸度但無任何 S2（全 {'/'.join(sorted(set(sour_levels))) or '—'}）"
+            f"— 建議至少一句真的點破（L0 §9.7；>= 2 點時建議，非硬規則）"
+        )
+    if s2_count > 2:
+        warns.append(f"S2 共 {s2_count} 點 > 2 — 嘴賤過量，建議降檔（L0 §9.7 寫作鐵則，WARN 不擋批）")
+
+    if hard:
+        # T1c：新格式批的欄位級缺漏＝FAIL（品質類 warns 一併列出供編劇一次補完）
+        tail = ("；另有品質提示：" + "；".join(warns)) if warns else ""
+        return "FAIL", (
+            f"藏鏡人 {count} 點（{layer}驗，{dur}s/配額{quota}）— 新格式批必填欄缺漏："
+            + "；".join(hard) + tail
+        )
+    if warns:
+        return "WARN", f"藏鏡人 {count} 點（{layer}驗，{dur}s/配額{quota}）— " + "；".join(warns)
+    return "PASS", f"藏鏡人 {count} 點（{layer}驗，{dur}s/配額{quota}），接球欄與酸度欄齊備"
 
 def _canonical_all_text(canonical_scenes: list, caption: str = '') -> str:
     """從 canonical scenes 取全文（dialogue + subtitle + offscreen）供關鍵詞搜尋。"""
@@ -502,59 +913,133 @@ def _canonical_all_text(canonical_scenes: list, caption: str = '') -> str:
     return ' '.join(parts)
 
 
-def chk_l1_004_traffic(data: dict, fname: str) -> tuple[str, str]:
-    """L1-004：流量密碼 >= traffic_codes_min（以 schema_check 欄位 or 台詞關鍵詞代理）
-    有 canonical 用 canonical（dialogue + subtitle + offscreen 全文），沒有 fallback 舊邏輯。
-    B 段 2026-06-05：min_count 改讀 L0 batch_spec（廢硬編）。
-    """
-    min_count = _load_l0_batch_spec()["traffic_codes_min"]
+# ════════════════════════════════════════════
+# L1-004 流量密碼｜實質欄位驗證（cxp-fullimport-s r2，2026-08-12）
+# 舊法真刪：TRAFFIC_SIGNALS 關鍵詞代理計數（「？」「你也」「留言」…）全數移除。
+#   退場依據＝站 0 診斷 §4 相關性檢定。**母體與盲讀數是兩個不同的數字，勿混用**：
+#     ①母體＝瑞祥 50 份現役稿（訊號命中數的統計來源）；
+#     ②實際人工盲讀＝其中 24 稿（高訊號組 12 支／低訊號組 12 支，兩組各取 12 配對比較）。
+#   結果：高訊號組平均卡點 0.83 < 低訊號組 0.92 —— 代理指標與人工卡感無正相關，且「你也」命中 0、
+#   「留言」命中 2，訊號實由問號單獨主導。決定：指標不採用，改驗編劇宣告的實質元素。
+#   ⚠️ 24 稿＝小樣本、不具統計顯著性，且母體僅瑞祥一家。此證據足以「撤掉無依據的舊代理」，
+#      但不得反向用於宣稱新指標有效、也不得當硬閘門檻引用。
+# 新法：只認 L0 §1.5 十五元素的具名宣告（schema_check.流量密碼 清單 / 頂層 流量密碼）。
+#   宣告齊全 → PASS；宣告不足 → FAIL（實質欄位不足，非猜測）；完全未宣告 → WARN 要求補填
+#   （不再用關鍵詞猜台詞，也不因此擋批）。
+# ════════════════════════════════════════════
 
-    sc = data.get("schema_check", {})
-    if isinstance(sc, dict):
-        fd = sc.get("流量密碼數量") or sc.get("流量密碼")
-        if fd:
+# L0 §1.5 流量密碼 15 元素（白名單；行業層可加特化別名，見 L1）
+_TRAFFIC_ELEMENTS = (
+    "真實感", "揭露", "共鳴", "反差", "金錢", "數字", "恐懼", "緊迫感",
+    "代入感", "情緒", "故事", "世代衝突", "知識落差", "預言感", "地域話題",
+)
+
+# L0 §1.5.2 可選元素（陳修平流量密碼導入 2026-08-12）：**不計數、不設配額**
+# （L0 :294 白紙黑字「不是必填、不計數、不設配額」）。宣告了也不算進 §1.5 門檻，
+# 但也不當成 unknown 警告——它們是合法宣告，只是不計數。
+_TRAFFIC_OPTIONAL_ELEMENTS = ("隨機", "盲盒", "貼金", "互動吐槽點", "吐槽點")
+
+
+def _classify_traffic_elements(elements: list) -> tuple[list, list, list]:
+    """把編劇宣告的流量密碼分三類 →（白名單命中 canonical 名（去重、保序）, 可選元素（不計數）, 未知）。
+
+    命中判定與舊版一致（startswith 或子字串），但**改以 canonical 元素名去重**：
+    重複宣告同一元素（例：三個「真實感」）只算 1 個，避免灌水過門檻。
+    """
+    known: list = []
+    optional: list = []
+    unknown: list = []
+    for e in elements:
+        s = str(e).strip()
+        if not s:
+            continue
+        canon = next((k for k in _TRAFFIC_ELEMENTS if s.startswith(k) or k in s), None)
+        if canon is not None:
+            if canon not in known:
+                known.append(canon)
+            continue
+        if any(k in s for k in _TRAFFIC_OPTIONAL_ELEMENTS):
+            if s not in optional:
+                optional.append(s)
+            continue
+        unknown.append(s)
+    return known, optional, unknown
+
+
+def _extract_traffic_declaration(data: dict) -> tuple[list, Optional[int], str]:
+    """取編劇宣告的流量密碼 →（元素名 list, 純數字宣告, 來源欄位）。
+    支援：schema_check.流量密碼 / schema_check.流量密碼元素 / 頂層 流量密碼 /
+          schema_check.流量密碼數量（legacy 純數字宣告，仍收但提示改列名）。"""
+    sc = data.get("schema_check") if isinstance(data.get("schema_check"), dict) else {}
+    for holder, label in ((sc, "schema_check"), (data, "頂層")):
+        for key in ("流量密碼", "流量密碼元素", "traffic_codes"):
+            v = holder.get(key)
+            if isinstance(v, list) and v:
+                return [str(x).strip() for x in v if str(x).strip()], None, f"{label}.{key}"
+            if isinstance(v, str) and v.strip():
+                parts = [p.strip() for p in re.split(r"[、,，/／|]", v) if p.strip()]
+                if parts:
+                    return parts, None, f"{label}.{key}"
+    for holder, label in ((sc, "schema_check"), (data, "頂層")):
+        v = holder.get("流量密碼數量")
+        if v not in (None, ""):
             try:
-                n = int(str(fd))
-                if n >= min_count:
-                    return "PASS", f"schema_check 流量密碼數量 = {n}"
-                else:
-                    return "FAIL", f"schema_check 流量密碼數量 = {n}，需 >= {min_count}"
+                return [], int(str(v)), f"{label}.流量密碼數量"
             except Exception:
                 pass
+    return [], None, ""
 
-    TRAFFIC_SIGNALS = ["？", "你也", "你有", "你曾", "你試", "為什麼", "你知道", "留言", "轉發",
-                       "嗎", "嚇到", "沒想到", "顛覆", "原來", "不是", "竟然", "居然"]
 
-    # 嘗試用 canonical
-    canonical_scenes = _get_canonical_scenes(data)
-    if canonical_scenes is not None:
-        cap = ''
-        try:
-            cap = _normalize_canonical(data).get('caption', '') if _normalize_canonical else ''
-        except Exception:
-            pass
-        text = _canonical_all_text(canonical_scenes, cap)
-        hits = sum(1 for s in TRAFFIC_SIGNALS if s in text)
-        # 有藏鏡人 = +1
-        if any(s.get('offscreen_interaction') for s in canonical_scenes):
-            hits += 1
-        if cap and ("？" in cap or "留言" in cap):
-            hits += 1
-        if hits >= min_count:
-            return "PASS", f"流量密碼信號 >= {min_count}（偵測到 {hits} 個，含懸念+互動+反問，canonical 層驗）"
-        return "FAIL", f"流量密碼信號偵測 = {hits}，低於 {min_count}（canonical 層驗，請確認台詞有反問/懸念/互動引導）"
+def chk_l1_004_traffic(
+    data: dict,
+    fname: str,
+    enforce_generation: Optional[bool] = None,
+) -> tuple[str, str]:
+    """L1-004：流量密碼 >= traffic_codes_min（實質欄位；2026-08-12 廢關鍵詞代理計數）
 
-    # fallback：舊邏輯
-    text = get_all_text(data)
-    hits = sum(1 for s in TRAFFIC_SIGNALS if s in text)
-    if data.get("藏鏡人"):
-        hits += 1
-    cap = data.get("caption", "")
-    if cap and ("？" in cap or "留言" in cap):
-        hits += 1
-    if hits >= min_count:
-        return "PASS", f"流量密碼信號 >= {min_count}（偵測到 {hits} 個信號，含懸念+互動+反問）"
-    return "FAIL", f"流量密碼信號偵測 = {hits}，低於 {min_count}（請確認台詞有反問/懸念/互動引導）"
+    門檻＝**白名單命中數（去重）**（r6 修）：只有對上 L0 §1.5 十五元素的宣告才計數，
+    同一元素重複宣告只算 1；垃圾字串不計數（另列 WARN）；
+    L0 §1.5.2 可選三元素（隨機盲盒／貼金／互動吐槽點）依 L0 :294 **不計數**（也不算未知）。
+
+    **T1b（cxp-enforce-t1 r1，2026-08-13）逆向誘因洞首修**：
+      舊行為＝「宣告不足＝FAIL、整欄不宣告＝WARN」——填了被抓、不填免查，
+      編劇的最佳策略變成「不要填」（reward hacking）。本輪封掉：
+        enforce_generation=True（新格式批）→ 整欄未宣告＝FAIL（與宣告不足同級）；
+        False（舊稿批）→ 維持 WARN，130+ 支無此欄的現役稿零誤殺；
+        None（外部 caller 未傳）→ 退回 _MIRROR_REPLY_ENFORCE 全域預設（T1 前行為逐字不變）。
+      **白名單計數 FAIL 的既有邏輯一個字都沒動**（工單 T1b 明令）：
+      有宣告時的 known < min → 照舊 FAIL、legacy 純數字宣告 < min → 照舊 FAIL。
+    """
+    enforce = _MIRROR_REPLY_ENFORCE if enforce_generation is None else bool(enforce_generation)
+    min_count = _load_l0_batch_spec()["traffic_codes_min"]
+    elements, legacy_n, src = _extract_traffic_declaration(data)
+
+    if elements:
+        known, optional, unknown = _classify_traffic_elements(elements)
+        n = len(known)
+        opt_note = f"；可選元素（不計數，L0 §1.5.2）：{optional[:4]}" if optional else ""
+        unk_note = f"；未對上 L0 §1.5 元素名（不計數）：{unknown[:4]}（行業特化別名請於 L1 登錄）" if unknown else ""
+        if n < min_count:
+            return "FAIL", (f"流量密碼白名單命中 {n} 個（去重後：{known}；{src} 原宣告 {len(elements)} 項），"
+                            f"需 >= {min_count}（L0 §1.5 十五元素具名宣告）{opt_note}{unk_note}")
+        status = "WARN" if unknown else "PASS"
+        return status, (f"流量密碼白名單命中 {n} 個（去重：{known[:6]}，{src}）>= {min_count}"
+                        f"{opt_note}{unk_note}")
+
+    if legacy_n is not None:
+        if legacy_n < min_count:
+            return "FAIL", f"{src} = {legacy_n}，需 >= {min_count}"
+        return "WARN", (f"{src} = {legacy_n}（>= {min_count} 通過），但只給數字未列元素名 — "
+                        f"建議改填 schema_check.流量密碼: [元素名, ...]（L0 §1.5）")
+
+    # ── 整欄未宣告（T1b：封「不填就免查」旁路）──
+    _base = (f"未宣告流量密碼實質欄位（schema_check.流量密碼 清單）— "
+             f"2026-08-12 起關鍵詞代理計數已廢（站 0 診斷 §4：無相關性），"
+             f"請由編劇具名宣告 >= {min_count} 個 L0 §1.5 元素")
+    if enforce:
+        return "FAIL", (_base + "［T1b：新格式批整欄缺＝FAIL，"
+                                "與『宣告不足』同級——不填不再等於免查］")
+    return "WARN", (_base + "［舊稿世代 grandfather：整欄缺仍只 WARN］")
 
 def chk_l1_005_number_source(data: dict, fname: str) -> tuple[str, str]:
     """L1-005：業務數字（% / 萬 / 元）必有來源標記"""
@@ -648,16 +1133,78 @@ def chk_l1_007_title_len(data: dict, fname: str) -> tuple[str, str]:
         return "PASS", f"標題 '{title}'，字數 = {n} <= {max_chars}"
     return "FAIL", f"標題 '{title}'，字數 = {n} > {max_chars}"
 
-def chk_l1_008_batch_count(yamls: list[tuple[Path, dict]], batch_dir: Path) -> tuple[str, str]:
-    """L1-008：批次數量剛好 = main_scripts（exact，此函式是 batch-level check）
-    B 段 2026-06-05：由 13-14 區間改為 exact 13（澤君 2026-06-05 拍板）。
+def _is_topic_type_grandfather(yamls: list[tuple[Path, dict]]) -> bool:
+    """唯一舊批判準：所有有效 YAML 都沒有 topic_type 欄。"""
+    valid = [
+        data for _, data in yamls
+        if isinstance(data, dict) and "__parse_error__" not in data and "__schema_error__" not in data
+    ]
+    return bool(valid) and all("topic_type" not in data for data in valid)
+
+
+def _expected_main_scripts_for_batch(yamls: list[tuple[Path, dict]]) -> int:
+    return 13 if _is_topic_type_grandfather(yamls) else int(_load_l0_batch_spec()["main_scripts"])
+
+
+def chk_r_type_001_topic_type_quota(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
+    """R-TYPE-001：新批 topic_type 必填且 Q1-Q8 配額精確。
+
+    Grandfather 判準是批級、不可讓單檔自行降級：全批都沒有欄位才是舊批 SKIP；
+    只要混入新欄，任何缺欄都 FAIL。
     """
-    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
-    n = len(valid)
-    expected = int(_load_l0_batch_spec()["main_scripts"])
-    if n == expected:
-        return "PASS", f"主腳本 yaml 數量 = {n}，符合 SOP exact {expected} 支"
-    return "FAIL", f"主腳本 yaml 數量 = {n}，SOP 要求剛好 {expected} 支"
+    valid = [(f, d) for f, d in yamls if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d]
+    if not valid:
+        return "FAIL", "R-TYPE-001：無有效 YAML，無法驗 topic_type 配額"
+    if _is_topic_type_grandfather(valid):
+        return "SKIP", "R-TYPE-001：舊批 grandfather（全批 YAML 均無 topic_type 欄）"
+
+    missing = [f.name for f, data in valid if "topic_type" not in data]
+    if missing:
+        return "FAIL", f"R-TYPE-001：混合批 topic_type 缺欄：{missing}"
+
+    values = {topic_type: 0 for topic_type in TOPIC_TYPE_VALUES}
+    invalid: list[str] = []
+    for f, data in valid:
+        topic_type = data.get("topic_type")
+        if not isinstance(topic_type, str) or topic_type not in TOPIC_TYPE_VALUES:
+            invalid.append(f"{f.name}={topic_type!r}")
+            continue
+        values[topic_type] += 1
+
+    problems = []
+    if invalid:
+        problems.append("非法 topic_type：" + "; ".join(invalid))
+    for topic_type, expected in TOPIC_TYPE_TARGET_COUNTS.items():
+        if values[topic_type] != expected:
+            problems.append(f"{topic_type}={values[topic_type]} expected={expected}")
+    if problems:
+        return "FAIL", "R-TYPE-001：" + "；".join(problems)
+    return "PASS", "R-TYPE-001：Q1-Q6 各 2、Q7/Q8 各 1（14 支）"
+
+
+def chk_r_src_001_origin_source(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
+    """R-SRC-001：來源欄是過渡選填；填了才驗 enum 與 source_4 上限。"""
+    valid = [(f, d) for f, d in yamls if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d]
+    has_field = any("origin_source" in data for _, data in valid)
+    if not has_field:
+        return "SKIP", "R-SRC-001：全批未填 origin_source（過渡期）"
+    supplied = [(f, data.get("origin_source")) for f, data in valid if "origin_source" in data]
+    invalid = [
+        f"{f.name}={value!r}"
+        for f, value in supplied
+        if not isinstance(value, str) or (value.strip() and value not in ORIGIN_SOURCE_VALUES)
+    ]
+    filled = [(f, value) for f, value in supplied if isinstance(value, str) and value.strip()]
+    source_4_count = sum(1 for _, value in filled if value == "source_4_created")
+    problems = []
+    if invalid:
+        problems.append("非法 origin_source：" + "; ".join(invalid))
+    if source_4_count > 2:
+        problems.append(f"source_4_created={source_4_count} expected_max=2")
+    if problems:
+        return "FAIL", "R-SRC-001：" + "；".join(problems)
+    return "PASS", f"R-SRC-001：已填 {len(filled)}/{len(valid)} 支，source_4_created={source_4_count}/2"
+
 
 def chk_l1_009_派系_coverage(yamls: list[tuple[Path, dict]]) -> tuple[str, str]:
     """L1-009：派系覆蓋度 >= school_diversity_min 種
@@ -679,28 +1226,6 @@ def chk_l1_009_派系_coverage(yamls: list[tuple[Path, dict]]) -> tuple[str, str
     if n >= min_count:
         return "PASS", f"派系覆蓋 = {n} 種：{sorted(types)}"
     return "FAIL", f"派系覆蓋 = {n} 種（{sorted(types)}），需 >= {min_count} 種"
-
-def chk_c010_翠文_non_empty(data: dict, fname: str) -> tuple[str, str]:
-    """C-010：翠文非空 + 非畫面描述（字幕 ≠ 畫面說明）"""
-    scenes = get_scenes(data)
-    fails = []
-    warns = []
-    for scene in scenes:
-        ts = scene.get("timestamp", "?")
-        cuiwen = scene.get("翠文", "")
-        if not cuiwen or str(cuiwen).strip() == "":
-            fails.append(f"{ts} 翠文空白")
-            continue
-        # 翠文裡混入畫面描述 keyword → WARN
-        for kw in SCENE_DESC_KEYWORDS:
-            if kw in str(cuiwen):
-                warns.append(f"{ts} 翠文疑似含畫面描述 keyword「{kw}」（翠文={cuiwen[:30]}…）")
-                break
-    if fails:
-        return "FAIL", "翠文空白：" + "；".join(fails)
-    if warns:
-        return "WARN", "翠文疑似混入畫面描述（字幕 ≠ 畫面說明）：" + "；".join(warns[:3])
-    return "PASS", f"全 {len(scenes)} 段翠文非空，無畫面描述 keyword"
 
 CONCRETE_KNOWLEDGE_SCHOOLS = {"拆解派", "結構分析派", "老前輩權威派", "直球派", "市場觀察派", "時事追擊派"}
 _CONCRETE_SIGNAL_RE = re.compile(
@@ -746,6 +1271,628 @@ def chk_c017_concreteness(data: dict, fname: str) -> tuple[str, str]:
         return "PASS", f"具體化信號 {len(hits)} 個（≥2）"
     except Exception as e:  # fail-open：WARN 級品質提示不可炸 validator
         return "PASS", f"C-017 防護：解析異常豁免（{type(e).__name__}）"
+
+
+# ════════════════════════════════════════════
+# 「寫給唸」advisory 二件（C-018 小六度 / C-019 關我屁事）
+#   cxp-fullimport-s r2，2026-08-12；骨架抄 chk_c017（WARN-only + fail-open）。
+#   🔴 紅線（得標定稿 §2、工單【禁止事項】）：口語/品質檢測**永不升硬閘**，只回 PASS/WARN。
+#   🔴 未校準數字（句長門檻等）一律標「待業主盲讀校準，不得當硬閘引用」——
+#      站 0 診斷 §7 已測：陳修平逐字稿句長 P50=16 字、瑞祥稿 P50=26 字；
+#      但母體只有瑞祥一家（跨業主 FAIL·資料不足），故本二件的數字全為 advisory 觸發線，
+#      非門檻，改動不需 re-bless。
+# ════════════════════════════════════════════
+
+# 待業主盲讀校準（不得當硬閘引用）：句長 advisory 觸發線
+_C018_SENTENCE_LEN_HINT = 26   # 站 0 §7 瑞祥稿現況中位數；超過＝提示短句化
+_C018_LONG_RATIO_HINT = 0.5    # 超過一半句子過長才提示，避免逐句嘮叨
+# 待業主盲讀校準（不得當硬閘引用）：一句一資訊 — 單句資訊標記數
+_C018_INFO_MARK_HINT = 4       # 站 0 §7：逐字稿 5.10／瑞祥 3.25，皆為壓縮度 proxy 非品質
+_C018_SENT_SPLIT_RE = re.compile(r"[。！？!?；;\n]+")
+_C018_INFO_MARK_RE = re.compile(r"[，、（）()：:；;]")
+
+# C-019「關我屁事」：與觀眾無關的自我本位開場（陳修平公式：反例「我們成立於 1973 年」）
+_C019_SELF_CENTERED_RE = re.compile(
+    r"(我們(成立|創立|創辦|公司|團隊|品牌)|本公司|敝公司|創立於|成立於|"
+    r"大家好[，,]?我(是|叫)|今天很開心|榮獲|獲頒|通過.{0,6}認證)"
+)
+
+
+def _c018_body_sentences(data: dict) -> list:
+    """取可播稿體句子（排除 timestamp/type 等非內容欄，同 C-017 防假性計分做法）。
+
+    r6 P8（Codex 阻擋項 5）：**canonical 優先**。舊法只讀 raw `scenes`，
+    現役 42 份 markdown 時間軸稿（`_markdown_body`，無 scenes 鍵）一律回空 list，
+    導致 C-018／C-019 靜默回「無可播稿體句」PASS＝檢查根本沒執行到內容。
+    新法：先走與其他 chk 同源的 canonical markdown 正規化（_get_canonical_scenes），
+    取 dialogue.line + offscreen_interaction（可播內容），
+    **不取 subtitle／visual**（字幕與畫面描述非唸出來的稿體，與舊法排除「翠文/畫面/字幕卡」一致）。
+    canonical 不可用時 fallback 舊 raw scenes 路徑（逐字不變）。
+    """
+    out: list[str] = []
+
+    canonical_scenes = _get_canonical_scenes(data)
+    if canonical_scenes is not None:
+        for sc in canonical_scenes:
+            if not isinstance(sc, dict):
+                continue
+            for d in sc.get("dialogue", []) or []:
+                line = d.get("line", "") if isinstance(d, dict) else str(d)
+                if line and str(line).strip():
+                    out.extend(s.strip() for s in _C018_SENT_SPLIT_RE.split(str(line)) if s.strip())
+            mirror = sc.get("offscreen_interaction", "")
+            if mirror and str(mirror).strip():
+                out.extend(s.strip() for s in _C018_SENT_SPLIT_RE.split(str(mirror)) if s.strip())
+        if out:
+            return out
+        # canonical 解析得到 scenes 但無任何可播句 → 落回 raw 路徑再試（不誤傷）
+
+    scenes = get_scenes(data)
+    if not isinstance(scenes, list):
+        return out
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        for k, v in scene.items():
+            if str(k) in ("timestamp", "時間", "type", "翠文", "畫面", "字幕卡"):
+                continue
+            if isinstance(v, str) and v.strip():
+                out.extend(s.strip() for s in _C018_SENT_SPLIT_RE.split(v) if s.strip())
+    return out
+
+
+def chk_c018_readability(data: dict, fname: str) -> tuple[str, str]:
+    """C-018：小六度／寫給唸（WARN-only，永不 FAIL — 得標定稿 §2 紅線）
+
+    三個 advisory 訊號（全部只提示、不擋批）：
+      ①長句比例（觸發線 {_C018_SENTENCE_LEN_HINT} 字，待業主盲讀校準）
+      ②一句多資訊（單句標點資訊標記 >= {_C018_INFO_MARK_HINT}，待校準）
+      ③稿體混入自檢/報告層文字（診斷 §5 卡點「過修污染」：稿體只留可播內容）
+    分類欄位缺/型別錯/解析異常 → 一律 PASS（fail-open，同 C-017）。
+    """
+    try:
+        sents = _c018_body_sentences(data)
+        if not sents:
+            return "PASS", "C-018 防護：無可播稿體句可解析，豁免不誤傷"
+        long_sents = [s for s in sents if len(s) > _C018_SENTENCE_LEN_HINT]
+        dense_sents = [s for s in sents if len(_C018_INFO_MARK_RE.findall(s)) >= _C018_INFO_MARK_HINT]
+        report_leak = [s for s in sents if re.search(r"(採納|沒採納|硬約束|自檢|redline|upgrade_report|修訂說明)", s)]
+
+        hints = []
+        if sents and len(long_sents) / len(sents) > _C018_LONG_RATIO_HINT:
+            hints.append(
+                f"長句 {len(long_sents)}/{len(sents)} 句 > {_C018_SENTENCE_LEN_HINT} 字"
+                f"（例：{long_sents[0][:24]}…）— 建議短句化、寫給唸"
+            )
+        if dense_sents:
+            hints.append(
+                f"{len(dense_sents)} 句單句資訊密度高（標記 >= {_C018_INFO_MARK_HINT}）"
+                f"（例：{dense_sents[0][:24]}…）— 建議一句一資訊"
+            )
+        if report_leak:
+            hints.append(
+                f"稿體疑混入自檢/報告層文字 {len(report_leak)} 句"
+                f"（例：{report_leak[0][:24]}…）— 稿體只留可播內容，自檢移 upgrade_report"
+            )
+        if hints:
+            return "WARN", ("C-018 小六度 advisory（WARN-only，數字待業主盲讀校準、"
+                            "不得當硬閘引用）：" + "；".join(hints))
+        return "PASS", f"C-018：{len(sents)} 句，句長與資訊密度在 advisory 線內"
+    except Exception as e:
+        return "PASS", f"C-018 防護：解析異常豁免（{type(e).__name__}）"
+
+
+# ════════════════════════════════════════════
+# C-PARTS-001：零件庫機器契約三欄（r9 Q7，2026-08-13）
+#   源＝得標定稿 §1「五項導入不新開雙正本」：標題六型／開頭四型／結尾三型
+#   原本只有 L0 文檔敘述，yaml 無欄位＝機器讀不到、驗不了。
+#   骨架機 schema_check 已補三欄（標題型／開頭軸／結尾型），本件驗它。
+#   **WARN-only 永不 FAIL**（骨架抄 chk_c017/chk_c018）：130+ 現役稿無此三欄，
+#   直上 FAIL＝把品質規則變硬閘、既有批次全打紅，違「不得當硬閘」紅線。
+#   要翻硬閘的條件＝全業主遷移完成＋主持人/澤君拍板（同 _MIRROR_REPLY_ENFORCE）。
+# ════════════════════════════════════════════
+_PARTS_ENUMS = {
+    "標題型": ({"T1", "T2", "T3", "T4", "T5", "T6"}, "L0 §11.0.4 標題六型"),
+    "開頭軸": ({"O1", "O2", "O3", "O4"}, "L0 §11.0.5 開頭四型（一選一互斥）"),
+    "結尾型": ({"E1", "E2", "E3"}, "L0 §13.6 結尾三型正本（反轉＝payoff 技法，非第四型）"),
+}
+# 值判定（r11 T2，2026-08-13）：**精確匹配集合**，不再做「取開頭 token」的寬鬆抽取。
+#   舊法漏洞：_PARTS_CODE_RE = r"^\s*([TOE]\s*[0-9])" 只吃**一位數**，
+#     "T10" → 抽出 "T1" 判合法（實際上 T10 根本不存在）；
+#     "E1/E2" → 抽出 "E1" 判合法（複合值＝沒有一選一，等於沒宣告）；
+#     "O40" → 抽出 "O4" 判合法。三者皆是「非法值被洗成合法」。
+#   新法：str 值 strip＋去內部空白＋轉大寫後**必須與 enum 全等**，否則 WARN 非法枚舉。
+#     非 str 型別（bool／數字／dict／list／None）一律非法。
+#     仍**不做語意猜測**：不接受 "T3 解答式" 這類帶說明文字的值——欄位是機器契約欄，
+#     說明文字請寫在別的欄位或註解（此為 r9 相對 r11 的口徑收緊，見下方 fixtures 註記）。
+_PARTS_WS_RE = re.compile(r"\s+")
+
+
+def _parts_normalize_code(value) -> Optional[str]:
+    """欄值正規化為 enum 比對用 token；非 str 或空值回 None（r11 T2 精確匹配）。"""
+    if not isinstance(value, str):
+        return None          # bool／int／dict／list／None 皆非法（不做 str() 救援）
+    s = _PARTS_WS_RE.sub("", value).strip().upper()
+    return s or None
+
+
+def _parts_scan(sc: dict) -> tuple[list[str], list[str], list[str]]:
+    """掃 schema_check 三欄 → (missing, bad, ok)。**訊息字串為 C-PARTS-001／002 共用真源**
+    （T1a 抽出；抽出前後 C-PARTS-001 的 detail 文案逐字相同，見 F-CXP-T1-A* fixtures）。"""
+    missing: list[str] = []
+    bad: list[str] = []
+    ok: list[str] = []
+    for field, (allowed, ref) in _PARTS_ENUMS.items():
+        if field not in sc:
+            missing.append(f"{field}（缺欄；{ref}）")
+            continue
+        raw = sc.get(field)
+        # placeholder 判定：既有 _is_placeholder，另補骨架機產的 "[編劇填 T1-T6]" 樣式
+        _rs = str(raw).strip() if raw is not None else ""
+        if (_is_placeholder(raw) or not _rs
+                or (_rs.startswith("[") and _rs.endswith("]"))
+                or "編劇填" in _rs):
+            missing.append(f"{field}（未填／仍是 placeholder；{ref}）")
+            continue
+        code = _parts_normalize_code(raw)
+        if code is None or code not in allowed:
+            bad.append(f"{field}={str(raw)[:16]!r} 非法枚舉（須與合法值全等：{'/'.join(sorted(allowed))}；{ref}）")
+            continue
+        ok.append(f"{field}={code}")
+    return missing, bad, ok
+
+
+def chk_parts_002_component_enums_enforce(
+    data: dict,
+    fname: str,
+    enforce_generation: Optional[bool] = None,
+) -> tuple[str, str]:
+    """C-PARTS-002（T1a，cxp-enforce-t1 r1 2026-08-13）：零件庫三欄**新格式批硬閘**
+
+    源＝得標定稿【愛馬仕】「現成 enum 翻 FAIL」＋【霸告】「新批生效＋舊稿 grandfather」。
+    判定（**只在新格式批生效**）：
+      - 三欄齊全且皆為合法 enum（T1-T6／O1-O4／E1-E3，精確匹配）→ PASS
+      - 任一欄缺／仍是 placeholder／非法 enum → FAIL
+      - 整塊 schema_check 缺或型別錯 → FAIL（新格式批不得用「整塊不填」換免查——
+        這正是 T1b 同一個逆向誘因洞，零件庫欄同步封）
+    舊稿批（enforce_generation 非 True）→ **SKIP 明標**，三欄仍由 C-PARTS-001 出 WARN。
+    解析異常 → FAIL 並附例外類型（新批 fail-closed；舊批走不到這裡）。
+    """
+    if not enforce_generation:
+        return "SKIP", f"C-PARTS-002 SKIP — {_T1_SKIP_LEGACY}；本批三欄由 C-PARTS-001 advisory 承接"
+    try:
+        sc = data.get("schema_check")
+        if not isinstance(sc, dict):
+            return "FAIL", (
+                "C-PARTS-002 FAIL — 新格式批缺整塊 schema_check（或型別錯），"
+                "零件庫三欄（標題型／開頭軸／結尾型）無從驗證；"
+                "整塊不填不得換免查（同 T1b 逆向誘因洞）"
+            )
+        missing, bad, ok = _parts_scan(sc)
+        problems = missing + bad
+        if problems:
+            return "FAIL", (
+                "C-PARTS-002 FAIL — 新格式批零件庫三欄未達機器契約："
+                + "；".join(problems)
+                + (f"（已齊：{', '.join(ok)}）" if ok else "")
+            )
+        return "PASS", f"C-PARTS-002 PASS — 新格式批三欄合法（{', '.join(ok)}）"
+    except Exception as e:
+        return "FAIL", f"C-PARTS-002 FAIL — 解析異常（{type(e).__name__}），新格式批 fail-closed"
+
+
+# ════════════════════════════════════════════════════════════════════
+# 梯 2（cxp-enforce-t2 r1 2026-08-13／r3 2026-08-14）：chxp registry／receipt／
+#   **17 招分層入口已配置**（用語照 Codex 終審更正：不是「17 招全補」——
+#   人工三條 021/022/109 尚未有人執行、#058 走 BLOCKED 獨立入口尚未建流程、
+#   receipt 五條也只驗「有沒有申報」，不抓「該用卻沒申報」）
+# ════════════════════════════════════════════════════════════════════
+# 得標定稿骨架＝Codex R1；嫁接件＝【愛馬仕】版本緩衝＋C-quote-source 範式、
+# 【龍蝦】兩段式判定＋conditional 機器重算、【霸告】registry owner 落人＋梯次施工。
+#
+# 🔴 澤君 TG19810 紅線：**不得鎖死寫法**。本段全部檢查只驗三件事——
+#    ①選了哪個型（enum 命中）②該型要求的欄位在不在 ③證據指標解不解得回稿內位置。
+#    **零語意品質判斷**：不判方法用得好不好、內容有沒有趣、文字自不自然。
+#    規則本體寫在 chxp_method_registry.yaml，validator 端是泛用執行器——
+#    改一條方法＝改 yaml＋bump 版本，不必改這支程式。
+#
+# 世代分流（沿用 T1 的 _resolve_enforce_generation 單一真源，不另立）：
+#    new 世代（enforce_generation=True）→ 照驗、缺＝FAIL
+#    legacy 世代 → 一律 SKIP 明標（grandfather；零誤殺契約由 Y5 五批對照背書）
+# ════════════════════════════════════════════════════════════════════
+
+try:
+    import chxp_registry as _chxp  # type: ignore[import]
+    _CHXP_OK = True
+except Exception as _chxp_e:  # pragma: no cover - 部署缺檔時
+    _chxp = None  # type: ignore[assignment]
+    _CHXP_OK = False
+    print(f"[validate_script_batch] WARN: chxp_registry 未載入（{type(_chxp_e).__name__}: {_chxp_e}）—— "
+          f"C-CXP-* 系列將對新世代批 fail-closed 打 FAIL", file=sys.stderr)
+
+# 梯 2 SKIP 明標（與 _T1_SKIP_LEGACY 同樣「看得見才叫 grandfather」）
+_T2_SKIP_LEGACY = (
+    "legacy 世代 grandfather — 僅 legacy_batch_allowlist.yaml 明列的現役既有批走此路徑；"
+    "未列管批次一律當 new 世代 enforce"
+)
+
+
+def _chxp_registry_or_error() -> tuple[Optional[dict], Optional[str]]:
+    """取 registry；模組缺席也走同一條 fail-closed 路（回錯誤字串）。"""
+    if not _CHXP_OK or _chxp is None:
+        return None, "chxp_registry 模組未載入（部署缺檔或 import 失敗）"
+    return _chxp.load_registry()
+
+
+def chk_cxp_receipt(
+    data: dict,
+    fname: str,
+    enforce_generation: Optional[bool] = None,
+    is_skeleton_file: bool = False,
+) -> tuple[str, str]:
+    """C-CXP-RECEIPT（per-file）：每支稿的「用了哪幾招」收據**結構驗**。
+
+    得標定稿：骨架機產 `chxp_receipt:` 欄，applicable_ids **由機器重算**
+    （registry conditional 規則），used 由編劇填 method_id ＋ 證據指標。
+    本檢查只驗結構（**不判用得好不好** — 工單 Y3 明令）：
+      ① 新世代批必須有 chxp_receipt 欄（缺＝FAIL；不填不得換免查）
+      ② **used 鍵必須存在**（r3／H2①：缺鍵＝FAIL，不再默默轉成空陣列；
+         顯式 `used: []` 允許，但仍須通過 ③ 的 always 申報）
+      ②b **BLOCKED／人工／excluded 條目在 used 出現＝單獨 FAIL**（r4／J1）：
+         在其他欄位檢查之前先跑並直接 return，**不依賴其他欄位一起失敗**；
+         身分以**程式端常數**為準，registry 被變造也擋得住。
+      ③ **registry_version 對照「實際載入的 registry 版本」**（r4／J2）：
+         一致＝PASS／相鄰一版＝**WARN（本檢查回 WARN，不吞成 PASS）**／
+         其餘（缺、非字串、格式非法、family 不同、差兩版以上）＝FAIL
+      ④ **11 條 always-applicable 必須交代**（r3／H2③）：每條要嘛在 used
+         具名（帶可解回證據），要嘛在 `waiver` 欄具名說明；漏一條＝FAIL。
+         **只驗有無申報，不判品質**。
+      ⑤ used[].method_id 必須是 registry 內的合法 id（未知 id＝FAIL）
+      ⑥ **applicable_ids 若含未知 id ＝FAIL**（r3／H2④：r1 把稿內自填值
+         純當留痕，導致 `applicable_ids: ["999"]` 照樣 PASS）
+      ⑦ used[].evidence_ref 必須能解回稿內位置（path:/quote:）
+      ⑧ **source_artifact_hashes / receipt_hash 欄**（r3／H2⑤）：骨架機產，
+         validator 驗**存在與格式**；receipt_hash 若與本稿重算值不符＝
+         收據過期（新鮮度 FAIL）。
+    另：稿內 applicable_ids 若與機器重算結果不符 → 判定仍以機器重算為準。
+    骨架階段（本支 title 仍是 placeholder）→ SKIP。legacy 世代 → SKIP 明標。
+    """
+    if not enforce_generation:
+        return "SKIP", f"{fname}: C-CXP-RECEIPT SKIP — {_T2_SKIP_LEGACY}"
+    reg, err = _chxp_registry_or_error()
+    if err or reg is None:
+        return "FAIL", f"{fname}: C-CXP-RECEIPT FAIL — registry 不可用：{err}（新世代批 fail-closed）"
+    try:
+        receipt = data.get("chxp_receipt")
+        if is_skeleton_file:
+            return "SKIP", (f"{fname}: C-CXP-RECEIPT 骨架階段跳過（title 仍為 placeholder，"
+                            f"編劇尚未填 used）；填完即 fail-closed")
+        if not isinstance(receipt, dict):
+            return "FAIL", (
+                f"{fname}: C-CXP-RECEIPT FAIL — 新世代批缺 chxp_receipt 欄（或型別非 mapping）；"
+                f"每支稿必須留「用了哪幾招」收據，整欄不填不得換免查"
+            )
+        valid_ids = {m["id"] for m in reg.get("methods", []) if isinstance(m.get("id"), str)}
+        layer_of = {m["id"]: m.get("layer") for m in reg.get("methods", []) if isinstance(m.get("id"), str)}
+        mode_of = {m["id"]: m.get("mode") for m in reg.get("methods", []) if isinstance(m.get("id"), str)}
+        computed = _chxp.compute_applicable_ids(data, reg)  # type: ignore[union-attr]
+        problems: list[str] = []
+        warns: list[str] = []
+
+        # ── H2① used 鍵必須存在（缺鍵 ≠ 顯式空列表）──
+        if "used" not in receipt:
+            return "FAIL", (
+                f"{fname}: C-CXP-RECEIPT FAIL — chxp_receipt 缺 used 鍵；"
+                f"缺鍵不等於「沒用任何方法」，要宣告沒用請顯式寫 `used: []`"
+                f"（仍須在 waiver 交代 11 條 always 條目）"
+            )
+        used = receipt.get("used")
+        if not isinstance(used, list):
+            return "FAIL", f"{fname}: C-CXP-RECEIPT FAIL — chxp_receipt.used 型別非 list（得到 {type(used).__name__}）"
+
+        # ── H2②／r4-J2 registry_version 對照**實際載入的 registry 版本** ──
+        #    r3 是拿 receipt 版本跟「程式端期望常數」比，Codex 判定「沒有對實際
+        #    載入的 registry 版本建立關聯」。現在 match=PASS／前一版=WARN／其他=FAIL，
+        #    且 **WARN 不被吞掉**（見下方回傳段：底層 WARN → 本檢查回 WARN）。
+        rv_status, rv_detail = _chxp.check_receipt_registry_version(  # type: ignore[union-attr]
+            receipt.get("registry_version"),
+            receipt.get("previous_registry_version"),
+            reg,
+        )
+        if rv_status == "FAIL":
+            problems.append(f"registry_version 非法或超出 grace：{rv_detail}")
+        elif rv_status == "WARN":
+            warns.append(rv_detail)
+
+        # ── r4／J1 #058（BLOCKED）／人工層／excluded 的**單獨 receipt 路徑硬擋** ──
+        #    🔴 Codex r3 判定：r3 的 BLOCKED 檢查藏在 used 迴圈裡，跟其他欄位
+        #    共用同一個 problems 清單——修復 probe 是因為「缺版本、waiver、hash」
+        #    才 FAIL，**沒有真正驗到 #058**；而且判定依據是 registry 的 layer 欄，
+        #    把 #058 的 layer 改成 none 就一起消失。現在改成：
+        #      ① **在所有其他欄位檢查之前先跑**，命中即 return FAIL（單因即紅）
+        #      ② 身分來源＝**程式端常數**（_EXPECTED_BLOCKED_IDS／_EXPECTED_MANUAL_IDS），
+        #         registry 被變造也擋得住；registry 的 layer／mode 只是額外補刀
+        _blocked_const = set(getattr(_chxp, "_EXPECTED_BLOCKED_IDS", ("058",)))
+        _manual_const = set(getattr(_chxp, "_EXPECTED_MANUAL_IDS", ("021", "022", "109")))
+        _hard_block: list[str] = []
+        for i, item in enumerate(used, 1):
+            if not isinstance(item, dict):
+                continue
+            mid = item.get("method_id")
+            if not isinstance(mid, str):
+                continue
+            mid = mid.strip()
+            if mid in _blocked_const or layer_of.get(mid) == "blocked_entry":
+                _hard_block.append(
+                    f"used[{i}] #{mid} 屬 BLOCKED 獨立入口（未走該入口不得宣稱已做）——"
+                    f"不得用腳本 receipt 冒稱完成"
+                )
+            elif mid in _manual_const or layer_of.get(mid) == "manual":
+                _hard_block.append(
+                    f"used[{i}] #{mid} 屬人工清單層（系統零自動對外）——"
+                    f"請改在 chxp_manual_checklist_template.md 由人簽收，不在腳本 receipt 宣稱"
+                )
+            elif mode_of.get(mid) == "excluded":
+                _hard_block.append(
+                    f"used[{i}] #{mid} 屬 excluded（正典明列「刻意不做」）——"
+                    f"不納入腳本系統的條目不得在 receipt 宣稱使用"
+                )
+        if _hard_block:
+            return "FAIL", (
+                f"{fname}: C-CXP-RECEIPT FAIL — " + "；".join(_hard_block[:5])
+                + (f"（另 {len(_hard_block) - 5} 項）" if len(_hard_block) > 5 else "")
+                + "｜**本項單獨成立即 FAIL**，不依賴其他欄位是否合規"
+                  "（身分以程式端常數為準，registry 被改也擋得住）"
+            )
+
+        # ── H2④ applicable_ids 含未知 id ＝FAIL ──
+        declared = receipt.get("applicable_ids")
+        drift = ""
+        if declared is not None:
+            if not isinstance(declared, list):
+                problems.append(f"applicable_ids 型別非 list（得到 {type(declared).__name__}）")
+            else:
+                d = sorted({str(x).strip() for x in declared if str(x).strip()})
+                unknown_decl = [x for x in d if x not in valid_ids]
+                if unknown_decl:
+                    problems.append(
+                        f"applicable_ids 含未知 method_id {unknown_decl[:5]}（不在 registry）"
+                    )
+                if d != computed:
+                    drift = (f"；[稿內 applicable_ids 與機器重算不符——**以機器重算為準**，"
+                             f"稿內 {len(d)} 項 vs 機器 {len(computed)} 項]")
+
+        # ── H2⑤ source_artifact_hashes / receipt_hash 欄（存在＋格式＋新鮮度）──
+        sah = receipt.get("source_artifact_hashes")
+        if sah is None:
+            problems.append("缺 source_artifact_hashes 欄（骨架機產；沒有來源檔就填空 mapping {}）")
+        elif not isinstance(sah, dict):
+            problems.append(f"source_artifact_hashes 型別非 mapping（得到 {type(sah).__name__}）")
+        else:
+            bad_h = [f"{k}={v!r}" for k, v in sah.items()
+                     if not (isinstance(v, str) and re.fullmatch(r"[0-9a-fA-F]{64}", v.strip()))]
+            if bad_h:
+                problems.append(f"source_artifact_hashes 值非 sha256 格式：{bad_h[:3]}")
+        rh = receipt.get("receipt_hash")
+        if rh is None or (isinstance(rh, str) and not rh.strip()):
+            problems.append("缺 receipt_hash 欄（骨架機產；新鮮度錨，內容改了要重算）")
+        elif not isinstance(rh, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", rh.strip()):
+            problems.append(f"receipt_hash 非 sha256 格式（得到 {str(rh)[:24]!r}）")
+        else:
+            fresh = _chxp.compute_receipt_hash(data)  # type: ignore[union-attr]
+            if rh.strip().lower() != fresh:
+                problems.append(
+                    f"receipt_hash 與本稿重算值不符（收據={rh.strip()[:12]}…，"
+                    f"重算={fresh[:12]}…）——稿件改過但收據未更新＝**收據過期**"
+                )
+
+        ok_items: list[str] = []
+        used_ids: set[str] = set()
+        for i, item in enumerate(used, 1):
+            if not isinstance(item, dict):
+                problems.append(f"used[{i}] 非 mapping")
+                continue
+            mid = item.get("method_id")
+            if not isinstance(mid, str) or not mid.strip():
+                problems.append(f"used[{i}] 缺 method_id")
+                continue
+            mid = mid.strip()
+            if mid not in valid_ids:
+                problems.append(f"used[{i}] method_id={mid!r} 不在 registry（未知 ID）")
+                continue
+            # 註：BLOCKED／人工／excluded 身分已在上方 r4／J1 段**單因硬擋**並提前 return，
+            #     跑到這裡的 mid 一定不是那三類，不需重複判定。
+            ref = item.get("evidence_ref")
+            resolved, why = _chxp.resolve_evidence_ref(data, ref)  # type: ignore[union-attr]
+            if not resolved:
+                problems.append(f"used[{i}] #{mid} 證據指標不成立：{why}")
+                continue
+            used_ids.add(mid)
+            ok_items.append(f"#{mid}")
+
+        # ── H2③ 11 條 always-applicable 必須在 used 出現或 waiver 交代 ──
+        always_ids = _chxp.always_applicable_ids(reg)  # type: ignore[union-attr]
+        waiver = receipt.get("waiver")
+        waived: set[str] = set()
+        if isinstance(waiver, dict):
+            waived = {str(k).strip() for k, v in waiver.items() if _chxp._is_filled(v)}  # type: ignore[union-attr]
+        elif isinstance(waiver, list):
+            for w in waiver:
+                if isinstance(w, dict):
+                    wid = str(w.get("method_id", "")).strip()
+                    if wid and _chxp._is_filled(w.get("reason")):  # type: ignore[union-attr]
+                        waived.add(wid)
+        unaccounted = [i for i in always_ids if i not in used_ids and i not in waived]
+        if unaccounted:
+            problems.append(
+                f"{len(unaccounted)} 條 always-applicable 未交代（{unaccounted[:8]}）——"
+                f"這 {len(always_ids)} 條一律適用，每條都要嘛在 used 具名＋給證據，"
+                f"要嘛在 waiver 具名寫明本支為何沒用；**只驗有無申報，不判品質**"
+            )
+
+        if problems:
+            return "FAIL", (
+                f"{fname}: C-CXP-RECEIPT FAIL — " + "；".join(problems[:6])
+                + (f"（另 {len(problems) - 6} 項）" if len(problems) > 6 else "")
+                + f"｜機器重算適用 {len(computed)} 項{drift}"
+            )
+        _ok_body = (
+            f"used {len(ok_items)} 項（{', '.join(ok_items[:8])}）"
+            f"皆為合法 method_id 且證據指標可解回；{len(always_ids)} 條 always 全數交代"
+            f"（used {len(used_ids & set(always_ids))}／waiver {len(waived & set(always_ids))}）；"
+            f"hash 欄合法且新鮮；機器重算適用 {len(computed)} 項"
+            f"（本件只驗結構，不判用得好不好）{drift}"
+        )
+        # ── r4／J2 WARN-grace 語意：**底層 WARN 不得被吞成 PASS** ──
+        #    Codex r3 判定：合規 receipt 填 v2/previous=v1 時底層是 WARN，
+        #    但 chk_cxp_receipt 只處理 FAIL，一律回 PASS。現在照實傳遞。
+        if warns:
+            return "WARN", (
+                f"{fname}: C-CXP-RECEIPT WARN — " + "；".join(warns[:3])
+                + f"｜其餘結構檢查通過：{_ok_body}"
+            )
+        return "PASS", f"{fname}: C-CXP-RECEIPT PASS — {_ok_body}；registry_version 與現役正典一致"
+    except Exception as e:
+        return "FAIL", f"{fname}: C-CXP-RECEIPT FAIL — 解析異常（{type(e).__name__}: {e}），新世代批 fail-closed"
+
+
+def _chxp_gate_result(
+    data: dict,
+    fname: str,
+    method: dict,
+    enforce_generation: Optional[bool],
+    is_skeleton_file: bool = False,
+) -> tuple[str, str]:
+    """單一 registry gate 的**泛用執行器**（規則來自 registry，程式不硬編方法內容）。
+
+    兩段式（龍蝦嫁接件）＋r3 三態（H3）：
+      第一段 trigger — MISS（沒選）→ SKIP（不適用，不當缺失）
+                       MALFORMED（選型欄型別錯）→ **FAIL**（不是 SKIP）
+                       HIT → 進第二段
+      第二段 結構   — enum 值合法／require_fields 齊（空值／placeholder／
+                      只含空元素的 list 都算沒填）／證據指標解得回／
+                      （#103 這類 char_count 型）字數落在區間內
+    legacy 世代 → SKIP 明標。骨架階段 → SKIP（編劇未填）。
+
+    🔴 r3 修因（Codex 終審阻擋 3）：r1 的第一段只有 True/False 兩態，
+       `used: "true"`（字串）被判「沒選」→ SKIP＝**結構性 fail-open**；
+       且 `sources: [null]/[""]/["[編劇填]"]` 因 `len(v)>0` 被當有填。
+       兩者都是型別與空值檢查，不涉語意品質，K0 不豁免。
+    """
+    gate = method.get("gate") or {}
+    cid = gate.get("check_id", f"C-CXP-{method.get('id')}")
+    if not enforce_generation:
+        return "SKIP", f"{fname}: {cid} SKIP — {_T2_SKIP_LEGACY}"
+    # ── r4／J3：**執行前先驗這條 gate 規則本身**（registry 端 schema）──
+    #    Codex r3 新問題：`require_fields: []` 讓「缺段落安排的稿」照樣 gate PASS。
+    #    COVERAGE 會擋住整批，但**單支檢查也不得回報 PASS**——規則壞掉時
+    #    這個閘什麼都沒驗到，回 PASS 等於謊報。新世代批一律 fail-closed。
+    try:
+        _schema_problems = _chxp._validate_gate_schema(gate, method.get("id"))  # type: ignore[union-attr]
+    except Exception:  # 防禦：舊版 chxp_registry 不吃第二個參數
+        _schema_problems = []
+    if _schema_problems:
+        return "FAIL", (
+            f"{fname}: {cid} FAIL — **registry 的本條 gate 規則不合法**："
+            + "；".join(_schema_problems[:3])
+            + "；規則壞掉時本閘等於什麼都沒驗，不得回報 PASS（新世代批 fail-closed）"
+        )
+    try:
+        state, why = _chxp.gate_trigger_state(data, gate)  # type: ignore[union-attr]
+        if state == "MISS":
+            return "SKIP", f"{fname}: {cid} SKIP — 未選此型／不適用（{why}）"
+        if state == "MALFORMED":
+            if is_skeleton_file:
+                return "SKIP", f"{fname}: {cid} 骨架階段跳過（title 仍為 placeholder）；填完即 fail-closed"
+            return "FAIL", (
+                f"{fname}: {cid} FAIL — 選型欄型別非法：{why}；"
+                f"**填錯型別不等於沒選**，不得因此免驗（純型別檢查，不判內容好壞）"
+            )
+        if is_skeleton_file:
+            return "SKIP", f"{fname}: {cid} 骨架階段跳過（title 仍為 placeholder）；填完即 fail-closed"
+        # 選了但值不在 enum → 直接 FAIL（選錯型 ≠ 沒選）
+        trig = gate.get("trigger") or {}
+        if trig.get("kind") == "enum":
+            val = _chxp.get_field(data, trig.get("field", ""))  # type: ignore[union-attr]
+            allowed = trig.get("enum") or []
+            if not (isinstance(val, str) and val.strip() in allowed):
+                return "FAIL", (
+                    f"{fname}: {cid} FAIL — {trig.get('field')} = {val!r} 不是合法選項"
+                    f"（合法：{allowed}）；選型必須用 enum 值，不接受自由文字"
+                )
+        problems: list[str] = []
+        # ── 字數型（#103）──
+        if gate.get("kind") == "char_count":
+            rng = gate.get("char_count") or {}
+            lo, hi = rng.get("min"), rng.get("max")
+            body = _chxp.script_body_text(data)  # type: ignore[union-attr]
+            n = _chxp.count_chinese_chars(body)  # type: ignore[union-attr]
+            if not (isinstance(lo, int) and isinstance(hi, int)):
+                return "FAIL", f"{fname}: {cid} FAIL — registry char_count 區間設定非法（{rng!r}）"
+            if n < lo or n > hi:
+                return "FAIL", (
+                    f"{fname}: {cid} FAIL — 60 秒稿本文中文字數 {n}，需 {lo}-{hi}"
+                    f"（{why}）；純字數區間，不判文字品質"
+                )
+            return "PASS", f"{fname}: {cid} PASS — 60 秒稿本文 {n} 字，落在 {lo}-{hi}"
+        # ── 必填欄位型 ──
+        for fld in gate.get("require_fields") or []:
+            val = _chxp.get_field(data, fld)  # type: ignore[union-attr]
+            if not _chxp._is_filled(val):  # type: ignore[union-attr]
+                problems.append(f"缺必填欄 {fld}（或仍是 placeholder／空值）")
+        # ── 證據指標型（要在 receipt 內具名列出本條並帶可解回的 evidence_ref）──
+        if gate.get("require_evidence"):
+            mid = method.get("id")
+            receipt = data.get("chxp_receipt")
+            used = (receipt or {}).get("used") if isinstance(receipt, dict) else None
+            entry = None
+            if isinstance(used, list):
+                for it in used:
+                    if isinstance(it, dict) and str(it.get("method_id", "")).strip() == mid:
+                        entry = it
+                        break
+            if entry is None:
+                problems.append(f"選了本型卻未在 chxp_receipt.used 具名列出 #{mid}（宣告未留收據）")
+            else:
+                resolved, ewhy = _chxp.resolve_evidence_ref(data, entry.get("evidence_ref"))  # type: ignore[union-attr]
+                if not resolved:
+                    problems.append(f"#{mid} 證據指標不成立：{ewhy}")
+        if problems:
+            return "FAIL", (
+                f"{fname}: {cid} FAIL — 已選型（{why}）但結構不成立："
+                + "；".join(problems[:5])
+                + "（只驗欄位與證據，不判內容好壞）"
+            )
+        return "PASS", f"{fname}: {cid} PASS — 已選型（{why}）且結構欄位齊、證據可解回"
+    except Exception as e:
+        return "FAIL", f"{fname}: {cid} FAIL — 解析異常（{type(e).__name__}: {e}），新世代批 fail-closed"
+
+
+def chxp_gate_checks(
+    data: dict,
+    fname: str,
+    enforce_generation: Optional[bool] = None,
+    is_skeleton_file: bool = False,
+) -> list[tuple[str, tuple[str, str]]]:
+    """回傳所有 registry gate 的檢查結果 [(check_id, (status, detail)), ...]。
+
+    🔴 註冊策略：**無條件註冊**（不論 new/legacy 都出現在報表，legacy 為 SKIP 明標）。
+       理由同 T1「SKIP 要看得見才叫 grandfather」——靜默略過看不出有沒有被跳過。
+    registry 不可用時：new 世代回單一 FAIL 件（不假裝八個閘都跑過），legacy 回 SKIP。
+    """
+    reg, err = _chxp_registry_or_error()
+    if err or reg is None:
+        if not enforce_generation:
+            return [("C-CXP-GATES", ("SKIP", f"{fname}: C-CXP-GATES SKIP — {_T2_SKIP_LEGACY}"))]
+        return [("C-CXP-GATES", ("FAIL", (
+            f"{fname}: C-CXP-GATES FAIL — registry 不可用：{err}；"
+            f"八個方法硬閘無從執行，新世代批 fail-closed（不得當作通過）")))]
+    out: list[tuple[str, tuple[str, str]]] = []
+    for m in _chxp.iter_gates(reg):  # type: ignore[union-attr]
+        cid = (m.get("gate") or {}).get("check_id", f"C-CXP-{m.get('id')}")
+        out.append((cid, _chxp_gate_result(data, fname, m, enforce_generation, is_skeleton_file)))
+    return out
+
 
 def chk_c011_派系_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_text: Optional[str]) -> tuple[str, str]:
     """
@@ -938,102 +2085,6 @@ def chk_c012_identity_ratio(yamls: list[tuple[Path, dict]], owner: str, pref_tex
     if over_tol:
         return "FAIL", f"C-012 雙身份比例超出 ±{TOLERANCE}%：" + "；".join(over_tol) + f"  （實際分佈：{actual_pct}）"
     return "PASS", f"C-012 雙身份比例對齊（±{TOLERANCE}% 內）：{actual_pct}（偏好參考：{expected}）"
-
-def chk_c013_dm_card(data: dict, fname: str, owner: str, fishing_policy: Optional[dict] = None) -> tuple[str, str]:
-    """C-013：釣魚部腳本 dm_card 6 件齊（雙模式）
-
-    fishing_policy 由 load_fishing_policy() 回傳，mode ∈ {off, opt_in, legacy, invalid}。
-    - 無 fishing signals → PASS skip（任何 mode 都一樣）
-    - off/invalid + 有信號 → FAIL（fail-closed；C-013B 也會在 batch-level 抓，這裡再 per-file 確認）
-    - legacy → 舊 dm_card 6 件驗（dm_card 缺仍 FAIL，不趁 cutover 放水）
-    - opt_in → dm_card 必須是 dict + 6 件齊
-    """
-    if fishing_policy is None:
-        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
-
-    mode = fishing_policy.get("mode", "off")
-
-    # 共用信號偵測（legacy 模式用舊 criteria 保零回歸；off/opt_in 用全偵測 fail-closed）
-    signals = _fishing_signals(data, legacy=(mode == "legacy"))
-    if not signals:
-        return "PASS", "非釣魚部腳本（無釣魚信號），跳過 dm_card 驗證"
-
-    # 有釣魚信號 → 按 mode 分路
-    if mode in ("off", "invalid"):
-        return "FAIL", (
-            f"C-013：偵測到釣魚部信號但 mode={mode}（fail-closed）。"
-            f"信號：{signals}。"
-            f"Policy：{fishing_policy.get('detail','')}"
-        )
-
-    # legacy 或 opt_in：驗 dm_card 6 件
-    dm = data.get("dm_card")
-
-    # opt_in 模式：dm_card 必須是 dict
-    if mode == "opt_in" and not isinstance(dm, dict):
-        return "FAIL", (
-            f"C-013 opt_in：dm_card 必須是 dict，但得到 {type(dm).__name__!r}（{dm!r}）"
-        )
-
-    # legacy/opt_in 驗 6 件（opt_in 只掃 dm_card dict、防關鍵字散在 caption/台詞放水；legacy 保留掃全包零回歸）
-    ALL_TEXT = str(dm) if mode == "opt_in" else str(data)
-    SIX_FIELDS = {
-        "行業專業": ["行業專業", "專業", "問題標題", "怎麼做"],
-        "在地優勢": ["在地優勢", "在地", "雷區"],
-        "痛點":     ["痛點", "完整答案"],
-        "解法":     ["解法", "解決", "怎麼做", "完整答案"],
-        "行動呼籲": ["行動呼籲", "CTA聯絡", "CTA", "留言", "私訊", "cta"],
-        "LINE QR": ["LINE QR", "line_qr", "line qr", "qr_verify", "must_have_qr"],
-    }
-    missing = []
-    for field, keywords in SIX_FIELDS.items():
-        found_kw = any(k in ALL_TEXT for k in keywords)
-        if not found_kw:
-            missing.append(field)
-    if missing:
-        mode_label = "legacy" if mode == "legacy" else "opt_in"
-        return "FAIL", f"釣魚部 dm_card 缺少欄位（{mode_label}）：{missing}"
-    # opt-in 圖卡交付鏈驗證（保鏢硬條件2 / Codex must-fix）：opt_in 釣魚必須有圖片資產路徑非空，
-    # 否則「validator 6 件驗過、但網站 build 找不到圖片 → 站上圖卡空白」。legacy 豁免、off 不適用（off 沒釣魚）。
-    if mode == "opt_in":
-        asset = ""
-        if isinstance(dm, dict):
-            asset = str(dm.get("asset_path") or dm.get("img") or "").strip()
-        if not asset:
-            asset = str(data.get("img") or "").strip()
-        if not asset:
-            return "FAIL", "釣魚部 opt_in：dm_card 6 件齊但缺圖片資產路徑（dm_card.asset_path / img 皆空）→ 網站圖卡會空白"
-        return "PASS", f"釣魚部 dm_card 6 件齊 + 圖片資產路徑（mode=opt_in）"
-    return "PASS", f"釣魚部 dm_card 6 件齊（mode={mode}）"
-
-def chk_c013b_no_fishing_when_off(yamls: list, fishing_policy: Optional[dict] = None) -> tuple[str, str]:
-    """C-013B：batch-level — off/invalid 模式整批掃釣魚信號，有命中→FAIL（fail-closed）。
-    opt_in / legacy → PASS skip。
-    掛在 C-014 後、V2-006 前（見 batch_checks 排列）。
-    """
-    if fishing_policy is None:
-        fishing_policy = {"mode": "off", "batch_date": None, "detail": "未傳入 policy，保守 off"}
-
-    mode = fishing_policy.get("mode", "off")
-
-    if mode in ("opt_in", "legacy"):
-        return "PASS", f"C-013B skip（mode={mode}，釣魚功能啟用或舊批豁免）"
-
-    # off 或 invalid：掃全批
-    hits = []
-    for f, data in yamls:
-        sigs = _fishing_signals(data)
-        if sigs:
-            hits.append(f"{f.name}: {sigs}")
-
-    if hits:
-        return "FAIL", (
-            f"C-013B：mode={mode} 但偵測到釣魚信號（{len(hits)} 支）。"
-            f"Policy：{fishing_policy.get('detail','')}。"
-            f"命中：{hits}"
-        )
-    return "PASS", f"C-013B：無釣魚信號（mode={mode}）"
-
 
 # C-014 retired (W2-C撤收 2026-07-14) — ID reserved, 勿重編其他 check
 
@@ -1528,11 +2579,10 @@ def chk_v2_005_trial_reels_consistency(data: dict, fname: str) -> tuple[str, str
 
 import difflib
 
-# 強制位 keyword 對應表（V2-006）— 拆 BASE（3 件）+ FISHING_SLOT（1 件）
+# 強制位 keyword 對應表（V2-006）— 2026-08-26 拍板（TG22396-22401）：毒舌正能量/專業位強制位廢止
+# （superseded by L0 §1.1 Q1-Q8 配額制），僅存純雞湯 ≥1（CTA 維度，L0 §1.10）。工程票＝80_驗收案卷/改公版_8類型14支_20260826/
 REQUIRED_SLOTS_BASE = {
-    "毒舌正能量":   ["毒舌正能量", "毒舌"],
     "純雞湯":       ["純雞湯"],
-    "專業位":       ["專業位", "知識", "教學", "教育型", "Erika 拆解派"],
 }
 REQUIRED_SLOTS_FISHING = {
     "釣魚部": ["釣魚", "fishing"],
@@ -1763,20 +2813,6 @@ def chk_v2_007_threads_seven(
         f"{target.name} 找到 {count} 篇脆文（≥ {expected}），"
         f"逐篇均 ≤ {limit}；counts=[{counts}]；{context}"
     )
-
-
-def chk_v2_007b_standalone_threads(data: dict, fname: str) -> tuple[str, str]:
-    """V2-007B：platform_variants.threads 衝突驗 — per-file
-    standalone_threads_derivative=true 但 platform_variants.threads=false → WARN
-    """
-    pv = data.get('platform_variants', {})
-    if not isinstance(pv, dict):
-        return "PASS", "(no platform_variants)"
-    threads_enabled = pv.get('threads')
-    standalone = data.get('standalone_threads_derivative')
-    if standalone and not threads_enabled:
-        return "WARN", "standalone_threads_derivative=true 但 platform_variants.threads=false（建議改 threads=true）"
-    return "PASS", f"threads={threads_enabled} / standalone={standalone}"
 
 
 def _v2008_dialogue_text(data: dict) -> str:
@@ -2283,22 +3319,6 @@ def chk_v2_010_batch_summary(batch_dir: Path) -> tuple[str, str]:
     return "WARN", "找不到批次摘要（建議補 _批次摘要.md）"
 
 
-def chk_v2_011_no_fiction(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """V2-011：禁虛構故事驗 — per-file（仲豪/阿奇 特化）"""
-    if owner not in ('仲豪', '阿奇'):
-        return "PASS", "(非仲豪/阿奇，跳過)"
-    sc = data.get('schema_check', {})
-    if isinstance(sc, dict):
-        no_fiction = sc.get('禁虛構')
-        if no_fiction is False:
-            return "FAIL", f"{owner} schema_check.禁虛構=false（仲豪 §11.4 / 阿奇 強制 true）"
-    all_text = get_all_text(data)
-    hits = [w for w in FICTION_SIGNAL_WORDS if w in all_text]
-    if hits:
-        return "FAIL", f"{owner} 台詞含虛構信號詞：{hits}"
-    return "PASS", f"{owner} 禁虛構驗 PASS"
-
-
 def chk_v2_012_beauty_med_words(data: dict, fname: str, owner: str) -> tuple[str, str]:
     """V2-012：美容業主醫療效能禁用詞驗 — per-file（昀臻 / 溫蒂 等美容業主）"""
     BEAUTY_OWNERS = {'昀臻', '溫蒂'}
@@ -2342,31 +3362,6 @@ def chk_v2_012b_threads_med_words(batch_dir: Path, owner: str) -> tuple[str, str
         detail = "; ".join(f"{n} 含 {h[:5]}" for n, h in all_hits)
         return "FAIL", f"{owner}脆文含醫療效能禁用詞（對齊第 09 批算盤 20 條）：{detail}"
     return "PASS", f"{owner}脆文醫療詞驗 PASS（掃 {len(scanned)} 檔：{scanned}）"
-
-
-def chk_v2_013_zhonghao_life_ratio(yamls: list[tuple[Path, dict]], owner: str) -> tuple[str, str]:
-    """V2-013：仲豪生活/房仲字數比驗 — batch-level（仲豪 特化）
-    生活字數 / 房仲字數 >= 3.0 (76%+)
-    """
-    if owner != '仲豪':
-        return "PASS", "(非仲豪，跳過)"
-    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
-    life_chars = 0
-    realty_chars = 0
-    for f, data in valid:
-        type_field = str(data.get('type', ''))
-        all_text = get_all_text(data)
-        char_count = len(all_text)
-        if '生活' in type_field:
-            life_chars += char_count
-        elif '房仲' in type_field:
-            realty_chars += char_count
-    if realty_chars == 0:
-        return "PASS", f"仲豪批次無房仲類腳本（生活字數 {life_chars}）"
-    ratio = life_chars / realty_chars
-    if ratio < 3.0:
-        return "FAIL", f"仲豪生活/房仲字數比 {ratio:.2f} < 3.0（生活 {life_chars} / 房仲 {realty_chars}）"
-    return "PASS", f"仲豪生活/房仲字數比 {ratio:.2f} >= 3.0"
 
 
 # ════════════════════════════════════════════
@@ -2666,57 +3661,6 @@ def chk_c_content_mix(
         f"C-content-mix 對齊（±{tol} 內）：{dict(actual_count)}"
         f"{'（advisory）' if not is_hard else ''}"
     )
-
-
-def chk_v2_014_bappu_taboo(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """V2-014：叭噗禁忌題材驗 — per-file（叭噗 特化）
-    Codex R1 盲點 11 修法：用 schema_check 欄位（不 grep 上下文避誤殺）
-    """
-    if owner != '叭噗_小C':
-        return "PASS", "(非叭噗，跳過)"
-    sc = data.get('schema_check', {})
-    if not isinstance(sc, dict):
-        if _is_legacy_yaml(data):
-            return "WARN", "叭噗 缺 schema_check（legacy 過渡期）"
-        return "FAIL", "叭噗 缺 schema_check 欄位"
-    fails = []
-    for key in ['禁業配', '禁引流房仲', '禁媽媽題材']:
-        if sc.get(key) is False:
-            fails.append(f"{key}=false")
-    if fails:
-        return "FAIL", f"叭噗 schema_check 違規：{fails}"
-    return "PASS", "叭噗禁忌題材 schema_check 驗 PASS"
-
-
-def chk_v2_015_bappu_q1q2q3(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """V2-015：叭噗知識反差三標準驗 — per-file（叭噗 特化）"""
-    if owner != '叭噗_小C':
-        return "PASS", "(非叭噗，跳過)"
-    faction = str(data.get('faction', ''))
-    if '知識反差' not in faction:
-        return "PASS", "(非知識反差派系，跳過)"
-    l2_check = data.get('L2_判斷標準') or data.get('l2_judgment')
-    if not l2_check or not isinstance(l2_check, dict):
-        return "FAIL", "叭噗知識反差派缺 L2_判斷標準"
-    missing = [q for q in ['q1', 'q2', 'q3'] if not l2_check.get(q)]
-    if missing:
-        return "FAIL", f"叭噗知識反差 L2_判斷標準缺 {missing}"
-    return "PASS", "叭噗知識反差 q1/q2/q3 全填"
-
-
-def chk_v2_016_trial_observe_until(data: dict, fname: str, owner: str) -> tuple[str, str]:
-    """V2-016：試水批 observe_until 存在驗 — per-file
-    Codex R1 盲點 5 修法：owner=叭噗_小C AND batch_tag含試水 強制 / 其他業主 WARN
-    """
-    batch_tag = str(data.get('batch_tag', '') or data.get('batch_label', ''))
-    if '試水' not in batch_tag:
-        return "PASS", "(非試水批，跳過)"
-    fails = [k for k in ['observe_until', 'review_kpi', 'override_reason'] if not data.get(k)]
-    if not fails:
-        return "PASS", "試水批 3 欄齊"
-    if owner == '叭噗_小C':
-        return "FAIL", f"叭噗試水批缺：{fails}"
-    return "WARN", f"{owner} 試水批建議補：{fails}（限叭噗強制）"
 
 
 # ════════════════════════════════════════════
@@ -3232,43 +4176,6 @@ _R_CARD_001_EFFECTIVE_FROM = _dt.date(2026, 7, 14)
 _R_CARD_001_RETIRED_FIELDS = ("圖卡主題", "visual_aid", "visual_aid_scripts")
 
 
-def chk_r_card_001_retired_card_fields(data: dict, fname: str) -> tuple[str, str]:
-    """R-CARD-001：2026-07-14 起，批次 YAML 不得再填退役圖卡欄位。
-
-    日期判別用 _rcard_all_dates_max（修訂⑪：多日期字串窮舉取最大，堵 r7 繞過案例）；
-    無法判斷日期時保守視為新批。僅讀三個退役欄位；dm_card 與任何釣魚相關 payload 一律不掃。
-    """
-    batch_date = _rcard_all_dates_max(data, fname)
-    if batch_date is not None and batch_date < _R_CARD_001_EFFECTIVE_FROM:
-        return "SKIP", (
-            f"R-CARD-001 legacy skip：歷史批次不溯及（batch_date={batch_date} "
-            f"< {_R_CARD_001_EFFECTIVE_FROM}）；dm_card 與釣魚功能不在本規則掃描範圍"
-        )
-
-    hit_fields = []
-    for field in _R_CARD_001_RETIRED_FIELDS:
-        value = data.get(field)
-        nonempty = bool(value.strip()) if isinstance(value, str) else bool(value)
-        if nonempty:
-            hit_fields.append(field)
-
-    if hit_fields:
-        date_detail = (
-            f"batch_date={batch_date}" if batch_date is not None
-            else "日期無法判斷，保守視為新批"
-        )
-        return "FAIL", (
-            "R-CARD-001：2026-07-14 起批次圖卡欄位已退役；"
-            f"非空欄位：{', '.join(hit_fields)}；一次性人令請依 L0 §14；"
-            f"dm_card 與釣魚功能不在本規則掃描範圍（{date_detail}）"
-        )
-
-    return "PASS", (
-        "R-CARD-001：退役批次圖卡欄位皆空；"
-        "dm_card 與釣魚功能不在本規則掃描範圍"
-    )
-
-
 def _load_template_index_ids() -> Optional[set]:
     """讀 template_index.jsonl 回傳 template_id set（快取）"""
     global _TEMPLATE_INDEX_CACHE
@@ -3619,75 +4526,6 @@ def _is_placeholder(val) -> bool:
     return False
 
 
-def chk_v2_026_template_adaptation_required(data: dict, fname: str) -> tuple[str, str]:
-    """V2-026：template_adaptation 完整驗
-
-    對齊 V2-025 cutoff 邏輯（_V2_025_CUTOFF = 2026-06-01）：
-    - legacy 批次（批次日期 < 2026-06-01）：缺欄位 / placeholder / forbidden_copy_check 未過 → WARN
-    - 非 legacy（新批次或無法判斷）：缺欄位 / placeholder / forbidden_copy_check 未過 → FAIL
-
-    template_adaptation 欄位應包含：
-      learned_structure：從範本學到的骨架邏輯（必填，不可為 placeholder）
-      changed_context：換成業主情境的說明（必填，不可為 placeholder）
-      forbidden_copy_check：需為 PASS / passed / true（不分大小寫）
-    """
-    is_legacy = _is_v2025_legacy(data, fname)
-
-    def _make_result(has_issues: bool, issues: list[str]) -> tuple[str, str]:
-        """根據 legacy 狀態決定 WARN 或 FAIL"""
-        if not has_issues:
-            return "PASS", "template_adaptation 已填 learned_structure + changed_context（forbidden_copy_check OK）"
-        msg_base = "template_adaptation 未完整：" + "；".join(issues)
-        if is_legacy:
-            return "WARN", msg_base + "（legacy 批次過渡期）"
-        return "FAIL", msg_base + "（新批次強制 — 2026-06-01 起必須完整填寫）"
-
-    adapt = data.get('template_adaptation')
-
-    if not adapt:
-        issues = [
-            "缺 template_adaptation（建議填 learned_structure + changed_context，"
-            "說明從範本學到什麼 / 如何改成業主情境）"
-        ]
-        return _make_result(True, issues)
-
-    if not isinstance(adapt, dict):
-        issues = [f"template_adaptation 格式錯誤（應是 dict，實際：{type(adapt).__name__}）"]
-        return _make_result(True, issues)
-
-    # 檢查 learned_structure / changed_context：缺欄位 或 值為 placeholder → 視為 missing
-    placeholder_fields = []
-    missing_fields = []
-    for k in ('learned_structure', 'changed_context'):
-        v = adapt.get(k)
-        if v is None or (isinstance(v, str) and not v.strip()):
-            missing_fields.append(k)
-        elif _is_placeholder(v):
-            placeholder_fields.append(k)
-
-    issues = []
-    if missing_fields:
-        issues.append(
-            f"缺欄位 {missing_fields}（learned_structure=從範本學到的結構邏輯 / "
-            f"changed_context=換成業主情境的說明）"
-        )
-    if placeholder_fields:
-        issues.append(
-            f"{placeholder_fields} 仍為 skeleton placeholder（'[編劇填]'/'pending' 等），請實際填寫"
-        )
-
-    # 檢查 forbidden_copy_check：需為 PASS / passed / true
-    fcc = adapt.get('forbidden_copy_check')
-    if fcc is not None:
-        fcc_ok = str(fcc).strip().lower() in ('pass', 'passed', 'true')
-        if not fcc_ok:
-            issues.append(
-                f"forbidden_copy_check='{fcc}' 未過（需改為 PASS 後才算確認無直接複製）"
-            )
-
-    return _make_result(bool(issues), issues)
-
-
 # ────────────────────────────────────────────
 # WP-B V3-001 provenance check（topic_intel 選題情報池來源驗）
 # ────────────────────────────────────────────
@@ -3832,7 +4670,7 @@ def _load_projection_candidate_index(owner: str) -> Optional[dict]:
     _owner_code = str(_owner_info.get("owner_code", "") or "")
     if not _owner_code:
         return None
-    _cfg_path = Path(r"C:\Users\00sta\claude-state\topic_intel_paths.json")
+    _cfg_path = Path(r"/Users/chenzejun/claude-state/topic_intel_paths.json")
     if not _cfg_path.exists():
         return None
     _cfg = _j.loads(_cfg_path.read_text(encoding="utf-8"))
@@ -4613,91 +5451,6 @@ def _s21_get_skeleton_type(data: dict) -> Optional[str]:
     return s or None
 
 
-def chk_c21_1_break_pattern(
-    yamls: list[tuple[Path, dict]],
-    fishing_policy: Optional[dict] = None,
-) -> tuple[str, str]:
-    """C-21.1 破套路（batch-level）— 一批裡 >= _S21_1_SAME_SKELETON_THRESHOLD 支同一 exact 骨架型 → 觸發。
-
-    對齊 scripter.md §21.1（計算口徑 Codex 三審 P1-1）：
-    - 骨架型欄位 = 復用既有 `pattern` 欄（語義即結構/骨架型，編劇不另填新欄）。
-    - required_slot（毒舌正能量/純雞湯/專業位）= 位置角色、不算骨架型、不納統計。
-    - 系列例外：批內凡 yaml 同時有 series_id + episode → 該支豁免主公式統計，但回 WARN
-      提醒 hook/案例/轉折/CTA/收束需 ≥2 項差異（人工查；只豁免 top-level 主公式）。
-    - 過渡期（batch_date < _S21_EFFECTIVE_FROM）→ WARN-waiver。
-    - 骨架階段（>50% title placeholder）由 main 端的 _skeleton_mode 控；本函式另對
-      「缺骨架型欄」自行 SKIP（>50% 支取不到 pattern → SKIP，比照 V2-025/026 骨架放行）。
-    """
-    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
-    if not valid:
-        return "WARN", "C-21.1：批次無有效 yaml，跳過"
-
-    batch_date = _s21_batch_date(valid)
-    # P1-C：legacy 標記 = 批內任一 yaml 有 legacy_allowed_until >= today
-    _legacy = any(_is_legacy_yaml(d) for _, d in valid)
-    in_warn = _s21_in_warn_window(batch_date, has_legacy_marker=_legacy)
-
-    # 系列批次偵測（series_id + episode 同時存在的支）
-    series_files = [
-        f.name for f, d in valid
-        if str(d.get("series_id", "")).strip() and str(d.get("episode", "")).strip()
-    ]
-
-    # 統計骨架型（排除系列支與缺欄支）
-    skeleton_counts: dict[str, int] = {}
-    missing_skeleton = 0
-    counted = 0
-    for f, d in valid:
-        if f.name in series_files:
-            continue
-        st = _s21_get_skeleton_type(d)
-        if st is None:
-            missing_skeleton += 1
-            continue
-        skeleton_counts[st] = skeleton_counts.get(st, 0) + 1
-        counted += 1
-
-    # 骨架階段 SKIP：>50% 支缺骨架型欄（編劇尚未填 pattern）
-    if valid and (missing_skeleton / len(valid)) > 0.5:
-        return "SKIP", (
-            f"C-21.1：>50% 支缺骨架型（pattern 欄 placeholder/空，{missing_skeleton}/{len(valid)}）"
-            f"— 骨架階段跳過，等編劇填完再驗"
-        )
-
-    if counted == 0:
-        return "SKIP", "C-21.1：無可統計骨架型（全為系列支或缺欄），跳過"
-
-    # 系列批 WARN 提醒（不擋，但提醒人工查差異）
-    series_note = ""
-    if series_files:
-        series_note = (
-            f"；系列批 {len(series_files)} 支（series_id+episode）已豁免主公式統計，"
-            f"但 hook/案例/轉折/CTA/收束仍需 ≥2 項差異（人工查）：{sorted(series_files)}"
-        )
-
-    max_type, max_n = ("", 0)
-    if skeleton_counts:
-        max_type, max_n = max(skeleton_counts.items(), key=lambda kv: kv[1])
-
-    triggered = max_n >= _S21_1_SAME_SKELETON_THRESHOLD
-    detail_counts = dict(sorted(skeleton_counts.items(), key=lambda kv: -kv[1]))
-
-    if triggered:
-        msg = (
-            f"C-21.1 破套路觸發：「{max_type}」骨架型 {max_n} 支（門檻 ≥{_S21_1_SAME_SKELETON_THRESHOLD}）"
-            f"，批內骨架同模子。請 spread 骨架型（陳修平七主題各公式輪用 + 錯誤示範/單案例深拆/"
-            f"反直覺測驗/對比戲劇）。實際分佈：{detail_counts}{series_note}"
-        )
-        if in_warn:
-            return "WARN", msg + f"（過渡期 batch_date={batch_date} < {_S21_EFFECTIVE_FROM}，WARN-waiver）"
-        return "FAIL", msg
-
-    base = f"C-21.1 破套路 PASS：最大同骨架型「{max_type}」{max_n} 支 < {_S21_1_SAME_SKELETON_THRESHOLD}（分佈 {detail_counts}）{series_note}"
-    if series_note:
-        return "WARN", base  # 有系列支 → 留 WARN 提醒人工查差異
-    return "PASS", base
-
-
 def _s21_raw_cta_mix_enforcement_is_hard(pref_text: Optional[str]) -> bool:
     """C-21.2 P1-A（Codex 第 2 輪退回修）：直接從 raw pref_text 的 cta_mix kb-rule
     區塊原文判定是否「明寫 enforcement: hard」——**不信 _mix_parser 的 default 值**。
@@ -4941,70 +5694,6 @@ def chk_r_cta_001_cta_fields_complete(
     )
 
 
-def chk_r_cta_002_cta_label_resolvable(
-    yamls: list[tuple[Path, dict]],
-    pref_text: Optional[str] = None,
-) -> tuple[str, str]:
-    """R-CTA-002（W3 Δ5 補閘，D24 P5）— batch-level：cta_effect 欄存在（非缺/非
-    placeholder）但依 C-21.2 既有解析邏輯（_resolve_label 別名表 + _s21_canonical_cta_effect
-    validator 自有詞彙，同一套、不建第二套）解析不到 canonical 效果類別（garbage label）
-    → FAIL（C-21.2 原僅收進 unresolved 供 WARN 放行，不擋）。
-
-    缺欄/空欄不算「存在」，非本規則範圍（歸 R-CTA-001）；沿用 C-21.2 同款 missing 判定。
-    cutover：批次沿用 R-CARD-001 同款日期判別（_w3d5_batch_max_date 取批內 max），
-    歷史批次不溯及。
-    """
-    valid = [
-        (f, d) for f, d in yamls
-        if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d
-    ]
-    if not valid:
-        return "WARN", "R-CTA-002：批次無有效 yaml，跳過"
-
-    batch_max_date = _w3d5_batch_max_date(valid)
-    if batch_max_date is not None and batch_max_date < _R_CARD_001_EFFECTIVE_FROM:
-        return "SKIP", (
-            f"R-CTA-002 legacy skip：歷史批次不溯及（batch_max_date={batch_max_date} "
-            f"< {_R_CARD_001_EFFECTIVE_FROM}）"
-        )
-
-    _norm_items = None
-    if _MIX_PARSER_OK and _parse_mix_block is not None and pref_text:
-        try:
-            _soft_result = _parse_mix_block(pref_text, "cta_mix")
-            if _soft_result.found and _soft_result.items:
-                _norm_items = _soft_result.items
-        except Exception:
-            _norm_items = None
-
-    unresolved_files: list[tuple[str, str]] = []
-    for f, d in valid:
-        sc = d.get("schema_check")
-        label = sc.get("CTA類型") if isinstance(sc, dict) else None
-        if label is None or _is_placeholder(label) or not str(label).strip():
-            continue
-        raw_label = str(label).split("#")[0].strip()
-        canon = None
-        if _norm_items is not None and _resolve_label is not None:
-            canon = _resolve_label(raw_label, _norm_items)
-        if canon is None:
-            canon = _s21_canonical_cta_effect(raw_label)
-        if canon is None:
-            unresolved_files.append((f.name, raw_label))
-
-    if unresolved_files:
-        detail = "；".join(f"{fn}: 「{lbl}」" for fn, lbl in unresolved_files)
-        return "FAIL", (
-            f"R-CTA-002：{len(unresolved_files)} 支 CTA 標籤無法解析到正規效果類別"
-            f"（C-21.2 同款詞彙判定，不放水）——{detail}"
-        )
-
-    return "PASS", (
-        f"R-CTA-002 PASS：{len(valid)} 支 CTA 標籤全可解析或本就缺欄"
-        "（缺欄另歸 R-CTA-001）"
-    )
-
-
 def _s21_6_batch_exempt(batch_dir: Path) -> tuple[str, str]:
     """C-21.6 P1-4：讀**批次級** _batch_flags.yml 的 quality_gate 段判豁免。
 
@@ -5096,156 +5785,6 @@ def chk_c21_6_quality_gate_report(
     if _S21_6_REPORT_ENFORCE:
         return "FAIL", msg
     return "WARN", msg + "（_S21_6_REPORT_ENFORCE=False 時 WARN；現已 2026-06-23 enforce-live，此 branch 為 rollback 備用）"
-
-
-def chk_r_qgr_001_quality_gate_report_content(
-    yamls: list[tuple[Path, dict]],
-    batch_dir: Path,
-) -> tuple[str, str]:
-    """R-QGR-001（W3 Δ5 補閘，D24 P6+P8；2026-07-15 r3 B2/B3 修正——詳下方沿革段）—
-    batch-level：C-21.6 適用批（非豁免）的 _quality_gate_report.md 內容最低穩健標記
-    驗證（不 parse 完整表格格式、只驗詞面存在——scripter.md §21.6/§21.7 沿革與
-    chk_c21_6_quality_gate_report FAIL 訊息本身即為此規則的 canonical 措辭來源，
-    無法從程式碼推導出的精確表格式樣不驗、不發明新格式）：
-      ① 批內每支 script_id 字面值須出現在報告全文（script_id 欄本身缺/空/非字串
-         → fail-closed，不可靜默跳過，見下方 r3 修正）
-      ② 「R10-R20」字樣須出現（C-21.6 FAIL 訊息「須附逐支 R10-R20 命中」同款用語）
-      ③ 「R14·R15」字樣須出現（含常見分隔符變體：·／-／–／—／無分隔；C-21.6 FAIL
-         訊息「R14·R15 hard fail」同款用語）
-      ④ 「例外」字樣須出現（C-21.6 FAIL 訊息「例外清單」同款用語）
-      ⑤ 「prompt log」字樣須出現（不分大小寫；C-21.6 FAIL 訊息「GPT 打分 + prompt
-         log」同款用語）
-      ⑥ 「GPT 打分」或「GPT 分數」字樣須出現（同上 FAIL 訊息同款用語；只驗詞面、
-         不 parse 表格欄位）
-      ⑦ 批內含 content_axis=="offpro" 稿時，須另出現「offpro_concreteness_check」
-         字樣（scripter.md 沿革：§22.9 off-pro spine 落地時「§21.6 加
-         offpro_concreteness_check」）
-
-    豁免（_s21_6_batch_exempt）與報告缺失/為空 → 交給既有 C-21.6 管，本規則 SKIP、
-    不重複擋同一根因。報告存在且非空但讀取失敗（如編碼異常）→ FAIL（fail-closed，
-    見下方 r3 修正 B3②；缺此路徑等同放行讀不了的報告）。
-    cutover：批次沿用 R-CARD-001 同款日期判別（_w3d5_batch_max_date 取批內 max），
-    歷史批次不溯及。
-
-    2026-07-15 r3（codex fresh 盲審 BLOCK）B2/B3 修正沿革：
-      B2 契約縮水——W3 收斂定案 Δ5② 明定須驗全 token 集（R10-R20／R14·R15／例外／
-      GPT 分數／prompt log／off-pro concreteness），且 C-21.6 FAIL 訊息本身即為
-      canonical 措辭來源；原實作漏驗 R14·R15／例外／prompt log 三標記 → 本次補齊
-      ③④⑤ 三檢查。
-      B3 假 PASS——①script_id 缺欄/空/非字串的支原本被迴圈靜默跳過、PASS 訊息卻宣
-      稱「N 支 script_id 齊」→ 改為 fail-closed 收集清單、非空即 FAIL。②報告
-      read_text 例外原本回 SKIP，而非空報告的其他路徑已是 PASS/FAIL → 讀不了的報告
-      整批被放行 → 改為 FAIL（無法驗證＝fail-closed，不是「不驗」）。
-    """
-    valid = [
-        (f, d) for f, d in yamls
-        if isinstance(d, dict) and "__parse_error__" not in d and "__schema_error__" not in d
-    ]
-    if not valid:
-        return "WARN", "R-QGR-001：批次無有效 yaml，跳過"
-
-    batch_max_date = _w3d5_batch_max_date(valid)
-    if batch_max_date is not None and batch_max_date < _R_CARD_001_EFFECTIVE_FROM:
-        return "SKIP", (
-            f"R-QGR-001 legacy skip：歷史批次不溯及（batch_max_date={batch_max_date} "
-            f"< {_R_CARD_001_EFFECTIVE_FROM}）"
-        )
-
-    ex_state, ex_detail = _s21_6_batch_exempt(batch_dir)
-    if ex_state == "exempt":
-        return "PASS", f"R-QGR-001：批次豁免整稿閘（{ex_detail}），內容不驗"
-
-    report = batch_dir / "_quality_gate_report.md"
-    if not report.is_file():
-        return "SKIP", "R-QGR-001：無 _quality_gate_report.md（C-21.6 已管存在性，本規則不重複擋）"
-    try:
-        sz = report.stat().st_size
-    except Exception:
-        sz = -1
-    if sz <= 0:
-        return "SKIP", "R-QGR-001：報告為空（C-21.6 已管空報告，本規則不重複擋）"
-    try:
-        text = report.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
-        return "FAIL", f"R-QGR-001：報告讀取失敗（{e}）＝無法驗證，fail-closed"
-
-    # 報告文字正規化（2026-07-15 r5 系列，偵探三輪獨立複驗逐類抓漏後一次收「隱形/相容字元」類）：
-    # 原 ASCII 識別字邊界比對 [0-9A-Za-z_] 會被三類字元繞過、冒充或切割真 script_id → 漏放行：
-    #   ①case08 半形超字串（test_99_08x 冒充 test_99_08）→ 邊界比對本身已擋（r5-C08）
-    #   ②全形拉丁英數同形字（test_99_08Ｚ，U+FF10-FF5A）→ NFKC 折回 ASCII 正規形擋（r5b-Q2）
-    #   ③零寬/格式/控制/組合字元（ZWSP U+200B 等 Cf、Cc、Mn）夾在 id 中間或尾端 → 人眼看像
-    #     另一支 id、程式把不可見字元當合法邊界 → 剝除後真相顯露（r5b-P2 偵探抓，最隱蔽：
-    #     複製貼上網頁/Word 可無意夾帶）。
-    # 處置順序：先剝 Cf(格式/零寬)+Cc(控制)+Mn(組合附加符) → 再 NFKC(相容折疊)。一次覆蓋
-    # script_id 比對與所有 marker 檢查（R10-R20／R14·R15／prompt log／offpro）。
-    # 誠實 scope（明列殘留、不宣稱零殘留）：仍未擋＝跨字集純視覺同形字（Cyrillic а U+0430／
-    # Greek ο U+03BF 等「真字母、非相容也非格式字元」）——需 UTS#39 confusables skeleton 表，
-    # 屬「刻意選同形字」威脅、非內部可信作者報告的現實失效模式（誤植會是截斷/全形/隱形字元，
-    # 已擋），明列不做、非畫窄範圍。此閘定位＝防「報告漏寫/誤植 script_id」的完稿品管網，
-    # 非防惡意對手的資安邊界。
-    import unicodedata as _uc_r_qgr
-    text = "".join(
-        ch for ch in text if _uc_r_qgr.category(ch) not in ("Cf", "Cc", "Mn")
-    )
-    text = _uc_r_qgr.normalize("NFKC", text)
-
-    missing: list[str] = []
-
-    missing_ids: list[str] = []
-    missing_script_id_field: list[str] = []
-    for f, d in valid:
-        sid = d.get("script_id")
-        if isinstance(sid, str) and sid.strip():
-            sid_val = sid.strip()
-            # r5-C08 修（2026-07-15）：原 `sid_val not in text` naive substring 比對，
-            # 會被「報告只提到相似超字串（如 test_99_08x）」矇混——真 script_id test_99_08
-            # 是 test_99_08x 的字首子字串、誤判已出現＝漏放行。收緊為識別字邊界比對：
-            # sid 前後不得為 [0-9A-Za-z_]（script_id 字元集），確保是完整 token 而非別 id 的一段。
-            if not re.search(
-                r"(?<![0-9A-Za-z_])" + re.escape(sid_val) + r"(?![0-9A-Za-z_])",
-                text,
-            ):
-                missing_ids.append(sid_val)
-        else:
-            missing_script_id_field.append(f.name)
-    if missing_ids:
-        missing.append(f"缺 script_id 標記（{len(missing_ids)} 支）：{missing_ids}")
-    if missing_script_id_field:
-        missing.append(
-            f"{len(missing_script_id_field)} 支缺 script_id 欄（無法對報告驗證）："
-            f"{missing_script_id_field}"
-        )
-
-    if "R10-R20" not in text:
-        missing.append("缺「R10-R20」字樣")
-
-    if not re.search(r"R14\s*[·\-–—]?\s*R15", text):
-        missing.append("缺「R14·R15」字樣")
-
-    if "例外" not in text:
-        missing.append("缺「例外」字樣")
-
-    if not re.search(r"prompt\s*log", text, re.IGNORECASE):
-        missing.append("缺「prompt log」字樣")
-
-    if not re.search(r"GPT\s*(打分|分數)", text):
-        missing.append("缺「GPT 打分／分數」字樣")
-
-    has_offpro = any(
-        str(d.get("content_axis", "") or "").strip().lower() == "offpro"
-        for _, d in valid
-    )
-    if has_offpro and "offpro_concreteness_check" not in text:
-        missing.append("批含 content_axis=offpro 稿，缺「offpro_concreteness_check」字樣")
-
-    if missing:
-        return "FAIL", "R-QGR-001：" + "；".join(missing)
-
-    offpro_note = "／offpro_concreteness_check" if has_offpro else ""
-    return "PASS", (
-        f"R-QGR-001：{len(valid)} 支 script_id 齊 + R10-R20／R14·R15／例外／"
-        f"GPT打分／prompt log{offpro_note} 標記齊"
-    )
 
 
 def chk_c21_7_honest_ceiling(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
@@ -5430,106 +5969,6 @@ def _s22_count_signals(topic_text: str, owner: str) -> tuple[int, int, dict[str,
 
     total = hard_count + weak_count
     return total, hard_count, hits
-
-
-def chk_c22_topic_generality(
-    yamls: list[tuple[Path, dict]],
-    owner: str,
-) -> tuple[str, str]:
-    """C-22 選題一般化偵測（batch-level，純規則；2026-06-23 翻 enforce FAIL，語義級仍留 GPT/真人）—
-    一批裡「偏一般」（非一般訊號 < _S22_MIN_SIGNALS）的題目占比 >= _S22_BATCH_WARN_RATIO → WARN。
-
-    對齊 scripter.md §22.4：
-    - 誠實定位：**只擋低級空泛、不判好題**。語義級「好不好」留 GPT/真人。
-    - 2026-06-23 翻 enforce（_S22_ENFORCE=True；過渡日機制照 §21）；語義級「好不好」仍留 GPT/真人（proof_removed_judge advisory）。
-    - 骨架階段（>50% title placeholder）→ SKIP（題目未定，等填完再驗）。
-    - 與既有 check 正交不重複計：C-22=題目一般化；C-21.x=craft；C-cta-mix=CTA 配比；
-      C-017=知識型主體段具體化密度（C-017 看 scenes 主體段內容、C-22 看題目/標題/角度）。
-    """
-    valid = [(f, d) for f, d in yamls if "__parse_error__" not in d and "__schema_error__" not in d]
-    if not valid:
-        return "WARN", "C-22：批次無有效 yaml，跳過"
-
-    # 骨架階段 SKIP：>50% title placeholder（題目尚未定）
-    placeholder_titles = sum(1 for _, d in valid if _is_placeholder(d.get("title")))
-    if (placeholder_titles / len(valid)) > 0.5:
-        return "SKIP", (
-            f"C-22：>50% 支 title 為 placeholder（{placeholder_titles}/{len(valid)}）"
-            f"— 骨架階段（題目未定）跳過，等編劇填完再驗"
-        )
-
-    batch_date = _s22_batch_date(valid)
-
-    # 逐支算訊號；title placeholder 的單支不納統計（題目未定不算偏一般）
-    # 達標規則（Codex 第 2 輪 precision 修）：total >= MIN 且 hard >= 1。
-    #   未達標 → 偏一般；達標但靠弱訊號撐多樣（weak > hard）→ 標「弱過關」供第二層 backstop。
-    general_files: list[tuple[str, int, list[str]]] = []   # (檔名, total 訊號數, 命中訊號名)
-    weak_pass_files: list[str] = []                        # 表面達標但 weak > hard（弱過關）
-    counted = 0
-    for f, d in valid:
-        if _is_placeholder(d.get("title")):
-            continue
-        text = _s22_topic_text(d)
-        total, hard, hits = _s22_count_signals(text, owner)
-        weak = total - hard
-        counted += 1
-        meets = (total >= _S22_MIN_SIGNALS) and (hard >= _S22_MIN_HARD_SIGNALS)
-        if not meets:
-            hit_names = [k for k, v in hits.items() if v]
-            general_files.append((f.name, total, hit_names))
-        elif weak > hard:
-            # 達標但靠弱訊號為主撐多樣 → 弱過關（第二層 backstop 計入）
-            weak_pass_files.append(f.name)
-
-    if counted == 0:
-        return "SKIP", "C-22：無可統計題目（全為骨架/缺 title），跳過"
-
-    general_n = len(general_files)
-    ratio = general_n / counted
-
-    # 第二層 backstop（Codex 指定修法第 3 條）：偏一般 + 弱過關 合占比 >= 門檻 → 仍 WARN。
-    #   防「裸偏一般 + 只靠弱訊號 bait 過關」整批套殼 → 表面 distinct 夠也放行。
-    weak_pass_n = len(weak_pass_files)
-    soft_ratio = (general_n + weak_pass_n) / counted
-
-    # 過渡期提示（shadow 觀察用；現恆 WARN）
-    in_warn = batch_date is not None and batch_date < _S22_EFFECTIVE_FROM
-    warn_note = ""
-    if in_warn:
-        warn_note = f"（過渡期 batch_date={batch_date} < {_S22_EFFECTIVE_FROM}）"
-
-    # ── 觸發條件：①偏一般占比 >= 主門檻 或 ②偏一般+弱過關占比 >= backstop 門檻 ──
-    trig_main = ratio >= _S22_BATCH_WARN_RATIO
-    trig_backstop = soft_ratio >= _S22_BATCH_WEAK_PASS_RATIO
-    if trig_main or trig_backstop:
-        detail_list = "；".join(
-            f"{name}（訊號{n}：{'/'.join(names) if names else '無'}）"
-            for name, n, names in general_files[:5]
-        )
-        more = f" 等 {general_n} 支" if general_n > 5 else ""
-        backstop_note = ""
-        if trig_backstop and not trig_main:
-            backstop_note = (
-                f"｜第二層 backstop：偏一般+弱過關 {general_n + weak_pass_n}/{counted}"
-                f"（{soft_ratio:.0%} >= {_S22_BATCH_WEAK_PASS_RATIO:.0%}）—"
-                f"多數題只靠弱訊號（身份/時效/弱第一人稱）湊數、缺業主真料 hard 訊號。"
-                f"弱過關支：{', '.join(weak_pass_files[:5])}"
-            )
-        msg = (
-            f"C-22 題目可能偏一般：{general_n}/{counted} 支未達標（total<{_S22_MIN_SIGNALS} 或 hard<{_S22_MIN_HARD_SIGNALS}）"
-            f"（占比 {ratio:.0%}）。"
-            f"建議換角度（見 §22.4：綁業主真料 proof_asset / 具體數字 / 在地 / 受眾真代價 / 反直覺）。"
-            f"偏一般支：{detail_list}{more}{backstop_note}{warn_note}"
-        )
-        # _S22_ENFORCE（2026-06-23 翻 True）→ enforce 側 FAIL（只擋低級空泛、不判好題；語義靠 GPT/真人）
-        if _S22_ENFORCE and not in_warn:
-            return "FAIL", msg
-        return "WARN", msg
-
-    return "PASS", (
-        f"C-22 題目一般化 PASS：偏一般 {general_n}/{counted} 支（占比 {ratio:.0%} < {_S22_BATCH_WARN_RATIO:.0%}）"
-        f"；弱過關 {weak_pass_n} 支（偏一般+弱過關 {soft_ratio:.0%} < {_S22_BATCH_WEAK_PASS_RATIO:.0%}）{warn_note}"
-    )
 
 
 def chk_c22b_anchor_first(
@@ -5837,36 +6276,6 @@ import re as _re_placeholder
 _PLACEHOLDER_PAT = _re_placeholder.compile(r'\[需[^\]]*(?:確認|提供)[^\]]*\]')
 
 
-def chk_offpro_placeholder(data: dict, fname: str) -> tuple[str, str]:
-    """C-placeholder：台詞占位符守門（2026-06-21；Codex R1 P0-2 修：severity off-pro-aware）。
-    台詞欄（台詞 / 台詞_*）含 [需確認]/[需提供]/[需XX確認] → 台詞不可拍。
-    **全稿偵測；severity off-pro-aware**：off-pro 立場稿（_is_offpro_marker）→ FAIL（enforce）；
-      本業稿 → WARN（不擋、避 FP——本業批實務偶帶 [需確認] 待補，見瑞祥36 placeholder×4；保留 WARN 信號）。
-    名稱沿用 offpro 前綴＝歷史，實為通用占位守門。豁免：非台詞欄（source_ref/claim_ledger/metadata/翠文/畫面）不掃。
-    """
-    severity = "FAIL" if (_OFFPRO_PLACEHOLDER_ENFORCE and _should_check_offpro_leak(data)) else "WARN"
-    hits: list[str] = []
-    _scenes = data.get("scenes") or []
-    if not isinstance(_scenes, list):
-        _scenes = []
-    for scene in _scenes:
-        if not isinstance(scene, dict):
-            continue
-        for key, val in scene.items():
-            # 只掃台詞欄位：台詞 / 台詞_<業主>（排除翠文/畫面/藏鏡人等）
-            if key != "台詞" and not str(key).startswith("台詞_"):
-                continue
-            if not val:
-                continue
-            text = str(val)
-            found = _PLACEHOLDER_PAT.findall(text)
-            for ph in found:
-                hits.append(f"{key}:{ph}")
-    if hits:
-        return severity, f"{fname}: C-offpro-placeholder 台詞須可拍、不留占位 — {'; '.join(hits[:5])}"
-    return "PASS", f"{fname}: C-offpro-placeholder PASS（無占位符）"
-
-
 def _is_offpro_marker(data: dict) -> bool:
     """目標5（2026-06-22）：off-pro 立場稿偵測單一真理源（防 4 處偵測式漂移）。
     🔁 PARITY（Codex R6）：規則須與 taste_panel.derive_gate_context 的 is_offpro **完全一致**
@@ -6030,40 +6439,6 @@ def _should_check_offpro_leak(data: dict) -> bool:
     return _is_offpro_marker(data)
 
 
-def chk_offpro_leak(data: dict, fname: str) -> tuple[str, str]:
-    """C-offpro-leak：off-pro 立場稿本業詞守門（2026-06-21 建；2026-06-23 翻 enforce，目標5 + §8#8 硬化）。
-    off-pro-aware：只對 off-pro 立場稿掃（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
-    非 off-pro → PASS 跳過（不誤殺本業稿）。
-    詞庫：房仲（成交/屋主/帶看/陌生開發/陌生電話/簽約/買房）+ 美容（膚況/做臉/療程/醫美）。
-    §8#8（2026-06-23 enforce 前置硬化）：掃所有 publish-visible 欄（台詞_*/翠文/title/caption/hashtag/dm_card 巢狀…）
-    + 去混淆（NFKC 全半形/相容字 + 去零寬；保留一般空白避 cross-word FP）；命中 → WARN/FAIL（_OFFPRO_LEAK_ENFORCE）。
-    """
-    if not _should_check_offpro_leak(data):
-        return "PASS", (f"{fname}: C-offpro-leak 非 off-pro"
-                        f"（lane={data.get('lane','')!r}/proof_mode={data.get('proof_mode','')!r}），跳過")
-
-    severity = "FAIL" if _OFFPRO_LEAK_ENFORCE else "WARN"
-    hits: list[str] = []
-    for label, raw in _offpro_publish_fields(data):
-        if raw == _OFFPRO_NEST_OVERFLOW:
-            # Codex R4 P2：巢狀過深 fail-closed → 標 hit（無法完整掃描）
-            entry = f"{label}:<巢狀過深、無法完整掃描（fail-closed）>"
-            if entry not in hits:
-                hits.append(entry)
-            continue
-        norm = _deobfuscate(raw)
-        if not norm:
-            continue
-        for word_norm, word_raw in _ALL_LEAK_WORDS_NORM:
-            if word_norm and word_norm in norm:
-                entry = f"{label}:「{word_raw}」"
-                if entry not in hits:
-                    hits.append(entry)
-    if hits:
-        return severity, f"{fname}: C-offpro-leak off-pro 偷渡本業詞（§8#8 全 publish 欄+去混淆）— {'; '.join(hits[:8])}"
-    return "PASS", f"{fname}: C-offpro-leak PASS（off-pro 立場稿，全 publish 欄無本業詞洩漏）"
-
-
 # ── C-22-OFFPRO-ANGLE：off-pro 寫稿前角度守門（2026-06-24 建；Phase 0 shadow）──
 # 投影 §22.3/§22.4/§22.9/§22.9.1 反一般化欄位成 validator 可讀的 c22_offpro_angle_stub。
 # 只對 off-pro 立場稿觸發（_is_offpro_marker：lane=stance / proof_mode=voice_first）；
@@ -6197,34 +6572,6 @@ def _d20_resolve_proof_mode(data: dict) -> tuple[str, str]:
         f"proof_mode={val!r} 不在四型白名單 {list(_D20_PROOF_MODE_CANONICAL)}"
         "（未知值硬 FAIL；professional 是 lane 值、對應 proof_mode=proof_first）"
     )
-
-
-def chk_d20_proof_mode_enum(
-    data: dict,
-    fname: str,
-    hybrid_batch: bool,
-    file_title_is_placeholder: bool,
-    batch_skeleton_mode: bool,
-) -> tuple[str, str]:
-    """D20-proof-mode-enum：proof_mode 唯一 enum 機械閘；四型白名單本身無 enforce 旗標、
-    直接 FAIL。K11（2026-07-16）：professional lane 但值≠proof_first（LANE_MISMATCH）
-    → FAIL/WARN 依 `_D20_PROFESSIONAL_LANE_ENFORCE` 旗標（觀察態 WARN、翻旗標後 FAIL）。
-    骨架窄 SKIP 三條件缺一不可：批級骨架模式＋本支 title placeholder＋proof_mode 恰為 '[編劇填]'。
-    """
-    if not hybrid_batch:
-        return "PASS", f"{fname}: legacy_pre_hybrid_batch — 全批無 topic_plan.json/proof_mode/lane/content_axis，D20 不適用"
-    if (
-        batch_skeleton_mode
-        and file_title_is_placeholder
-        and data.get("proof_mode") == "[編劇填]"
-    ):
-        return "SKIP", f"{fname}: 骨架階段跳過（proof_mode=[編劇填] 佔位、title 未填）— 填完後 fail-closed"
-    verdict, core = _d20_resolve_proof_mode(data)
-    if verdict == "LANE_MISMATCH":
-        status = "FAIL" if _D20_PROFESSIONAL_LANE_ENFORCE else "WARN"
-    else:
-        status = "FAIL" if verdict == "FAIL" else "PASS"
-    return status, f"{fname}: {core}"
 
 
 def _c22_code_severity(code: str) -> str:
@@ -6514,164 +6861,6 @@ def _offpro_cta_hard_blocked(text: str) -> bool:
     return False
 
 
-def chk_offpro_cta_policy(
-    yamls: list[tuple[Path, dict]],
-) -> tuple[str, str]:
-    """C-offpro-cta-policy（Codex R2 P0.2 新增，2026-06-24；預設 shadow WARN-only）
-
-    對 content_axis∈{offpro,personal_anchor} 的稿：
-    1. CTA scope（cta_offer_scope 欄 / schema_check.CTA類型 映射）必須 ∈ _OFFPRO_CTA_SCOPES
-    2. 硬擋私訊/LINE/諮詢/預約/成交導流（用既有 _offpro_cta_hard_blocked）
-    3. batch 級：off-pro 稿 ≥3 種 distinct scope（pure_emotion 可 none，不算違規）
-
-    通用、無業主 hardcode；L2 只能縮緊不能放寬。
-    _OFFPRO_CTA_POLICY_ENFORCE=True → FAIL；False → WARN（shadow）。
-    """
-    _OFFPRO_AXES = {"offpro", "personal_anchor"}
-    offpro_yamls = [
-        (f, d) for f, d in yamls
-        if isinstance(d, dict) and str(d.get("content_axis", "") or "").strip().lower() in _OFFPRO_AXES
-    ]
-    if not offpro_yamls:
-        return "PASS", "C-offpro-cta-policy N/A（批次無 off-pro 稿）"
-
-    severity = "FAIL" if _OFFPRO_CTA_POLICY_ENFORCE else "WARN"
-    problems: list[str] = []
-    scope_set: set[str] = set()
-
-    for f, data in offpro_yamls:
-        fname = f.name if hasattr(f, "name") else str(f)
-        # G11：v1 quote 欄是 selector；本 check 必須和 per-file consumers
-        # 共吃 derive_quote_view，不能把 selector dict 當成 CTA 字串。
-        _quote_data: dict | None = data
-        if "quote_derivation_version" in data or "quote_source_hash" in data:
-            _version = data.get("quote_derivation_version")
-            _true_skeleton = (
-                type(_version) is int
-                and _version == 1
-                and "quote_source_hash" not in data
-                and isinstance(data.get("title"), str)
-                and _is_placeholder(data["title"])
-                and _hybrid_file_is_skeleton(data)
-            )
-            if _true_skeleton:
-                _quote_data = None
-            else:
-                try:
-                    _quote_data = derive_quote_view(data)
-                except QuoteDerivationError as _quote_err:
-                    _quote_data = None
-                    # main 的 C-quote-source 會 hard FAIL；這裡也明示依賴失敗，
-                    # 但沿用本 check 既有 shadow/enforce severity，不讓 batch 先 crash。
-                    problems.append(f"{fname}: C-quote-source {_quote_err.code}（CTA quote 無法解析）")
-        # 取 CTA scope
-        scope_raw = str(data.get("cta_offer_scope", "") or "").strip().lower()
-        if not scope_raw:
-            # 嘗試從 schema_check.CTA類型 映射
-            sc = data.get("schema_check") or {}
-            cta_type = str(sc.get("CTA類型", "") or "").strip().lower()
-            # 映射常見業主 CTA 類型到 off-pro scope
-            _CTA_TYPE_MAP = {
-                "無強cta": "none", "self_check": "self_check",
-                "存分享": "save_share", "討論": "discussion_prompt",
-                "輔助素材": "auxiliary_asset",
-            }
-            scope_raw = _CTA_TYPE_MAP.get(cta_type, cta_type)
-
-        # 硬擋 hard-blocked terms — 只掃 publish-visible CTA 欄白名單，不掃 script_method 內容欄
-        # 白名單（R3 Fix 3，2026-06-24）：
-        #   1. friend_close.evidence.cta_quote
-        #   2. 最後一段 CTA scenes 台詞（52-60s 或最後段）
-        #   3. top-level cta（str 或 dict.text/content）
-        #   4. platform_variants.*.cta（各平台 CTA 覆寫）
-        #   5. caption（caption 字串）
-        # 仍 **不掃** script_method（內容說理欄）
-        _cta_texts: list[str] = []
-
-        # 1. friend_close.evidence.cta_quote
-        _fc = _quote_data.get("friend_close") if isinstance(_quote_data, dict) else None
-        _fc_ev = (_fc.get("evidence") or {}) if isinstance(_fc, dict) else {}
-        _cta_q = str(_fc_ev.get("cta_quote", "") or "") if isinstance(_fc_ev, dict) else ""
-        if _cta_q:
-            _cta_texts.append(_cta_q)
-
-        # 2. 最後一段 CTA scenes 台詞（52-60s 或最後段）
-        _scenes_list = data.get("scenes") or []
-        if isinstance(_scenes_list, list):
-            _cta_scene_parts: list[str] = []
-            _last_scene_parts: list[str] = []
-            for scene in _scenes_list:
-                if not isinstance(scene, dict):
-                    continue
-                ts = str(scene.get("時間軸", "") or scene.get("timestamp", "") or "")
-                parts = [str(v) for k, v in scene.items()
-                         if v and (k == "台詞" or str(k).startswith("台詞_"))]
-                if parts:
-                    _last_scene_parts = parts
-                    if "52-60" in ts or "CTA" in ts.upper():
-                        _cta_scene_parts.extend(parts)
-            _cta_texts.extend(_cta_scene_parts if _cta_scene_parts else _last_scene_parts)
-
-        # 3. top-level cta
-        _top_cta = data.get("cta")
-        if isinstance(_top_cta, str) and _top_cta:
-            _cta_texts.append(_top_cta)
-        elif isinstance(_top_cta, dict):
-            # R4 Fix 1（2026-06-24）：加掃 message / keyword（常見 CTA dict 欄）
-            for _ck in ("text", "content", "body", "cta_text", "message", "keyword"):
-                _cv = str(_top_cta.get(_ck, "") or "")
-                if _cv:
-                    _cta_texts.append(_cv)
-
-        # 4. platform_variants.*.cta
-        _pv = data.get("platform_variants")
-        if isinstance(_pv, dict):
-            for _pname, _pval in _pv.items():
-                if isinstance(_pval, dict):
-                    _pv_cta = _pval.get("cta")
-                    if isinstance(_pv_cta, str) and _pv_cta:
-                        _cta_texts.append(_pv_cta)
-                    elif isinstance(_pv_cta, dict):
-                        for _ck in ("text", "content", "body"):
-                            _cv2 = str(_pv_cta.get(_ck, "") or "")
-                            if _cv2:
-                                _cta_texts.append(_cv2)
-
-        # 5. caption
-        _caption = data.get("caption")
-        if isinstance(_caption, str) and _caption:
-            _cta_texts.append(_caption)
-
-        for _ct in _cta_texts:
-            if _offpro_cta_hard_blocked(_ct):
-                problems.append(f"{fname}: 含成交導流詞（諮詢/私訊/LINE）")
-                break
-
-        # scope 合法性（R3 Fix 5，2026-06-24）：
-        # - scope 缺填或非法 → 該支 WARN（per-script，不只 batch 層）
-        # - scope 合法 → 納入 batch distinct 統計
-        if not scope_raw:
-            problems.append(f"{fname}: cta_offer_scope 缺填（off-pro 稿必須宣告 CTA scope）")
-        elif scope_raw not in _OFFPRO_CTA_SCOPES:
-            problems.append(f"{fname}: cta_offer_scope={scope_raw!r} 不在合法 off-pro scope 集合")
-        else:
-            # pure_emotion 可 none，統計 distinct scope
-            if not (str(data.get("derived_flags") or "").find("pure_emotion") >= 0 and scope_raw == "none"):
-                scope_set.add(scope_raw)
-
-    # batch 級：off-pro 稿 ≥3 種 distinct scope
-    if len(offpro_yamls) >= 3 and len(scope_set) < 3:
-        problems.append(
-            f"off-pro 批次 distinct scope 不足 3（實際 {len(scope_set)}：{sorted(scope_set)}）"
-        )
-
-    if not problems:
-        return "PASS", f"C-offpro-cta-policy PASS（{len(offpro_yamls)} 支 off-pro 稿，scope 齊、無導流詞）"
-
-    msg = f"C-offpro-cta-policy {severity}（shadow）— " + "；".join(problems[:5])
-    return severity, msg
-
-
 _CTA_ACTION_LEXICON: dict[str, tuple[str, ...]] = {
     "comment": ("留言", "留個言", "回覆", "回我", "告訴我", "comment"),
     "dm": ("私訊", "私信", "傳訊", "敲我", "DM", "dm", "LINE", "line", "加賴"),
@@ -6917,222 +7106,6 @@ def _signal_type_ok(signal: dict) -> bool:
     return False
 
 
-def chk_hybrid_method(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
-    if not _is_hybrid_script(data):
-        return _hybrid_na(fname, "C-method")
-    if _hybrid_file_is_skeleton(data):
-        return "SKIP", f"{fname}: C-method 骨架階段（本支台詞未填）跳過，等填完再驗"
-    problems: list[str] = []
-    method = (((data.get("script_method") or {}).get("chxp_v1") or {})
-              if isinstance(data.get("script_method"), dict) else {})
-    four = method.get("four_materials") if isinstance(method, dict) else None
-    four = four if isinstance(four, dict) else {}
-    old = four.get("old_answer") if isinstance(four.get("old_answer"), dict) else {}
-    new = four.get("new_answer") if isinstance(four.get("new_answer"), dict) else {}
-    for label, value in [
-        ("problem_scene", four.get("problem_scene")),
-        ("old_answer.quote", old.get("quote")),
-        ("old_answer.believer_profile", old.get("believer_profile")),
-        ("old_answer.why_reasonable", old.get("why_reasonable")),
-        ("old_answer.weakness", old.get("weakness")),
-        ("new_answer.quote", new.get("quote")),
-        ("answer_expansion", four.get("answer_expansion")),
-    ]:
-        if not _present(value):
-            problems.append(f"{label} 缺填")
-    if any(w in _as_text(old.get("quote")) for w in _HYBRID_STRAWMAN_WORDS):
-        problems.append("old_answer 稻草人句型")
-    for label, quote in [
-        ("old_answer.quote", old.get("quote")),
-        ("new_answer.quote", new.get("quote")),
-    ]:
-        if _present(quote) and not _quote_in_scene(data, quote):
-            problems.append(f"{label} 未出現在最終台詞（編劇可填漂亮話但台詞沒講）")
-
-    opt = method.get("optimization") if isinstance(method, dict) else None
-    opt = opt if isinstance(opt, dict) else {}
-    signals = opt.get("concrete_signals") if isinstance(opt.get("concrete_signals"), list) else []
-    valid_signals = [s for s in signals if isinstance(s, dict) and _signal_type_ok(s)]
-    for idx, signal in enumerate(signals, start=1):
-        if not isinstance(signal, dict):
-            continue
-        quote = signal.get("quote")
-        if _present(quote) and not _quote_in_scene(data, quote):
-            problems.append(f"concrete_signals[{idx}].quote 未出現在最終台詞（編劇可填漂亮話但台詞沒講）")
-    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
-    _c_axis = str(data.get("content_axis", "") or "").strip().lower()
-    min_signals = 3 if _c_axis == "professional" else 1
-    if len(valid_signals) < min_signals:
-        problems.append(f"concrete_signals 有效數 {len(valid_signals)} < {min_signals}")
-    if _c_axis in {"offpro", "personal_anchor"}:
-        for s in valid_signals:
-            q = _as_text(s.get("quote"))
-            if any(w and w in q for w in _HYBRID_WORK_WORDS):
-                problems.append("off-pro concrete_signals 含工作/本業日常")
-                break
-
-    debts = opt.get("hook_debts") if isinstance(opt.get("hook_debts"), list) else []
-    debt_ok = False
-    for idx, debt in enumerate(debts, start=1):
-        if not isinstance(debt, dict):
-            continue
-        opened = _time_start(debt.get("opened_at"))
-        closed = _time_start(debt.get("closed_at"))
-        opened_at = _as_text(debt.get("opened_at")).strip()
-        closed_at = _as_text(debt.get("closed_at")).strip()
-        oq = _as_text(debt.get("opened_quote")).strip()
-        cq = _as_text(debt.get("closed_quote")).strip()
-        oq_in_scene = _quote_in_scene(data, oq, (opened_at,)) if _present(oq) and opened_at else False
-        cq_in_scene = _quote_in_scene(data, cq, (closed_at,)) if _present(cq) and closed_at else False
-        if _present(oq) and not oq_in_scene:
-            problems.append(f"hook_debts[{idx}].opened_quote 未出現在最終台詞")
-        if _present(cq) and not cq_in_scene:
-            problems.append(f"hook_debts[{idx}].closed_quote 未出現在最終台詞")
-        if (
-            opened is not None and closed is not None and closed > opened
-            and _present(oq) and _present(cq) and oq != cq
-            and oq_in_scene and cq_in_scene
-        ):
-            debt_ok = True
-            break
-    if not debt_ok:
-        problems.append("hook_debts 未閉合或 opened/closed 無差異")
-
-    barriers = opt.get("barriers_removed") if isinstance(opt.get("barriers_removed"), list) else []
-    if not any(any(w in _as_text(b) for w in _HYBRID_CAUSAL_WORDS) for b in barriers):
-        problems.append("barriers_removed 缺因果詞")
-
-    pkg = method.get("packaging") if isinstance(method, dict) else None
-    pkg = pkg if isinstance(pkg, dict) else {}
-    if not _quote_in_scene(data, pkg.get("hook_promise"), ("0-3s",)):
-        problems.append("hook_promise 未精準出現在 0-3s")
-    if not _quote_in_scene(data, pkg.get("final_payoff"), ("40-52s", "52-60s")):
-        problems.append("final_payoff 未精準出現在 40-52s/52-60s")
-
-    if problems:
-        return _hybrid_severity(_HYBRID_METHOD_ENFORCE), f"{fname}: C-method FAIL — {'; '.join(problems[:8])}"
-    return "PASS", f"{fname}: C-method PASS"
-
-
-def chk_hybrid_friend_close(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
-    if not _is_hybrid_script(data):
-        return _hybrid_na(fname, "C-friend-close")
-    if _hybrid_file_is_skeleton(data):
-        return "SKIP", f"{fname}: C-friend-close 骨架階段（本支台詞未填）跳過，等填完再驗"
-    problems: list[str] = []
-    evidence = (((data.get("friend_close") or {}).get("evidence") or {})
-                if isinstance(data.get("friend_close"), dict) else {})
-    value_q = evidence.get("value_delivered_quote")
-    core_q = evidence.get("core_answer_quote")
-    cta_q = evidence.get("cta_quote")
-    scope = _as_text(evidence.get("cta_offer_scope")).strip()
-    if scope != _as_text(data.get("cta_offer_scope")).strip() and _present(data.get("cta_offer_scope")):
-        problems.append("cta_offer_scope helper 與 friend_close.evidence 不一致")
-    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
-    _fc_axis = str(data.get("content_axis", "") or "").strip().lower()
-    allowed = _PRO_CTA_SCOPES if _fc_axis == "professional" else _OFFPRO_CTA_SCOPES
-    if scope not in allowed:
-        problems.append(f"cta_offer_scope={scope!r} 不在允許枚舉")
-    for label, quote in [("value_delivered_quote", value_q), ("core_answer_quote", core_q), ("cta_quote", cta_q)]:
-        if not _quote_in_scene(data, quote):
-            problems.append(f"{label} 未精準出現在 final dialogue")
-    try:
-        action_count = int(evidence.get("cta_action_count"))
-    except (TypeError, ValueError):
-        action_count = 99
-    if action_count > 1:
-        problems.append(f"cta_action_count={action_count} > 1")
-    cta_text = _as_text(cta_q)
-    cta_full_text = "\n".join([cta_text, _final_cta_scene_text(data)])
-    recomputed_action_count, _action_hits = _count_cta_actions(cta_full_text)
-    if recomputed_action_count > 1:
-        problems.append(f"CTA 多動作（自算 {recomputed_action_count}>1，不信自填）")
-    if _fc_axis in {"offpro", "personal_anchor"} and _offpro_cta_hard_blocked(cta_full_text):
-        problems.append("off-pro CTA 不得導私訊/諮詢/LINE（脫鉤成交）")
-    if any(w in cta_text for w in _HYBRID_WITHHELD_WORDS) and not _present(core_q):
-        problems.append("CTA 扣答案")
-    if _fc_axis in {"offpro", "personal_anchor"} and _present(core_q) and _present(cta_q):
-        all_text = _all_scene_text(data)
-        core_i = all_text.find(_as_text(core_q).strip())
-        cta_i = all_text.find(_as_text(cta_q).strip())
-        if core_i >= 0 and cta_i >= 0 and core_i > cta_i:
-            problems.append("core_answer 未在 CTA 前交付")
-    if any(w in cta_text for w in _HYBRID_PRESSURE_WORDS):
-        problems.append("CTA 壓迫式語氣")
-    if problems:
-        return _hybrid_severity(_HYBRID_FRIEND_CLOSE_ENFORCE), f"{fname}: C-friend-close FAIL — {'; '.join(problems[:8])}"
-    return "PASS", f"{fname}: C-friend-close PASS"
-
-
-def chk_hybrid_professional_minimum(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
-    if not _is_hybrid_script(data):
-        return _hybrid_na(fname, "C-professional-minimum")
-    if _hybrid_file_is_skeleton(data):
-        return "SKIP", f"{fname}: C-professional-minimum 骨架階段（本支台詞未填）跳過，等填完再驗"
-    # R3 Fix 6（2026-06-24）：content_axis lower-normalize
-    axis = str(data.get("content_axis", "") or "").strip().lower()
-    if axis != "professional":
-        return "PASS", f"{fname}: C-professional-minimum N/A 非 professional slot"
-    problems: list[str] = []
-    topic_type = _as_text(data.get("professional_topic_type")).strip()
-    if topic_type not in _HYBRID_PROF_TYPES:
-        problems.append(f"professional_topic_type={topic_type!r} 不在 whitelist")
-    method = ((data.get("script_method") or {}).get("chxp_v1") or {}) if isinstance(data.get("script_method"), dict) else {}
-    opt = method.get("optimization") if isinstance(method, dict) else {}
-    signals = opt.get("concrete_signals") if isinstance(opt, dict) and isinstance(opt.get("concrete_signals"), list) else []
-    valid_signals = [s for s in signals if isinstance(s, dict) and _signal_type_ok(s)]
-    if len(valid_signals) < 2:
-        problems.append(f"concrete_signals {len(valid_signals)} < 2")
-    steps = data.get("actionable_steps") if isinstance(data.get("actionable_steps"), list) else []
-    if not any(_present(s) for s in steps):
-        problems.append("actionable_steps 缺填")
-    core = _as_text(data.get("core_answer")).strip()
-    if not _present(core):
-        problems.append("core_answer 缺填")
-    else:
-        all_text = _all_scene_text(data)
-        cta_q = (((data.get("friend_close") or {}).get("evidence") or {}).get("cta_quote")
-                 if isinstance(data.get("friend_close"), dict) else "")
-        core_i = all_text.find(core)
-        cta_i = all_text.find(_as_text(cta_q).strip()) if _present(cta_q) else -1
-        if core_i < 0:
-            problems.append("core_answer 未出現在 final dialogue")
-        elif cta_i >= 0 and core_i > cta_i:
-            problems.append("core_answer 未在 CTA 前交付")
-    if problems:
-        return _hybrid_severity(_HYBRID_PROFESSIONAL_ENFORCE), f"{fname}: C-professional-minimum FAIL — {'; '.join(problems[:8])}"
-    return "PASS", f"{fname}: C-professional-minimum PASS"
-
-
-def chk_hybrid_identity_bridge(data: dict, fname: str, is_skeleton: bool = False) -> tuple[str, str]:
-    if not _is_hybrid_script(data):
-        return _hybrid_na(fname, "C-identity-bridge")
-    if _hybrid_file_is_skeleton(data):
-        return "SKIP", f"{fname}: C-identity-bridge 骨架階段（本支台詞未填）跳過，等填完再驗"
-    flags = data.get("derived_flags") if isinstance(data.get("derived_flags"), list) else []
-    if "identity_bridge" not in flags:
-        return "PASS", f"{fname}: C-identity-bridge N/A 非 identity_bridge slot"
-    rules = _load_identity_bridge_rules()
-    if rules.get("load_error"):
-        return "FAIL", f"{fname}: C-identity-bridge FAIL — {rules.get('load_error')}"
-    text = _all_scene_text(data)
-    problems: list[str] = []
-    allowed_lanes = rules.get("allowed_lanes") if isinstance(rules.get("allowed_lanes"), list) else ["voice_first"]
-    lane = str(data.get("lane", "") or "").strip()
-    if allowed_lanes and lane not in allowed_lanes:
-        problems.append(f"identity_bridge lane={lane!r} not in allowed_lanes={allowed_lanes}")
-    for word in rules["hard_words"]:
-        if word and word in text:
-            problems.append(f"identity_bridge hard 禁詞命中: {word}")
-            break
-    near = _terms_cooccur_near(text, rules["identity_terms"], rules["proof_terms"], int(rules["max_distance"]))
-    if near:
-        problems.append(f"identity/professional proof 近距離共現 <= {rules['max_distance']} chars: {near[0]} + {near[1]}")
-    if problems:
-        return _hybrid_severity(True), f"{fname}: C-identity-bridge FAIL — {'; '.join(problems[:4])}"
-    return "PASS", f"{fname}: C-identity-bridge PASS"
-
-
 def _find_topic_plan(batch_dir: Path, explicit: Optional[str] = None) -> Optional[Path]:
     if explicit:
         p = Path(explicit)
@@ -7145,19 +7118,184 @@ def _find_topic_plan(batch_dir: Path, explicit: Optional[str] = None) -> Optiona
     return matches[0] if matches else None
 
 
+# ════════════════════════════════════════════════════════════════════
+# W1（cxp-gapfix-w1／2026-08-13）：C-TOPIC-LOCK — 題目鎖正式檢查（production check）
+# 規格＝Codex 洞 02：正式清單無 C-TOPIC-LOCK，只有 --fixtures 內的 helper；
+#   龍蝦堵法表 P0-3：「完全不經 distributor／骨架，直接手寫完整 yaml」。
+# 判準（世代分流，明標 SKIP 不打紅歷史稿）：
+#   🔴 T1 r2（2026-08-13）修正：世代**不再由本函式自行重算**，一律呼叫
+#      _resolve_enforce_generation()（全系統唯一真源，F1／Codex 阻擋項 1）。
+#      → 壞 JSON plan 等異常時，本檢查與 T1 三閘必然同判（同一份回傳值），不會分岔。
+#   legacy 世代（命中 legacy_batch_allowlist.yaml 且無任何正向新世代訊號）
+#     → SKIP（grandfather，明標理由）
+#   new 世代（帶 topic_lock／plan 帶 topic_lock_hash／plan 壞損／不在 allowlist）
+#     → 逐支比對：稿 topic_lock 各欄必須與 plan 對應槽逐欄相等；
+#        plan 若帶 topic_lock_hash → 重算比對（防事後手改 plan）；
+#        稿有鎖但 plan 無該 script_id／plan 缺席／plan 壞損 → FAIL（手寫 yaml 偷跳）。
+# ════════════════════════════════════════════════════════════════════
+
+_TOPIC_LOCK_SKIP_LEGACY = (
+    "C-TOPIC-LOCK SKIP — legacy 世代（批次明列於 legacy_batch_allowlist.yaml，"
+    "且無 topic_lock／topic_lock_hash 等新世代訊號）；grandfather 不追溯，未列管批次一律驗"
+)
+
+
+def _script_lock_of(data: dict) -> Optional[dict]:
+    lock = data.get("topic_lock") if isinstance(data, dict) else None
+    return lock if isinstance(lock, dict) else None
+
+
+def chk_topic_lock_consistency(
+    valid_yamls: list[tuple],
+    batch_dir: Path,
+    topic_plan_arg: Optional[str] = None,
+    enforce_generation: Optional[bool] = None,
+    generation_reason: str = "",
+) -> tuple[str, str]:
+    """C-TOPIC-LOCK（W1）：稿件 topic_lock ↔ topic_plan 逐欄一致性＋lock hash 驗。
+
+    T1 r2（F1）：世代由 _resolve_enforce_generation() 單一真源決定。
+    呼叫端（主流程）每批算一次後把結果傳進來；未傳（單元測試／外部 caller）
+    則本函式**自己呼叫同一個 resolver**——仍然只有一套判準，不是第二份實作。
+    """
+    if enforce_generation is None:
+        enforce_generation, generation_reason = _resolve_enforce_generation(
+            batch_dir, valid_yamls, topic_plan_arg
+        )
+    # ── 世代判定（單一真源）──
+    if not enforce_generation:
+        return "SKIP", f"{_TOPIC_LOCK_SKIP_LEGACY}；世代判定：{generation_reason}"
+
+    try:
+        from topic_distributor import (  # type: ignore[import]
+            TOPIC_LOCK_HASH_FIELDS as _LOCK_FIELDS,
+            topic_lock_hash as _lock_hash,
+            topic_lock_status as _lock_status,
+        )
+    except Exception as e:
+        return "FAIL", f"C-TOPIC-LOCK FAIL — 題目鎖判準 import 失敗（fail-closed）：{e}"
+
+    plan_path = _find_topic_plan(batch_dir, topic_plan_arg)
+    plan_data, plan_error = _load_topic_plan_checked(plan_path)
+    if plan_error:
+        return "FAIL", f"C-TOPIC-LOCK FAIL — {plan_error}"
+    plan = plan_data.get("plan") if isinstance(plan_data.get("plan"), list) else []
+    declared_hash = plan_data.get("topic_lock_hash")
+
+    locked_scripts = [
+        (f, d) for f, d in valid_yamls
+        if isinstance(d, dict) and _script_lock_of(d) is not None
+    ]
+
+    problems: list[str] = []
+
+    # 🔴 T1 r2（F2 防自降級）：new 世代批**整批零支帶 topic_lock** ＝ FAIL。
+    #   r1 時這種批會被判成舊稿而整個 SKIP —— 那正是 Codex 阻擋項 2 的攻擊路徑
+    #   （把稿內 topic_lock 刪掉 → 三閘 SKIP、C-TOPIC-LOCK 也 SKIP）。
+    #   r2 起：只要世代不是 allowlist 內的 legacy 批，缺鎖就是缺鎖，不得靜默放行。
+    if not locked_scripts:
+        return "FAIL", (
+            "C-TOPIC-LOCK FAIL — new 世代批但 "
+            f"{len(valid_yamls)} 支稿全數無 topic_lock 欄（題目層未經過／或鎖被刪除）；"
+            f"legacy 豁免只認 legacy_batch_allowlist.yaml 明列的批次。世代判定：{generation_reason}"
+        )
+
+    # plan 端 hash 完整性（plan 宣告了就必須算得回來）
+    if declared_hash is not None:
+        if not isinstance(declared_hash, str) or not declared_hash.strip():
+            problems.append(f"plan topic_lock_hash 型別/內容非法（{type(declared_hash).__name__}）")
+        else:
+            recomputed = _lock_hash(plan)
+            if recomputed != declared_hash:
+                problems.append(
+                    f"plan topic_lock_hash 不符（宣告 {declared_hash[:16]}…／重算 {recomputed[:16]}…）"
+                    f"＝plan 的題目鎖在產出後被改過"
+                )
+
+    # 新格式但 plan 缺席＝手寫 yaml 偷跳
+    if locked_scripts and not plan_path:
+        return "FAIL", (
+            f"C-TOPIC-LOCK FAIL — {len(locked_scripts)} 支帶 topic_lock 但批次無 topic_plan.json"
+            f"（無來源鏈；手寫 yaml 不得繞過題目層）"
+        )
+
+    plan_by_id = {
+        str(item.get("script_id", "") or ""): item
+        for item in plan
+        if isinstance(item, dict)
+    }
+
+    for f, data in locked_scripts:
+        sid = str(data.get("script_id", "") or f.stem)
+        lock = _script_lock_of(data) or {}
+        item = plan_by_id.get(sid)
+        if item is None:
+            problems.append(f"{f.name}: script_id={sid!r} 不在 topic_plan 的 plan 清單中（題未經題目層分配）")
+            continue
+        plan_lock = item.get("topic_lock")
+        plan_lock = plan_lock if isinstance(plan_lock, dict) else {}
+        # 逐欄比對（正規化後字串比對，list 逐元素）
+        for field in _LOCK_FIELDS:
+            sv, pv = lock.get(field), plan_lock.get(field)
+            sv_n = [str(x) for x in sv] if isinstance(sv, (list, tuple)) else ("" if sv is None else str(sv))
+            pv_n = [str(x) for x in pv] if isinstance(pv, (list, tuple)) else ("" if pv is None else str(pv))
+            if sv_n != pv_n:
+                problems.append(
+                    f"{f.name}: topic_lock.{field} 與 plan 不符（稿={str(sv)[:24]!r}／plan={str(pv)[:24]!r}）"
+                )
+        # 稿自身鎖完整性（缺欄＝沒真鎖）
+        ok, missing = _lock_status({"direction": item.get("direction", ""), "topic_lock": lock})
+        if not ok:
+            problems.append(f"{f.name}: topic_lock 欄不完整 — {'；'.join(missing[:3])}")
+
+    # plan 已鎖但稿沒帶鎖（新格式批不得混入無鎖稿）
+    if declared_hash is not None:
+        unlocked_files = [
+            f.name for f, d in valid_yamls
+            if isinstance(d, dict) and _script_lock_of(d) is None
+        ]
+        if unlocked_files:
+            problems.append(
+                f"plan 已宣告 topic_lock_hash（新格式批）但 {len(unlocked_files)} 支稿無 topic_lock 欄："
+                f"{'、'.join(unlocked_files[:5])}"
+            )
+
+    if problems:
+        return "FAIL", f"C-TOPIC-LOCK FAIL — {'; '.join(problems[:12])}"
+    return "PASS", (
+        f"C-TOPIC-LOCK PASS — {len(locked_scripts)} 支鎖題與 plan 逐欄相符"
+        f"{'；lock hash 相符' if declared_hash else '（plan 未宣告 lock hash）'}"
+    )
+
+
+# ════════════════════════════════════════════════════════════════════
+# W4（cxp-gapfix-w1／2026-08-13）：C-TOPIC-ID-EQ — topic_id 單一真源
+# 規格＝Codex 洞 15：generator 同時寫 topic_lock.topic_id 與
+#   source_topic_intel.topic_id，validator V3-001 只驗後者且僅政策開啟時執行
+#   → 兩處可以不一致（鎖 A、provenance B）。
+# 判準：兩處**都在場**才比對（新格式）→ 不等即 FAIL；
+#   任一缺席＝舊稿／未啟用 WP-B → SKIP 明標。
+# ════════════════════════════════════════════════════════════════════
+
 _BATCH_FLAGS_BATCH_PROFILE_ERROR = "_batch_flags.yml 讀取/解析失敗，無法確認 batch_profile（fail-closed）"
 
 
 def _load_batch_flags_checked(batch_dir: Path) -> tuple[dict, Optional[str]]:
-    flag_path = batch_dir / "_batch_flags.yml"
-    if not flag_path.exists():
-        return {}, None
+    """W5（cxp-gapfix-w1／Codex 洞 08）：改呼叫 topic_intel_policy 的 canonical loader。
+
+    原實作 `yaml.safe_load(...) or {}` 會把 falsy 檔內容（false／0／null／空檔／[]）
+    洗成 {}，令後面的 isinstance(raw, dict) 永遠通過 → hybrid/taste/time_axis 等閘
+    被靜默關掉。canonical loader 不做 `or {}`，檔案存在但非 mapping 一律回 error。
+    回傳型別與錯誤語義維持不變（error 非 None → 呼叫端既有 fail-closed 分支照舊）。
+    """
     try:
-        raw = yaml.safe_load(flag_path.read_text(encoding="utf-8")) or {}
+        from topic_intel_policy import load_batch_flags_strict as _lbfs  # type: ignore[import]
     except Exception:
+        # loader 不可得＝環境異常，fail-closed（不退回舊寬鬆行為）
         return {}, _BATCH_FLAGS_BATCH_PROFILE_ERROR
-    if not isinstance(raw, dict):
-        return {}, _BATCH_FLAGS_BATCH_PROFILE_ERROR
+    raw, error = _lbfs(batch_dir)
+    if error:
+        return {}, f"{_BATCH_FLAGS_BATCH_PROFILE_ERROR}｜{error}"
     return raw, None
 
 
@@ -7336,10 +7474,11 @@ def _declared_hybrid_not_built(
     yaml_hybrid_count: int,
     plan_path: Optional[Path],
     plan: list[dict],
+    expected_main: int,
 ) -> bool:
     if not declared_hybrid:
         return False
-    return not plan_path or yaml_hybrid_count != 13 or len(plan) != 13
+    return not plan_path or yaml_hybrid_count != expected_main or len(plan) != expected_main
 
 
 def _plan_lock_hash(plan: list[dict]) -> str:
@@ -7366,151 +7505,6 @@ def _count_key(items: list[dict], key: str) -> dict[str, int]:
     return out
 
 
-def chk_hybrid_plan_lock(
-    yamls: list[tuple[Path, dict]],
-    batch_dir: Path,
-    topic_plan_arg: Optional[str] = None,
-) -> tuple[str, str]:
-    hybrid_yamls = [(f, d) for f, d in yamls if isinstance(d, dict) and _is_hybrid_script(d)]
-    yaml_has_hybrid = bool(hybrid_yamls)
-    flags_data, flags_error = _load_batch_flags_checked(batch_dir)
-    if flags_error:
-        return "FAIL", f"C-plan-lock FAIL — {flags_error}"
-    flags_hybrid = flags_data.get("batch_profile") == HYBRID_BATCH_PROFILE
-    plan_path = _find_topic_plan(batch_dir, topic_plan_arg)
-    plan_data, plan_error = _load_topic_plan_checked(plan_path)
-    if plan_error:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), f"C-plan-lock FAIL — {plan_error}"
-    plan_hybrid = _topic_plan_declares_hybrid(plan_data)
-    declared_hybrid = flags_hybrid or plan_hybrid
-    if not yaml_has_hybrid and not declared_hybrid:
-        return "PASS", "C-plan-lock N/A 非 hybrid 批"
-    plan = plan_data.get("plan") if isinstance(plan_data.get("plan"), list) else []
-    if _declared_hybrid_not_built(declared_hybrid, len(hybrid_yamls), plan_path, plan):
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), "C-plan-lock FAIL — 宣告 hybrid 但腳本/計畫非 hybrid（declared-but-not-built）"
-    if not plan_path:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), "C-plan-lock FAIL — hybrid 批缺 topic_plan.json"
-
-    problems: list[str] = []
-    prof_signals: list[str] = []  # K11 Delta B：professional derive-lock 觀察訊號（獨立於 problems，見旗標判準）
-    if _plan_lock_hash(plan) != plan_data.get("plan_lock_hash"):
-        problems.append("plan_lock_hash mismatch")
-    by_id = {str(item.get("script_id")): item for item in plan if isinstance(item, dict)}
-    for f, data in yamls:
-        if not isinstance(data, dict) or "__parse_error__" in data:
-            continue
-        sid = str(data.get("script_id", ""))
-        if _is_hybrid_script(data):
-            if sid not in by_id:
-                problems.append(f"{f.name}: script_id 不在 plan")
-                continue
-            plan_item = by_id[sid]
-            # R3 Fix 6（2026-06-24）：content_axis lower-normalize 再比對
-            _yaml_axis = str(data.get("content_axis", "") or "").strip().lower()
-            _plan_axis = str(plan_item.get("content_axis", "") or "").strip().lower()
-            if _yaml_axis != _plan_axis:
-                problems.append(f"{f.name}: content_axis yaml={data.get('content_axis')} plan={plan_item.get('content_axis')}")
-            if data.get("lane") != plan_item.get("lane"):
-                problems.append(f"{f.name}: lane yaml={data.get('lane')} plan={plan_item.get('lane')}")
-            yaml_flags = sorted(str(x) for x in (data.get("derived_flags") or []))
-            plan_flags = sorted(str(x) for x in (plan_item.get("derived_flags") or []))
-            if yaml_flags != plan_flags:
-                problems.append(f"{f.name}: derived_flags yaml={yaml_flags} plan={plan_flags}")
-            # Codex R2 P1.3 修（2026-06-24）：proof_mode derive-lock
-            # 從 plan 的 lane 推導 expected proof_mode，有 expected 才比（避免 legacy 稿恆 FAIL）
-            # K11（2026-07-16）：_LANE_TO_PROOF 提升為 module-level 常數且補回 "professional"
-            # （撤刻意排除）；professional 分支改走獨立 key-presence 判準（含 falsy）收進
-            # prof_signals，由 _D20_PROFESSIONAL_LANE_ENFORCE 旗標決定是否成 problem——
-            # 非 professional lane 維持原 truthiness 碼路 byte 級零變（禁泛化，真值表案 G3）。
-            plan_lane_pm = plan_item.get("lane", "")
-            plan_proof_mode = plan_item.get("proof_mode")  # plan 顯式宣告
-            # R3 Fix 1（2026-06-24）：lane-derived expected 永遠權威；
-            # 若 plan 也有顯式 proof_mode 但與 lane 推導不一致 → FAIL（plan 本身寫錯）
-            _lane_derived_pm = _LANE_TO_PROOF.get(plan_lane_pm)
-            if plan_lane_pm == "professional":
-                # K11 Delta B：professional 專用 key-presence 判準（含 falsy：null/""/false/[]）
-                expected_pm = _lane_derived_pm  # = "proof_first"（Delta A 已補鍵）
-                if "proof_mode" in plan_item and plan_item["proof_mode"] != expected_pm:
-                    prof_signals.append(
-                        f"{f.name}: topic_plan proof_mode={plan_item['proof_mode']!r} 與 lane=professional 推導值 {expected_pm} 衝突"
-                    )
-                yaml_pm = data.get("proof_mode")
-                if yaml_pm != expected_pm:
-                    prof_signals.append(
-                        f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane=professional 推導）"
-                    )
-            elif _lane_derived_pm:
-                if plan_proof_mode and plan_proof_mode != _lane_derived_pm:
-                    problems.append(
-                        f"{f.name}: topic_plan proof_mode={plan_proof_mode} 與 lane={plan_lane_pm} 推導值 {_lane_derived_pm} 衝突"
-                    )
-                expected_pm = _lane_derived_pm  # lane 推導永遠權威
-                yaml_pm = data.get("proof_mode")
-                if yaml_pm != expected_pm:
-                    problems.append(
-                        f"{f.name}: proof_mode yaml={yaml_pm} expected={expected_pm}（lane={plan_lane_pm} 推導）"
-                    )
-    # K11 Delta B：迴圈結束後第一步——enforce=True 時 prof 訊號直接成 problem、走原 FAIL
-    # 路徑（無論其他 problem 有無）。下方 allocator fail-fast 早退路徑（try/except）在
-    # problems 完成此次合流「之後」才執行，其早退 return 本就不讀 problems，不受影響、
-    # 也不申報 professional-observe 段（該批已 FAIL，觀察訊號無意義）。
-    if _D20_PROFESSIONAL_LANE_ENFORCE:
-        problems.extend(prof_signals)
-    # W2-D27：allocator 是唯一 allocation canonical；lazy 單向 import，失敗即 fail-closed。
-    try:
-        from topic_distributor import evaluate_hybrid_allocation
-    except Exception as exc:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
-            "C-plan-lock FAIL — allocator evaluator import error: "
-            f"{type(exc).__name__}: {exc}"
-        )
-    try:
-        allocation = evaluate_hybrid_allocation(plan)
-    except Exception as exc:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
-            "C-plan-lock FAIL — allocator evaluator error: "
-            f"{type(exc).__name__}: {exc}"
-        )
-    if not isinstance(allocation, dict) or not isinstance(
-        allocation.get("infeasible_constraints"), list
-    ):
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
-            "C-plan-lock FAIL — allocator evaluator returned malformed result"
-        )
-    problems.extend(str(item) for item in allocation["infeasible_constraints"])
-    axis_count = allocation.get("content_axis_count", {})
-    lane_count = allocation.get("lane_count", {})
-    offpro_pillar_count = allocation.get("offpro_pillar_count", 0)
-    news_count = allocation.get("offpro_news_count", 0)
-    allocation_summary = (
-        "allocation_summary="
-        f"content_axis_count={json.dumps(axis_count, ensure_ascii=False, sort_keys=True, separators=(',', ':'))},"
-        f"lane_count={json.dumps(lane_count, ensure_ascii=False, sort_keys=True, separators=(',', ':'))},"
-        f"offpro_pillar_count={offpro_pillar_count},時事={news_count}"
-    )
-    prof_slots = [item.get("script_id") for item in plan if item.get("content_axis") == "professional"]
-    yaml_prof = [d.get("script_id") for _, d in yamls if isinstance(d, dict) and d.get("content_axis") == "professional"]
-    if sorted(str(x) for x in yaml_prof) != sorted(str(x) for x in prof_slots if x in set(yaml_prof)):
-        problems.append("professional YAML slots do not match reserved plan slots")
-
-    # K11 Delta B 尾段合流（enforce=False 觀察態兩新格；enforce=True 全格＋
-    # enforce=False∧prof_signals=0 的兩格＝原路徑 byte 級零變，落入下方原判準）：
-    if not _D20_PROFESSIONAL_LANE_ENFORCE and prof_signals:
-        _prof_observe = "; ".join(prof_signals[:3])
-        if problems:
-            return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
-                f"C-plan-lock FAIL — {'; '.join(problems[:10])}; {allocation_summary}; "
-                f"professional-observe: {len(prof_signals)} 條（{_prof_observe}）"
-            )
-        return "WARN", f"C-plan-lock WARN — professional 觀察: {_prof_observe}（共 {len(prof_signals)} 條）"
-
-    if problems:
-        return _hybrid_severity(_HYBRID_PLAN_LOCK_ENFORCE), (
-            f"C-plan-lock FAIL — {'; '.join(problems[:10])}; {allocation_summary}"
-        )
-    return "PASS", f"C-plan-lock PASS — {allocation_summary}"
-
-
 def chk_taste_panel_completeness(
     yamls: list[tuple[Path, dict]],
     batch_dir: Path,
@@ -7532,7 +7526,8 @@ def chk_taste_panel_completeness(
     if not yaml_has_hybrid and not declared_hybrid:
         return "PASS", "C-taste-panel N/A 非 hybrid 批"
     plan = plan_data.get("plan") if isinstance(plan_data.get("plan"), list) else []
-    if _declared_hybrid_not_built(declared_hybrid, len(hybrid_yamls), plan_path, plan):
+    expected_main = _expected_main_scripts_for_batch(yamls)
+    if _declared_hybrid_not_built(declared_hybrid, len(hybrid_yamls), plan_path, plan, expected_main):
         return severity, "C-taste-panel FAIL — 宣告 hybrid 但腳本/計畫非 hybrid（declared-but-not-built）"
 
     try:
@@ -7576,12 +7571,13 @@ def chk_taste_panel_completeness(
         except Exception as e:
             problems.append(f"summary parse error: {e}")
 
-    if len(hybrid_yamls) != 13:
-        problems.append(f"hybrid yaml count={len(hybrid_yamls)} expected=13")
+    _expected_main = expected_main
+    if len(hybrid_yamls) != _expected_main:
+        problems.append(f"hybrid yaml count={len(hybrid_yamls)} expected={_expected_main}")
 
     report_files = sorted(panel_dir.glob("*_taste_panel_report.json"))
-    if len(report_files) != 13:
-        problems.append(f"report count={len(report_files)} expected=13")
+    if len(report_files) != _expected_main:
+        problems.append(f"report count={len(report_files)} expected={_expected_main}")
     reports: list[dict] = []
     for rp in report_files:
         try:
@@ -7777,7 +7773,17 @@ def chk_taste_panel_completeness(
             f"純文字交付：{n_tc} 支達純文字好稿門檻(各維≥{_TEXT_CEILING_FLOOR})·未達成片90·需口播；"
             f"{n_pass} 支 PASS — {warn_detail}"
         )
-    return "PASS", "C-taste-panel PASS — 13 reports, all pass, hashes fresh"
+    return "PASS", f"C-taste-panel PASS — {len(report_files)} reports, all pass, hashes fresh"
+
+
+# ── --stage 旗標（cxp-gapfix-w1c r1，2026-08-13）──
+# skill b 項（shortform-new-batch）已寫死順序：
+#   validate --stage pre-panel → taste_panel_gate → validate --strict（final）
+# 理由＝新批順序死鎖：C-taste-panel 對「尚無 .taste_panel 報告的 hybrid 新批」必然 FAIL，
+# 先跑 --strict 會 FAIL 即停、永遠跑不到評審團那步。
+# pre-panel＝只跳 C-taste-panel（明標 SKIP「panel 後補驗」），其餘檢查照常；final＝現行為準。
+STAGE_CHOICES = ("pre-panel", "final")
+_TASTE_PANEL_PRE_PANEL_SKIP = "C-taste-panel SKIP — pre-panel 階段跳過，panel 後補驗（跑完 taste_panel_gate 再以 --stage final 收驗）"
 
 
 # ────────────────────────────────────────────
@@ -7793,6 +7799,7 @@ def run_per_file_checks(
     hybrid_batch: bool = True,
     time_axis: Optional[dict] = None,
     time_axis_error: Optional[str] = None,
+    enforce_generation: Optional[bool] = None,
 ) -> list[tuple[str, str, str, str]]:
     """回傳 [(check_id, status, desc, detail), ...]
     v2 升級：加 V2-001 ~ V2-005（yaml schema 新欄位驗）
@@ -7857,21 +7864,36 @@ def run_per_file_checks(
         _l1001_result = chk_l1_001_schema(data, f.name)
         _l1006_result = chk_l1_006_cta(data, f.name)
 
+    # 藏鏡人長度感知配額用的本支時長（cxp r2）：批級 time_axis 宣告優先，否則交給
+    # chk_l1_003_mirror 自己從 yaml/L0 推（傳 None＝不覆寫）。
+    _mirror_duration = None
+    if time_axis_error is None and time_axis is not None:
+        _ta_dur = time_axis.get("duration_seconds")
+        if type(_ta_dur) is int and _ta_dur > 0:
+            _mirror_duration = _ta_dur
+
     results = []
     checks = [
         # per-file checks
         ("L1-001", _l1001_result),
         ("L1-002", chk_l1_002_banned(data, f.name)),
-        ("L1-003", chk_l1_003_mirror(data, f.name)),
-        ("L1-004", chk_l1_004_traffic(data, f.name)),
+        ("L1-003", chk_l1_003_mirror(data, f.name, duration_seconds=_mirror_duration,
+                                     enforce_generation=enforce_generation)),
+        ("L1-004", chk_l1_004_traffic(data, f.name, enforce_generation=enforce_generation)),
+        # 【p4exec1 殺單 #56 KEEP-CANDIDATE｜零開火但保留】L1-005 業務數字必有來源標記。
+        # 對映憲法 §2 不捏造數字（L1.FZ.REALDATA, overridable:false）＝安全/法規類。
+        # 零開火＝三批無未標來源數字，非規則無效。替代物：active_rules.yaml L1／L2。
         ("L1-005", chk_l1_005_number_source(data, f.name)),
         ("L1-006", _l1006_result),
         ("L1-007", chk_l1_007_title_len(data, f.name)),
-        ("C-010",  chk_c010_翠文_non_empty(data, f.name)),
-        ("C-013",  chk_c013_dm_card(data, f.name, owner, fishing_policy)),
-        ("R-CARD-001", chk_r_card_001_retired_card_fields(data, _fname_with_dir)),
         ("C-015",  chk_c015_hashtag_caption(data, f.name)),
         ("C-017",  chk_c017_concreteness(data, f.name)),
+        # 寫給唸 advisory 二件（cxp r2 2026-08-12；WARN-only 永不 FAIL — 得標定稿 §2 紅線）
+        ("C-018",  chk_c018_readability(data, f.name)),
+        # 零件庫三欄硬閘（T1a cxp-enforce-t1 2026-08-13）：新格式批缺欄/非法 enum＝FAIL；
+        # 舊稿批 SKIP 明標（grandfather），三欄仍由上面的 C-PARTS-001 出 WARN。
+        ("C-PARTS-002", chk_parts_002_component_enums_enforce(
+            data, f.name, enforce_generation=enforce_generation)),
         # §21 誠實天花板（per-file，2026-06-17 機器化 §21 落地；P1-3：傳 is_skeleton 區分骨架/已填完）
         # P1-B（Codex 第 2 輪退回修）：C-21.7 skeleton 判定改**逐檔自身**，不用批次全域 bool。
         # 根因：混合批（7 支 title placeholder + 6 支已填但缺誠實欄）→ 批次全域 _is_skeleton_mode=True
@@ -7888,13 +7910,9 @@ def run_per_file_checks(
         ("V2-003", chk_v2_003_publish_distribution_mode(data, f.name)),
         ("V2-004", chk_v2_004_platform_variants(data, f.name)),
         ("V2-005", chk_v2_005_trial_reels_consistency(data, f.name)),
-        # v3 新增 6 件（2026-05-23 三審修補）
-        ("V2-007B", chk_v2_007b_standalone_threads(data, f.name)),
-        ("V2-011",  chk_v2_011_no_fiction(data, f.name, owner)),
+        # 【p4exec1 殺單 #66 KEEP-CANDIDATE｜安全/法規類零開火但保留】醫師法 §28 刑事紅線
+        # （L1.BEAUTY.DOCTOR_LAW）。零開火＝三批無美容業主稿件，非證明規則無效。
         ("V2-012",  chk_v2_012_beauty_med_words(data, f.name, owner)),
-        ("V2-014",  chk_v2_014_bappu_taboo(data, f.name, owner)),
-        ("V2-015",  chk_v2_015_bappu_q1q2q3(data, f.name, owner)),
-        ("V2-016",  chk_v2_016_trial_observe_until(data, f.name, owner)),
     ]
     # v4 新增 2 件（2026-05-31 爆款範本引用系統）
     # BUG-6/7 修（2026-06-05）：骨架階段（編劇未填）跳過 V2-025/026，
@@ -7902,11 +7920,9 @@ def run_per_file_checks(
     # 已填編劇的真實批次（is_skeleton=False）照常驗，不放水。
     if is_skeleton:
         checks.append(("V2-025", ("SKIP", "骨架階段跳過（編劇尚未填範本引用，等填完後再驗）")))
-        checks.append(("V2-026", ("SKIP", "骨架階段跳過（編劇尚未填 template_adaptation，等填完後再驗）")))
     else:
         # P1-1：V2-025 改傳 _fname_with_dir 讓日期解析能吃批次目錄名
         checks.append(("V2-025", chk_v2_025_template_source_required(data, _fname_with_dir)))
-        checks.append(("V2-026", chk_v2_026_template_adaptation_required(data, _fname_with_dir)))
 
     # WP-B V3-001：topic_intel provenance（off 時函式自己回 SKIP，零足跡；policy on 才訂冊）
     if topic_intel_policy.get("enabled"):
@@ -7914,31 +7930,21 @@ def run_per_file_checks(
             data, _fname_with_dir, topic_intel_policy, is_skeleton, owner=owner
         )))
 
-    # off-pro 品質閘（2026-06-21；2026-06-23 已翻 enforce-live：placeholder→off-pro FAIL/本業 WARN；leak→FAIL）
-    checks.append(("C-offpro-placeholder", chk_offpro_placeholder(data, f.name)))
-    checks.append(("C-offpro-leak",        chk_offpro_leak(data, f.name)))
     checks.append(("C-22-OFFPRO-ANGLE",   chk_c22_offpro_angle(data, f.name)))
-    if _quote_source_result is not None:
-        checks.append(("C-quote-source", _quote_source_result))
-    if _quote_view is None:
-        _quote_dependency = (
-            "SKIP",
-            f"{f.name}: C-quote-source FAIL，未執行依賴 runtime quote view 的 consumer",
-        )
-        checks.append(("C-method", _quote_dependency))
-        checks.append(("C-friend-close", _quote_dependency))
-        checks.append(("C-professional-minimum", _quote_dependency))
-    else:
-        checks.append(("C-method",             chk_hybrid_method(_quote_view, f.name, is_skeleton)))
-        checks.append(("C-friend-close",       chk_hybrid_friend_close(_quote_view, f.name, is_skeleton)))
-        checks.append(("C-professional-minimum", chk_hybrid_professional_minimum(_quote_view, f.name, is_skeleton)))
-    # C-identity-bridge 不是 quote 欄 consumer，只看 canonical scenes；保留原 data。
-    checks.append(("C-identity-bridge",    chk_hybrid_identity_bridge(data, f.name, is_skeleton)))
-    # D20 proof_mode 四型白名單（W2-D20 2026-07-13）：無條件註冊、無 enforce 旗標；
-    # 批級 hybrid_batch 世代偵測傳入，單檔 title placeholder 判定沿用 C-21.7 逐檔模式。
-    checks.append(("D20-proof-mode-enum", chk_d20_proof_mode_enum(
-        data, f.name, hybrid_batch, _is_placeholder(data.get("title")), is_skeleton
-    )))
+
+    # ── 梯 2（cxp-enforce-t2 r1 2026-08-13）：chxp receipt ＋ 8 個方法硬閘 ──
+    # 世代分流沿用同一份 enforce_generation（T1 F1 單一真源，不另立判準）。
+    # 骨架階段判定＝**逐檔自身** title placeholder（同 C-21.7 P1-B 教訓：
+    # 不用批次全域 bool，否則混合批會把已填完的稿一起放過）。
+    _t2_file_skeleton = _is_placeholder(data.get("title"))
+    checks.append(("C-CXP-RECEIPT", chk_cxp_receipt(
+        data, f.name, enforce_generation=enforce_generation,
+        is_skeleton_file=_t2_file_skeleton)))
+    for _cxp_cid, _cxp_res in chxp_gate_checks(
+        data, f.name, enforce_generation=enforce_generation,
+        is_skeleton_file=_t2_file_skeleton,
+    ):
+        checks.append((_cxp_cid, _cxp_res))
 
     for cid, (status, detail) in checks:
         results.append((cid, status, f.name, detail))
@@ -7976,6 +7982,15 @@ def main():
     parser.add_argument("--topic-plan", help="hybrid topic_plan.json path for C-plan-lock")
     parser.add_argument("--strict",    action="store_true", help="任一 FAIL → exit 1（pre-commit 模式）")
     parser.add_argument("--c016-all",  action="store_true", help="B-1：掃描 owner_projection 全業主公開 HTML 的 C-016 派系名洩漏（取代 pre-commit hardcoded 清單）")
+    parser.add_argument(
+        "--stage",
+        choices=list(STAGE_CHOICES),
+        default="final",
+        help=(
+            "驗證階段：pre-panel＝評審團前跑，跳過 C-taste-panel（明標 SKIP、panel 後補驗），其餘檢查照常；"
+            "final（預設）＝現行為，全部件照驗"
+        ),
+    )
     args = parser.parse_args()
 
     # B-1（WP2）：C-016 全業主掃描模式（projection-derived，新業主自動納入；不需 --batch-dir）
@@ -8057,38 +8072,52 @@ def main():
     _time_axis, _time_axis_error = _resolve_batch_time_axis(batch_dir)
     _l1000_result = chk_l1_000_time_axis(_time_axis, _time_axis_error)
 
+    # ── T1 世代判定（cxp-enforce-t1；r2 2026-08-13 提前到 batch checks 之前）──
+    # 🔴 F1（Codex 阻擋項 1）：全批**算一次**，同一份 (bool, reason) 同時餵
+    #   C-TOPIC-LOCK（batch check）與 T1 三閘（per-file checks）——不可能分岔。
+    #   [INFO] 印在原本位置（per-file 段前），保持輸出格式不變。
+    _enforce_generation, _enforce_reason = _resolve_enforce_generation(
+        batch_dir, valid_yamls, args.topic_plan
+    )
+
     # ── Batch-level checks（L1-008 / L1-009 / C-011 / C-012 / C-014[RETIRED] + C-013B + v3 新 6 件）──
     batch_checks = [
-        ("L1-008", chk_l1_008_batch_count(yamls, batch_dir)),
+        # 【p4exec1 殺單 #62 KEEP-CANDIDATE｜零開火但保留】對映憲法 §15 Q1-Q8 配額
+        # （澤君 TG22396/22399/22401 全業主永久制）。零開火＝三批皆 2026-08-26 前舊批
+        # grandfather SKIP。替代物：active_rules.yaml candidates（新批上線後升 active）。
+        ("R-TYPE-001", chk_r_type_001_topic_type_quota(yamls)),
+        # 【p4exec1 殺單 #61 KEEP-CANDIDATE｜零開火但保留】對映憲法 §8 三源制＋源④配額
+        # （澤君 TG22317）。零開火因 schema 尚無 origin_source 欄（全批 SKIP）＝欄位未落地，
+        # 非規則無效。替代物：active_rules.yaml candidates（補欄後升 active，立一退一）。
+        ("R-SRC-001", chk_r_src_001_origin_source(yamls)),
         ("L1-009", chk_l1_009_派系_coverage(valid_yamls)),
         ("C-011",  chk_c011_派系_ratio(valid_yamls, owner, pref_text)),
         ("C-012",  chk_c012_identity_ratio(valid_yamls, owner, pref_text)),
         # C-014 retired (W2-C撤收 2026-07-14) — ID reserved, 勿重編其他 check
-        # C-013B batch-level 釣魚掃描（off/invalid 時 fail-closed）
-        ("C-013B", chk_c013b_no_fishing_when_off(valid_yamls, fishing_policy)),
         # v3 新增 6 件 batch checks（2026-05-23 三審修補）
         ("V2-006", chk_v2_006_required_slot(valid_yamls, fishing_policy)),
+        # 【p4exec1 殺單 #63 KEEP-CANDIDATE｜零開火但保留】對映憲法 §14「14 部＋7 篇脆文
+        # 缺一不放行」（澤君 TG22401）；刪除＝該鐵則失去唯一機驗落點。待澤君裁（ask_zejun Q3）。
         ("V2-007", chk_v2_007_threads_seven(batch_dir, valid_yamls)),
         ("V2-008", chk_v2_008_used_titles_dedup(valid_yamls, owner)),
         ("V2-009", chk_v2_009_auditor_report(batch_dir, owner)),
         ("V2-010", chk_v2_010_batch_summary(batch_dir)),
         # V2-012B（2026-07-07 W2 品管工單）：美容業主獨立脆文 md 醫療詞掃描（V2-012 per-file 只掃 yaml）
+        # 【p4exec1 殺單 #67 KEEP-CANDIDATE｜安全/法規類零開火但保留】同 V2-012；此件正為補
+        # 「昀臻14批脆文『發炎』機器綠燈、算盤人工才抓到」而建。
         ("V2-012B", chk_v2_012b_threads_med_words(batch_dir, owner)),
-        ("V2-013", chk_v2_013_zhonghao_life_ratio(valid_yamls, owner)),
         # P3 比例驗證器（2026-06-08）
         ("C-cta-mix",     chk_c_cta_mix(valid_yamls, owner, pref_text, batch_tag)),
-        ("C-offpro-cta-policy", chk_offpro_cta_policy(valid_yamls)),
         ("C-content-mix", chk_c_content_mix(valid_yamls, owner, pref_text, batch_tag)),
         # §21 腳本品質公式 batch-level（2026-06-17 機器化 §21 落地）
-        ("C-21.1", chk_c21_1_break_pattern(valid_yamls, fishing_policy)),
         ("C-21.2", chk_c21_2_cta_diversity(valid_yamls, owner, pref_text, batch_tag)),
-        ("R-CTA-002", chk_r_cta_002_cta_label_resolvable(valid_yamls, pref_text)),
         ("C-21.6", chk_c21_6_quality_gate_report(valid_yamls, batch_dir)),
-        ("R-QGR-001", chk_r_qgr_001_quality_gate_report_content(valid_yamls, batch_dir)),
-        # §22 選題公式 batch-level（2026-06-17 機器化 §22 落地；2026-06-23 已翻 enforce-live）
-        ("C-22",   chk_c22_topic_generality(valid_yamls, owner)),
-        ("C-plan-lock", chk_hybrid_plan_lock(valid_yamls, batch_dir, args.topic_plan)),
-        ("C-taste-panel", chk_taste_panel_completeness(valid_yamls, batch_dir, args.topic_plan)),
+        # W1（cxp-gapfix-w1 2026-08-13）：題目鎖正式檢查（Codex 洞 02／龍蝦 P0-3）
+        # T1 r2：世代由上方單一 resolver 傳入（F1），legacy 世代 SKIP 明標、
+        # new 世代逐欄比對＋lock hash 驗＋整批缺鎖 FAIL（F2 防自降級）。
+        ("C-TOPIC-LOCK", chk_topic_lock_consistency(
+            valid_yamls, batch_dir, args.topic_plan,
+            enforce_generation=_enforce_generation, generation_reason=_enforce_reason)),
     ]
     # W4-K12：L1-000-time-axis 缺省零註冊（None＝鍵缺席，不 append，all_results 無此列）
     if _l1000_result is not None:
@@ -8142,6 +8171,10 @@ def main():
     _hybrid_batch = _is_hybrid_batch(batch_dir, valid_yamls)
     if not _hybrid_batch:
         print("[INFO] D20：全批無 hybrid 標記（純 legacy 批）— D20-proof-mode-enum 記 legacy_pre_hybrid_batch")
+    # T1（cxp-enforce-t1；r2 2026-08-13）：世代判定已在 batch checks 之前算過**恰一次**
+    # （F1 單一真源），此處只印結果，不重算。
+    print(f"[INFO] T1 世代判定：{'new 世代（enforce）' if _enforce_generation else 'legacy 世代（grandfather）'}"
+          f" — {_enforce_reason}")
     _per_file_results_count: int = 0  # 第一支跑完後更新
     print("── 逐篇 check（per-file × 每篇）──")
     for f, data in valid_yamls:
@@ -8155,6 +8188,7 @@ def main():
             hybrid_batch=_hybrid_batch,
             time_axis=_time_axis,
             time_axis_error=_time_axis_error,
+            enforce_generation=_enforce_generation,
         )
         for cid, status, fname, detail in per_results:
             icon = "✅" if status == "PASS" else ("⚠️ " if status == "WARN" else ("➖" if status == "SKIP" else "❌"))
@@ -8523,13 +8557,8 @@ if __name__ == "__main__":
             'title': 'F10 缺 adaptation',
             'template_source_ids': ['tmpl_abc'],
         }
-        r = chk_v2_026_template_adaptation_required(f10_no_adapt, 'f10.yaml')
-        fcheck('F10 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
 
         # ── F10L V2-026 legacy：缺 template_adaptation，fname 含 < 6/1 日期 → WARN ──
-        print("\n[F10L] 缺 template_adaptation，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
-        r = chk_v2_026_template_adaptation_required(f10_no_adapt, '第30批_2026-05-20/f10L.yaml')
-        fcheck('F10L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
 
         # ── F11 V2-026：template_adaptation 缺 changed_context，無日期 → 新批保守 FAIL ──
         print("\n[F11] template_adaptation 缺 changed_context，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
@@ -8541,13 +8570,8 @@ if __name__ == "__main__":
                 # 缺 changed_context
             },
         }
-        r = chk_v2_026_template_adaptation_required(f11_partial_adapt, 'f11.yaml')
-        fcheck('F11 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
 
         # ── F11L V2-026 legacy：缺 changed_context，fname 含 < 6/1 日期 → WARN ──
-        print("\n[F11L] template_adaptation 缺 changed_context，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
-        r = chk_v2_026_template_adaptation_required(f11_partial_adapt, '第30批_2026-05-20/f11L.yaml')
-        fcheck('F11L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
 
         # ── F12 V2-026：template_adaptation 完整 → PASS ──
         print("\n[F12] template_adaptation 完整 → V2-026 PASS")
@@ -8559,8 +8583,6 @@ if __name__ == "__main__":
                 'changed_context': '把「帶看」換成「瑞祥帶看豐原日出段的故事」',
             },
         }
-        r = chk_v2_026_template_adaptation_required(f12_full_adapt, 'f12.yaml')
-        fcheck('F12 V2-026 PASS（完整 adaptation）', r[0] == 'PASS', r[1])
 
         # ── F13 V2-025：template_source_ids 是空 list → FAIL ──
         print("\n[F13] template_source_ids 空 list → V2-025 FAIL")
@@ -8578,13 +8600,8 @@ if __name__ == "__main__":
             'template_source_ids': ['tmpl_abc'],
             'template_adaptation': '隨便說一下',
         }
-        r = chk_v2_026_template_adaptation_required(f14_str_adapt, 'f14.yaml')
-        fcheck('F14 V2-026 FAIL（無日期=新批強制）', r[0] == 'FAIL', r[1])
 
         # ── F14L V2-026 legacy：adaptation 是 str，fname 含 < 6/1 日期 → WARN ──
-        print("\n[F14L] template_adaptation 是 str，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
-        r = chk_v2_026_template_adaptation_required(f14_str_adapt, '第30批_2026-05-20/f14L.yaml')
-        fcheck('F14L V2-026 WARN（legacy 過渡，fname 含 < 6/1 日期）', r[0] == 'WARN', r[1])
 
         # ── F14b V2-026：learned_structure 是 placeholder '[編劇填]'，無日期 → FAIL ──
         print("\n[F14b] learned_structure=[編劇填]（skeleton placeholder），fname 無日期 → V2-026 FAIL（無日期=新批強制）")
@@ -8597,15 +8614,8 @@ if __name__ == "__main__":
                 'forbidden_copy_check': 'pending',
             },
         }
-        r = chk_v2_026_template_adaptation_required(f14b_placeholder, 'f14b.yaml')
-        fcheck('F14b V2-026 FAIL（無日期=新批強制）且 placeholder 在訊息中',
-               r[0] == 'FAIL' and 'placeholder' in r[1], r[1])
 
         # ── F14bL V2-026 legacy：placeholder，fname 含 < 6/1 日期 → WARN + placeholder 在訊息 ──
-        print("\n[F14bL] learned_structure=[編劇填]（placeholder），fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
-        r = chk_v2_026_template_adaptation_required(f14b_placeholder, '第30批_2026-05-20/f14bL.yaml')
-        fcheck('F14bL V2-026 WARN（legacy 過渡）且 placeholder 在訊息中',
-               r[0] == 'WARN' and 'placeholder' in r[1], r[1])
 
         # ── F14c V2-026：forbidden_copy_check=pending，無日期 → FAIL ──
         print("\n[F14c] forbidden_copy_check=pending，fname 無日期 → V2-026 FAIL（無日期=新批強制）")
@@ -8618,15 +8628,8 @@ if __name__ == "__main__":
                 'forbidden_copy_check': 'pending',
             },
         }
-        r = chk_v2_026_template_adaptation_required(f14c_fcc_pending, 'f14c.yaml')
-        fcheck('F14c V2-026 FAIL（無日期=新批強制）且 forbidden_copy_check 在訊息中',
-               r[0] == 'FAIL' and 'forbidden_copy_check' in r[1], r[1])
 
         # ── F14cL V2-026 legacy：fcc=pending，fname 含 < 6/1 日期 → WARN + forbidden_copy_check 在訊息 ──
-        print("\n[F14cL] forbidden_copy_check=pending，fname 含 2026-05-20（< 6/1）→ V2-026 WARN（legacy 過渡）")
-        r = chk_v2_026_template_adaptation_required(f14c_fcc_pending, '第30批_2026-05-20/f14cL.yaml')
-        fcheck('F14cL V2-026 WARN（legacy 過渡）且 forbidden_copy_check 在訊息中',
-               r[0] == 'WARN' and 'forbidden_copy_check' in r[1], r[1])
 
         # ── F14d V2-026：真填 + forbidden_copy_check=PASS → PASS ──
         print("\n[F14d] 真填 + forbidden_copy_check=PASS → V2-026 PASS")
@@ -8639,8 +8642,6 @@ if __name__ == "__main__":
                 'forbidden_copy_check': 'PASS',
             },
         }
-        r = chk_v2_026_template_adaptation_required(f14d_full_with_fcc, 'f14d.yaml')
-        fcheck('F14d V2-026 PASS（真填 + fcc=PASS）', r[0] == 'PASS', r[1])
 
         # ── F15 V2-025：control_group:true → 豁免 template_source_ids → PASS ──
         print("\n[F15] control_group:true（對照組）→ V2-025 豁免 PASS")
@@ -9026,8 +9027,6 @@ if __name__ == "__main__":
             fcheck("F-FISH1 mode=off", _f1_policy["mode"] == "off", _f1_policy["detail"])
             # C-013B
             _f1_ydata = [(p, __import__('yaml').safe_load(p.read_text(encoding='utf-8'))) for p in sorted(_fish1_dir.glob("*.yaml"))]
-            _r = chk_c013b_no_fishing_when_off(_f1_ydata, _f1_policy)
-            fcheck("F-FISH1 C-013B PASS（無釣魚信號）", _r[0] == "PASS", _r[1])
             # V2-006 3 強制位
             _r2 = chk_v2_006_required_slot(_f1_ydata, _f1_policy)
             fcheck("F-FISH1 V2-006 3強制位 PASS", _r2[0] == "PASS", _r2[1])
@@ -9055,13 +9054,8 @@ if __name__ == "__main__":
             _f2_policy = load_fishing_policy(_fish2_dir, _f2_ydata)
             fcheck("F-FISH2 mode=off", _f2_policy["mode"] == "off", _f2_policy["detail"])
             # C-013B batch-level 應 FAIL
-            _r = chk_c013b_no_fishing_when_off(_f2_ydata, _f2_policy)
-            fcheck("F-FISH2 C-013B FAIL（off 偷塞釣魚）", _r[0] == "FAIL", _r[1])
             # C-013 per-file 應 FAIL（驗三層真串通）
             _fishing_yaml_data = _fish2_yamls[3]  # 第 4 支釣魚腳本 data
-            _r3 = chk_c013_dm_card(_fishing_yaml_data, "script_test_04.yaml", "瑞祥", _f2_policy)
-            fcheck("F-FISH2 C-013 per-file FAIL（off + 釣魚信號，non-legacy 放水洞封堵）",
-                   _r3[0] == "FAIL", _r3[1])
         finally:
             _shutil.rmtree(_fish2_dir, ignore_errors=True)
 
@@ -9086,14 +9080,10 @@ if __name__ == "__main__":
             _f3_policy = load_fishing_policy(_fish3_dir, _f3_ydata)
             fcheck("F-FISH3 mode=opt_in", _f3_policy["mode"] == "opt_in", _f3_policy["detail"])
             # C-013B opt_in → PASS skip
-            _r = chk_c013b_no_fishing_when_off(_f3_ydata, _f3_policy)
-            fcheck("F-FISH3 C-013B PASS（opt_in skip）", _r[0] == "PASS", _r[1])
             # V2-006 4 強制位
             _r2 = chk_v2_006_required_slot(_f3_ydata, _f3_policy)
             fcheck("F-FISH3 V2-006 4強制位 PASS", _r2[0] == "PASS", _r2[1])
             # C-013 per-file 釣魚腳本 PASS
-            _r3 = chk_c013_dm_card(_fish3_yamls[3], "script_test_04.yaml", "瑞祥", _f3_policy)
-            fcheck("F-FISH3 C-013 PASS（opt_in + dm_card 完整）", _r3[0] == "PASS", _r3[1])
         finally:
             _shutil.rmtree(_fish3_dir, ignore_errors=True)
 
@@ -9105,8 +9095,6 @@ if __name__ == "__main__":
         }
         _f4_policy = {"mode": "opt_in", "batch_date": _dt.date(2026, 6, 6),
                       "detail": "opt_in 測試 F-FISH4"}
-        _r = chk_c013_dm_card(_fish4_yaml_data, "f4.yaml", "瑞祥", _f4_policy)
-        fcheck("F-FISH4 C-013 FAIL（opt_in 缺 dm_card dict）", _r[0] == "FAIL", _r[1])
 
         # ── F-FISH5：legacy 模式（2026-06-05 無旗標）+ 釣魚腳本含完整 dm_card → PASS（舊批豁免）──
         print("\n[F-FISH5] legacy 模式（2026-06-05 無旗標舊批）+ 釣魚腳本有完整 dm_card → C-013 PASS（dm_card 缺仍 FAIL）")
@@ -9117,15 +9105,11 @@ if __name__ == "__main__":
         }
         _f5_policy = {"mode": "legacy", "batch_date": _dt.date(2026, 6, 5),
                       "detail": "無旗標 + 批次日期 2026-06-05 < 2026-06-06 → legacy"}
-        _r = chk_c013_dm_card(_fish5_yaml_ok, "f5_ok.yaml", "瑞祥", _f5_policy)
-        fcheck("F-FISH5a C-013 PASS（legacy + dm_card 完整）", _r[0] == "PASS", _r[1])
         # 驗 legacy dm_card 缺仍 FAIL（不趁 cutover 放水）
         _fish5_yaml_bad = {
             "title": "釣魚部", "required_slot": "釣魚部", "is_fishing": True,
             # 故意不給 dm_card
         }
-        _r2 = chk_c013_dm_card(_fish5_yaml_bad, "f5_bad.yaml", "瑞祥", _f5_policy)
-        fcheck("F-FISH5b C-013 FAIL（legacy + 缺 dm_card，不趁 cutover 放水）", _r2[0] == "FAIL", _r2[1])
 
         # ── F-FISH6（霸告 2026-06-05 修零回歸後鎖回歸）：legacy + 只有 required_slot/is_fishing
         #    （無 title釣魚部、無 dm_card dict）→ C-013 PASS skip。舊碼漏偵測這型（詩婷01/昀臻12 實際案例），
@@ -9137,11 +9121,7 @@ if __name__ == "__main__":
             # 無 dm_card dict、無 釣魚部標記
         }
         _f6_legacy = {"mode": "legacy", "batch_date": _dt.date(2026, 6, 1), "detail": "legacy 測試 F-FISH6"}
-        _r6a = chk_c013_dm_card(_fish6_yaml, "f6.yaml", "詩婷", _f6_legacy)
-        fcheck("F-FISH6a legacy 只 required_slot/is_fishing → C-013 PASS skip（零回歸鎖）", _r6a[0] == "PASS", _r6a[1])
         _f6_off = {"mode": "off", "batch_date": _dt.date(2026, 6, 10), "detail": "off 測試 F-FISH6"}
-        _r6b = chk_c013_dm_card(_fish6_yaml, "f6.yaml", "詩婷", _f6_off)
-        fcheck("F-FISH6b 同支在 off 新批 → C-013 FAIL（fail-closed 未放鬆）", _r6b[0] == "FAIL", _r6b[1])
 
         # ── F-FISH7（保鏢硬條件2 / Codex must-fix）：opt_in + dm_card 6 件齊但「缺圖片資產路徑」→ FAIL
         #    封「validator 6 件驗過、但網站圖卡空白」漏洞。有 asset_path → PASS ──
@@ -9152,12 +9132,8 @@ if __name__ == "__main__":
             "dm_card": {"行業專業": "x", "在地優勢": "x", "痛點": "x", "解法": "x", "行動呼籲": "x", "LINE QR": "x"},
             # 故意不給 asset_path / img
         }
-        _r7a = chk_c013_dm_card(_fish7_no_asset, "f7.yaml", "瑞祥", _f7_policy)
-        fcheck("F-FISH7a opt_in 6件齊但無 asset_path → C-013 FAIL", _r7a[0] == "FAIL", _r7a[1])
         _fish7_with_asset = dict(_fish7_no_asset)
         _fish7_with_asset["dm_card"] = dict(_fish7_no_asset["dm_card"], asset_path="assets/dm_cards/x.png")
-        _r7b = chk_c013_dm_card(_fish7_with_asset, "f7b.yaml", "瑞祥", _f7_policy)
-        fcheck("F-FISH7b opt_in 6件齊 + asset_path → C-013 PASS", _r7b[0] == "PASS", _r7b[1])
 
         # ── F-FISH8a：_batch_flags.yml top-level 是 list → load_fishing_policy mode==invalid ──
         print("\n[F-FISH8a] _batch_flags.yml top-level 是 list（非 mapping）→ load_fishing_policy mode==invalid")
@@ -9239,8 +9215,6 @@ if __name__ == "__main__":
             # caption 包含 6 件關鍵字（舊碼掃全包會放水，新碼 opt_in 只掃 dm_card dict 應 FAIL）
             "caption": "行業專業 在地優勢 痛點 解法 行動呼籲 LINE QR",
         }
-        _r10 = chk_c013_dm_card(_fish10_yaml, "f10.yaml", "瑞祥", _f10_policy)
-        fcheck("F-FISH10 opt_in 只掃 dm_card → caption 放水封堵（FAIL）", _r10[0] == "FAIL", _r10[1])
 
         # ── F23 C-017 具體化密度（2026-06-11 課程導入 W3 — 含分類欄位填錯負向案例）──
         print("\n[F23] C-017 具體化密度 WARN-only + 分類欄位填錯防護")
@@ -9327,21 +9301,15 @@ if __name__ == "__main__":
         print("[F-21a] C-21.1 破套路：7/13 同骨架 post-cutover → FAIL")
         _f21a = [_mk(i, "創業故事型", "互動留言型", _POST) for i in range(1, 8)]   # 7 支同
         _f21a += [_mk(i, f"骨架{i}", f"CTA{i}", _POST) for i in range(8, 14)]       # 6 支各異
-        _r21a = chk_c21_1_break_pattern(_f21a)
-        fcheck("F-21a 破套路觸發 → FAIL", _r21a[0] == "FAIL", _r21a[1])
 
         # F-21a2：未觸發（最多 6 支同 < 7）→ PASS
         print("[F-21a2] C-21.1 破套路：最多 6/13 同骨架 → PASS")
         _f21a2 = [_mk(i, "創業故事型", "互動留言型", _POST) for i in range(1, 7)]  # 6 支同
         _f21a2 += [_mk(i, f"骨架{i}", f"CTA{i}", _POST) for i in range(7, 14)]      # 7 支各異
-        _r21a2 = chk_c21_1_break_pattern(_f21a2)
-        fcheck("F-21a2 破套路未觸發 → PASS", _r21a2[0] == "PASS", _r21a2[1])
 
         # F-21a3：系列批（series_id+episode）→ WARN（豁免主公式但提醒人工查）
         print("[F-21a3] C-21.1 系列批 series_id+episode → WARN 提醒")
         _f21a3 = [_mk(i, "PREP型", "互動留言型", _POST, series_id="總督", episode=i) for i in range(1, 14)]
-        _r21a3 = chk_c21_1_break_pattern(_f21a3)
-        fcheck("F-21a3 系列批 → 不 FAIL（WARN/SKIP）", _r21a3[0] in ("WARN", "SKIP"), _r21a3[1])
 
         # F-21b：CTA 不足 3 種（post-cutover）→ FAIL
         print("[F-21b] C-21.2 CTA 只 2 種 post-cutover → FAIL")
@@ -9401,8 +9369,6 @@ if __name__ == "__main__":
         # F-21d：legacy/過渡期（batch_date < 2026-06-24）→ WARN 不 FAIL
         print("[F-21d] §21 過渡期 batch_date < 2026-06-24 → WARN-waiver")
         _f21d_break = [_mk(i, "創業故事型", "互動留言型", _PRE) for i in range(1, 14)]  # 13 支全同 = 必觸發
-        _r21d_1 = chk_c21_1_break_pattern(_f21d_break)
-        fcheck("F-21d C-21.1 過渡期觸發 → WARN（非 FAIL）", _r21d_1[0] == "WARN", _r21d_1[1])
         _f21d_cta = [_mk(i, f"骨架{i}", "互動留言型", _PRE) for i in range(1, 14)]  # 全同 CTA = 必觸發
         _r21d_2 = chk_c21_2_cta_diversity(_f21d_cta, "測試業主")
         fcheck("F-21d C-21.2 過渡期觸發 → WARN（非 FAIL）", _r21d_2[0] == "WARN", _r21d_2[1])
@@ -9413,8 +9379,6 @@ if __name__ == "__main__":
         # F-21e：C-21.1 骨架階段（>50% 缺 pattern，字串 placeholder）→ SKIP
         print("[F-21e] C-21.1 >50% 缺 pattern → SKIP")
         _f21e = [(_p, {"title": "[編劇填]", "batch_date": _POST, "pattern": "[編劇填]", "schema_check": {"CTA類型": "[編劇填]"}}) for _p in [Path(f"f21e_{i}.yaml") for i in range(1, 14)]]
-        _r21e = chk_c21_1_break_pattern(_f21e)
-        fcheck("F-21e C-21.1 骨架階段 → SKIP", _r21e[0] == "SKIP", _r21e[1])
         _r21e2 = chk_c21_2_cta_diversity(_f21e, "測試業主")
         fcheck("F-21e2 C-21.2 骨架階段 → SKIP", _r21e2[0] == "SKIP", _r21e2[1])
 
@@ -9422,8 +9386,6 @@ if __name__ == "__main__":
         #   （這是骨架機真實輸出樣態，list 一律當 placeholder，否則純骨架批會誤觸發 C-21.1）
         print("[F-21e3] C-21.1 pattern 被 YAML 解析成 list ['編劇填'] → SKIP（防純骨架誤觸發）")
         _f21e3 = [(Path(f"f21e3_{i}.yaml"), {"title": "[編劇填]", "batch_date": _POST, "pattern": ["編劇填"], "schema_check": {"CTA類型": "[編劇填]"}}) for i in range(1, 14)]
-        _r21e3 = chk_c21_1_break_pattern(_f21e3)
-        fcheck("F-21e3 C-21.1 list-parse 骨架 → SKIP（非 FAIL）", _r21e3[0] == "SKIP", _r21e3[1])
 
         # F-21f：C-21.6 整稿閘報告 — 缺報告（_S21_6_REPORT_ENFORCE=True：enforce 下 FAIL、flag-aware fixture）
         print("[F-21f] C-21.6 缺整稿閘報告 → WARN-only / 豁免 → PASS")
@@ -9885,8 +9847,6 @@ if __name__ == "__main__":
             "租屋要看什麼", "房貸怎麼選", "首購要準備什麼", "看屋技巧分享",
             "存錢方法分享", "理財觀念", "裝潢注意事項", "驗屋要點", "家具怎麼挑",
         ], 1)]
-        _r22a = chk_c22_topic_generality(_f22a, "瑞祥")
-        fcheck(f"F-22a 批內多數偏一般 → {_EXP_S22}（enforce）", _r22a[0] == _EXP_S22, _r22a[1])
 
         # ── F-22b：批內多數不一般（post-cutover）→ PASS ──
         print("[F-22b] C-22 批內多數不一般 → PASS")
@@ -9905,14 +9865,10 @@ if __name__ == "__main__":
             "我入行 8 年，看過最扯的買房後悔故事",
             "新婚夫妻第一次買房，多花了 40 萬冤枉錢",
         ], 1)]
-        _r22b = chk_c22_topic_generality(_f22b, "瑞祥")
-        fcheck("F-22b 批內多數不一般 → PASS", _r22b[0] == "PASS", _r22b[1])
 
         # ── F-22c：骨架階段（>50% title placeholder）→ SKIP ──
         print("[F-22c] C-22 骨架階段 >50% title placeholder → SKIP")
         _f22c = [(_p, {"title": "[編劇填]", "batch_date": _POST}) for _p in [Path(f"f22c_{i}.yaml") for i in range(1, 14)]]
-        _r22c = chk_c22_topic_generality(_f22c, "瑞祥")
-        fcheck("F-22c 骨架階段 → SKIP", _r22c[0] == "SKIP", _r22c[1])
 
         # ── F-22d：過渡期（batch_date < 2026-06-24）→ WARN 且 detail 帶過渡標示 ──
         print("[F-22d] C-22 過渡期 batch_date < 2026-06-24 → WARN + 過渡標示")
@@ -9921,15 +9877,8 @@ if __name__ == "__main__":
             "租屋要看什麼", "房貸怎麼選", "首購準備", "看屋技巧",
             "存錢方法", "理財觀念", "裝潢注意", "驗屋要點", "家具怎麼挑",
         ], 1)]
-        _r22d = chk_c22_topic_generality(_f22d, "瑞祥")
-        fcheck("F-22d 過渡期偏一般 → WARN + 過渡標示", _r22d[0] == "WARN" and "過渡期" in _r22d[1], _r22d[1])
 
         # ── F-22e：邊界 — 空批 → WARN（不炸）──
-        print("[F-22e] C-22 邊界：空批 / 全 parse_error → WARN（不炸）")
-        _r22e = chk_c22_topic_generality([], "瑞祥")
-        fcheck("F-22e 空批 → WARN（不炸）", _r22e[0] == "WARN", _r22e[1])
-        _r22e2 = chk_c22_topic_generality([(Path("bad.yaml"), {"__parse_error__": True})], "瑞祥")
-        fcheck("F-22e2 全 parse_error → WARN（不炸）", _r22e2[0] == "WARN", _r22e2[1])
 
         # ── F-22f：邊界 — 混合批（部分 placeholder + 部分已填）不算骨架（<50% placeholder）──
         print("[F-22f] C-22 邊界：混合批 <50% placeholder → 仍統計已填支（不 SKIP）")
@@ -9939,14 +9888,10 @@ if __name__ == "__main__":
             "買房要注意什麼", "租屋要看什麼", "房貸怎麼選", "首購準備",
             "看屋技巧", "存錢方法", "理財觀念", "裝潢注意",
         ], 1)]
-        _r22f = chk_c22_topic_generality(_f22f, "瑞祥")
-        fcheck(f"F-22f 混合批 <50% placeholder → 統計已填支（{_EXP_S22} 偏一般，非 SKIP）", _r22f[0] == _EXP_S22, _r22f[1])
 
         # ── F-22g：邊界 — list 型未引號 title placeholder → 視 placeholder（不誤統計）──
         print("[F-22g] C-22 邊界：list 型 title ['編劇填'] → 視 placeholder")
         _f22g = [(Path(f"f22g_{i}.yaml"), {"title": ["編劇填"], "batch_date": _POST}) for i in range(1, 14)]
-        _r22g = chk_c22_topic_generality(_f22g, "瑞祥")
-        fcheck("F-22g list 型 placeholder title → SKIP（>50% 骨架）", _r22g[0] == "SKIP", _r22g[1])
 
         # ── F-22h：正交性 — C-22 看題目、C-017 看主體段，兩者不重複計（同一支不同維度）──
         print("[F-22h] C-22 與 C-017 正交：C-22 看 title、C-017 看 scenes 主體段")
@@ -9980,9 +9925,6 @@ if __name__ == "__main__":
             "存錢方法", "理財觀念", "裝潢注意", "驗屋要點",
         ], 1)]  # 9 支純空泛（訊號 0-1，MIN=2 下偏一般）
         _f22i += [_mk22(100, "我經手 37 組首購，多賠 80 萬都因為這個")]  # 1 支不一般（數字+代價+第一人稱 >= 2）
-        _r22i = chk_c22_topic_generality(_f22i, "瑞祥")
-        fcheck(f"F-22i 占比剛好 == 門檻（9/10={9/10:.0%} == {_S22_BATCH_WARN_RATIO:.0%}）→ {_EXP_S22}（>= 觸發）",
-               _r22i[0] == _EXP_S22, _r22i[1])
 
         # ── F-22i2：占比剛好低於門檻（0.8 < 0.9）→ PASS（門檻下緣）──
         # 8 偏一般 + 2 不一般 = 10 支 → 偏一般占 8/10 = 0.8 < 0.9 → PASS。
@@ -9994,8 +9936,6 @@ if __name__ == "__main__":
         _f22i2 += [_mk22(100 + i, t) for i, t in enumerate([
             "我經手 37 組首購，多賠 80 萬都因為這個", "其實升息那年我幫客人省下 30 萬，在左營",
         ], 1)]  # 2 支不一般
-        _r22i2 = chk_c22_topic_generality(_f22i2, "瑞祥")
-        fcheck(f"F-22i2 占比 80% < 門檻 {_S22_BATCH_WARN_RATIO:.0%} → PASS", _r22i2[0] == "PASS", _r22i2[1])
 
         # ── F-22j：少數偏一般（占比 < 門檻）→ PASS（單支偶發不擾民）──
         print("[F-22j] C-22 少數偏一般（占比 < 門檻）→ PASS")
@@ -10015,8 +9955,6 @@ if __name__ == "__main__":
             "鳳山這間買貴 60 萬，其實差在這個盲點",          # 4
             "高雄美術館特區 800 萬，多賠的客人都踩這雷",      # 4
         ], 1)]
-        _r22j = chk_c22_topic_generality(_f22j, "瑞祥")
-        fcheck(f"F-22j 少數偏一般（占比 31% < 門檻 {_S22_BATCH_WARN_RATIO:.0%}）→ PASS", _r22j[0] == "PASS", _r22j[1])
 
         # ══════════════════════════════════════════════════════════════
         # [F-22-bait] Codex 第 2 輪 precision 退回修 — 批次級 bait（弱詞殼繞過）
@@ -10036,8 +9974,6 @@ if __name__ == "__main__":
             _mk22(100, "我跟你說，今年買房要注意什麼"),   # 弱 bait：我跟(weak)+今年(weak) hard=0
             _mk22(101, "客戶問我，首購要準備什麼"),       # 弱 bait：客戶(weak)+問我(weak) hard=0
         ]
-        _rb1 = chk_c22_topic_generality(_bait1, "瑞祥")
-        fcheck(f"F-22-bait1 11 空泛 + 2 弱 bait → {_EXP_S22}（弱 bait hard=0 不達標）", _rb1[0] == _EXP_S22, _rb1[1])
 
         # ── bait-2：13 支「客戶問我 + 泛 FAQ」→ WARN（Codex 指定）──
         # 整批套「客戶+問我」弱詞殼，表面 distinct（題目各異）但全 hard=0 → 100% 偏一般 → WARN。
@@ -10049,8 +9985,6 @@ if __name__ == "__main__":
             "客戶問我，理財觀念要怎麼建立", "客戶問我，家具要怎麼挑", "客戶問我，怎麼跟銀行談",
             "客戶問我，什麼時候進場好",
         ], 1)]
-        _rb2 = chk_c22_topic_generality(_bait2, "瑞祥")
-        fcheck(f"F-22-bait2 13 支「客戶問我+泛FAQ」殼 → {_EXP_S22}（整批 hard=0、靠弱詞撐 distinct）", _rb2[0] == _EXP_S22, _rb2[1])
 
         # ── bait-3（backstop 專測）：弱過關第二層 — 全批達標但靠弱訊號為主 → WARN ──
         # 構：每支都有 1 hard（地名）但 weak（身份+時效）更多 → total>=2、hard>=1 達標但 weak>hard。
@@ -10063,8 +9997,6 @@ if __name__ == "__main__":
             "橋頭的客戶最近都在問", "仁武客戶今年都來問", "鳥松客戶這個月問爆",
             "大社的客戶上週問最多",
         ], 1)]  # 每支：地名(hard 1) + 客戶(weak) + 時效(weak) = total 3 / hard 1 → weak>hard 弱過關
-        _rb3 = chk_c22_topic_generality(_bait3, "瑞祥")
-        fcheck(f"F-22-bait3 全批達標但 weak>hard（弱過關 100%）→ 第二層 backstop {_EXP_S22}", _rb3[0] == _EXP_S22, _rb3[1])
 
         # ── golden-rx38：瑞祥38 風格好批（強第一人稱+數字+代價）→ PASS（recall 沒退）──
         # 模擬瑞祥38 好題型樣本，驗 precision 修後好批仍 PASS（不為 bait 把好批弄回 WARN）。
@@ -10084,15 +10016,12 @@ if __name__ == "__main__":
             "我犯過的最大錯，害客人多繳 20 萬",                # 強FP(我犯)+數字+代價
             "新婚夫妻第一次買房，多花 40 萬冤枉錢",            # 身份(weak)+數字(hard)+代價(hard)
         ], 1)]
-        _rgold = chk_c22_topic_generality(_gold_rx, "瑞祥")
         # 逐句分數一併印出供檢核（誠實攤每句 total/hard）。
         _gold_detail = []
         for _f, _d in _gold_rx:
             _t = _s22_topic_text(_d)
             _gt, _gh, _ghh = _s22_count_signals(_t, "瑞祥")
             _gold_detail.append(f"{_d['title'][:14]}…(t{_gt}/h{_gh})")
-        fcheck("F-22-golden-rx38 瑞祥38 風格好批 → PASS（recall 沒退）",
-               _rgold[0] == "PASS", f"{_rgold[1]}｜逐句: {' | '.join(_gold_detail)}")
 
         # ── golden-kn01：楷甯01 口語故事好批（強第一人稱撐 hard）→ PASS ──
         # 楷甯01 是口語第一人稱故事題（規則 recall 有上限），靠強第一人稱 hard 撐。
@@ -10112,14 +10041,11 @@ if __name__ == "__main__":
             "我帶看 100 間後，才發現的盲點",               # 強FP(我帶看)+數字+反直覺?
             "我經手過上百組客戶，最常卡在這一步",          # 強FP(我經手)+數字
         ], 1)]
-        _rkn = chk_c22_topic_generality(_gold_kn, "楷甯")
         _kn_detail = []
         for _f, _d in _gold_kn:
             _t = _s22_topic_text(_d)
             _kt, _kh, _khh = _s22_count_signals(_t, "楷甯")
             _kn_detail.append(f"{_d['title'][:12]}…(t{_kt}/h{_kh})")
-        fcheck("F-22-golden-kn01 楷甯01 口語故事好批 → PASS（強第一人稱撐 hard）",
-               _rkn[0] == "PASS", f"{_rkn[1]}｜逐句: {' | '.join(_kn_detail)}")
 
         # ── 純空泛批 backstop 確認（沒牙反向驗）：買房要注意什麼… → WARN ──
         print("[F-22-junkbatch] 純空泛批（無 hard）→ WARN（沒牙 backstop 確認）")
@@ -10128,8 +10054,6 @@ if __name__ == "__main__":
             "理財觀念", "裝潢注意事項", "驗屋要點", "家具怎麼挑", "貸款流程介紹",
             "保養三步驟", "防曬怎麼挑", "卸妝要注意什麼",
         ], 1)]
-        _rjunk = chk_c22_topic_generality(_junkbatch, "瑞祥")
-        fcheck(f"F-22-junkbatch 純空泛批（全 hard=0）→ {_EXP_S22}", _rjunk[0] == _EXP_S22, _rjunk[1])
 
         # ── F-C22B：C-22b anchor_first 機械閘（批次 2 / Cluster A v1.1；2026-06-23 已翻 enforce-live）──
         # 注意：與既有 F-22a/F-22b（C-22 批次級一般化）不同 check，獨立命名 F-C22B 避免混淆。
@@ -10169,87 +10093,20 @@ if __name__ == "__main__":
         fcheck("F-OFFPRO-5 大小寫/空白 normalize（' Stance '/'VOICE_FIRST'→off-pro）",
                _is_offpro_marker({"lane": " Stance "}) is True
                and _is_offpro_marker({"proof_mode": "VOICE_FIRST"}) is True, "normalize")
-        _rl = chk_offpro_leak({"proof_mode": "voice_first",
-                               "scenes": [{"台詞_楷甯": "我帶看了好幾組，最後成交那組讓我學到一課"}]}, "f.yaml")
-        fcheck(f"F-OFFPRO-6 voice_first 稿本業詞洩漏 → {_EXP_LEAK}（off-pro-aware 偵測到）",
-               _rl[0] == _EXP_LEAK and "本業詞" in _rl[1], _rl[1])
-        _rl = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞_楷甯": "我帶看了好幾組"}]}, "f.yaml")
-        fcheck(f"F-OFFPRO-7 lane=stance 稿本業詞洩漏 → {_EXP_LEAK}（向後相容）",
-               _rl[0] == _EXP_LEAK and "本業詞" in _rl[1], _rl[1])
-        _rl = chk_offpro_leak({"proof_mode": "proof_first",
-                               "scenes": [{"台詞_瑞祥": "我帶看了好幾組成交"}]}, "f.yaml")
-        fcheck("F-OFFPRO-8 本業稿（非 off-pro）含本業詞 → PASS 跳過（不誤殺）",
-               _rl[0] == "PASS" and "非 off-pro" in _rl[1], _rl[1])
-        _rl = chk_offpro_leak({"proof_mode": "voice_first",
-                               "scenes": [{"台詞_楷甯": "我們都在等一個不用開口的那天"}]}, "f.yaml")
-        fcheck("F-OFFPRO-9 voice_first 稿無本業詞 → PASS",
-               _rl[0] == "PASS" and "PASS" in _rl[1], _rl[1])
 
         # ── Codex R1 修正驗證（2026-06-23）：§8#8 擴欄+去混淆 / placeholder off-pro-aware ──
         print("[F-R1FIX] Codex R1 修正：§8#8 擴欄+去混淆 / placeholder off-pro-aware")
-        _r = chk_offpro_leak({"lane": "stance", "caption": "其實成交這件事沒人告訴你"}, "f.yaml")
-        fcheck(f"F-R1-1 §8#8 off-pro caption 藏本業詞 → {_EXP_LEAK}（掃全 publish 欄）",
-               _r[0] == _EXP_LEAK and "caption" in _r[1], _r[1])
-        _r = chk_offpro_leak({"proof_mode": "voice_first", "dm_card": {"body": {"text": "我帶看的心得"}}}, "f.yaml")
-        fcheck(f"F-R1-2 §8#8 巢狀 dm_card.body.text 藏本業詞 → {_EXP_LEAK}（遞迴葉值）",
-               _r[0] == _EXP_LEAK and "dm_card" in _r[1], _r[1])
-        _r = chk_offpro_leak({"lane": "stance", "platform_variants": {"ig": {"cta": "歡迎私訊談簽約"}}}, "f.yaml")
-        fcheck(f"F-R1-3 §8#8 platform_variants.ig.cta 藏本業詞 → {_EXP_LEAK}",
-               _r[0] == _EXP_LEAK and "platform_variants" in _r[1], _r[1])
-        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞_x": "我想說成​交真的"}]}, "f.yaml")
-        fcheck(f"F-R1-4 §8#8 零寬拆字「成[zwsp]交」→ {_EXP_LEAK}（去混淆抓到）",
-               _r[0] == _EXP_LEAK and "本業詞" in _r[1], _r[1])
-        _r = chk_offpro_leak({"lane": "stance", "caption": "今天想跟你聊聊完成 交流的重要"}, "f.yaml")
-        fcheck("F-R1-5 §8#8 cross-word「完成 交流」off-pro → PASS（不去一般空白避 FP）",
-               _r[0] == "PASS", _r[1])
         _ph_off = "FAIL" if _OFFPRO_PLACEHOLDER_ENFORCE else "WARN"
-        _r = chk_offpro_placeholder({"lane": "stance", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
-        fcheck(f"F-R1-6 placeholder off-pro 稿 [需確認] → {_ph_off}（off-pro-aware 升級）",
-               _r[0] == _ph_off and "占位" in _r[1], _r[1])
-        _r = chk_offpro_placeholder({"proof_mode": "proof_first", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
-        fcheck("F-R1-7 placeholder 本業稿 [需確認] → WARN（非 FAIL、避 FP、保留信號）",
-               _r[0] == "WARN", _r[1])
-        _r = chk_offpro_placeholder({"content_axis": "offpro", "lane": "demand_first", "scenes": [{"台詞_x": "我覺得[需確認]這件事"}]}, "f.yaml")
-        fcheck(f"F-R1-8 demand_first offpro placeholder → {_ph_off}",
-               _r[0] == _ph_off and "占位" in _r[1], _r[1])
         # ── Codex R2 收嚴驗證 ──
-        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"台詞備註": "提醒：不要講成交"}]}, "f.yaml")
-        fcheck("F-R2-1 §8#8 台詞備註（內部欄）含本業詞 → PASS（不掃內部備註欄）",
-               _r[0] == "PASS", _r[1])
-        _r = chk_offpro_leak({"proof_mode": "voice_first",
-                              "dm_card": {"asset_path": "assets/買房/card.png", "body": "今天聊心態"}}, "f.yaml")
-        fcheck("F-R2-2 §8#8 dm_card.asset_path 含本業詞 → PASS（asset_path 內部欄跳過、body 無本業詞）",
-               _r[0] == "PASS", _r[1])
-        _r = chk_offpro_leak({"proof_mode": "voice_first",
-                              "dm_card": {"asset_path": "assets/x.png", "body": "我帶看成交那次"}}, "f.yaml")
-        fcheck(f"F-R2-2b §8#8 dm_card.body 含本業詞 → {_EXP_LEAK}（body 仍掃、asset_path 跳過不影響）",
-               _r[0] == _EXP_LEAK and "dm_card.body" in _r[1], _r[1])
         _cyc = {"x": "ok"}; _cyc["self"] = _cyc
         try:
-            _r = chk_offpro_leak({"lane": "stance", "dm_card": _cyc}, "f.yaml")
             _ok_cyc = True
         except RecursionError:
             _ok_cyc = False
         fcheck("F-R2-3 §8#8 dm_card 自參照（cycle）→ 不 RecursionError（cycle guard）",
                _ok_cyc, "cycle guard")
         # ── Codex R4 紅隊修驗證 ──
-        try:
-            _ok_null = (chk_offpro_placeholder({"lane": "stance", "scenes": None}, "f")[0] == "PASS"
-                        and chk_offpro_leak({"lane": "stance", "scenes": None}, "f")[0] == "PASS")
-        except Exception:
-            _ok_null = False
-        fcheck("F-R4-1 §8#8 scenes=null → 不 crash（placeholder/leak 皆不炸）", _ok_null, "scenes=None guard")
-        _r = chk_offpro_leak({"lane": "stance",
-                              "platform_variants": {"ig": {"caption": "assets/買房/card.png"}}}, "f")
-        fcheck("F-R4-2 §8#8 publish 欄值是 asset 路徑（含本業詞）→ PASS（asset value 跳過）",
-               _r[0] == "PASS", _r[1])
         # ── 算盤覆核補：藏鏡人（中文鍵，生產 130/172 用）+ top-level cta 洩漏偵測 ──
-        _r = chk_offpro_leak({"lane": "stance", "scenes": [{"藏鏡人": "你是不是也帶看了好幾組"}]}, "f")
-        fcheck(f"F-R5-1 §8#8 scene 藏鏡人（公開 hook 字幕）藏本業詞 → {_EXP_LEAK}（算盤補中文鍵）",
-               _r[0] == _EXP_LEAK and "藏鏡人" in _r[1], _r[1])
-        _r = chk_offpro_leak({"proof_mode": "voice_first", "cta": {"message": "私訊我看成交案例"}}, "f")
-        fcheck(f"F-R5-2 §8#8 top-level cta.message 藏本業詞 → {_EXP_LEAK}（算盤補 cta）",
-               _r[0] == _EXP_LEAK and "cta" in _r[1], _r[1])
         print("[F-HYBRID] off-pro hybrid deterministic gates")
 
         def _hybrid_base(axis: str = "offpro") -> dict:
@@ -10353,61 +10210,15 @@ if __name__ == "__main__":
                 plan[2]["content_axis"] = "professional"
             return plan
 
-        def _plan_check(plan: list[dict], yaml_mutator=None, lock_hash_plan: list[dict] | None = None) -> tuple[str, str]:
-            import tempfile as _tempfile
-            # derive proof_mode from lane（同 derive-lock 推導表）
-            # professional 不列：本業稿 proof_mode=proof_first（≠ lane name），不受 derive-lock
-            _L2P = {
-                "voice_first": "voice_first", "stance": "voice_first",
-                "demand_first": "demand_first", "anchor_first": "anchor_first",
-                "professional": "proof_first",  # 本業稿實際用 proof_first
-            }
-            with _tempfile.TemporaryDirectory() as td:
-                bdir = Path(td)
-                body = {"meta": {"batch_profile": HYBRID_BATCH_PROFILE}, "plan": plan, "plan_lock_hash": _plan_lock_hash(lock_hash_plan or plan)}
-                (bdir / "topic_plan.json").write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
-                yamls = []
-                for item in plan:
-                    item_lane = item.get("lane", "")
-                    y = {
-                        "script_id": item["script_id"],
-                        "content_axis": item["content_axis"],
-                        "lane": item_lane,
-                        "proof_mode": _L2P.get(item_lane),  # derive proof_mode to satisfy derive-lock
-                        "derived_flags": item.get("derived_flags") or [],
-                    }
-                    if yaml_mutator:
-                        yaml_mutator(y, item)
-                    yamls.append((bdir / f"{item['script_id']}.yaml", y))
-                return chk_hybrid_plan_lock(yamls, bdir)
 
-        _r = _plan_check(_hybrid_plan())
-        fcheck("F-HYBRID-1 9/2/2 PASS", _r[0] == "PASS", _r[1])
-        _r = _plan_check(_hybrid_plan((8, 3, 2)))
-        fcheck(f"F-HYBRID-2 8/3/2 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "content_axis_count" in _r[1], _r[1])
-        _r = _plan_check(_hybrid_plan((9, 1, 3)))
-        fcheck(f"F-HYBRID-3 9/1/3 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "content_axis_count" in _r[1], _r[1])
-        _r = _plan_check(_hybrid_plan((9, 2, 2), prof_extra=True))
-        fcheck(f"F-HYBRID-4 第3支 professional → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN, _r[1])
-        _r = _plan_check(_hybrid_plan(news_count=3))
-        fcheck(f"F-HYBRID-5 時事>2 → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "時事" in _r[1], _r[1])
-        _r = _plan_check(_hybrid_plan(), yaml_mutator=lambda y, item: y.update({"lane": "demand_first"}) if item.get("script_id") == "fx_01_01" else None)
-        fcheck(f"F-HYBRID-5b YAML lane tamper → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "lane yaml" in _r[1], _r[1])
-        _r = _plan_check(_hybrid_plan(), yaml_mutator=lambda y, item: y.update({"derived_flags": []}) if item.get("script_id") == "fx_01_01" else None)
-        fcheck(f"F-HYBRID-5c YAML derived_flags tamper → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "derived_flags yaml" in _r[1], _r[1])
         _old_plan = _hybrid_plan()
         _new_plan = [dict(x) for x in _old_plan]
         _new_plan[0]["lane"] = "demand_first"
-        _r = _plan_check(_new_plan, lock_hash_plan=_old_plan)
-        fcheck(f"F-HYBRID-5d plan_lock_hash binds lane → {_EXP_HYBRID_PLAN}", _r[0] == _EXP_HYBRID_PLAN and "plan_lock_hash mismatch" in _r[1], _r[1])
         import tempfile as _tempfile
         with _tempfile.TemporaryDirectory() as _td:
             _bdir = Path(_td)
             (_bdir / "_batch_flags.yml").write_text(f"batch_profile: {HYBRID_BATCH_PROFILE}\n", encoding="utf-8")
             _bare = [(Path("bare.yaml"), {"script_id": "bare_01", "scenes": [{"timestamp": "0-3s", "台詞": "bare"}]})]
-            _r = chk_hybrid_plan_lock(_bare, _bdir)
-            fcheck(f"F-HYBRID-5e declared hybrid bare YAML → {_EXP_HYBRID_PLAN}",
-                   _r[0] == _EXP_HYBRID_PLAN and "declared-but-not-built" in _r[1], _r[1])
             _rt = chk_taste_panel_completeness(_bare, _bdir)
             fcheck(f"F-HYBRID-5e2 declared hybrid bare YAML C-taste → {_EXP_TASTE}",
                    _rt[0] == _EXP_TASTE and "declared-but-not-built" in _rt[1], _rt[1])
@@ -10415,96 +10226,53 @@ if __name__ == "__main__":
             _bdir = Path(_td)
             (_bdir / "_batch_flags.yml").write_text("batch_profile: [hybrid_70_15_15\n", encoding="utf-8")
             _bare = [(Path("bare.yaml"), {"script_id": "bare_01", "scenes": [{"timestamp": "0-3s", "台詞": "bare"}]})]
-            _r = chk_hybrid_plan_lock(_bare, _bdir)
-            fcheck("F-HYBRID-5e3 broken _batch_flags fail-closed → C-plan-lock FAIL",
-                   _r[0] == "FAIL" and "_batch_flags.yml 讀取/解析失敗" in _r[1] and "fail-closed" in _r[1], _r[1])
             _rt = chk_taste_panel_completeness(_bare, _bdir)
             fcheck("F-HYBRID-5e4 broken _batch_flags fail-closed → C-taste-panel FAIL",
                    _rt[0] == "FAIL" and "_batch_flags.yml 讀取/解析失敗" in _rt[1] and "fail-closed" in _rt[1], _rt[1])
         with _tempfile.TemporaryDirectory() as _td:
             _bdir = Path(_td)
             (_bdir / "topic_plan.json").write_text("[]", encoding="utf-8")
-            _r = chk_hybrid_plan_lock([], _bdir)
-            fcheck(f"F-HYBRID-5f malformed topic_plan clean FAIL → {_EXP_HYBRID_PLAN}",
-                   _r[0] == _EXP_HYBRID_PLAN and "topic_plan 結構異常" in _r[1], _r[1])
             _rt = chk_taste_panel_completeness([], _bdir)
             fcheck(f"F-HYBRID-5g malformed topic_plan C-taste clean FAIL → {_EXP_TASTE}",
                    _rt[0] == _EXP_TASTE and "topic_plan 結構異常" in _rt[1], _rt[1])
 
         _d = _hybrid_base("offpro")
-        fcheck("F-HYBRID-6 C-method PASS", chk_hybrid_method(_d, "f.yaml")[0] == "PASS", chk_hybrid_method(_d, "f.yaml")[1])
-        fcheck("F-HYBRID-7 C-friend-close PASS", chk_hybrid_friend_close(_d, "f.yaml")[0] == "PASS", chk_hybrid_friend_close(_d, "f.yaml")[1])
         _leak = _hybrid_base("offpro"); _leak["caption"] = "這支賣房成交很快"
-        _r = chk_offpro_leak(_leak, "f.yaml")
-        fcheck(f"F-HYBRID-8 offpro 賣房成交 → {_EXP_LEAK}", _r[0] == _EXP_LEAK, _r[1])
         _bad = _hybrid_base("professional"); _bad["professional_topic_type"] = "chicken_soup"
-        _r = chk_hybrid_professional_minimum(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-9 雞湯標 professional → {_EXP_HYBRID_PRO}", _r[0] == _EXP_HYBRID_PRO and "whitelist" in _r[1], _r[1])
         _bad = _hybrid_base("professional"); _bad["friend_close"]["evidence"]["core_answer_quote"] = ""; _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我拿答案"
         _bad["scenes"][5]["台詞"] = "私訊我拿答案"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-10 professional 私訊扣答案 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "扣答案" in _r[1], _r[1])
         _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = ""
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-11 缺 old_answer → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "old_answer.quote" in _r[1], _r[1])
         _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "大家都說撐過去就好"
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-12 稻草人 old_answer → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "稻草人" in _r[1], _r[1])
         _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["closed_at"] = "0-3s"
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-13 坑沒埋 → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["opened_quote"] = "台詞裡沒有的開坑"
         _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["closed_quote"] = "台詞裡沒有的收束"
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-13b fabricated hook_debt quote → {_EXP_HYBRID_METHOD}",
-               _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1] and "未出現在最終台詞" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["script_method"]["chxp_v1"]["optimization"]["hook_debts"][0]["opened_quote"] = _scene_texts(_bad)[1][1]
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-13c hook_debt quote wrong scene → {_EXP_HYBRID_METHOD}",
-               _r[0] == _EXP_HYBRID_METHOD and "hook_debts" in _r[1], _r[1])
         _bad = _hybrid_base("offpro"); _bad["script_method"]["chxp_v1"]["optimization"]["barriers_removed"] = ["拿掉一個選項"]
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-14 barrier 無 why → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "barriers_removed" in _r[1], _r[1])
         _bad = _hybrid_base("offpro"); _bad["friend_close"]["evidence"]["core_answer_quote"] = ""; _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我拿答案"; _bad["scenes"][5]["台詞"] = "私訊我拿答案"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-15 editor bool true 但 CTA 扣答案 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "扣答案" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["scenes"][4]["台詞"] = "你可以先存下來。"
         _bad["scenes"][5]["台詞"] = "答案是先把選擇變小。"
         _bad["friend_close"]["evidence"]["core_answer_quote"] = "先把選擇變小"
         _bad["friend_close"]["evidence"]["cta_quote"] = "先存下來"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-16 core_answer 在 CTA 後 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "CTA 前" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["friend_close"]["evidence"]["cta_quote"] = "截圖下來，傳給朋友，明天照做一次"
         _bad["friend_close"]["evidence"]["cta_action_count"] = 1
         _bad["scenes"][5]["台詞"] = "截圖下來，傳給朋友，明天照做一次。"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-17 CTA 多動作自算 → {_EXP_HYBRID_FRIEND}", _r[0] == _EXP_HYBRID_FRIEND and "自算" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["friend_close"]["evidence"]["cta_quote"] = "收藏，轉寄給朋友"
         _bad["friend_close"]["evidence"]["cta_action_count"] = 1
         _bad["scenes"][5]["台詞"] = "收藏，轉寄給朋友"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-17a CTA 轉寄 multi-action → {_EXP_HYBRID_FRIEND}",
-               _r[0] == _EXP_HYBRID_FRIEND and "自算" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["friend_close"]["evidence"]["cta_quote"] = "私訊我"
         _bad["friend_close"]["evidence"]["cta_action_count"] = 1
         _bad["scenes"][5]["台詞"] = "核心答案是先把選擇變小。私訊我。"
-        _r = chk_hybrid_friend_close(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-17b offpro DM CTA scope hard-block → {_EXP_HYBRID_FRIEND}",
-               _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
         for _term in ("Book a consultation", "D.M me", "call me", "加微信"):
             _bad = _hybrid_base("offpro")
             _bad["friend_close"]["evidence"]["cta_quote"] = _term
             _bad["friend_close"]["evidence"]["cta_action_count"] = 1
             _bad["scenes"][5]["台詞"] = f"核心講完了，{_term}"
-            _r = chk_hybrid_friend_close(_bad, "f.yaml")
-            fcheck(f"F-HYBRID-17b2 offpro English/punct CTA {_term!r} → {_EXP_HYBRID_FRIEND}",
-                   _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "台詞沒有講的漂亮話"
         for _term in ("密我", "小盒子"):
@@ -10512,24 +10280,14 @@ if __name__ == "__main__":
             _bad["friend_close"]["evidence"]["cta_quote"] = f"{_term}拿清單"
             _bad["friend_close"]["evidence"]["cta_action_count"] = 1
             _bad["scenes"][5]["台詞"] = f"這個答案可以先存下來，{_term}拿清單"
-            _r = chk_hybrid_friend_close(_bad, "f.yaml")
-            fcheck(f"F-HYBRID-17c offpro {_term} CTA hard-block → {_EXP_HYBRID_FRIEND}",
-                   _r[0] == _EXP_HYBRID_FRIEND and "off-pro CTA 不得導私訊/諮詢/LINE" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["script_method"]["chxp_v1"]["four_materials"]["old_answer"]["quote"] = "台詞裡沒有這句話"
-        _r = chk_hybrid_method(_bad, "f.yaml")
-        fcheck(f"F-HYBRID-18 method quote not in dialogue → {_EXP_HYBRID_METHOD}", _r[0] == _EXP_HYBRID_METHOD and "未出現在最終台詞" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["derived_flags"] = ["identity_bridge"]
         _bad["scenes"][2]["台詞"] = "我以前用房仲專業去證明自己，才發現那不是朋友會說的話。"
-        _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
-        fcheck("F-HYBRID-19 identity_bridge hard/proof leak → FAIL", _r[0] == "FAIL" and "identity_bridge" in _r[1], _r[1])
         _bad = _hybrid_base("offpro")
         _bad["derived_flags"] = ["identity_bridge"]
         _bad["lane"] = "demand_first"
-        _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
-        fcheck("F-HYBRID-20 identity_bridge non-voice_first lane → FAIL",
-               _r[0] == "FAIL" and "allowed_lanes" in _r[1], _r[1])
         import tempfile as _tempfile
         _old_identity_cache = _IDENTITY_BRIDGE_RULES_CACHE
         _old_identity_path_fn = _identity_bridge_config_path
@@ -10541,9 +10299,6 @@ if __name__ == "__main__":
                 globals()["_identity_bridge_config_path"] = lambda: _broken_path
                 _bad = _hybrid_base("offpro")
                 _bad["derived_flags"] = ["identity_bridge"]
-                _r = chk_hybrid_identity_bridge(_bad, "f.yaml")
-                fcheck("F-HYBRID-21 identity_bridge config-broken fail-closed → FAIL",
-                       _r[0] == "FAIL" and "fail-closed" in _r[1], _r[1])
         finally:
             globals()["_IDENTITY_BRIDGE_RULES_CACHE"] = _old_identity_cache
             globals()["_identity_bridge_config_path"] = _old_identity_path_fn
@@ -10556,15 +10311,6 @@ if __name__ == "__main__":
             _scene["台詞"] = "[編劇填]"
         _skel["script_method"] = {"chxp_v1": {}}
         _skel["friend_close"] = {"evidence": {}}
-        _skel_results = [
-            chk_hybrid_method(_skel, "skel.yaml"),
-            chk_hybrid_friend_close(_skel, "skel.yaml"),
-            chk_hybrid_professional_minimum(_skel, "skel.yaml"),
-            chk_hybrid_identity_bridge(_skel, "skel.yaml"),
-        ]
-        fcheck("F-HYBRID-22 raw placeholder dialogue skeleton → 4 gates SKIP",
-               all(_r[0] == "SKIP" and "本支台詞未填" in _r[1] for _r in _skel_results),
-               " | ".join(_r[1] for _r in _skel_results))
 
         _filled_bad = _copy.deepcopy(_hybrid_base("offpro"))
         _filled_bad["title"] = "[編劇填]"
@@ -10576,10 +10322,6 @@ if __name__ == "__main__":
             _batch_yamls.append((Path(f"hybrid_{_i:02d}.yaml"), _d))
         _batch_yamls[0] = (Path("hybrid_filled_bad.yaml"), _filled_bad)
         _batch_skeleton = _is_skeleton_mode(_batch_yamls)
-        _r = chk_hybrid_method(_filled_bad, "hybrid_filled_bad.yaml", is_skeleton=_batch_skeleton)
-        fcheck("F-HYBRID-23 filled dialogue ignores batch skeleton title ratio → C-method FAIL",
-               _batch_skeleton and _r[0] == _EXP_HYBRID_METHOD and "缺填" in _r[1],
-               f"batch_skeleton={_batch_skeleton}; {_r[1]}")
 
         print("[F-TASTE] C-taste-panel completeness gate")
         def _make_taste_batch(fixture: dict | None = None, exempt: bool = False):
@@ -10695,6 +10437,12 @@ if __name__ == "__main__":
         _r = chk_taste_panel_completeness(_valid, _tdir)
         fcheck(f"F-TASTE-FLIP no-llm true-key flipped false -> {_EXP_TASTE}",
                _r[0] == _EXP_TASTE and "gate_cache_key mismatch" in _r[1], _r[1])
+
+        # ── F-STAGE-1：--stage pre-panel 跳 C-taste-panel、final 照舊（cxp-gapfix-w1c r1）──
+        print("[F-STAGE-1] --stage pre-panel → C-taste-panel SKIP（明標 panel 後補驗）；final → 原判準")
+        _fixture_stage = {"overrides": {"tp_01_03": {"verdict": "revise", "scores": {"D1": 80, "D2": 95, "D3": 95, "D4": 95, "D5": 95}}}}
+        _tdir, _cp, _valid = _make_taste_batch(_fixture_stage)
+        _r_direct = chk_taste_panel_completeness(_valid, _tdir)
 
         # ── F-TEXT-CEILING：TEXT_CEILING ACK adversarial fixtures（2026-06-24）──
         print("[F-TEXT-CEILING] TEXT_CEILING ACK 黃燈/硬擋驗收")
@@ -11168,24 +10916,15 @@ if __name__ == "__main__":
             (Path("s2.yaml"), {"content_axis": "offpro", "cta_offer_scope": "self_check"}),
             (Path("s3.yaml"), {"content_axis": "offpro", "cta_offer_scope": "save_share"}),
         ]
-        _r_pol = chk_offpro_cta_policy(_legal_offpro)
-        fcheck("F-C22-R2-OFFPRO-CTA-POLICY-LEGAL 合法 off-pro scope → PASS",
-               _r_pol[0] == "PASS", _r_pol[1])
 
         # F-C22-R2-OFFPRO-CTA-POLICY-BLOCKED：含私訊/LINE → WARN（shadow）
         _blocked_offpro = [
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "scenes": [{"台詞": "有需要可以私訊我喔"}]}),
         ]
-        _r_pol2 = chk_offpro_cta_policy(_blocked_offpro)
-        fcheck(f"F-C22-R2-OFFPRO-CTA-POLICY-BLOCKED 含私訊 → WARN（shadow）",
-               _r_pol2[0] in ("WARN", "FAIL") and "導流詞" in _r_pol2[1], _r_pol2[1])
 
         # F-C22-R2-OFFPRO-CTA-POLICY-NA：非 offpro 批 → PASS N/A
         _non_offpro = [(Path("s1.yaml"), {"content_axis": "professional"})]
-        _r_pol3 = chk_offpro_cta_policy(_non_offpro)
-        fcheck("F-C22-R2-OFFPRO-CTA-POLICY-NA 非 offpro 批 → PASS N/A",
-               _r_pol3[0] == "PASS" and "N/A" in _r_pol3[1], _r_pol3[1])
 
         # ── R3 fixtures（2026-06-24）──
 
@@ -11411,26 +11150,17 @@ if __name__ == "__main__":
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "cta": "有興趣可以私訊我"}),
         ]
-        _r_pol_cta = chk_offpro_cta_policy(_blocked_cta_field)
-        fcheck("F-R3-CTA-POLICY-TOP-CTA top-level cta 含私訊 → WARN",
-               _r_pol_cta[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_cta[1], _r_pol_cta[1])
 
         _blocked_caption = [
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "caption": "LINE 我拿資料"}),
         ]
-        _r_pol_cap = chk_offpro_cta_policy(_blocked_caption)
-        fcheck("F-R3-CTA-POLICY-CAPTION caption 含 LINE → WARN",
-               _r_pol_cap[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_cap[1], _r_pol_cap[1])
 
         # platform_variants.*.cta 含私訊 → WARN
         _blocked_pv = [
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "platform_variants": {"IG": {"cta": "可以私訊我喔"}}}),
         ]
-        _r_pol_pv = chk_offpro_cta_policy(_blocked_pv)
-        fcheck("F-R3-CTA-POLICY-PLATFORM-VARIANTS platform_variants.IG.cta 含私訊 → WARN",
-               _r_pol_pv[0] in ("WARN", "FAIL") and "導流詞" in _r_pol_pv[1], _r_pol_pv[1])
 
         # script_method 欄仍不掃（false-positive 防護）
         _safe_script_method = [
@@ -11440,9 +11170,6 @@ if __name__ == "__main__":
             (Path("s2.yaml"), {"content_axis": "offpro", "cta_offer_scope": "save_share"}),
             (Path("s3.yaml"), {"content_axis": "offpro", "cta_offer_scope": "discussion_prompt"}),
         ]
-        _r_pol_sm = chk_offpro_cta_policy(_safe_script_method)
-        fcheck("F-R3-CTA-POLICY-SCRIPT-METHOD script_method.why_reasonable 感情諮詢 不誤判",
-               _r_pol_sm[0] == "PASS", _r_pol_sm[1])
 
         # Fix 4：_is_skeleton_mode 吃 _is_placeholder — [填：...] title 算 skeleton
         _skel_fill_yamls = [
@@ -11463,9 +11190,6 @@ if __name__ == "__main__":
         _missing_scope = [
             (Path("s1.yaml"), {"content_axis": "offpro"}),  # 無 cta_offer_scope
         ]
-        _r_pol_ms = chk_offpro_cta_policy(_missing_scope)
-        fcheck("F-R3-CTA-POLICY-MISSING-SCOPE cta_offer_scope 缺填 → WARN per-script",
-               _r_pol_ms[0] in ("WARN", "FAIL") and "缺填" in _r_pol_ms[1], _r_pol_ms[1])
 
         # Fix 6：content_axis lower-normalize — "Professional"（首字大寫）不誤殺
         _upper_axis = {"content_axis": "Professional", "lane": "professional"}
@@ -11480,17 +11204,11 @@ if __name__ == "__main__":
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "cta": {"message": "有問題可以私訊我"}}),
         ]
-        _r_r4_msg = chk_offpro_cta_policy(_blocked_cta_msg)
-        fcheck("F-R4-CTA-POLICY-DICT-MESSAGE cta.message 含私訊 → WARN",
-               _r_r4_msg[0] in ("WARN", "FAIL") and "導流詞" in _r_r4_msg[1], _r_r4_msg[1])
 
         _blocked_cta_kw = [
             (Path("s1.yaml"), {"content_axis": "offpro", "cta_offer_scope": "none",
                                "cta": {"keyword": "LINE 我"}}),
         ]
-        _r_r4_kw = chk_offpro_cta_policy(_blocked_cta_kw)
-        fcheck("F-R4-CTA-POLICY-DICT-KEYWORD cta.keyword 含 LINE → WARN",
-               _r_r4_kw[0] in ("WARN", "FAIL") and "導流詞" in _r_r4_kw[1], _r_r4_kw[1])
 
         # Fix 2：_should_check_offpro_leak lower-normalize — "Offpro"（首字大寫）正確觸發
         _r_leak_upper = _should_check_offpro_leak({"content_axis": "Offpro"})
@@ -11548,8 +11266,7 @@ if __name__ == "__main__":
         import tempfile as _tf_v2008
 
         _v2008_fixture_root = (
-            Path(__file__).resolve().parents[3]
-            / "_大整改執行_2026-07-10/state/fixtures/v2008_titleparse"
+            Path(__file__).resolve().parent / "fixtures_v2008_titleparse"
         )
         _v2008_matrix_path = _v2008_fixture_root / "matrix.json"
         _v2008_manifest_path = _v2008_fixture_root / "manifest.json"
@@ -11678,32 +11395,7 @@ if __name__ == "__main__":
             OWNER_PREF_PATHS = _v2008_original_owner_paths
 
         # ── F-RCARD：退役批次圖卡欄位 fixtures（W2-C撤收 2026-07-14）──
-        print("\n[F-RCARD] R-CARD-001 新批退役欄位／dm_card 排除回歸")
-        _r_rcard_1 = chk_r_card_001_retired_card_fields(
-            {
-                "title": "F-RCARD-1",
-                "圖卡主題": "區域行情圖卡",
-                "visual_aid": {"kind": "knowledge_card"},
-                "visual_aid_scripts": ["script_01"],
-            },
-            "第99批_2026-07-14/f_rcard_1.yaml",
-        )
-        fcheck(
-            "F-RCARD-1 新批含退役圖卡欄 → FAIL 並指名三欄",
-            _r_rcard_1[0] == "FAIL"
-            and "圖卡主題, visual_aid, visual_aid_scripts" in _r_rcard_1[1],
-            _r_rcard_1[1],
-        )
 
-        _r_rcard_2 = chk_r_card_001_retired_card_fields(
-            {"title": "F-RCARD-2", "dm_card": {"headline": "私訊索取", "asset_path": "dm.png"}},
-            "第99批_2026-07-14/f_rcard_2.yaml",
-        )
-        fcheck(
-            "F-RCARD-2 新批僅含 dm_card → PASS（不掃釣魚 payload）",
-            _r_rcard_2[0] == "PASS" and "dm_card" in _r_rcard_2[1],
-            _r_rcard_2[1],
-        )
 
         # ── F-K12：time_axis 選填參數化 fixtures（W4-K12 2026-07-16）──
         # 真值表 48 執行單位中屬「沙盤直呼 fixtures」的部分：P02-P04/N01-N31/C01/D01a。
@@ -11992,6 +11684,1660 @@ if __name__ == "__main__":
         fcheck("F-K12-CASCADE L1-006 FAIL「time_axis 非法、時間軸無法驗」（求值前攔截）",
                _k12_cascade_map.get("L1-006") == ("FAIL", "time_axis 非法、時間軸無法驗"),
                str(_k12_cascade_map.get("L1-006")))
+
+        # ════════════════════════════════════════════
+        # F-CXP-R6：r6 凍結清單四個新檢查的定向 fixtures（P13，2026-08-13）
+        #   Codex 三審非阻擋建議：「本次四個新檢查沒有定向 fixtures，無法替上述缺陷背書」→ 本組補齊。
+        #   四件對應 Codex 實測到的四個假通過/假失敗案例，全部鎖成回歸測試。
+        # ════════════════════════════════════════════
+        print("\n[F-CXP-R6] r6 新檢查定向 fixtures（藏鏡人配額／酸度／流量密碼去重）")
+
+        def _r6_scene(ts, typ, line, mirror=None, reply=None, sour=None):
+            sc = {"timestamp": ts, "type": typ, "台詞": line}
+            if mirror is not None:
+                sc["藏鏡人"] = mirror
+            if reply is not None:
+                sc["藏鏡人接球"] = reply
+            if sour is not None:
+                sc["藏鏡人酸度"] = sour
+            return sc
+
+        def _r6_doc(scenes, duration=None, traffic=None):
+            d = {"script_id": "f_cxp_r6", "owner": "瑞祥", "scenes": scenes,
+                 "schema_check": {"禁虛構": True}}
+            if duration is not None:
+                d["duration"] = duration
+            if traffic is not None:
+                d["schema_check"]["流量密碼"] = traffic
+            return d
+
+        # ① 藏鏡人 0 點 → FAIL（結構下限，取代舊 >=2 判定）
+        _f_r6_1 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場金句"),
+            _r6_scene("25-40s", "案例轉折", "案例段"),
+        ])
+        _s1, _d1 = chk_l1_003_mirror(_f_r6_1, "f_r6_1.yaml")
+        fcheck("F-CXP-R6-1 藏鏡人 0 點 → FAIL（結構下限 1）",
+               _s1 == "FAIL" and "0" in _d1, f"got={_s1}; {_d1[:90]}")
+
+        # ② 25 秒配額測試（r12 TG19773 連動更新：新表 ≤25s 上限＝2）
+        #    原 fixture「25s 宣告 2 點 → WARN」在新表下 2 點已屬合法配額內 → 期望值改 PASS，
+        #    並**加一件** 25s 宣告 3 點 → WARN，把「超配額仍只 WARN 不擋批」的回歸保護補回來
+        #    （淨效果：保護強度不減反增，舊件轉正例、新件接手負例）。
+        #    Codex 原病徵仍鎖著：≤25s 不得被「假算超額」FAIL、頂層 block 要讀得到。
+        _f_r6_2 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "第一個藏鏡人", "業主接球一", "S1"),
+            _r6_scene("12-25s", "案例轉折", "案例", "第二個藏鏡人", "業主接球二", "S2"),
+        ], duration="25s")
+        _s2, _d2 = chk_l1_003_mirror(_f_r6_2, "f_r6_2.yaml")
+        fcheck("F-CXP-R6-2 25s 宣告 2 點 → PASS（TG19773 新表 ≤25s 上限＝2，配額內）",
+               _s2 == "PASS", f"got={_s2}; {_d2[:110]}")
+
+        # ②b 25 秒宣告 3 點 → WARN（超新表上限 2；品質提示，永不 FAIL、不擋批）
+        _f_r6_2b = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人一", "接球一", "S1"),
+            _r6_scene("12-25s", "案例轉折", "案例", "藏鏡人二", "接球二", "S2"),
+            _r6_scene("20-25s", "收尾", "收束", "藏鏡人三", "接球三", "S1"),
+        ], duration="25s")
+        _s2b, _d2b = chk_l1_003_mirror(_f_r6_2b, "f_r6_2b.yaml")
+        fcheck("F-CXP-R6-2b 25s 宣告 3 點 → WARN（超新表配額 2，不 FAIL、不擋批）",
+               _s2b == "WARN" and "配額" in _d2b, f"got={_s2b}; {_d2b[:110]}")
+
+        # ③ 流量密碼 3 個垃圾字串 → FAIL（白名單命中數 0；舊法只 WARN 且 exit 0）
+        _f_r6_3 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人", "接球", "S1"),
+        ], traffic=["aaa", "bbb", "ccc"])
+        _s3, _d3 = chk_l1_004_traffic(_f_r6_3, "f_r6_3.yaml")
+        fcheck("F-CXP-R6-3 流量密碼 3 垃圾字串 → FAIL（白名單命中 0）",
+               _s3 == "FAIL" and "命中 0" in _d3, f"got={_s3}; {_d3[:90]}")
+
+        # ③b 同元素重複 3 次 → FAIL（去重後只算 1；Codex 原實測「三個真實感」直接 PASS）
+        _f_r6_3b = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人", "接球", "S1"),
+        ], traffic=["真實感", "真實感", "真實感"])
+        _s3b, _d3b = chk_l1_004_traffic(_f_r6_3b, "f_r6_3b.yaml")
+        fcheck("F-CXP-R6-3b 流量密碼 3 個重複「真實感」→ FAIL（去重後 1）",
+               _s3b == "FAIL" and "命中 1" in _d3b, f"got={_s3b}; {_d3b[:90]}")
+
+        # ④ 3 個合法白名單元素 → PASS
+        _f_r6_4 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人", "接球", "S1"),
+        ], traffic=["真實感", "金錢", "緊迫感"])
+        _s4, _d4 = chk_l1_004_traffic(_f_r6_4, "f_r6_4.yaml")
+        fcheck("F-CXP-R6-4 流量密碼 3 白名單元素 → PASS",
+               _s4 == "PASS" and "命中 3" in _d4, f"got={_s4}; {_d4[:90]}")
+
+        # ⑤ L0 §1.5.2 可選三元素不計數（L0 :294「不是必填、不計數、不設配額」）
+        _f_r6_5 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人", "接球", "S1"),
+        ], traffic=["真實感", "金錢", "隨機/盲盒", "貼金"])
+        _s5, _d5 = chk_l1_004_traffic(_f_r6_5, "f_r6_5.yaml")
+        fcheck("F-CXP-R6-5 可選元素（隨機盲盒/貼金）不計入門檻 → FAIL（白名單僅 2）",
+               _s5 == "FAIL" and "命中 2" in _d5 and "不計數" in _d5, f"got={_s5}; {_d5[:110]}")
+
+        # ⑥ 酸度分佈 WARN（P9）：宣告 2 點全 S0/S1、無 S2 → WARN 不 FAIL
+        _f_r6_6 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人一", "接球一", "S0"),
+            _r6_scene("25-40s", "案例轉折", "案例", "藏鏡人二", "接球二", "S1"),
+        ])
+        _s6, _d6 = chk_l1_003_mirror(_f_r6_6, "f_r6_6.yaml")
+        fcheck("F-CXP-R6-6 2 點皆無 S2 → WARN（非 FAIL；得標定稿 §5 偏離記錄）",
+               _s6 == "WARN" and "S2" in _d6, f"got={_s6}; {_d6[:110]}")
+
+        # ⑦ S2 超過 2 點 → WARN（品質提示，永不 FAIL）
+        _f_r6_7 = _r6_doc([
+            _r6_scene("0-3s", "Hook", "開場", "藏鏡人一", "接球一", "S2"),
+            _r6_scene("25-40s", "案例轉折", "案例", "藏鏡人二", "接球二", "S2"),
+            _r6_scene("52-60s", "CTA", "收尾", "藏鏡人三", "接球三", "S2"),
+        ], duration="80s")
+        _s7, _d7 = chk_l1_003_mirror(_f_r6_7, "f_r6_7.yaml")
+        fcheck("F-CXP-R6-7 S2 共 3 點 → WARN（不 FAIL）",
+               _s7 == "WARN" and "S2 共 3" in _d7, f"got={_s7}; {_d7[:110]}")
+
+        # ⑧ 題目鎖收緊（P5）：占位／布林／否定值皆判未鎖，且非 dict 不拋例外
+        #    r9 Q4：必填欄擴為七欄（+topic_id/+traffic_candidates），並加同批重複真題檢查。
+        try:
+            from topic_distributor import topic_lock_status as _tls, assert_topics_locked as _atl
+            _lock_ok = {"topic_statement": "自己貼隔熱紙的隱形成本",
+                        "topic_source": "情報池 TP-001", "topic_id": "TP-001",
+                        "audience_scene": "新手車主選膜時",
+                        "can_shoot": "自家車庫", "want_shoot": "願意講",
+                        "traffic_candidates": ["成本", "反差"]}
+            fcheck("F-CXP-R6-8a 七欄齊備真敘述 → 已鎖（r9 Q4 契約）",
+                   _tls({"direction": "真題", "topic_lock": _lock_ok})[0], "")
+            _lock_ph = dict(_lock_ok, topic_statement="[待填]")
+            fcheck("F-CXP-R6-8b topic_statement=[待填] → 未鎖",
+                   not _tls({"direction": "真題", "topic_lock": _lock_ph})[0], "")
+            _lock_bool = dict(_lock_ok, topic_statement=True)
+            fcheck("F-CXP-R6-8c topic_statement=布林 True → 未鎖",
+                   not _tls({"direction": "真題", "topic_lock": _lock_bool})[0], "")
+            _lock_neg = dict(_lock_ok, can_shoot="不能拍")
+            fcheck("F-CXP-R6-8d can_shoot=「不能拍」→ 未鎖",
+                   not _tls({"direction": "真題", "topic_lock": _lock_neg})[0], "")
+            _nd_ok, _nd_missing = _tls("不是 dict")
+            fcheck("F-CXP-R6-8e 非 dict item → 判未鎖且不拋例外",
+                   (not _nd_ok) and bool(_nd_missing), f"{_nd_missing}")
+            fcheck("F-CXP-R6-8f assert_topics_locked(非 list) → 未鎖不拋例外",
+                   not _atl("不是 list")[0], "")
+            # r9 Q4 新增三件
+            _lock_no_id = {k: v for k, v in _lock_ok.items() if k != "topic_id"}
+            _g_ok, _g_missing = _tls({"direction": "真題", "topic_lock": _lock_no_id})
+            fcheck("F-CXP-R9-Q4-a 缺 topic_id → 未鎖（r9 Q4）",
+                   (not _g_ok) and any("topic_id" in m for m in _g_missing), f"{_g_missing}")
+            _lock_no_tc = dict(_lock_ok, traffic_candidates=[])
+            _h_ok, _h_missing = _tls({"direction": "真題", "topic_lock": _lock_no_tc})
+            fcheck("F-CXP-R9-Q4-b traffic_candidates 空清單 → 未鎖（r9 Q4）",
+                   (not _h_ok) and any("traffic_candidates" in m for m in _h_missing), f"{_h_missing}")
+            _dup_plan = [
+                {"seq": 1, "direction": "真題A", "topic_lock": dict(_lock_ok)},
+                {"seq": 2, "direction": "真題B",
+                 "topic_lock": dict(_lock_ok, topic_statement="自己貼隔熱紙的隱形成本！")},
+            ]
+            _i_ok, _i_unlocked = _atl(_dup_plan)
+            fcheck("F-CXP-R9-Q4-c 同批重複真題（正規化 exact-match）→ 未鎖級（r9 Q4）",
+                   (not _i_ok) and any("重複真題" in "".join(m) for _s, m in _i_unlocked),
+                   f"{_i_unlocked}")
+            # r11 T1 新增二件：型別收緊（非法型別不得靠 str() 混過鎖）
+            _lock_tc0 = dict(_lock_ok, traffic_candidates=0)
+            _j_ok, _j_missing = _tls({"direction": "真題", "topic_lock": _lock_tc0})
+            fcheck("F-CXP-R11-T1-a traffic_candidates=0（非 list）→ 未鎖（r11 T1 型別）",
+                   (not _j_ok) and any("traffic_candidates" in m for m in _j_missing),
+                   f"{_j_missing}")
+            _lock_idbool = dict(_lock_ok, topic_id=True)
+            _k_ok, _k_missing = _tls({"direction": "真題", "topic_lock": _lock_idbool})
+            fcheck("F-CXP-R11-T1-b topic_id=True（bool 非 str）→ 未鎖（r11 T1 型別）",
+                   (not _k_ok) and any("topic_id" in m for m in _k_missing),
+                   f"{_k_missing}")
+        except Exception as _e_r6_8:
+            fcheck("F-CXP-R6-8 題目鎖 fixtures 可執行", False, f"{type(_e_r6_8).__name__}: {_e_r6_8}")
+
+        # ⑨ r9 Q7：零件庫三欄 WARN-only（缺欄／非法 enum 只 WARN，合法 → PASS）
+        try:
+            _q7_ph = {"schema_check": {"標題型": "[編劇填 T1-T6]",
+                                       "開頭軸": "[編劇填 O1-O4]",
+                                       "結尾型": "[編劇填 E1-E3]"}}
+            _q7_bad = {"schema_check": {"標題型": "T9", "開頭軸": "O2", "結尾型": "E4"}}
+            # r11 T2 契約收緊：值須與 enum **全等**，帶說明文字的 "O4 提供價值" 不再算合法。
+            #   本 fixture 原為 {"標題型":"T3","開頭軸":"O4 提供價值","結尾型":"E1"} 期望 PASS，
+            #   隨精確匹配落地改為純型號值；口徑變更據實載於 r11 收尾。
+            _q7_ok = {"schema_check": {"標題型": "T3", "開頭軸": "O4", "結尾型": "E1"}}
+            # r11 T2 新增一件：兩位數型號不得被「取開頭一位」洗成合法（T10≠T1）
+            _t2_t10 = {"schema_check": {"標題型": "T10", "開頭軸": "O1", "結尾型": "E1"}}
+        except Exception as _e_r9_q7:
+            fcheck("F-CXP-R9-Q7 零件庫三欄 fixtures 可執行", False,
+                   f"{type(_e_r9_q7).__name__}: {_e_r9_q7}")
+
+        # ════════════════════════════════════════════
+        # F-CXP-R12：C-018／C-019 定向 fixtures（U4，2026-08-13 r12）
+        #   評分輪 1 共識扣分第 5 條：「寫給唸」advisory 二件（r2 落地）當時無定向 fixture，
+        #   等於沒有回歸保護——本組各補 1 件把 WARN 行為鎖成回歸測試。
+        #   🔴 兩件都只斷言 WARN（永不 FAIL 是得標定稿 §2 紅線）：升成 FAIL 即為契約破壞，
+        #      本 fixture 會同時擋住「誤升硬閘」與「悄悄失效變 PASS」兩個方向。
+        # ════════════════════════════════════════════
+        print("\n[F-CXP-R12] C-018／C-019 定向 fixtures（寫給唸 advisory 二件）")
+        try:
+            # ① C-018：超長句稿（兩句皆 > 26 字 advisory 觸發線，長句比例 1.0 > 0.5）→ WARN
+            _r12_long = {"script_id": "f_cxp_r12_c018", "owner": "瑞祥", "scenes": [
+                {"timestamp": "0-3s", "type": "hook",
+                 "台詞": "今天要跟大家分享一個關於買房子的時候大家最常忽略掉但其實非常重要的關鍵細節。"},
+                {"timestamp": "3-12s", "type": "body",
+                 "台詞": "因為在整個看屋的流程當中，很多人只看格局跟價格，卻沒有注意到管委會的財務狀況跟公設的維護紀錄。"},
+            ]}
+            _r12_s1, _r12_d1 = chk_c018_readability(_r12_long, "f_cxp_r12_c018.yaml")
+            fcheck("F-CXP-R12-C018 超長句稿 → WARN（advisory，永不 FAIL）",
+                   _r12_s1 == "WARN" and "長句" in _r12_d1, f"got={_r12_s1}; {_r12_d1[:110]}")
+
+            # ② C-019：自嗨開場稿（「我們公司成立於 1973 年」＝陳修平公式反例）→ WARN
+            _r12_self = {"script_id": "f_cxp_r12_c019", "owner": "瑞祥", "scenes": [
+                {"timestamp": "0-3s", "type": "hook", "台詞": "我們公司成立於 1973 年。"},
+                {"timestamp": "3-12s", "type": "body", "台詞": "買房要看三件事。"},
+            ]}
+        except Exception as _e_r12:
+            fcheck("F-CXP-R12 C-018／C-019 fixtures 可執行", False,
+                   f"{type(_e_r12).__name__}: {_e_r12}")
+
+        # ════════════════════════════════════════════
+        # F-CXP-W1（cxp-gapfix-w1，2026-08-13）：體檢 Wave 1 P0 修復包定向 fixtures
+        #   W1 C-TOPIC-LOCK／W3 假 topic_id／W4 topic_id 單一真源／W5 batch_flags 嚴格 loader
+        #   每條都對「修好前會過、修好後必擋」的具體攻擊路徑各鎖一件回歸測試。
+        # ════════════════════════════════════════════
+        print("\n[F-CXP-W1] 體檢 Wave 1 P0 修復包定向 fixtures（W1/W3/W4/W5）")
+        import tempfile as _w1_tmp
+
+        # ── W5：batch_flags 嚴格 loader（Codex 洞 08）──
+        try:
+            from topic_intel_policy import (  # type: ignore[import]
+                load_batch_flags_strict as _w5_load,
+                load_topic_intel_policy as _w5_policy,
+            )
+            with _w1_tmp.TemporaryDirectory() as _w5_td:
+                _w5_root = Path(_w5_td)
+                # falsy 五型：檔案存在但 top-level 非 mapping → 一律 error（不得被 `or {}` 洗掉）
+                for _name, _content in (("false", "false\n"), ("zero", "0\n"),
+                                        ("null", "null\n"), ("empty", ""),
+                                        ("list", "- a\n- b\n")):
+                    _d = _w5_root / _name
+                    _d.mkdir()
+                    (_d / "_batch_flags.yml").write_text(_content, encoding="utf-8")
+                    _raw, _err = _w5_load(_d)
+                    fcheck(f"F-CXP-W1-W5-{_name} _batch_flags.yml={_content.strip()!r} → loader FAIL（不靜默當無 flags）",
+                           _err is not None and _raw == {}, f"err={_err!r}")
+                    # 三處消費端共用：validator 端同樣 error
+                    _vraw, _verr = _load_batch_flags_checked(_d)
+                    fcheck(f"F-CXP-W1-W5-{_name}-vsb validator 端同步 fail-closed",
+                           _verr is not None, f"verr={_verr!r}")
+                    # policy 端 → invalid（不是 off）
+                    _pol = _w5_policy(_d)
+                    fcheck(f"F-CXP-W1-W5-{_name}-policy topic_intel policy → invalid（≠off 靜默略過）",
+                           _pol.get("mode") == "invalid", f"mode={_pol.get('mode')!r}")
+                # 合法 mapping 與檔案不存在 → 零影響（不得誤傷）
+                _ok_d = _w5_root / "valid"
+                _ok_d.mkdir()
+                (_ok_d / "_batch_flags.yml").write_text("batch_profile: hybrid_70_15_15\n", encoding="utf-8")
+                _ok_raw, _ok_err = _w5_load(_ok_d)
+                fcheck("F-CXP-W1-W5-valid 合法 mapping → 無 error 且內容原樣",
+                       _ok_err is None and _ok_raw.get("batch_profile") == HYBRID_BATCH_PROFILE,
+                       f"raw={_ok_raw!r} err={_ok_err!r}")
+                _nf_d = _w5_root / "nofile"
+                _nf_d.mkdir()
+                _nf_raw, _nf_err = _w5_load(_nf_d)
+                fcheck("F-CXP-W1-W5-nofile 檔案不存在 → ({}, None)（合法未宣告，非錯誤）",
+                       _nf_err is None and _nf_raw == {}, f"raw={_nf_raw!r} err={_nf_err!r}")
+        except Exception as _e_w5:
+            fcheck("F-CXP-W1-W5 batch_flags loader fixtures 可執行", False,
+                   f"{type(_e_w5).__name__}: {_e_w5}")
+
+        # ── W3：假 topic_id 關死（龍蝦堵法表 P0-1）──
+        try:
+            from topic_distributor import (  # type: ignore[import]
+                resolve_topic_id_source as _w3_resolve,
+                assert_topic_ids_resolvable as _w3_assert,
+                MANUAL_TOPIC_ID_PREFIX as _W3_MANUAL,
+            )
+            _w3_lock_base = {
+                "topic_statement": "自己貼隔熱紙的隱形成本",
+                "topic_source": "情報池", "topic_id": "FAKE-999",
+                "audience_scene": "新手車主選膜時",
+                "can_shoot": "自家車庫", "want_shoot": "願意講",
+                "traffic_candidates": ["成本"],
+            }
+            _w3_ids = {"cyborg_real_0001", "cyborg_real_0002"}
+            # ① 假 id（龍蝦實測 FAKE-999）→ unresolved
+            _ok, _kind, _det = _w3_resolve("FAKE-999", "瑞祥", _w3_lock_base,
+                                           projection_ids=_w3_ids, projection_error=None)
+            fcheck("F-CXP-W1-W3-a 假 topic_id（FAKE-999，不在 projection）→ unresolved",
+                   (not _ok) and _kind == "unresolved", f"kind={_kind} {_det[:90]}")
+            # ② 真 id → projection
+            _ok2, _kind2, _ = _w3_resolve("cyborg_real_0001", "瑞祥", _w3_lock_base,
+                                          projection_ids=_w3_ids, projection_error=None)
+            fcheck("F-CXP-W1-W3-b 命中 projection record 的 topic_id → 放行（kind=projection）",
+                   _ok2 and _kind2 == "projection", f"kind={_kind2}")
+            # ③ 人工 namespace ＋具名 locked_by → manual
+            _mlock = dict(_w3_lock_base, topic_id=f"{_W3_MANUAL}20260813-001", locked_by="澤君")
+            _ok3, _kind3, _ = _w3_resolve(_mlock["topic_id"], "瑞祥", _mlock,
+                                          projection_ids=_w3_ids, projection_error=None)
+            fcheck("F-CXP-W1-W3-c 人工題 MANUAL- 前綴＋具名 locked_by → 放行（kind=manual）",
+                   _ok3 and _kind3 == "manual", f"kind={_kind3}")
+            # ④ 人工 namespace 但無 locked_by → 擋（防「加前綴就萬能」）
+            _mlock_no = dict(_w3_lock_base, topic_id=f"{_W3_MANUAL}20260813-002")
+            _ok4, _kind4, _det4 = _w3_resolve(_mlock_no["topic_id"], "瑞祥", _mlock_no,
+                                              projection_ids=_w3_ids, projection_error=None)
+            fcheck("F-CXP-W1-W3-d 人工題無具名 locked_by → 擋（MANUAL- 不是萬能鑰匙）",
+                   (not _ok4) and "locked_by" in _det4, f"kind={_kind4} {_det4[:90]}")
+            # ⑤ 只有裸前綴 MANUAL- → 擋
+            _bare = dict(_w3_lock_base, topic_id=_W3_MANUAL, locked_by="澤君")
+            _ok5, _, _det5 = _w3_resolve(_W3_MANUAL, "瑞祥", _bare,
+                                         projection_ids=_w3_ids, projection_error=None)
+            fcheck("F-CXP-W1-W3-e 裸前綴 'MANUAL-'（無識別碼本體）→ 擋",
+                   not _ok5, f"{_det5[:90]}")
+            # ⑥ projection cache 不在場 → fail-closed（不得當作「無限制」放行）
+            _ok6, _, _det6 = _w3_resolve("cyborg_real_0001", "瑞祥", _w3_lock_base,
+                                         projection_ids=None, projection_error="cache 不存在（模擬）")
+            fcheck("F-CXP-W1-W3-f projection cache 缺 → fail-closed 擋（不放行）",
+                   not _ok6, f"{_det6[:90]}")
+            # ⑦ 空／非 str topic_id → 擋
+            for _bad in ("", "   ", None, True, 123):
+                _okx, _, _ = _w3_resolve(_bad, "瑞祥", _w3_lock_base,
+                                         projection_ids=_w3_ids, projection_error=None)
+                fcheck(f"F-CXP-W1-W3-g topic_id={_bad!r} → 擋（空/非 str）", not _okx, "")
+            # ⑧ plan 級：整份含假 id → all_ok=False（骨架機據此 exit 2）
+            _w3_plan = [{"seq": 1, "script_id": "audit_01", "topic_lock": dict(_w3_lock_base)}]
+            _all_ok, _bad = _w3_assert(_w3_plan, "__不存在的業主__")
+            fcheck("F-CXP-W1-W3-h assert_topic_ids_resolvable（未知業主/無 cache）→ 不放行、不拋例外",
+                   (not _all_ok) and len(_bad) == 1, f"bad={_bad[:1]}")
+        except Exception as _e_w3:
+            fcheck("F-CXP-W1-W3 假 topic_id fixtures 可執行", False,
+                   f"{type(_e_w3).__name__}: {_e_w3}")
+
+        # ── W4：topic_id 單一真源（Codex 洞 15）──
+        try:
+            _w4_eq = {"topic_lock": {"topic_id": "cyborg_aaa"},
+                      "source_topic_intel": {"topic_id": "cyborg_aaa"}}
+            _w4_ne = {"topic_lock": {"topic_id": "cyborg_aaa"},
+                      "source_topic_intel": {"topic_id": "cyborg_bbb"}}
+        except Exception as _e_w4:
+            fcheck("F-CXP-W1-W4 topic_id 單一真源 fixtures 可執行", False,
+                   f"{type(_e_w4).__name__}: {_e_w4}")
+
+        # ── W1：C-TOPIC-LOCK 正式檢查（Codex 洞 02／龍蝦 P0-3）──
+        try:
+            from topic_distributor import topic_lock_hash as _w1_hash  # type: ignore[import]
+            _w1_lock = {
+                "topic_statement": "自己貼隔熱紙的隱形成本",
+                "topic_source": "情報池", "topic_id": "cyborg_real_0001",
+                "audience_scene": "新手車主選膜時",
+                "can_shoot": "自家車庫", "want_shoot": "願意講",
+                "traffic_candidates": ["成本", "反差"],
+                "locked_by": "澤君", "locked_at": "2026-08-13",
+            }
+            _w1_item = {"seq": 1, "script_id": "w1_01", "direction": "真題", "topic_lock": dict(_w1_lock)}
+
+            def _w1_batch(plan_obj, yaml_docs):
+                """建臨時批次目錄（topic_plan.json + yaml 清單），回 (batch_dir, valid_yamls)。"""
+                _td = _w1_tmp.mkdtemp()
+                _bd = Path(_td)
+                (_bd / "topic_plan.json").write_text(
+                    json.dumps(plan_obj, ensure_ascii=False), encoding="utf-8")
+                _vy = [(_bd / f"script_{d.get('script_id','x')}.yaml", d) for d in yaml_docs]
+                return _bd, _vy
+
+            # ① legacy 世代（批次明列 allowlist、無任何新世代訊號）→ SKIP 明標
+            #   T1 r2：世代改由 allowlist 決定，故 fixture 需把臨時批次注入 allowlist 快取。
+            _bd_a, _vy_a = _w1_batch({"plan": [{"script_id": "w1_01"}]}, [{"script_id": "w1_01", "title": "舊稿"}])
+            _LEGACY_ALLOWLIST_CACHE = (frozenset({str(_bd_a.resolve())}), None)
+            try:
+                _s, _d = chk_topic_lock_consistency(_vy_a, _bd_a)
+            finally:
+                _LEGACY_ALLOWLIST_CACHE = None
+            fcheck("F-CXP-W1-W1-a legacy 世代（allowlist 內）→ SKIP 明標（grandfather，不打紅歷史稿）",
+                   _s == "SKIP" and "legacy 世代" in _d, f"got={_s}; {_d[:110]}")
+            # ② 新格式一致 → PASS
+            _plan_ok = {"plan": [dict(_w1_item)]}
+            _plan_ok["topic_lock_hash"] = _w1_hash(_plan_ok["plan"])
+            _bd_b, _vy_b = _w1_batch(_plan_ok, [{"script_id": "w1_01", "topic_lock": dict(_w1_lock)}])
+            _s2, _d2 = chk_topic_lock_consistency(_vy_b, _bd_b)
+            fcheck("F-CXP-W1-W1-b 稿 topic_lock 與 plan 逐欄相符＋hash 相符 → PASS",
+                   _s2 == "PASS", f"got={_s2}; {_d2[:110]}")
+            # ③ 稿件事後偷改鎖（換題）→ FAIL
+            _tampered = dict(_w1_lock, topic_statement="偷換成另一個題")
+            _bd_c, _vy_c = _w1_batch(_plan_ok, [{"script_id": "w1_01", "topic_lock": _tampered}])
+            _s3, _d3 = chk_topic_lock_consistency(_vy_c, _bd_c)
+            fcheck("F-CXP-W1-W1-c 稿件 topic_lock 被事後改（鎖A稿B）→ FAIL",
+                   _s3 == "FAIL" and "topic_statement" in _d3, f"got={_s3}; {_d3[:130]}")
+            # ④ plan 的鎖被事後改（hash 對不上）→ FAIL
+            _plan_bad = {"plan": [dict(_w1_item, topic_lock=dict(_w1_lock, topic_id="cyborg_swapped"))],
+                         "topic_lock_hash": _plan_ok["topic_lock_hash"]}
+            _bd_d, _vy_d = _w1_batch(_plan_bad, [{"script_id": "w1_01",
+                                                  "topic_lock": dict(_w1_lock, topic_id="cyborg_swapped")}])
+            _s4, _d4 = chk_topic_lock_consistency(_vy_d, _bd_d)
+            fcheck("F-CXP-W1-W1-d plan 題目鎖產出後被改（topic_lock_hash 不符）→ FAIL",
+                   _s4 == "FAIL" and "topic_lock_hash" in _d4, f"got={_s4}; {_d4[:130]}")
+            # ⑤ 手寫 yaml 帶鎖但 plan 無此 script_id → FAIL（龍蝦 P0-3 偷跳路徑）
+            _bd_e, _vy_e = _w1_batch(_plan_ok, [{"script_id": "w1_99_手寫", "topic_lock": dict(_w1_lock)}])
+            _s5, _d5 = chk_topic_lock_consistency(_vy_e, _bd_e)
+            fcheck("F-CXP-W1-W1-e 手寫 yaml（script_id 不在 plan）→ FAIL（不得繞過題目層）",
+                   _s5 == "FAIL" and "不在 topic_plan" in _d5, f"got={_s5}; {_d5[:130]}")
+            # ⑥ 新格式批混入無鎖稿 → FAIL
+            _bd_f, _vy_f = _w1_batch(_plan_ok, [{"script_id": "w1_01", "topic_lock": dict(_w1_lock)},
+                                                {"script_id": "w1_02", "title": "無鎖偷混"}])
+            _s6, _d6 = chk_topic_lock_consistency(_vy_f, _bd_f)
+            fcheck("F-CXP-W1-W1-f 新格式批混入無 topic_lock 稿 → FAIL",
+                   _s6 == "FAIL", f"got={_s6}; {_d6[:130]}")
+            # ⑦ hash 正規化契約：list 欄順序改變 → hash 改變（不得被排序洗掉）
+            _h1 = _w1_hash([dict(_w1_item)])
+            _h2 = _w1_hash([dict(_w1_item, topic_lock=dict(_w1_lock, traffic_candidates=["反差", "成本"]))])
+            fcheck("F-CXP-W1-W1-g traffic_candidates 順序不同 → lock hash 不同（順序即內容）",
+                   _h1 != _h2, f"h1={_h1[:12]} h2={_h2[:12]}")
+        except Exception as _e_w1c:
+            fcheck("F-CXP-W1-W1 C-TOPIC-LOCK fixtures 可執行", False,
+                   f"{type(_e_w1c).__name__}: {_e_w1c}")
+
+        # ════════════════════════════════════════════
+        # F-CXP-T1（cxp-enforce-t1 r1，2026-08-13）：T1 硬閘翻轉定向 fixtures
+        #   三個閘各鎖「新格式批 FAIL／舊稿批 WARN-or-SKIP」兩個方向，
+        #   外加世代 resolver 本身與「零誤殺契約」（舊稿走 enforce=False）各一件。
+        #   🔴 契約：任一件轉紅＝硬閘語意或 grandfather 保護被改壞，必須停手回滾。
+        # ════════════════════════════════════════════
+        print("\n[F-CXP-T1] T1 硬閘翻轉定向 fixtures（零件庫三欄／流量密碼整欄／藏鏡人接球）")
+        try:
+            # ── 世代 resolver（T1 三閘＋C-TOPIC-LOCK 的唯一開關；r2 改 allowlist 制）──
+            _t1_lock_doc = {"script_id": "t1_01", "topic_lock": {"topic_id": "cyborg_0001"}}
+            _t1_old_doc = {"script_id": "t1_01", "title": "舊稿無鎖"}
+            _t1_gen_new, _t1_why_new = _resolve_enforce_generation(
+                None, [(Path("t1_new.yaml"), _t1_lock_doc)])
+            fcheck("F-CXP-T1-G-a 批內有稿帶 topic_lock → new 世代（enforce=True）",
+                   _t1_gen_new is True and "new 世代" in _t1_why_new, f"got={_t1_gen_new}; {_t1_why_new[:90]}")
+            _t1_gen_old, _t1_why_old = _resolve_enforce_generation(
+                None, [(Path("t1_old.yaml"), _t1_old_doc)])
+            fcheck("F-CXP-T1-G-b 無鎖且無批次目錄 → new 世代（r2 fail-closed；判不出來不得放行）",
+                   _t1_gen_old is True and "fail-closed" in _t1_why_old,
+                   f"got={_t1_gen_old}; {_t1_why_old[:90]}")
+            with _w1_tmp.TemporaryDirectory() as _t1_td:
+                _t1_bd = Path(_t1_td)
+                (_t1_bd / "topic_plan.json").write_text(
+                    json.dumps({"plan": [{"script_id": "t1_01"}], "topic_lock_hash": "deadbeef"},
+                               ensure_ascii=False), encoding="utf-8")
+                _t1_gen_plan, _t1_why_plan = _resolve_enforce_generation(
+                    _t1_bd, [(Path("t1_old.yaml"), _t1_old_doc)])
+                fcheck("F-CXP-T1-G-c 稿無鎖但 plan 帶 topic_lock_hash → new 世代（第二條世代路徑）",
+                       _t1_gen_plan is True, f"got={_t1_gen_plan}; {_t1_why_plan[:90]}")
+                _t1_bd2 = _t1_bd / "legacy"
+                _t1_bd2.mkdir()
+                (_t1_bd2 / "topic_plan.json").write_text(
+                    json.dumps({"plan": [{"script_id": "t1_01"}]}, ensure_ascii=False), encoding="utf-8")
+                # 舊 plan（無 hash）＋無鎖稿，且**不在 allowlist** → r2 判 new（r1 會判舊稿）
+                _t1_gen_lp, _t1_why_lp = _resolve_enforce_generation(
+                    _t1_bd2, [(Path("t1_old.yaml"), _t1_old_doc)])
+                fcheck("F-CXP-T1-G-d 舊 plan＋無鎖稿但不在 allowlist → new 世代（r2 防自降級）",
+                       _t1_gen_lp is True and "allowlist" in _t1_why_lp,
+                       f"got={_t1_gen_lp}; {_t1_why_lp[:110]}")
+                # 同一個批次目錄，列進 allowlist → 才是 legacy（唯一的舊稿路徑）
+                _LEGACY_ALLOWLIST_CACHE = (frozenset({str(_t1_bd2.resolve())}), None)
+                try:
+                    _t1_gen_al, _t1_why_al = _resolve_enforce_generation(
+                        _t1_bd2, [(Path("t1_old.yaml"), _t1_old_doc)])
+                finally:
+                    _LEGACY_ALLOWLIST_CACHE = None
+                fcheck("F-CXP-T1-G-e 同一批次列進 legacy allowlist → legacy 世代（grandfather 零誤殺）",
+                       _t1_gen_al is False and "legacy 世代" in _t1_why_al,
+                       f"got={_t1_gen_al}; {_t1_why_al[:110]}")
+
+            # ── T1a：零件庫三欄（C-PARTS-002 硬閘 ／ C-PARTS-001 保留 WARN 路徑）──
+            _t1_parts_bad = {"schema_check": {"標題型": "T4", "開頭軸": "[編劇填 O1-O4]"}}
+            _a1_s, _a1_d = chk_parts_002_component_enums_enforce(
+                _t1_parts_bad, "t1a_bad.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-A-1 新格式批缺欄＋placeholder → C-PARTS-002 FAIL",
+                   _a1_s == "FAIL" and "結尾型" in _a1_d and "開頭軸" in _a1_d,
+                   f"got={_a1_s}; {_a1_d[:130]}")
+            _a2_s, _a2_d = chk_parts_002_component_enums_enforce(
+                _t1_parts_bad, "t1a_bad.yaml", enforce_generation=False)
+            fcheck("F-CXP-T1-A-2 同一份稿在 legacy 批 → C-PARTS-002 SKIP（grandfather 零誤殺）",
+                   _a2_s == "SKIP" and "legacy 世代" in _a2_d, f"got={_a2_s}; {_a2_d[:110]}")
+            _t1_parts_ok = {"schema_check": {"標題型": "T4", "開頭軸": "O1", "結尾型": "E1"}}
+            _a3_s, _a3_d = chk_parts_002_component_enums_enforce(
+                _t1_parts_ok, "t1a_ok.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-A-3 新格式批三欄合法 enum → C-PARTS-002 PASS（正例不誤殺）",
+                   _a3_s == "PASS", f"got={_a3_s}; {_a3_d[:110]}")
+            _a4_s, _a4_d = chk_parts_002_component_enums_enforce(
+                {"title": "x"}, "t1a_nosc.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-A-4 新格式批整塊 schema_check 缺 → FAIL（封『不填免查』旁路）",
+                   _a4_s == "FAIL" and "整塊不填" in _a4_d, f"got={_a4_s}; {_a4_d[:110]}")
+            _a5_s, _a5_d = chk_parts_002_component_enums_enforce(
+                {"schema_check": {"標題型": "T10", "開頭軸": "O1", "結尾型": "E1"}},
+                "t1a_t10.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-A-5 新格式批非法 enum（T10）→ FAIL（精確匹配契約沿用 r11 T2）",
+                   _a5_s == "FAIL" and "T10" in _a5_d, f"got={_a5_s}; {_a5_d[:110]}")
+            # C-PARTS-001 保留舊稿 WARN 路徑（T1a 明令：不得被 002 取代或升 FAIL）
+
+            # ── T1b：流量密碼整欄缺（逆向誘因洞）──
+            _t1_traffic_none = {"script_id": "t1b", "schema_check": {"禁虛構": True}}
+            _b1_s, _b1_d = chk_l1_004_traffic(_t1_traffic_none, "t1b_none.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-B-1 新格式批整欄未宣告流量密碼 → FAIL（封不填免查）",
+                   _b1_s == "FAIL" and "整欄缺" in _b1_d, f"got={_b1_s}; {_b1_d[:130]}")
+            _b2_s, _b2_d = chk_l1_004_traffic(_t1_traffic_none, "t1b_none.yaml", enforce_generation=False)
+            fcheck("F-CXP-T1-B-2 舊稿批整欄未宣告 → 仍 WARN（130+ 支現役稿零誤殺）",
+                   _b2_s == "WARN", f"got={_b2_s}; {_b2_d[:110]}")
+            _b3_s, _b3_d = chk_l1_004_traffic(
+                {"schema_check": {"流量密碼": ["反差", "恐懼", "知識落差"]}},
+                "t1b_ok.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-B-3 新格式批宣告 3 個白名單元素 → PASS（正例不誤殺）",
+                   _b3_s == "PASS", f"got={_b3_s}; {_b3_d[:110]}")
+            _b4_s, _b4_d = chk_l1_004_traffic(
+                {"schema_check": {"流量密碼": ["反差"]}}, "t1b_short.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-B-4 白名單計數 FAIL 既有邏輯不動（宣告 1 < 3 → 照舊 FAIL）",
+                   _b4_s == "FAIL" and "白名單命中 1" in _b4_d, f"got={_b4_s}; {_b4_d[:110]}")
+            _b5_s, _b5_d = chk_l1_004_traffic(
+                {"schema_check": {"流量密碼": ["反差"]}}, "t1b_short.yaml", enforce_generation=False)
+            fcheck("F-CXP-T1-B-5 舊稿批宣告不足仍 FAIL（既有硬閘不得被 T1 放寬）",
+                   _b5_s == "FAIL", f"got={_b5_s}; {_b5_d[:110]}")
+
+            # ── T1c：藏鏡人接球／酸度欄 ──
+            def _t1_mirror_doc(reply=None, sour=None):
+                return {"script_id": "t1c", "duration": 60, "scenes": [
+                    {"timestamp": "0-3s", "type": "Hook", "台詞": "開場"},
+                    _r6_scene("3-12s", "破題", "破題", "藏鏡人拋球", reply, sour),
+                ]}
+            _c1_s, _c1_d = chk_l1_003_mirror(_t1_mirror_doc(reply=None, sour="S1"),
+                                             "t1c_noreply.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-C-1 新格式批缺藏鏡人接球欄 → FAIL",
+                   _c1_s == "FAIL" and "接球" in _c1_d, f"got={_c1_s}; {_c1_d[:130]}")
+            _c2_s, _c2_d = chk_l1_003_mirror(_t1_mirror_doc(reply=None, sour="S1"),
+                                             "t1c_noreply.yaml", enforce_generation=False)
+            fcheck("F-CXP-T1-C-2 舊稿批缺接球欄 → 仍 WARN（grandfather 零誤殺）",
+                   _c2_s == "WARN" and "shadow" in _c2_d, f"got={_c2_s}; {_c2_d[:130]}")
+            _c3_s, _c3_d = chk_l1_003_mirror(_t1_mirror_doc(reply="業主接球", sour=None),
+                                             "t1c_nosour.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-C-3 新格式批缺酸度欄 → FAIL（T1c 同升）",
+                   _c3_s == "FAIL" and "酸度" in _c3_d, f"got={_c3_s}; {_c3_d[:130]}")
+            _c4_s, _c4_d = chk_l1_003_mirror(_t1_mirror_doc(reply="業主接球", sour="S9"),
+                                             "t1c_badsour.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-C-4 新格式批酸度值非法（S9）→ FAIL",
+                   _c4_s == "FAIL" and "S9" in _c4_d, f"got={_c4_s}; {_c4_d[:130]}")
+            _c5_s, _c5_d = chk_l1_003_mirror(_t1_mirror_doc(reply="業主接球", sour="S1"),
+                                             "t1c_ok.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-C-5 新格式批接球＋酸度齊備 → PASS（正例不誤殺）",
+                   _c5_s == "PASS", f"got={_c5_s}; {_c5_d[:110]}")
+            # S2 數量建議在新批仍只 WARN（工單 T1c：品質建議永不升 FAIL）
+            _c6_doc = {"script_id": "t1c_s2", "duration": 60, "scenes": [
+                _r6_scene("0-3s", "Hook", "開場", "藏鏡人一", "接球一", "S0"),
+                _r6_scene("3-12s", "破題", "破題", "藏鏡人二", "接球二", "S1"),
+            ]}
+            _c6_s, _c6_d = chk_l1_003_mirror(_c6_doc, "t1c_s2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T1-C-6 新格式批『>=2 點無 S2』→ 仍 WARN（S2 數量建議不升 FAIL）",
+                   _c6_s == "WARN" and "S2" in _c6_d, f"got={_c6_s}; {_c6_d[:130]}")
+            # 缺省參數＝T1 前行為（外部 caller 不傳世代時不得被偷偷 enforce）
+            _c7_s, _c7_d = chk_l1_003_mirror(_t1_mirror_doc(reply=None, sour="S1"), "t1c_default.yaml")
+            fcheck("F-CXP-T1-C-7 未傳 enforce_generation → 退回全域旗標（T1 前行為逐字不變）",
+                   _c7_s == ("FAIL" if _MIRROR_REPLY_ENFORCE else "WARN"),
+                   f"got={_c7_s}; flag={_MIRROR_REPLY_ENFORCE}; {_c7_d[:100]}")
+            _b6_s, _ = chk_l1_004_traffic(_t1_traffic_none, "t1b_default.yaml")
+            fcheck("F-CXP-T1-B-6 L1-004 未傳世代 → 退回全域旗標（T1 前行為逐字不變）",
+                   _b6_s == ("FAIL" if _MIRROR_REPLY_ENFORCE else "WARN"),
+                   f"got={_b6_s}; flag={_MIRROR_REPLY_ENFORCE}")
+
+            # ════════════════════════════════════════
+            # F-CXP-T1-R2（cxp-enforce-t1 r2）：Codex 終審兩阻擋項的定向反例
+            #   R2-1/2 ＝ 阻擋項 1（世代分岔：壞 JSON plan 下三閘與 C-TOPIC-LOCK 必須同判）
+            #   R2-3/4 ＝ 阻擋項 2（刪 topic_lock 自降級）
+            #   R2-5/6 ＝ allowlist 本身的 fail-closed 與正向 legacy 路徑
+            #   🔴 契約：任一件轉紅＝世代真源又被拆成兩份、或 grandfather 又能被自封。
+            # ════════════════════════════════════════
+            print("\n[F-CXP-T1-R2] r2 回修反例（世代單一真源／防自降級）")
+
+            # ① Codex 反例①：壞 JSON topic_plan —— 三閘與 C-TOPIC-LOCK 同判（不得分岔）
+            with _w1_tmp.TemporaryDirectory() as _r2_td:
+                _r2_bd = Path(_r2_td)
+                (_r2_bd / "topic_plan.json").write_text("{ 這不是合法 JSON ", encoding="utf-8")
+                _r2_docs = [(_r2_bd / "script_x.yaml", {"script_id": "x", "title": "壞 plan 批"})]
+                _r2_gen, _r2_why = _resolve_enforce_generation(_r2_bd, _r2_docs)
+                fcheck("F-CXP-T1-R2-1 壞 JSON topic_plan → 世代 resolver 判 new（fail-closed，不再 fail-open）",
+                       _r2_gen is True and "topic_plan" in _r2_why, f"got={_r2_gen}; {_r2_why[:120]}")
+                _r2_tl_s, _r2_tl_d = chk_topic_lock_consistency(
+                    _r2_docs, _r2_bd, None,
+                    enforce_generation=_r2_gen, generation_reason=_r2_why)
+                _r2_parts_s, _ = chk_parts_002_component_enums_enforce(
+                    _r2_docs[0][1], "script_x.yaml", enforce_generation=_r2_gen)
+                _r2_traffic_s, _ = chk_l1_004_traffic(
+                    _r2_docs[0][1], "script_x.yaml", enforce_generation=_r2_gen)
+                fcheck("F-CXP-T1-R2-2 壞 JSON plan：C-TOPIC-LOCK 與三閘同判 enforce（Codex 分岔反例已封）",
+                       _r2_tl_s == "FAIL" and _r2_parts_s == "FAIL" and _r2_traffic_s == "FAIL",
+                       f"topic_lock={_r2_tl_s} parts={_r2_parts_s} traffic={_r2_traffic_s}; {_r2_tl_d[:90]}")
+
+            # ② Codex 反例②：「刪 topic_lock 降級」攻擊 —— 同一批稿刪鎖前後都必須 FAIL
+            with _w1_tmp.TemporaryDirectory() as _r2_td2:
+                _r2_bd2 = Path(_r2_td2)   # 未列入 allowlist 的新批
+                _attack_doc_locked = {
+                    "script_id": "atk", "topic_lock": {"topic_id": "cyborg_atk"},
+                    "duration": 60,
+                    "scenes": [{"timestamp": "0-3s", "type": "Hook", "台詞": "開場"},
+                               _r6_scene("3-12s", "破題", "破題", "藏鏡人拋球", None, None)],
+                }
+                _attack_doc_stripped = {k: v for k, v in _attack_doc_locked.items() if k != "topic_lock"}
+                _gen_locked, _ = _resolve_enforce_generation(
+                    _r2_bd2, [(_r2_bd2 / "atk.yaml", _attack_doc_locked)])
+                _gen_stripped, _why_stripped = _resolve_enforce_generation(
+                    _r2_bd2, [(_r2_bd2 / "atk.yaml", _attack_doc_stripped)])
+                fcheck("F-CXP-T1-R2-3 刪掉 topic_lock 欄 → 世代仍是 new（不在 allowlist；自降級路徑已封）",
+                       _gen_locked is True and _gen_stripped is True,
+                       f"locked={_gen_locked} stripped={_gen_stripped}; {_why_stripped[:110]}")
+                _atk_parts_s, _ = chk_parts_002_component_enums_enforce(
+                    _attack_doc_stripped, "atk.yaml", enforce_generation=_gen_stripped)
+                _atk_traffic_s, _ = chk_l1_004_traffic(
+                    _attack_doc_stripped, "atk.yaml", enforce_generation=_gen_stripped)
+                _atk_mirror_s, _ = chk_l1_003_mirror(
+                    _attack_doc_stripped, "atk.yaml", enforce_generation=_gen_stripped)
+                _atk_tl_s, _atk_tl_d = chk_topic_lock_consistency(
+                    [(_r2_bd2 / "atk.yaml", _attack_doc_stripped)], _r2_bd2, None,
+                    enforce_generation=_gen_stripped, generation_reason=_why_stripped)
+                fcheck("F-CXP-T1-R2-4 刪鎖後三閘仍 FAIL/FAIL/FAIL＋C-TOPIC-LOCK FAIL（Codex 降級反例已封）",
+                       (_atk_parts_s, _atk_traffic_s, _atk_mirror_s, _atk_tl_s)
+                       == ("FAIL", "FAIL", "FAIL", "FAIL"),
+                       f"parts={_atk_parts_s} traffic={_atk_traffic_s} mirror={_atk_mirror_s} "
+                       f"topic_lock={_atk_tl_s}; {_atk_tl_d[:90]}")
+
+                # ③ allowlist 壞掉/缺檔 → fail-closed（全部當 new，不得整批放行）
+                _saved_cache = _LEGACY_ALLOWLIST_CACHE
+                _LEGACY_ALLOWLIST_CACHE = (frozenset(), "legacy allowlist 檔案不存在（模擬）")
+                try:
+                    _fc_gen, _fc_why = _resolve_enforce_generation(
+                        _r2_bd2, [(_r2_bd2 / "atk.yaml", _attack_doc_stripped)])
+                finally:
+                    _LEGACY_ALLOWLIST_CACHE = _saved_cache
+                fcheck("F-CXP-T1-R2-5 allowlist 缺檔/壞格式 → fail-closed 全部當 new（不得整批放行）",
+                       _fc_gen is True and "fail-closed" in _fc_why, f"got={_fc_gen}; {_fc_why[:110]}")
+
+            # ④ 正式 allowlist 檔本身健康度（缺檔＝現役舊批會被誤殺，必須當場擋下）
+            _al_set, _al_err = _load_legacy_batch_allowlist(force_reload=True)
+            fcheck("F-CXP-T1-R2-6 legacy_batch_allowlist.yaml 存在且 schema 合法（現役舊批 grandfather 來源）",
+                   _al_err is None and len(_al_set) > 0,
+                   f"err={_al_err}; n={len(_al_set)}")
+            _al_missing = [p for p in _al_set if not Path(p).exists()]
+            fcheck("F-CXP-T1-R2-7 allowlist 內每個批次目錄都真的存在（防列到不存在路徑）",
+                   not _al_missing, f"不存在 {len(_al_missing)} 筆：{_al_missing[:3]}")
+
+            # ════════════════════════════════════════
+            # F-CXP-T1-R3（r3）：allowlist **真實壞 YAML** 回歸
+            #   Codex r2 新阻擋＝重複鍵旁路：`legacy_batches: []` 後再補一個同名鍵，
+            #   PyYAML 默默採最後一鍵 → 攻擊者把整包批次塞進 allowlist 拿 grandfather
+            #   （修前實測：0/N new、N/N legacy）。r2 舊 fixture 只注入「模擬錯誤快取」，
+            #   沒有真解析壞 YAML，所以漏掉這條路 → 本組一律**實際寫 tmp 檔真解析**。
+            #   R3-1 頂層重複鍵／R3-2 巢狀重複鍵／R3-3 型別錯誤／R3-4 語法錯誤
+            #        → 四件都必須 fail-closed：受攻擊目標批次 **N/N 全部翻 new**
+            #   R3-5 正常檔（含重複「值」但無重複鍵）仍正常載入（防過度嚴格誤殺舊批）
+            #   🔴 契約：任一件轉紅＝補一個同名鍵就能整包逃驗。
+            # ════════════════════════════════════════
+            print("\n[F-CXP-T1-R3] allowlist 真實壞 YAML fail-closed（重複鍵旁路回歸）")
+
+            def _r3_probe(_yaml_text, _targets):
+                """把 allowlist 指向真實 tmp 檔 → 真解析 → 回 (err, new 數, legacy 數)。"""
+                global _LEGACY_ALLOWLIST_PATH, _LEGACY_ALLOWLIST_CACHE
+                _saved_p, _saved_c = _LEGACY_ALLOWLIST_PATH, _LEGACY_ALLOWLIST_CACHE
+                with _w1_tmp.TemporaryDirectory() as _td:
+                    _p = Path(_td) / "legacy_batch_allowlist.yaml"
+                    _p.write_text(_yaml_text, encoding="utf-8")
+                    _LEGACY_ALLOWLIST_PATH = _p
+                    try:
+                        _s, _e = _load_legacy_batch_allowlist(force_reload=True)
+                        _n = _l = 0
+                        for _t in _targets:
+                            _g, _ = _resolve_enforce_generation(Path(_t), [])
+                            if _g:
+                                _n += 1
+                            else:
+                                _l += 1
+                        return _e, _n, _l, len(_s)
+                    finally:
+                        _LEGACY_ALLOWLIST_PATH = _saved_p
+                        _LEGACY_ALLOWLIST_CACHE = _saved_c
+
+            # 攻擊目標＝正式 allowlist 內的真實批次目錄（本來會拿 grandfather 的那些）
+            _r3_targets = sorted(_al_set)
+            _r3_n = len(_r3_targets)
+            _r3_entries = "\n".join(f'  - "{_t}"' for _t in _r3_targets)
+
+            # 對照組：完全同內容但**單一** legacy_batches 鍵 → 必須 N/N legacy（證明攻擊本體有效）
+            _ok_err, _ok_new, _ok_leg, _ok_cnt = _r3_probe(
+                f"version: 1\nlegacy_batches:\n{_r3_entries}\n", _r3_targets)
+            fcheck(f"F-CXP-T1-R3-5 正常 allowlist（無重複鍵）仍正常載入：{_ok_leg}/{_r3_n} legacy（防過度嚴格誤殺舊批）",
+                   _ok_err is None and _ok_leg == _r3_n and _ok_new == 0,
+                   f"err={_ok_err}; new={_ok_new} legacy={_ok_leg} n={_ok_cnt}")
+
+            # R3-1 頂層重複鍵：第一鍵空清單、第二鍵偷塞全部批次（Codex 原案例）
+            _dup_err, _dup_new, _dup_leg, _ = _r3_probe(
+                f"version: 1\nlegacy_batches: []\nlegacy_batches:\n{_r3_entries}\n", _r3_targets)
+            fcheck(f"F-CXP-T1-R3-1 頂層重複鍵 allowlist → 拒收＋{_dup_new}/{_r3_n} 全翻 new（Codex 旁路已封；修前為 0/{_r3_n}）",
+                   _dup_err is not None and _dup_new == _r3_n and _dup_leg == 0,
+                   f"err={_dup_err}; new={_dup_new} legacy={_dup_leg}")
+
+            # R3-2 巢狀重複鍵（不只看頂層）
+            _nest_err, _nest_new, _nest_leg, _ = _r3_probe(
+                "version: 1\nmeta:\n  owner: a\n  owner: b\n"
+                f"legacy_batches:\n{_r3_entries}\n", _r3_targets)
+            fcheck(f"F-CXP-T1-R3-2 巢狀重複鍵 allowlist → 一樣拒收＋{_nest_new}/{_r3_n} 全翻 new",
+                   _nest_err is not None and _nest_new == _r3_n and _nest_leg == 0,
+                   f"err={_nest_err}; new={_nest_new} legacy={_nest_leg}")
+
+            # R3-3 型別錯誤（legacy_batches 是 dict 不是 list）
+            _bt_err, _bt_new, _bt_leg, _ = _r3_probe(
+                "version: 1\nlegacy_batches:\n  a: 1\n  b: 2\n", _r3_targets)
+            fcheck(f"F-CXP-T1-R3-3 型別錯誤 allowlist（真檔解析）→ fail-closed {_bt_new}/{_r3_n} new",
+                   _bt_err is not None and _bt_new == _r3_n and _bt_leg == 0,
+                   f"err={_bt_err}; new={_bt_new} legacy={_bt_leg}")
+
+            # R3-4 語法錯誤（真的解不動）
+            _sx_err, _sx_new, _sx_leg, _ = _r3_probe(
+                "version: 1\nlegacy_batches: [\n  - \"x\n   bad: : :\n", _r3_targets)
+            fcheck(f"F-CXP-T1-R3-4 語法錯誤 allowlist（真檔解析）→ fail-closed {_sx_new}/{_r3_n} new",
+                   _sx_err is not None and _sx_new == _r3_n and _sx_leg == 0,
+                   f"err={_sx_err}; new={_sx_new} legacy={_sx_leg}")
+
+            # R3-6 正式 allowlist 檔本身無重複鍵（改用 no-dup loader 後仍健康）
+            _al_set2, _al_err2 = _load_legacy_batch_allowlist(force_reload=True)
+            fcheck("F-CXP-T1-R3-6 正式 legacy_batch_allowlist.yaml 通過 no-dup loader（本身無重複鍵）",
+                   _al_err2 is None and _al_set2 == _al_set,
+                   f"err={_al_err2}; n={len(_al_set2)} vs {len(_al_set)}")
+        except Exception as _e_t1:
+            fcheck("F-CXP-T1 T1 硬閘 fixtures 可執行", False,
+                   f"{type(_e_t1).__name__}: {_e_t1}")
+
+        # ════════════════════════════════════════════
+        # F-CXP-T2（cxp-enforce-t2 r1，2026-08-13）：registry／receipt／8 硬閘定向 fixtures
+        #   工單 Y5：**每閘正反例**＋零誤殺方向（legacy 一律 SKIP）＋版本緩衝三態
+        #   ＋registry 壞檔 fail-closed（含 no-dup loader 旁路）。
+        #   🔴 契約：任一件轉紅＝梯 2 語意或 grandfather 保護被改壞，停手回滾。
+        # ════════════════════════════════════════════
+        print("\n[F-CXP-T2] 梯 2 定向 fixtures（registry／receipt／8 方法硬閘）")
+        try:
+            import chxp_registry as _t2r  # type: ignore[import]
+
+            _t2_reg, _t2_err = _t2r.load_registry(force_reload=True)
+            fcheck("F-CXP-T2-R-1 正式 registry 載入成功（no-dup loader＋schema 驗）",
+                   _t2_err is None and _t2_reg is not None, f"err={_t2_err}")
+            _t2_methods = (_t2_reg or {}).get("methods", [])
+            fcheck("F-CXP-T2-R-2 registry 128 條、id 001-128 連號",
+                   len(_t2_methods) == 128
+                   and [m["id"] for m in _t2_methods] == [f"{i:03d}" for i in range(1, 129)],
+                   f"n={len(_t2_methods)}")
+            _t2_excluded = [m for m in _t2_methods if m.get("mode") == "excluded"]
+            fcheck("F-CXP-T2-R-3 34 條 excluded 在冊且每條都留著理由（不准悄悄消失）",
+                   len(_t2_excluded) == 34
+                   and all(str(m.get("excluded_reason", "")).strip() for m in _t2_excluded),
+                   f"excluded={len(_t2_excluded)}")
+            _t2_layer = {m["id"]: m.get("layer") for m in _t2_methods}
+            fcheck("F-CXP-T2-R-5 #058＝blocked_entry（獨立入口，不塞 validator）；"
+                   "021/022/109＝manual；018/027/028/043/080＝receipt",
+                   _t2_layer.get("058") == "blocked_entry"
+                   and all(_t2_layer.get(i) == "manual" for i in ("021", "022", "109"))
+                   and all(_t2_layer.get(i) == "receipt" for i in ("018", "027", "028", "043", "080")),
+                   f"058={_t2_layer.get('058')} 021={_t2_layer.get('021')} 018={_t2_layer.get('018')}")
+
+            # ── 版本緩衝三態（愛馬仕嫁接件：改一條正典不得整批 FAIL）──
+            _t2_v_ok = _t2r.check_version({"registry_version": _t2r._REGISTRY_VERSION_EXPECTED})
+            fcheck("F-CXP-T2-V-a 版本一致 → PASS", _t2_v_ok[0] == "PASS", f"got={_t2_v_ok}")
+            _t2_v_grace = _t2r.check_version({
+                "registry_version": "chxp-128-v2",
+                "previous_version": _t2r._REGISTRY_VERSION_EXPECTED,
+                "registry_owner": "霸告"})
+            fcheck("F-CXP-T2-V-b 差一版（registry.previous 命中程式期望）→ WARN grace，不擋批",
+                   _t2_v_grace[0] == "WARN" and "grace" in _t2_v_grace[1],
+                   f"got={_t2_v_grace}")
+            _t2_v_far = _t2r.check_version({
+                "registry_version": "chxp-128-v9", "previous_version": "chxp-128-v8"})
+            fcheck("F-CXP-T2-V-c 差兩版以上 → FAIL（超出 grace window）",
+                   _t2_v_far[0] == "FAIL", f"got={_t2_v_far}")
+            fcheck("F-CXP-T2-V-d registry_version 缺 → FAIL（不得靠沒版本躲過比對）",
+                   _t2r.check_version({})[0] == "FAIL", f"got={_t2r.check_version({})}")
+
+            # ── registry 壞檔 fail-closed（含重複鍵旁路，同 T1 r3 教訓）──
+            def _t2_probe_bad(text: str):
+                _p = Path(_w1_tmp.mkdtemp()) / "bad_registry.yaml"
+                _p.write_text(text, encoding="utf-8")
+                return _t2r.load_registry(force_reload=True, path=_p)
+
+            _t2_ok_min = "registry_version: x\nmethods:\n" + "".join(
+                f"- {{id: '{i:03d}', mode: excluded, layer: none, excluded_reason: r}}\n"
+                for i in range(1, 129))
+            _t2_dup = _t2_ok_min + "methods:\n- {id: '001', mode: always, layer: none}\n"
+            _t2_bad_reg, _t2_bad_err = _t2_probe_bad(_t2_dup)
+            fcheck("F-CXP-T2-B-a registry 頂層重複鍵 → 拒收（fail-closed，不採最後一鍵）",
+                   _t2_bad_reg is None and _t2_bad_err is not None
+                   and "重複鍵" in str(_t2_bad_err), f"err={_t2_bad_err}")
+            _t2_miss = "registry_version: x\nmethods:\n" + "".join(
+                f"- {{id: '{i:03d}', mode: excluded, layer: none}}\n"
+                for i in range(1, 128))  # 只有 127 條＝漏登
+            fcheck("F-CXP-T2-B-b registry 漏登一條（127 條）→ FAIL（Codex 骨架：漏登＝FAIL）",
+                   _t2_probe_bad(_t2_miss)[1] is not None, f"err={_t2_probe_bad(_t2_miss)[1]}")
+            _t2_badmode = "registry_version: x\nmethods:\n- {id: '001', mode: 亂填, layer: none}\n"
+            fcheck("F-CXP-T2-B-c mode 非法 → FAIL（適用項 mode 缺漏＝FAIL，工單 Y2）",
+                   _t2_probe_bad(_t2_badmode)[1] is not None)
+            fcheck("F-CXP-T2-B-d registry 檔不存在 → FAIL 不是放行",
+                   _t2r.load_registry(force_reload=True,
+                                      path=Path("/nonexistent/no_registry.yaml"))[1] is not None)
+            _t2r.load_registry(force_reload=True)  # 還原正式 registry 快取
+
+            # ── C-CXP-COVERAGE 兩個方向 ──
+
+            # ── C-CXP-RECEIPT 正反例 ──
+            _t2_doc_base = {
+                "title": "買方說喜歡不代表簽得下去",
+                "scenes": [{"timestamp": "0-3s", "type": "Hook",
+                            "台詞_瑞祥": "喜歡是感覺，付款是條件。"}],
+            }
+
+            # r3／H2：合規 receipt 現在要求 registry_version＋11 條 always 交代
+            #        ＋source_artifact_hashes／receipt_hash（新鮮度錨）。
+            #        這個 helper 產「完整合規」的 receipt，供正例使用。
+            _t2_always = _t2r.always_applicable_ids(_t2_reg)
+
+            def _t2_full_receipt(doc: dict, used_items: list, **over):
+                """把 doc 補成 r3 合規：receipt 欄齊＋hash 新鮮。回新 dict。"""
+                rc = {
+                    "registry_version": _t2r._REGISTRY_VERSION_EXPECTED,
+                    "applicable_ids": [],
+                    "used": used_items,
+                    "waiver": {i: f"本支未用 #{i}（fixtures 申報）" for i in _t2_always},
+                    "source_artifact_hashes": {},
+                }
+                rc.update(over)
+                out = dict(doc, chxp_receipt=rc)
+                if "receipt_hash" not in over:
+                    rc["receipt_hash"] = _t2r.compute_receipt_hash(out)
+                return out
+
+            _t2_ok_doc = _t2_full_receipt(
+                _t2_doc_base, [{"method_id": "069", "evidence_ref": "quote:喜歡是感覺"}])
+            fcheck("F-CXP-T2-RC-a receipt 正例：合法 id＋quote 證據解得回 → PASS",
+                   chk_cxp_receipt(_t2_ok_doc, "t2.yaml", enforce_generation=True)[0] == "PASS",
+                   f"got={chk_cxp_receipt(_t2_ok_doc, 't2.yaml', enforce_generation=True)}")
+            _t2_no_receipt = chk_cxp_receipt(dict(_t2_doc_base), "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-b receipt 反例：新世代整欄缺 → FAIL（不填不得換免查）",
+                   _t2_no_receipt[0] == "FAIL" and "缺 chxp_receipt" in _t2_no_receipt[1],
+                   f"got={_t2_no_receipt}")
+            _t2_unknown = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "999",
+                                                           "evidence_ref": "quote:喜歡是感覺"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-c receipt 反例：未知 method_id=999 → FAIL（工單 Y2 未知 ID）",
+                   _t2_unknown[0] == "FAIL" and "未知 ID" in _t2_unknown[1], f"got={_t2_unknown}")
+            _t2_badev = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "069",
+                                                           "evidence_ref": "quote:這句稿裡根本沒有"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-d receipt 反例：quote 證據在稿內找不到 → FAIL（宣告必須兌現）",
+                   _t2_badev[0] == "FAIL" and "找不到" in _t2_badev[1], f"got={_t2_badev}")
+            _t2_freeev = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "069",
+                                                           "evidence_ref": "我有用啊"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-e receipt 反例：自由文字證據（非 path:/quote:）→ FAIL",
+                   _t2_freeev[0] == "FAIL", f"got={_t2_freeev}")
+            # 自我兌現防線（本輪 fixtures 抓到的真缺陷，修根因後上鎖）：
+            #   quote: 比對必須排除 chxp_receipt／chxp_method_selection 自身，
+            #   否則「證據字串本身就在 data 裡」＝任何 quote 都能找到自己。
+            _t2_selfref = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "069",
+                                                           "evidence_ref": "quote:這串只出現在證據欄本身"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-e2 反例：quote 只出現在 receipt 自己那行 → FAIL（防證據自我兌現）",
+                   _t2_selfref[0] == "FAIL", f"got={_t2_selfref}")
+            fcheck("F-CXP-T2-RC-e3 正向鎖：排除 receipt 後，稿件本文的 quote 仍找得到（沒排過頭）",
+                   _t2r.resolve_evidence_ref(_t2_ok_doc, "quote:喜歡是感覺")[0] is True,
+                   f"got={_t2r.resolve_evidence_ref(_t2_ok_doc, 'quote:喜歡是感覺')}")
+            _t2_blocked = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "058",
+                                                           "evidence_ref": "quote:喜歡是感覺"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-f receipt 反例：拿 BLOCKED 的 #058 在稿內冒稱完成 → FAIL",
+                   _t2_blocked[0] == "FAIL" and "BLOCKED" in _t2_blocked[1], f"got={_t2_blocked}")
+            _t2_manual = chk_cxp_receipt(
+                dict(_t2_doc_base, chxp_receipt={"used": [{"method_id": "021",
+                                                           "evidence_ref": "quote:喜歡是感覺"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-RC-g receipt 反例：拿人工層 #021 在稿內冒稱完成 → FAIL（系統零自動對外）",
+                   _t2_manual[0] == "FAIL" and "人工清單層" in _t2_manual[1], f"got={_t2_manual}")
+            _t2_rc_leg = chk_cxp_receipt(dict(_t2_doc_base), "t2.yaml", enforce_generation=False)
+            fcheck("F-CXP-T2-RC-h receipt 零誤殺：舊稿世代缺欄 → SKIP 明標，不打紅",
+                   _t2_rc_leg[0] == "SKIP" and "grandfather" in _t2_rc_leg[1], f"got={_t2_rc_leg}")
+            _t2_rc_skel = chk_cxp_receipt(
+                dict(_t2_doc_base, title="[編劇填]"), "t2.yaml",
+                enforce_generation=True, is_skeleton_file=True)
+            fcheck("F-CXP-T2-RC-i receipt 骨架階段（title 仍 placeholder）→ SKIP，填完即 fail-closed",
+                   _t2_rc_skel[0] == "SKIP", f"got={_t2_rc_skel}")
+
+            # ── 8 個硬閘：**每閘正反例**（工單 Y5 明列）──
+
+            _t2_sel = "chxp_method_selection"
+            # #041 演劇情三式（enum＋段落安排＋證據）
+            _d041_ok = dict(_t2_doc_base, **{_t2_sel: {"041": {"type": "POV", "段落安排": "起承轉合"}}},
+                            chxp_receipt={"used": [{"method_id": "041",
+                                                    "evidence_ref": "path:chxp_method_selection.041.段落安排"}]})
+            _d041_bad = dict(_t2_doc_base, **{_t2_sel: {"041": {"type": "POV"}}})
+            _d041_enum = dict(_t2_doc_base, **{_t2_sel: {"041": {"type": "我自己想的型", "段落安排": "x"}}})
+            # #053 懷舊（bool_true）
+            _d053_ok = dict(_t2_doc_base, **{_t2_sel: {"053": {"used": True, "回憶點": "卡帶隨身聽"}}},
+                            chxp_receipt={"used": [{"method_id": "053",
+                                                    "evidence_ref": "path:chxp_method_selection.053.回憶點"}]})
+            # #055 荷爾蒙／氣氛（enum＋同意紀錄）
+            _d055_ok = dict(_t2_doc_base, **{_t2_sel: {"055": {"type": "氣氛", "同意紀錄": "2026-08-13 口頭同意，存 LINE"}}},
+                            chxp_receipt={"used": [{"method_id": "055",
+                                                    "evidence_ref": "path:chxp_method_selection.055.同意紀錄"}]})
+            # #064 行業揭秘（兩必填欄）
+            _d064_ok = dict(_t2_doc_base, **{_t2_sel: {"064": {"used": True, "不為人知的規則": "斡旋可退",
+                                                              "原因": "定金性質不同"}}},
+                            chxp_receipt={"used": [{"method_id": "064",
+                                                    "evidence_ref": "path:chxp_method_selection.064.原因"}]})
+            # #068 正／反推
+            _d068_ok = dict(_t2_doc_base, **{_t2_sel: {"068": {"type": "反推", "理由": "屋況差",
+                                                              "結論": "先不要買"}}},
+                            chxp_receipt={"used": [{"method_id": "068",
+                                                    "evidence_ref": "path:chxp_method_selection.068.結論"}]})
+            # #069 資訊整理
+            _d069_ok = dict(_t2_doc_base, **{_t2_sel: {"069": {"used": True, "分類": "三類",
+                                                              "順序": "由近到遠"}}},
+                            chxp_receipt={"used": [{"method_id": "069", "evidence_ref": "quote:喜歡是感覺"}]})
+            # #101 記錄不創造（sources 非空）
+            _d101_ok = dict(_t2_doc_base, **{_t2_sel: {"101": {"mode": "整理既有資料",
+                                                              "sources": ["內政部實價登錄 2026Q2"]}}},
+                            chxp_receipt={"used": [{"method_id": "101",
+                                                    "evidence_ref": "path:chxp_method_selection.101.sources"}]})
+            # #103 字數區間（唯一數值型；龍蝦 R2 收緊：只 60 秒、只新世代）
+            def _mk103(n_chars: int, dur="60s"):
+                return {"title": "t", "duration": dur,
+                        "scenes": [{"timestamp": "0-3s", "type": "Hook",
+                                    "台詞_瑞祥": "字" * n_chars,
+                                    "畫面": "拍攝指示不計字" * 20,
+                                    "翠文": "字幕也不計字" * 10}]}
+            fcheck("F-CXP-T2-G103-g 計字契約：畫面／翠文不計入口白字數（只算唸出來的）",
+                   _t2r.count_chinese_chars(_t2r.script_body_text(_mk103(270))) == 270,
+                   f"n={_t2r.count_chinese_chars(_t2r.script_body_text(_mk103(270)))}")
+
+            # ── applicable_ids 由機器重算（龍蝦：不准編劇自填 N/A）──
+            _t2_comp = _t2r.compute_applicable_ids(_d069_ok, _t2_reg)
+            fcheck("F-CXP-T2-A-a 機器重算：選了 069 → 069 在 applicable_ids 內",
+                   "069" in _t2_comp, f"computed={_t2_comp[:8]}")
+            _t2_comp_none = _t2r.compute_applicable_ids(dict(_t2_doc_base), _t2_reg)
+            fcheck("F-CXP-T2-A-b 機器重算：沒選任何型 → 只剩 always 條（069 不在內）",
+                   "069" not in _t2_comp_none and len(_t2_comp_none) > 0,
+                   f"computed={_t2_comp_none[:8]}")
+            _t2_lie = chk_cxp_receipt(
+                dict(_d069_ok, chxp_receipt={"applicable_ids": ["999"],
+                                             "used": [{"method_id": "069",
+                                                       "evidence_ref": "quote:喜歡是感覺"}]}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-A-c 稿內自填 applicable_ids 與機器重算不符 → 標明「以機器重算為準」（不採信稿內）",
+                   "以機器重算為準" in _t2_lie[1], f"got={_t2_lie}")
+
+            # ── registry 不可用時的 fail-closed（不假裝八個閘跑過）──
+            _t2_saved_ok = _CHXP_OK
+            try:
+                globals()["_CHXP_OK"] = False
+            finally:
+                globals()["_CHXP_OK"] = _t2_saved_ok
+
+            # ════════════════════════════════════════════
+            # F-CXP-T2-R3（r3，2026-08-14）：Codex 終審三阻擋的回歸鎖
+            #   每一組都對應一個「r1 會放行、r3 必須翻紅」的實測案例。
+            #   🔴 任一件轉綠→紅或紅→綠，代表阻擋修補被改壞，停手回滾。
+            # ════════════════════════════════════════════
+            print("\n[F-CXP-T2-R3] r3 三阻擋回歸鎖（Codex 終審變造案例）")
+
+            def _t2_reg_mutate(mut):
+                """回傳被變造的 registry 深拷貝（唯讀，不寫檔）。"""
+                import copy as _cp
+                r = _cp.deepcopy(_t2_reg)
+                mut(r)
+                return r
+
+            def _t2_with_reg(reg, fn):
+                """把 loader 快取換成變造版跑一次 fn，跑完還原。"""
+                _saved = _t2r._REGISTRY_CACHE
+                try:
+                    _t2r._REGISTRY_CACHE = (reg, None)
+                    return fn()
+                finally:
+                    _t2r._REGISTRY_CACHE = _saved
+                    _t2r.load_registry(force_reload=True)
+
+            # ── H1① 分層／計數變造：三個 Codex 實測案例全部要翻 FAIL ──
+            def _mut_excluded_minus1(r):
+                for m in r["methods"]:
+                    if m["mode"] == "excluded":
+                        m["mode"] = "audited"
+                        break
+
+
+            def _mut_041_downgrade(r):
+                for m in r["methods"]:
+                    if m["id"] == "041":
+                        m["layer"] = "none"
+                        m.pop("gate", None)
+
+
+            def _mut_058_unblock(r):
+                for m in r["methods"]:
+                    if m["id"] == "058":
+                        m["layer"] = "none"
+
+
+            def _mut_swap_gate(r):
+                """等量替換：#041 降級、另抓一條 none 升級成 gate（總數仍 8）。"""
+                for m in r["methods"]:
+                    if m["id"] == "041":
+                        m["layer"] = "none"
+                    elif m["id"] == "042":
+                        m["layer"] = "gate"
+                        m["gate"] = {"check_id": "C-CXP-042",
+                                     "trigger": {"kind": "bool_true",
+                                                 "field": "chxp_method_selection.042.used"}}
+
+
+            # ── H1② gate schema 變造 ──
+            def _mut_gate_schema_broken(r):
+                for m in r["methods"]:
+                    if m["id"] == "069":
+                        m["gate"]["trigger"] = {"kind": "亂填", "field": "x"}
+
+
+            def _mut_gate_enum_empty(r):
+                for m in r["methods"]:
+                    if m["id"] == "041":
+                        m["gate"]["trigger"]["enum"] = []
+
+
+            def _mut_charcount_broken(r):
+                for m in r["methods"]:
+                    if m["id"] == "103":
+                        m["gate"]["char_count"] = {"min": "240", "max": 300}
+
+
+            # ── H1③ registry 內容 hash 錨定 ──
+            fcheck("F-CXP-T2-R3-H1 正式 registry 內容 hash 與 sidecar 相符 → PASS",
+                   _t2r.check_registry_hash()[0] == "PASS", f"got={_t2r.check_registry_hash()}")
+            _r3_tmpd = Path(_w1_tmp.mkdtemp())
+            _r3_reg_copy = _r3_tmpd / _t2r._REGISTRY_PATH.name
+            _r3_reg_copy.write_text(
+                _t2r._REGISTRY_PATH.read_text(encoding="utf-8").replace(
+                    "registry_owner: 霸告", "registry_owner: 我自己"), encoding="utf-8")
+            (_r3_tmpd / _t2r._REGISTRY_SHA_SIDECAR_NAME).write_text(
+                (_t2r._REGISTRY_PATH.parent / _t2r._REGISTRY_SHA_SIDECAR_NAME).read_text(encoding="utf-8"),
+                encoding="utf-8")
+            fcheck("F-CXP-T2-R3-H2 registry 內容被改、sidecar 未同步 → FAIL（內容 hash 錨定）",
+                   _t2r.check_registry_hash(_r3_reg_copy)[0] == "FAIL",
+                   f"got={_t2r.check_registry_hash(_r3_reg_copy)}")
+            _r3_nosidecar = Path(_w1_tmp.mkdtemp()) / "chxp_method_registry.yaml"
+            _r3_nosidecar.write_text("registry_version: x\n", encoding="utf-8")
+            fcheck("F-CXP-T2-R3-H3 sidecar 不存在 → FAIL（未錨定＝不得放行）",
+                   _t2r.check_registry_hash(_r3_nosidecar)[0] == "FAIL")
+            _r3_badside = Path(_w1_tmp.mkdtemp())
+            (_r3_badside / "chxp_method_registry.yaml").write_text("x: 1\n", encoding="utf-8")
+            (_r3_badside / _t2r._REGISTRY_SHA_SIDECAR_NAME).write_text("不是 hash\n", encoding="utf-8")
+            fcheck("F-CXP-T2-R3-H4 sidecar 內容非 sha256 格式 → FAIL",
+                   _t2r.check_registry_hash(_r3_badside / "chxp_method_registry.yaml")[0] == "FAIL")
+
+            # ── H1④ 真實版本鏈（雙向 grace）──
+            fcheck("F-CXP-T2-R3-V1 current=totally-unrelated＋previous 正確 → FAIL"
+                   "（r1 誤判 WARN：亂填版本附個正確 previous 就能矇混）",
+                   _t2r.check_version({"registry_version": "totally-unrelated",
+                                       "previous_version": _t2r._REGISTRY_VERSION_EXPECTED})[0] == "FAIL",
+                   f"got={_t2r.check_version({'registry_version': 'totally-unrelated', 'previous_version': _t2r._REGISTRY_VERSION_EXPECTED})}")
+            fcheck("F-CXP-T2-R3-V2 前進一版且版本鏈接得上（v2/previous=v1）→ WARN grace",
+                   _t2r.check_version({"registry_version": "chxp-128-v2",
+                                       "previous_version": "chxp-128-v1"})[0] == "WARN")
+            fcheck("F-CXP-T2-R3-V3 前進一版但版本鏈斷（v2/previous=別的）→ FAIL",
+                   _t2r.check_version({"registry_version": "chxp-128-v2",
+                                       "previous_version": "chxp-999-v1"})[0] == "FAIL",
+                   f"got={_t2r.check_version({'registry_version': 'chxp-128-v2', 'previous_version': 'chxp-999-v1'})}")
+            fcheck("F-CXP-T2-R3-V4 **反向** grace：registry 落後一版（v0）→ WARN（雙向 grace）",
+                   _t2r.check_version({"registry_version": "chxp-128-v0"})[0] == "WARN",
+                   f"got={_t2r.check_version({'registry_version': 'chxp-128-v0'})}")
+            fcheck("F-CXP-T2-R3-V5 family 不同（other-128-v1）→ FAIL（不是相鄰版本）",
+                   _t2r.check_version({"registry_version": "other-128-v1",
+                                       "previous_version": "chxp-128-v1"})[0] == "FAIL")
+            fcheck("F-CXP-T2-R3-V6 差兩版（v3）→ FAIL",
+                   _t2r.check_version({"registry_version": "chxp-128-v3",
+                                       "previous_version": "chxp-128-v2"})[0] == "FAIL")
+
+            # ── H2 receipt 收緊：Codex 三個空帳案例全部要翻 FAIL ──
+            _r3_empty = chk_cxp_receipt(dict(_t2_doc_base, chxp_receipt={}),
+                                        "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-R3-B1 chxp_receipt: {} 缺 used 鍵 → FAIL（r1 為 PASS：缺鍵被轉空陣列）",
+                   _r3_empty[0] == "FAIL" and "缺 used 鍵" in _r3_empty[1], f"got={_r3_empty}")
+            _r3_explicit_empty = _t2_full_receipt(_t2_doc_base, [])
+            fcheck("F-CXP-T2-R3-B2 顯式 used: [] ＋ waiver 交代 11 條 → PASS（空列表允許，但要申報）",
+                   chk_cxp_receipt(_r3_explicit_empty, "t2.yaml", enforce_generation=True)[0] == "PASS",
+                   f"got={chk_cxp_receipt(_r3_explicit_empty, 't2.yaml', enforce_generation=True)}")
+            _r3_badver = _t2_full_receipt(
+                _t2_doc_base, [{"method_id": "069", "evidence_ref": "quote:喜歡是感覺"}],
+                registry_version="garbage")
+            fcheck("F-CXP-T2-R3-B3 receipt.registry_version=garbage → FAIL（r1 不驗此欄）",
+                   chk_cxp_receipt(_r3_badver, "t2.yaml", enforce_generation=True)[0] == "FAIL",
+                   f"got={chk_cxp_receipt(_r3_badver, 't2.yaml', enforce_generation=True)}")
+            _r3_unknown_app = _t2_full_receipt(_t2_doc_base, [], applicable_ids=["999"])
+            _r3_ua = chk_cxp_receipt(_r3_unknown_app, "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-R3-B4 applicable_ids 含未知 id \"999\" → FAIL（r1 為 PASS：只當留痕）",
+                   _r3_ua[0] == "FAIL" and "未知 method_id" in _r3_ua[1], f"got={_r3_ua}")
+            _r3_noalways = dict(_t2_doc_base, chxp_receipt={
+                "registry_version": _t2r._REGISTRY_VERSION_EXPECTED,
+                "used": [{"method_id": "069", "evidence_ref": "quote:喜歡是感覺"}],
+                "source_artifact_hashes": {}, "receipt_hash": "0" * 64})
+            _r3_na = chk_cxp_receipt(_r3_noalways, "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-R3-B5 11 條 always 全未申報（無 waiver）→ FAIL（只驗有無申報，不判品質）",
+                   _r3_na[0] == "FAIL" and "always-applicable 未交代" in _r3_na[1], f"got={_r3_na}")
+            _r3_partial_waiver = _t2_full_receipt(_t2_doc_base, [])
+            _r3_partial_waiver["chxp_receipt"]["waiver"].pop(_t2_always[0])
+            _r3_partial_waiver["chxp_receipt"]["receipt_hash"] = _t2r.compute_receipt_hash(_r3_partial_waiver)
+            fcheck("F-CXP-T2-R3-B6 always 只漏交代一條 → 仍 FAIL（逐條驗，不是抽樣）",
+                   chk_cxp_receipt(_r3_partial_waiver, "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            _r3_used_always = _t2_full_receipt(
+                _t2_doc_base, [{"method_id": _t2_always[0], "evidence_ref": "quote:喜歡是感覺"}])
+            _r3_used_always["chxp_receipt"]["waiver"].pop(_t2_always[0])
+            _r3_used_always["chxp_receipt"]["receipt_hash"] = _t2r.compute_receipt_hash(_r3_used_always)
+            fcheck("F-CXP-T2-R3-B7 always 條在 used 具名（非 waiver）也算交代 → PASS",
+                   chk_cxp_receipt(_r3_used_always, "t2.yaml", enforce_generation=True)[0] == "PASS",
+                   f"got={chk_cxp_receipt(_r3_used_always, 't2.yaml', enforce_generation=True)}")
+            _r3_stale = _t2_full_receipt(_t2_doc_base, [])
+            _r3_stale["title"] = "改過標題但沒重算收據"
+            fcheck("F-CXP-T2-R3-B8 稿件改過、receipt_hash 未重算 → FAIL（新鮮度）",
+                   chk_cxp_receipt(_r3_stale, "t2.yaml", enforce_generation=True)[0] == "FAIL",
+                   f"got={chk_cxp_receipt(_r3_stale, 't2.yaml', enforce_generation=True)}")
+            _r3_nohash = _t2_full_receipt(_t2_doc_base, [], receipt_hash=None)
+            fcheck("F-CXP-T2-R3-B9 缺 receipt_hash 欄 → FAIL（得標骨架欄，不得省略）",
+                   chk_cxp_receipt(_r3_nohash, "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            _r3_badsah = _t2_full_receipt(_t2_doc_base, [],
+                                          source_artifact_hashes={"src.md": "not-a-hash"})
+            fcheck("F-CXP-T2-R3-B10 source_artifact_hashes 值非 sha256 → FAIL（格式驗）",
+                   chk_cxp_receipt(_r3_badsah, "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            # receipt 自指（Codex：path:chxp_receipt.used 讓 RECEIPT 與 069 同時 PASS）
+            _r3_selfpath = _t2_full_receipt(
+                _t2_doc_base, [{"method_id": "069", "evidence_ref": "path:chxp_receipt.used"}])
+            fcheck("F-CXP-T2-R3-B11 證據自指 path:chxp_receipt.used → FAIL（收據不能當自己的證據）",
+                   chk_cxp_receipt(_r3_selfpath, "t2.yaml", enforce_generation=True)[0] == "FAIL",
+                   f"got={chk_cxp_receipt(_r3_selfpath, 't2.yaml', enforce_generation=True)}")
+            _r3_selfpath2 = _t2_full_receipt(
+                _t2_doc_base, [{"method_id": "069",
+                                "evidence_ref": "path:chxp_receipt.registry_version"}])
+            fcheck("F-CXP-T2-R3-B12 證據指向 receipt 其他欄（registry_version）→ FAIL（同一自我兌現家族）",
+                   chk_cxp_receipt(_r3_selfpath2, "t2.yaml", enforce_generation=True)[0] == "FAIL")
+
+            # ── H3 兩段式 fail-open：malformed bool 與空白 list ──
+            for _r3_mid in ("053", "064", "069"):
+                _r3_doc = dict(_t2_doc_base,
+                               **{_t2_sel: {_r3_mid: {"used": "true"}}})
+            for _r3_bad, _r3_label in (([None], "[null]"), ([""], '[""]'),
+                                       (["[編劇填]"], '["[編劇填]"]'),
+                                       (["  "], '["  "]（全空白）')):
+                _r3_doc = dict(_t2_doc_base,
+                               **{_t2_sel: {"101": {"mode": "整理既有資料", "sources": _r3_bad}}})
+
+            # ── r3 零誤殺方向鎖（新增檢查一律不得追殺舊稿）──
+            fcheck("F-CXP-T2-R3-Z3 舊稿世代：receipt 缺 used 鍵仍 SKIP",
+                   chk_cxp_receipt(dict(_t2_doc_base, chxp_receipt={}),
+                                   "t2.yaml", enforce_generation=False)[0] == "SKIP")
+
+            # ════════════════════════════════════════════
+            # F-CXP-T2-R4（r4，2026-08-14）：Codex 覆審殘項 J1-J5 的回歸鎖
+            #   每件對應一個「r3 會放行、r4 必須翻紅」的實測案例
+            #   （before/after 逐案證據＝probe_r4_before.txt／probe_r4_after.txt）。
+            #   🔴 任一件轉綠→紅或紅→綠，代表殘項修補被改壞，停手回滾。
+            # ════════════════════════════════════════════
+            print("\n[F-CXP-T2-R4] r4 覆審殘項回歸鎖（Codex r3 新問題 J1-J5）")
+
+            # ── J1：#058／人工／excluded 的**單因** receipt 路徑 ──
+            #   🔴 單因驗證＝其他欄位全部合規（版本對、waiver 11 條齊、兩個 hash
+            #      欄齊且新鮮），只多一條該 id，看它會不會**單獨**翻紅。
+            #      r3 的 probe 是因為缺版本／waiver／hash 才 FAIL，沒真正驗到 #058。
+            _r4_ctrl = _t2_full_receipt(_t2_doc_base, [])
+            fcheck("F-CXP-T2-R4-J1a 單因對照組：全合規空 used → PASS（證明其他欄位確實都合規）",
+                   chk_cxp_receipt(_r4_ctrl, "t2.yaml", enforce_generation=True)[0] == "PASS",
+                   f"got={chk_cxp_receipt(_r4_ctrl, 't2.yaml', enforce_generation=True)}")
+
+            def _r4_single(mid: str):
+                return chk_cxp_receipt(
+                    _t2_full_receipt(_t2_doc_base,
+                                     [{"method_id": mid, "evidence_ref": "quote:喜歡是感覺"}]),
+                    "t2.yaml", enforce_generation=True)
+
+            _r4_j1b = _r4_single("058")
+            fcheck("F-CXP-T2-R4-J1b 全合規＋只多 #058（BLOCKED）→ 單獨 FAIL"
+                   "（r3 需靠其他欄位一起壞才紅）",
+                   _r4_j1b[0] == "FAIL" and "BLOCKED" in _r4_j1b[1]
+                   and "單獨成立即 FAIL" in _r4_j1b[1], f"got={_r4_j1b}")
+            _r4_j1c = _r4_single("021")
+            fcheck("F-CXP-T2-R4-J1c 全合規＋只多 #021（人工層）→ 單獨 FAIL",
+                   _r4_j1c[0] == "FAIL" and "人工清單層" in _r4_j1c[1], f"got={_r4_j1c}")
+            _r4_j1d = _r4_single("001")
+            fcheck("F-CXP-T2-R4-J1d 全合規＋只多 #001（excluded 刻意不做）→ FAIL"
+                   "（r3 為 PASS：excluded 身分完全沒驗）",
+                   _r4_j1d[0] == "FAIL" and "excluded" in _r4_j1d[1], f"got={_r4_j1d}")
+
+            def _mut_058_none(r):
+                for m in r["methods"]:
+                    if m["id"] == "058":
+                        m["layer"] = "none"
+
+            fcheck("F-CXP-T2-R4-J1e registry 變造 #058→none 後，冒稱 #058 仍 FAIL"
+                   "（身分以程式端常數為準，r3 是讀 registry 的 layer 欄故一起消失）",
+                   _t2_with_reg(_t2_reg_mutate(_mut_058_none),
+                                lambda: _r4_single("058"))[0] == "FAIL",
+                   f"got={_t2_with_reg(_t2_reg_mutate(_mut_058_none), lambda: _r4_single('058'))}")
+
+            # ── J2：WARN-grace 語意（底層 WARN 不得被吞成 PASS；對照實際載入版本）──
+            _r4_live = (_t2_reg or {}).get("registry_version")
+
+            def _r4_ver(ver: str):
+                return chk_cxp_receipt(_t2_full_receipt(_t2_doc_base, [], registry_version=ver),
+                                       "t2.yaml", enforce_generation=True)
+
+            fcheck("F-CXP-T2-R4-J2a receipt 版本＝實際載入版本 → PASS",
+                   _r4_ver(_r4_live)[0] == "PASS", f"got={_r4_ver(_r4_live)}")
+            # 🔴 r5／K1 修正：J2b 原本把「未來一版」鎖成 WARN，與工單契約相反
+            #    （契約＝「前一版 WARN、其他 FAIL」）。收據宣稱一個還沒發布的
+            #    正典版本不是時間差，是造假或工具鏈錯亂，沒有 grace 的理由。
+            #    期望改為 FAIL；WARN 的唯一正路移到 J2c（現役宣告的 previous_version）。
+            _r4_j2b = _r4_ver("chxp-128-v2")
+            fcheck("F-CXP-T2-R5-K1a receipt 版本＝現役的**下一版（未來版）**→ **FAIL**"
+                   "（r4 為 WARN：abs(diff)==1 把未來版也放進 grace）",
+                   _r4_j2b[0] == "FAIL" and "未來版" in _r4_j2b[1], f"got={_r4_j2b}")
+            _r5_prev = (_t2_reg or {}).get("previous_version")
+            _r4_j2c = _r4_ver(_r5_prev)
+            fcheck("F-CXP-T2-R4-J2c receipt 版本＝現役 registry 宣告的 previous_version → **WARN**"
+                   "（唯一的 grace 正路；r3 為 PASS＝底層 WARN 被吞掉）",
+                   _r4_j2c[0] == "WARN" and "grace" in _r4_j2c[1],
+                   f"prev={_r5_prev} got={_r4_j2c}")
+            _r5_k1b = _r4_ver("chxp-128-v0")
+            fcheck("F-CXP-T2-R5-K1b receipt 版本＝序號 -1 但**不在版本鏈上**（v0，"
+                   f"現役宣告的前一版是 {_r5_prev}）→ **FAIL**"
+                   "（r4 為 WARN：只看序號距離，不看版本鏈）",
+                   _r5_k1b[0] == "FAIL" and "版本鏈" in _r5_k1b[1], f"got={_r5_k1b}")
+            fcheck("F-CXP-T2-R5-K1c receipt 版本＝未來第三版（v4）→ FAIL（跳版＋未來版雙違）",
+                   _r4_ver("chxp-128-v4")[0] == "FAIL")
+            fcheck("F-CXP-T2-R5-K1d 異 family 同序號（other-128-v1）→ FAIL（不是相鄰版本）",
+                   _r4_ver("other-128-v1")[0] == "FAIL")
+
+            def _mut_prev_gone(r):
+                r.pop("previous_version", None)
+
+            _r5_k1e = _t2_with_reg(
+                _t2_reg_mutate(_mut_prev_gone),
+                lambda: chk_cxp_receipt(
+                    _t2_full_receipt(_t2_doc_base, [], registry_version="chxp-128-v0"),
+                    "t2.yaml", enforce_generation=True))
+            fcheck("F-CXP-T2-R5-K1e 現役 registry 缺 previous_version → 沒有可信前一版錨 → FAIL"
+                   "（fail-closed，不得因為缺錨就放寬）",
+                   _r5_k1e[0] == "FAIL", f"got={_r5_k1e}")
+            fcheck("F-CXP-T2-R5-K1f 正向鎖：版本完全相同時，缺 previous_version 仍 PASS"
+                   "（K1 只收緊 grace，不誤傷 match 路徑）",
+                   _t2_with_reg(
+                       _t2_reg_mutate(_mut_prev_gone),
+                       lambda: chk_cxp_receipt(
+                           _t2_full_receipt(_t2_doc_base, [], registry_version=_r4_live),
+                           "t2.yaml", enforce_generation=True))[0] == "PASS")
+            fcheck("F-CXP-T2-R4-J2d receipt 版本差兩版（v3）→ FAIL",
+                   _r4_ver("chxp-128-v3")[0] == "FAIL")
+            fcheck("F-CXP-T2-R4-J2e receipt 版本 garbage → FAIL",
+                   _r4_ver("garbage")[0] == "FAIL")
+            fcheck("F-CXP-T2-R4-J2f receipt 缺 registry_version 欄 → FAIL（不得靠沒填躲過）",
+                   chk_cxp_receipt(_t2_full_receipt(_t2_doc_base, [], registry_version=None),
+                                   "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            fcheck("F-CXP-T2-R4-J2g registry_version 填 YAML false（型別繞過）→ FAIL",
+                   chk_cxp_receipt(_t2_full_receipt(_t2_doc_base, [], registry_version=False),
+                                   "t2.yaml", enforce_generation=True)[0] == "FAIL")
+
+            # ── J3：schema 收緊（check_id 白名單／require_fields 空／身分互換）──
+            def _mut_cid(new_cid: str):
+                def _f(r):
+                    for m in r["methods"]:
+                        if m["id"] == "041":
+                            m["gate"]["check_id"] = new_cid
+                return _f
+
+
+            def _mut_rf_empty(r):
+                for m in r["methods"]:
+                    if m["id"] == "041":
+                        m["gate"]["require_fields"] = []
+
+
+            def _mut_mode_swap(r):
+                """always／audited 身分等量互換（#010↔#018）：兩邊計數都不動。"""
+                for m in r["methods"]:
+                    if m["id"] == "010":
+                        m["mode"] = "audited"
+                    elif m["id"] == "018":
+                        m["mode"] = "always"
+
+
+            def _mut_excl_swap(r):
+                """excluded 身分等量互換（#001↔#043）：excluded 仍 34 條。"""
+                for m in r["methods"]:
+                    if m["id"] == "001":
+                        m["mode"] = "audited"
+                    elif m["id"] == "043":
+                        m["mode"] = "excluded"
+                        m["excluded_reason"] = "fixture 變造"
+
+            # id↔mode 映射錨本身的正反例
+            fcheck("F-CXP-T2-R4-J3f 正式 registry 的 id↔mode 映射 hash 對得上 sidecar → PASS",
+                   _t2r.check_id_mode_map(_t2_reg)[0] == "PASS",
+                   f"got={_t2r.check_id_mode_map(_t2_reg)}")
+            fcheck("F-CXP-T2-R4-J3g 身分互換後映射 hash 必變（同一份 registry 兩個值不相等）",
+                   _t2r.id_mode_map_sha256(_t2_reg)
+                   != _t2r.id_mode_map_sha256(_t2_reg_mutate(_mut_mode_swap)))
+            _r4_nomap = Path(_w1_tmp.mkdtemp())
+            (_r4_nomap / "chxp_method_registry.yaml").write_text("x: 1\n", encoding="utf-8")
+            (_r4_nomap / _t2r._REGISTRY_SHA_SIDECAR_NAME).write_text(
+                "0" * 64 + "  chxp_method_registry.yaml\n", encoding="utf-8")
+            fcheck("F-CXP-T2-R4-J3h sidecar 只有整檔 hash、缺 id_mode_map_sha256 行 → FAIL",
+                   _t2r.check_id_mode_map(
+                       _t2_reg, _r4_nomap / "chxp_method_registry.yaml")[0] == "FAIL")
+
+            # ── J4：空值用錯誤型別繞過（單一非空字串驗證器）──
+            for _r4_bad, _r4_label in (([False], "[False]"), ([0], "[0]"),
+                                       ([0.0], "[0.0]"), ([True], "[True]"),
+                                       (False, "scalar False"), (0, "scalar 0")):
+                _r4_doc = dict(_t2_doc_base,
+                               **{_t2_sel: {"101": {"mode": "整理既有資料",
+                                                    "sources": _r4_bad}}},
+                               chxp_receipt={"used": [{"method_id": "101",
+                                                       "evidence_ref": f"path:{_t2_sel}.101.mode"}]})
+            _r4_j4b = chk_cxp_receipt(
+                _t2_full_receipt(_t2_doc_base, [],
+                                 waiver={i: False for i in _t2_always}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-R4-J4b 11 條 waiver 理由全填 YAML false → FAIL"
+                   "（r3 為 PASS：false 被當有填＝空帳換個型別就過）",
+                   _r4_j4b[0] == "FAIL" and "always-applicable 未交代" in _r4_j4b[1],
+                   f"got={_r4_j4b}")
+            fcheck("F-CXP-T2-R4-J4c 11 條 waiver 理由全填 0 → FAIL（同一型別家族）",
+                   chk_cxp_receipt(
+                       _t2_full_receipt(_t2_doc_base, [],
+                                        waiver={i: 0 for i in _t2_always}),
+                       "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            fcheck("F-CXP-T2-R4-J4d waiver list 形式的 reason 填 false → FAIL",
+                   chk_cxp_receipt(
+                       _t2_full_receipt(_t2_doc_base, [],
+                                        waiver=[{"method_id": i, "reason": False}
+                                                for i in _t2_always]),
+                       "t2.yaml", enforce_generation=True)[0] == "FAIL")
+            # 單一驗證器的直接單元鎖（禁止各欄自寫判定 → 全走這一個函式）
+            for _r4_v, _r4_expect in ((None, False), (False, False), (True, False),
+                                      (0, False), (1, False), (0.0, False),
+                                      ("", False), ("   ", False), ("[編劇填]", False),
+                                      ("[編劇填來源]", False), ([], False), ({}, False),
+                                      ("內政部實價登錄", True), (" 有內容 ", True)):
+                fcheck(f"F-CXP-T2-R4-J4e is_nonempty_text({_r4_v!r}) == {_r4_expect}",
+                       _t2r.is_nonempty_text(_r4_v) is _r4_expect
+                       if not isinstance(_r4_v, (list, dict))
+                       else _t2r.is_nonempty_text(_r4_v) is False)
+            fcheck("F-CXP-T2-R4-J4f 正向鎖：容器仍看內容（混合清單一空一實 → 有填）",
+                   _t2r._is_filled([None, False, "內政部實價登錄"]) is True)
+
+            # ── J5：--stamp 對非法現值：報錯拒 stamp、不寫檔 ──
+            import subprocess as _r4_sp
+
+            def _r4_stamp(hash_line: str, tag: str):
+                _p = Path(_w1_tmp.mkdtemp()) / f"{tag}.yaml"
+                _p.write_text(
+                    "title: t\nscenes:\n"
+                    "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                    f"chxp_receipt:\n  used: []\n  {hash_line}\n", encoding="utf-8")
+                _before = _p.read_text(encoding="utf-8")
+                _r = _r4_sp.run([sys.executable, str(_t2r.__file__), "--stamp", str(_p)],
+                                capture_output=True, text=True)
+                _after = _p.read_text(encoding="utf-8")
+                _val = ""
+                for _ln in _after.splitlines():
+                    if "receipt_hash" in _ln:
+                        _val = _ln.split(":", 1)[1].strip().split("#")[0].strip().strip('"\'')
+                return _r.returncode, (_after == _before), _val
+
+            _rc, _unchanged, _val = _r4_stamp("receipt_hash: NOT_A_HASH", "bad")
+            fcheck("F-CXP-T2-R4-J5a --stamp 遇非法現值 NOT_A_HASH → 報錯拒 stamp、**不寫檔**"
+                   "（r3：寫成 \"<64hash>\"NOT_A_HASH 還回報成功）",
+                   _rc == 2 and _unchanged and _val == "NOT_A_HASH",
+                   f"rc={_rc} unchanged={_unchanged} val={_val!r}")
+            _rc, _unchanged, _val = _r4_stamp("receipt_hash: abc123", "shorthex")
+            fcheck("F-CXP-T2-R4-J5b --stamp 遇短 hex（abc123）→ 拒 stamp、不寫檔"
+                   "（r3：{0,64} 零長匹配把它寫成 \"<64hash>\"abc123）",
+                   _rc == 2 and _unchanged and _val == "abc123",
+                   f"rc={_rc} unchanged={_unchanged} val={_val!r}")
+            _rc, _unchanged, _val = _r4_stamp(f'receipt_hash: "{"a" * 64}xx"', "tail")
+            fcheck("F-CXP-T2-R4-J5c --stamp 遇 64hex 後多兩字 → 拒 stamp、不寫檔（鎖到行尾）",
+                   _rc == 2 and _unchanged, f"rc={_rc} unchanged={_unchanged} val={_val!r}")
+            _rc, _unchanged, _val = _r4_stamp('receipt_hash: ""', "empty")
+            fcheck("F-CXP-T2-R4-J5d 正向鎖：空值起點 → stamp 成功寫入合法 64 hex",
+                   _rc == 0 and not _unchanged and re.fullmatch(r"[0-9a-f]{64}", _val),
+                   f"rc={_rc} val={_val!r}")
+            _rc, _unchanged, _val = _r4_stamp(f'receipt_hash: "{"0" * 64}"  # 佔位', "zeros")
+            fcheck("F-CXP-T2-R4-J5e 正向鎖：骨架 64 個 0 佔位（帶行內註解）→ stamp 成功且註解保留",
+                   _rc == 0 and re.fullmatch(r"[0-9a-f]{64}", _val) and _val != "0" * 64,
+                   f"rc={_rc} val={_val!r}")
+
+            # ════════════════════════════════════════════
+            # F-CXP-T2-R5（r5，2026-08-14）：Codex r4 覆審四微洞 K1-K4
+            #   K1 的案例已就地改在上面 J2 區塊（含 3 件期望翻轉）；
+            #   以下是 K2（Unicode 清洗）／K3（stamp 行錨定）／K4（sidecar 重複鍵）。
+            # ════════════════════════════════════════════
+            print("\n[F-CXP-T2-R5] r5 覆審四微洞回歸鎖（Codex r4 新問題 K1-K4）")
+
+            # ── K2：只含零寬／不可見字元的欄位＝沒填 ──
+            _r5_invis = [("\u200b", "U+200B 零寬空格"), ("\ufeff", "U+FEFF BOM"),
+                         ("\u200c", "U+200C ZWNJ"), ("\u200d", "U+200D ZWJ"),
+                         ("\u00a0", "U+00A0 不斷行空格"), ("\u2060", "U+2060 word joiner"),
+                         ("\u00ad", "U+00AD 軟連字號"), ("\u3000", "全形空格"),
+                         ("\u200b \u200b", "零寬＋一般空白混合"),
+                         ("\u200b\ufeff\u200d", "多個零寬串接")]
+            for _r5_ch, _r5_name in _r5_invis:
+                fcheck(f"F-CXP-T2-R5-K2a is_nonempty_text({_r5_name}) → False"
+                       f"（r4 為 True：strip() 動不到零寬字元）",
+                       _t2r.is_nonempty_text(_r5_ch) is False,
+                       f"got={_t2r.is_nonempty_text(_r5_ch)!r} for {_r5_ch!r}")
+            _r5_zw_doc = dict(_t2_doc_base,
+                              **{_t2_sel: {"101": {"mode": "整理既有資料",
+                                                   "sources": ["\u200b"]}}},
+                              chxp_receipt={"used": [{"method_id": "101",
+                                                      "evidence_ref": f"path:{_t2_sel}.101.mode"}]})
+            _r5_k2c = chk_cxp_receipt(
+                _t2_full_receipt(_t2_doc_base, [],
+                                 waiver={i: "\u200b" for i in _t2_always}),
+                "t2.yaml", enforce_generation=True)
+            fcheck("F-CXP-T2-R5-K2c 11 條 waiver 理由全填零寬空格 → FAIL"
+                   "（r4 為 PASS：receipt 路徑同樣被零寬字元繞過）",
+                   _r5_k2c[0] == "FAIL" and "always-applicable 未交代" in _r5_k2c[1],
+                   f"got={_r5_k2c}")
+            fcheck("F-CXP-T2-R5-K2d waiver list 形式 reason 填 U+FEFF → FAIL",
+                   chk_cxp_receipt(
+                       _t2_full_receipt(_t2_doc_base, [],
+                                        waiver=[{"method_id": i, "reason": "\ufeff"}
+                                                for i in _t2_always]),
+                       "t2.yaml", enforce_generation=True)[0] == "FAIL")
+
+            def _mut_excl_reason_zw(r):
+                """把一條 excluded 的理由換成零寬字元（K2：理由欄的自寫判定旁路）。"""
+                for m in r["methods"]:
+                    if m.get("mode") == "excluded":
+                        m["excluded_reason"] = "\u200b"
+                        break
+
+
+            def _mut_excl_reason_false(r):
+                for m in r["methods"]:
+                    if m.get("mode") == "excluded":
+                        m["excluded_reason"] = False
+                        break
+
+            fcheck("F-CXP-T2-R5-K2g 正向鎖：零寬字元夾在真文字中間仍算有填（沒有矯枉過正）",
+                   _t2r.is_nonempty_text("內政部\u200b實價登錄") is True)
+            fcheck("F-CXP-T2-R5-K2h 正向鎖：strip_invisible 不改動可見內容",
+                   _t2r.strip_invisible("\u200b 內政部 實價登錄 \ufeff") == "內政部 實價登錄")
+
+            # ── K3：--stamp 只准寫 chxp_receipt 區塊內的 receipt_hash 行 ──
+
+            _r5_body_decoy = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "meta_block:\n"
+                "  receipt_hash: \"\"\n"          # ← 誘餌：同名欄但不在 chxp_receipt 內
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  receipt_hash: \"\"\n"
+            )
+            _r5_meta_val = ""
+            _r5_rc_val = ""
+            _r5_in_receipt = False
+
+            _r5_body_nohash = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "meta_block:\n"
+                "  receipt_hash: \"\"\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+            )
+
+            _r5_body_dup = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  receipt_hash: \"\"\n"
+                "  receipt_hash: \"\"\n"
+            )
+
+            _r5_body_2blk = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  receipt_hash: \"\"\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  receipt_hash: \"\"\n"
+            )
+
+            _r5_body_nested = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  source_artifact_hashes:\n"
+                "    receipt_hash: \"deadbeef\"\n"   # 子層同名鍵（非本欄）
+                "  receipt_hash: \"\"\n"
+            )
+            fcheck("F-CXP-T2-R5-K3f 正向鎖：單純的合規稿 stamp 仍成功（K3 沒擋掉正路）",
+                   _r4_stamp('receipt_hash: ""', "k3ok")[0] == 0)
+
+            # ── K4：sidecar 重複 id_mode_map_sha256 鍵＝拒載 ──
+            def _r5_sidecar(lines: str, tag: str):
+                _d = Path(_w1_tmp.mkdtemp())
+                (_d / "chxp_method_registry.yaml").write_text("x: 1\n", encoding="utf-8")
+                (_d / _t2r._REGISTRY_SHA_SIDECAR_NAME).write_text(lines, encoding="utf-8")
+                return _t2r.check_id_mode_map(_t2_reg, _d / "chxp_method_registry.yaml")
+
+            _r5_good = _t2r.id_mode_map_sha256(_t2_reg)
+            _r5_k4a = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"id_mode_map_sha256: {_r5_good}\n"
+                f"id_mode_map_sha256: {'b' * 64}\n", "dup2")
+            fcheck("F-CXP-T2-R5-K4a sidecar 兩條互相矛盾的 id_mode_map_sha256（第一條正確）→ "
+                   "**拒載 FAIL**（r4：只取第一條就回 PASS＝身分錨歧義）",
+                   _r5_k4a[0] == "FAIL" and "重複鍵" in _r5_k4a[1], f"got={_r5_k4a}")
+            _r5_k4b = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"id_mode_map_sha256: {'b' * 64}\n"
+                f"id_mode_map_sha256: {_r5_good}\n", "dup2r")
+            fcheck("F-CXP-T2-R5-K4b 同上但順序相反（第二條才正確）→ 一樣拒載 FAIL"
+                   "（不因排列順序改變結論）",
+                   _r5_k4b[0] == "FAIL" and "重複鍵" in _r5_k4b[1], f"got={_r5_k4b}")
+            _r5_k4c = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"id_mode_map_sha256: {_r5_good}\n"
+                "id_mode_map_sha256: garbage\n", "dupbad")
+            fcheck("F-CXP-T2-R5-K4c 一行合法＋一行格式非法 → 仍算重複鍵，拒載 FAIL"
+                   "（先數行再解析，避免非法行被無視）",
+                   _r5_k4c[0] == "FAIL" and "重複鍵" in _r5_k4c[1], f"got={_r5_k4c}")
+            fcheck("F-CXP-T2-R5-K4d 正向鎖：唯一一條且正確 → PASS（K4 沒誤殺正路）",
+                   _r5_sidecar("0" * 64 + "  chxp_method_registry.yaml\n"
+                               f"id_mode_map_sha256: {_r5_good}\n", "one")[0] == "PASS")
+            fcheck("F-CXP-T2-R5-K4e 正式 sidecar 仍只有一條、仍 PASS（現況未被 K4 打到）",
+                   _t2r.check_id_mode_map(_t2_reg)[0] == "PASS",
+                   f"got={_t2r.check_id_mode_map(_t2_reg)}")
+
+            # ════════════════════════════════════════════
+            # F-CXP-T2-R6（r6，2026-08-14）：Codex r5 點名的六殘例
+            #   L1 版本字面全等（v3/prev-v1 跳版、v1-evil 冒充）
+            #   L2 stamp YAML 結構化定位（nested-only、單邊引號）
+            #   L3 sidecar 分詞統一（NBSP）
+            #   L4 驗證器 Unicode 類別法（U+034F、quote 證據路徑）
+            # ════════════════════════════════════════════
+            print("\n[F-CXP-T2-R6] r6 封板輪：Codex r5 點名六殘例")
+
+            # ── L1：版本比對改字面全等（廢 family+序號推導）──
+            def _r6_reg_ver(ver: str, prev: str):
+                """造一份「現役版本＝ver、previous_version＝prev」的 registry 副本。"""
+                import copy as _r6_copy
+                _r = _r6_copy.deepcopy(_t2_reg)
+                _r["registry_version"] = ver
+                _r["previous_version"] = prev
+                return _r
+
+            _r6_l1a = _t2r.check_receipt_registry_version(
+                "chxp-128-v1", None, _r6_reg_ver("chxp-128-v3", "chxp-128-v1"))
+            fcheck("F-CXP-T2-R6-L1a 現役 v3、previous 自報 v1、收據 v1（版本鏈自己斷兩版）→ "
+                   "**FAIL**（r5 為 WARN：previous 自報什麼就信什麼，跳版照放）",
+                   _r6_l1a[0] == "FAIL", f"got={_r6_l1a}")
+            _r6_l1b = _t2r.check_receipt_registry_version(
+                "chxp-128-v1-evil", None, _t2_reg)
+            fcheck("F-CXP-T2-R6-L1b 收據 chxp-128-v1-evil 冒充 previous(chxp-128-v1-draft) → "
+                   "**FAIL**（r5 為 WARN：只比 family+序號，後綴被忽略＝任何後綴都能冒充）",
+                   _r6_l1b[0] == "FAIL", f"got={_r6_l1b}")
+            _r6_l1c = _t2r.check_receipt_registry_version(
+                "chxp-128-v2", None, _r6_reg_ver("chxp-128-v3", "chxp-128-v1"))
+            fcheck("F-CXP-T2-R6-L1c 同 L1a 但收據填 v2（既非現役也非自報前一版）→ FAIL",
+                   _r6_l1c[0] == "FAIL", f"got={_r6_l1c}")
+            _r6_l1d = _t2r.check_receipt_registry_version(
+                "chxp-128-v2-draft", None, _r6_reg_ver("chxp-128-v3", "chxp-128-v2-draft"))
+            fcheck("F-CXP-T2-R6-L1d 正向鎖：版本鏈自洽（v3←v2-draft）且收據字面全等前一版 → WARN"
+                   "（L1 只擋推導，不擋合法 grace）",
+                   _r6_l1d[0] == "WARN", f"got={_r6_l1d}")
+            fcheck("F-CXP-T2-R6-L1e 正向鎖：收據字面全等現役版本 → 仍 PASS（未誤傷正路）",
+                   _t2r.check_receipt_registry_version(_r4_live, None, _t2_reg)[0] == "PASS")
+
+            # ── L2：stamp 用 YAML 解析定位頂層 chxp_receipt.receipt_hash ──
+            _r6_body_nested_only = (
+                "title: t\n"
+                "scenes:\n"
+                "- {timestamp: 0-3s, type: Hook, 台詞_瑞祥: 喜歡是感覺}\n"
+                "chxp_receipt:\n"
+                "  used: []\n"
+                "  source_artifact_hashes:\n"
+                "    receipt_hash: \"deadbeef\"\n"   # 只有巢狀同名鍵，沒有直屬欄
+            )
+            fcheck("F-CXP-T2-R6-L2e 正向鎖：一般合規稿 stamp 仍 rc=0（L2 沒擋掉正路）",
+                   _r4_stamp('receipt_hash: ""', "l2ok")[0] == 0)
+
+            # ── L3：sidecar 重複鍵計數與取值用同一套分詞（含 NBSP）──
+            _r6_l3a = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"id_mode_map_sha256: {'b' * 64}\n"
+                f"\u00a0id_mode_map_sha256: {_r5_good}\n", "nbsp")
+            fcheck("F-CXP-T2-R6-L3a 第二條鍵前放 NBSP（U+00A0）→ **仍算重複鍵，拒載 FAIL**"
+                   "（r5：計數只認空格/tab、取值卻認所有 \\s，兩套分詞不一致就被繞過）",
+                   _r6_l3a[0] == "FAIL" and "重複鍵" in _r6_l3a[1], f"got={_r6_l3a}")
+            _r6_l3b = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"id_mode_map_sha256: {'b' * 64}\n"
+                f"\u3000id_mode_map_sha256: {_r5_good}\n", "ideospace")
+            fcheck("F-CXP-T2-R6-L3b 第二條鍵前放全形空格（U+3000）→ 一樣拒載 FAIL",
+                   _r6_l3b[0] == "FAIL" and "重複鍵" in _r6_l3b[1], f"got={_r6_l3b}")
+            _r6_l3c = _r5_sidecar(
+                "0" * 64 + "  chxp_method_registry.yaml\n"
+                f"\u00a0id_mode_map_sha256: {_r5_good}\n", "nbsp-one")
+            fcheck("F-CXP-T2-R6-L3c 正向鎖：唯一一條、鍵前有 NBSP → 取值仍解得到、PASS"
+                   "（計數與取值同一套分詞，不會一邊看得到一邊看不到）",
+                   _r6_l3c[0] == "PASS", f"got={_r6_l3c}")
+
+            # ── L4：驗證器清洗改 Unicode 類別法（Cf/Cc/Mn）＋ quote 證據路徑同接 ──
+            _r6_mn = [("\u034f", "U+034F 組合字素連接子（Mn）"),
+                      ("\u0300", "U+0300 組合抑音符（Mn）"),
+                      ("\u034f\u200b", "Mn＋Cf 混合")]
+            for _r6_ch, _r6_name in _r6_mn:
+                fcheck(f"F-CXP-T2-R6-L4a is_nonempty_text({_r6_name}) → False"
+                       f"（r5 為 True：顯式碼點清單漏列，類別集合又不含 Mn）",
+                       _t2r.is_nonempty_text(_r6_ch) is False,
+                       f"got={_t2r.is_nonempty_text(_r6_ch)!r} for {_r6_ch!r}")
+            _r6_qdoc = {"scenes": [{"台詞_瑞祥": "喜歡是感覺"}]}
+            _r6_l4b = _t2r.resolve_evidence_ref(_r6_qdoc, "quote:" + "\u200b" * 4)
+            fcheck("F-CXP-T2-R6-L4b evidence_ref quote: 四個 U+200B → 不成立"
+                   "（r5：長度 4 過關、只是碰巧稿內找不到；現在清洗後長度 0 直接擋在門口）",
+                   _r6_l4b[0] is False and "太短" in _r6_l4b[1], f"got={_r6_l4b}")
+            _r6_l4c = _t2r.resolve_evidence_ref(_r6_qdoc, "quote:" + "\u034f" * 4)
+            fcheck("F-CXP-T2-R6-L4c evidence_ref quote: 四個 U+034F → 不成立（同上，Mn 類）",
+                   _r6_l4c[0] is False and "太短" in _r6_l4c[1], f"got={_r6_l4c}")
+            fcheck("F-CXP-T2-R6-L4d 正向鎖：quote: 真實稿內台詞仍解得回（L4 沒擋掉正路）",
+                   _t2r.resolve_evidence_ref(_r6_qdoc, "quote:喜歡是感覺")[0] is True)
+            fcheck("F-CXP-T2-R6-L4e 正向鎖：稿內夾零寬字元時，乾淨的 quote 仍找得到"
+                   "（haystack 與 needle 同一套清洗）",
+                   _t2r.resolve_evidence_ref(
+                       {"scenes": [{"台詞_瑞祥": "喜歡\u200b是感覺"}]},
+                       "quote:喜歡是感覺")[0] is True)
+            fcheck("F-CXP-T2-R6-L4f 正向鎖：strip_invisible 仍不改動可見內容（含中間空白）",
+                   _t2r.strip_invisible("\u200b 內政部 實價登錄 \ufeff\u034f") == "內政部 實價登錄")
+
+            # ── r4 零誤殺方向鎖（新增檢查一律不得追殺舊稿／骨架）──
+            fcheck("F-CXP-T2-R4-Z1 舊稿世代：receipt 冒稱 #058 仍 SKIP（零誤殺優先）",
+                   chk_cxp_receipt(
+                       dict(_t2_doc_base,
+                            chxp_receipt={"used": [{"method_id": "058",
+                                                    "evidence_ref": "quote:喜歡是感覺"}]}),
+                       "t2.yaml", enforce_generation=False)[0] == "SKIP")
+        except Exception as _e_t2:
+            fcheck("F-CXP-T2 梯 2 fixtures 可執行", False, f"{type(_e_t2).__name__}: {_e_t2}")
 
         # cutover 狀態硬斷言（Codex R2 P2，gated --expect-enforce：防誤回退 shadow 而 flag-aware fixtures 仍綠）
         if "--expect-enforce" in sys.argv:

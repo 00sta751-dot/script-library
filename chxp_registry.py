@@ -56,11 +56,19 @@ _REGISTRY_EXPECTED_COUNT = 128
 #    gate 改成 none（硬閘 8→7）、把 #058 從 blocked_entry 改成 none，
 #    三種變造在 r1 全部 COVERAGE PASS。改成程式端硬斷言後三種全翻 FAIL。
 #    正典要改分層＝改這裡的常數＋bump registry_version（版本流程一部分）。
+# p4exec1 C 區收刀（2026-08-27，澤君殺單 rules_kill_manifest #34-41）：
+#   八條 gate（#041/053/055/064/068/069/101/103）判定為殭屍閘（registry 自標
+#   「現況: 沒做」＝條件觸發從未命中），整組降 layer: none、gate 規則區塊移除。
+#   條目**留在冊**（128 條不變、mode 分佈不變）——退場的是「機器硬閘」這個身分，
+#   不是方法本身。故 gate 8→0、none 111→119；excluded 34 與 mode 各類計數零變。
 _EXPECTED_LAYER_COUNTS: dict[str, int] = {
-    "gate": 8, "receipt": 5, "manual": 3, "blocked_entry": 1, "none": 111,
+    "gate": 0, "receipt": 5, "manual": 3, "blocked_entry": 1, "none": 119,
 }
 _EXPECTED_EXCLUDED_COUNT = 34
-_EXPECTED_GATE_IDS = ("041", "053", "055", "064", "068", "069", "101", "103")
+# p4exec1 C 區收刀：原 ("041","053","055","064","068","069","101","103") 全數退場。
+# 空 tuple ＝「本層現在零條目」的硬斷言——任何一條偷偷升回 gate 都會被 assert_canon 抓到
+# （layer=gate 實際 1 條 ≠ 硬斷言 0 條）。要重新立閘＝改這裡＋bump registry_version。
+_EXPECTED_GATE_IDS: tuple[str, ...] = ()
 _EXPECTED_RECEIPT_IDS = ("018", "027", "028", "043", "080")
 _EXPECTED_MANUAL_IDS = ("021", "022", "109")
 _EXPECTED_BLOCKED_IDS = ("058",)
@@ -102,7 +110,9 @@ _ID_MODE_MAP_VAL_RE = re.compile(
 # 沒人認得的 id 出現在報表，等於「閘還在但改名換姓」。現在 check_id 必須：
 #   ① 在本集合內（未知＝FAIL）② 等於 `C-CXP-<該條目自己的 id>`（張冠李戴＝FAIL）
 _REGISTERED_GATE_CHECK_IDS = tuple(f"C-CXP-{mid}" for mid in _EXPECTED_GATE_IDS)
-_REGISTERED_BATCH_CHECK_IDS = ("C-CXP-COVERAGE", "C-CXP-RECEIPT", "C-CXP-GATES")
+# p4exec1 C 區收刀（2026-08-27）：C-CXP-COVERAGE 隨 128 條登記冊硬閘一併退場
+# （殺單 #42），故從已註冊 batch check 集合移除。RECEIPT 與 GATES 留任。
+_REGISTERED_BATCH_CHECK_IDS = ("C-CXP-RECEIPT", "C-CXP-GATES")
 _REGISTERED_CHECK_IDS = _REGISTERED_GATE_CHECK_IDS + _REGISTERED_BATCH_CHECK_IDS
 
 _REGISTRY_PATH = Path(__file__).resolve().parent / "chxp_method_registry.yaml"

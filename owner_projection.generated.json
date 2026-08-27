@@ -3,50 +3,16 @@
     "generated": true,
     "do_not_edit": true,
     "generator": "gen_owner_projection_cache.py",
-    "generated_at": "2026-07-30T19:46:55Z",
-    "owner_discovery_py_sha256": "bddea242de439e7e05c61b2e34d9d8f466a629477c881c08fbc371085a9a0591",
+    "generated_at": "2026-08-27T09:18:51Z",
+    "owner_discovery_py_sha256": "d27d757ae1d71832d04fc5e6b2ef47858a237882dbf38339f7762b7d8aa45382",
     "kb_rule_parser_py_sha256": "8834e224f6efc1b630f423e826e958ed33e71f5e085b4041dbf12070421c2fb6",
-    "generator_py_sha256": "b4eac8881735d27577447f592a18f5362ce219905897b22db832297bfadc80bd",
-    "runtime_overrides_sha256": "012158fa9c7cb9ddd88d60990ed71be4c3a31ce3e3a0a264a18099f4b2b31964",
-    "discovery_fingerprint": "13739498468e143038ccde07f1d0033a44dc36ebd69c1f0ae554bd1483ddf10c",
-    "projection_fingerprint": "d17b5b5b2b1772f2e1f5c7e535c49bf0b6835404a1306045bd6b00530d63e5f0"
+    "generator_py_sha256": "98e4c94874358d70c2398a0dddf878d22040b43322db1a089e3c8b54bcc86b45",
+    "runtime_overrides_sha256": "827400f74ae230c6669055373c06d22c7c48b39dd08c0da70b8de669bfcf318c",
+    "discovery_fingerprint": "75096ffc4d06c43456c261a29081c9408905d98848f6d0fad0df8387eccc06f4",
+    "projection_fingerprint": "a1a13c2886ac15ad2e55d06e160925d11848675daf83101d54cdb09561b13e69"
   },
-  "runtime_aliases": {
-    "叭噗": "叭噗_小C"
-  },
+  "runtime_aliases": {},
   "owners": {
-    "仲豪": {
-      "owner_id": "ZHONGHAO",
-      "owner_name": "仲豪",
-      "industry_id": "房仲",
-      "industries": [
-        "房仲"
-      ],
-      "owner_dir": "房仲_仲豪",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_仲豪/00_業主核心檔/source_overlay/_仲豪偏好.md",
-      "owner_code": "zhonghao",
-      "html_file": "kenny.html",
-      "build_script": "build_all.py",
-      "card_prefix": "kenny-",
-      "platform": "FB Reels",
-      "dialogue_key": "台詞_仲豪"
-    },
-    "叭噗_小C": {
-      "owner_id": "BAPU",
-      "owner_name": "叭噗_小C",
-      "industry_id": "情侶",
-      "industries": [
-        "情侶"
-      ],
-      "owner_dir": "情侶_叭噗_小C",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/情侶_叭噗_小C/00_業主核心檔/source_overlay/_叭噗_小C偏好.md",
-      "owner_code": "bappu",
-      "html_file": "bappu-cc/index.html",
-      "build_script": "build_bappu.py",
-      "card_prefix": "bappu-",
-      "platform": "IG Reels",
-      "dialogue_key": "台詞_叭噗"
-    },
     "昀臻": {
       "owner_id": "YUNZHEN",
       "owner_name": "昀臻",
@@ -55,29 +21,13 @@
         "美容"
       ],
       "owner_dir": "美容_昀臻",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/美容_昀臻/00_業主核心檔/source_overlay/_昀臻偏好.md",
+      "l2_path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_昀臻/00_業主核心檔/source_overlay/_昀臻偏好.md",
       "owner_code": "yunzhen",
       "html_file": "beauty.html",
       "build_script": "build_beauty.py",
       "card_prefix": "yunzhen-",
       "platform": "IG Reels",
       "dialogue_key": "台詞_昀臻"
-    },
-    "楷甯": {
-      "owner_id": "KAINING",
-      "owner_name": "楷甯",
-      "industry_id": "房仲",
-      "industries": [
-        "房仲"
-      ],
-      "owner_dir": "房仲_楷甯",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_楷甯/00_業主核心檔/source_overlay/_楷甯偏好.md",
-      "owner_code": "kaining",
-      "html_file": "kaining.html",
-      "build_script": "build_kaining.py",
-      "card_prefix": "kaining-",
-      "platform": "FB Reels",
-      "dialogue_key": "台詞_楷甯"
     },
     "溫蒂": {
       "owner_id": "WENDI",
@@ -87,13 +37,29 @@
         "美容"
       ],
       "owner_dir": "美容_溫蒂",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/美容_溫蒂/00_業主核心檔/source_overlay/_溫蒂偏好.md",
+      "l2_path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/00_業主核心檔/source_overlay/_溫蒂偏好.md",
       "owner_code": "wendi",
       "html_file": "wendi.html",
       "build_script": "build_wendi.py",
       "card_prefix": "wendi-",
       "platform": "IG Reels",
       "dialogue_key": "台詞_溫蒂"
+    },
+    "澤君": {
+      "owner_id": "ZEJUN",
+      "owner_name": "澤君",
+      "industry_id": "房仲",
+      "industries": [
+        "房仲"
+      ],
+      "owner_dir": "房仲_澤君",
+      "l2_path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/房仲_澤君/00_業主核心檔/source_overlay/_澤君偏好.md",
+      "owner_code": "zejun",
+      "html_file": "zejun.html",
+      "build_script": "build_zejun.py",
+      "card_prefix": "zejun-",
+      "platform": "IG Reels",
+      "dialogue_key": "台詞_澤君"
     },
     "瑞祥": {
       "owner_id": "RUIXIANG",
@@ -103,49 +69,13 @@
         "房仲"
       ],
       "owner_dir": "房仲_瑞祥",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_瑞祥/00_業主核心檔/source_overlay/_瑞祥偏好.md",
+      "l2_path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/房仲_瑞祥/00_業主核心檔/source_overlay/_瑞祥偏好.md",
       "owner_code": "ruixiang",
       "html_file": "index.html",
       "build_script": "build_index.py",
       "card_prefix": "rui-",
       "platform": "FB Reels",
       "dialogue_key": "台詞_瑞祥"
-    },
-    "詩婷": {
-      "owner_id": "SHITING",
-      "owner_name": "詩婷",
-      "industry_id": "房仲",
-      "industries": [
-        "房仲"
-      ],
-      "owner_dir": "房仲_詩婷",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/房仲_詩婷/00_業主核心檔/source_overlay/_詩婷偏好.md",
-      "owner_code": "shihting",
-      "html_file": "shihting.html",
-      "build_script": "build_shihting.py",
-      "card_prefix": "shihting-",
-      "platform": "IG Reels",
-      "dialogue_key": "台詞_詩婷"
-    },
-    "阿奇": {
-      "owner_id": "AQI",
-      "owner_name": "阿奇",
-      "industry_id": "餐飲",
-      "industries": [
-        "餐飲",
-        "房仲"
-      ],
-      "owner_dir": "餐飲_阿奇",
-      "l2_path": "/Users/chenzejun/Documents/Claude/Projects/短影音系統/L2_業主層/餐飲_阿奇/00_業主核心檔/source_overlay/_阿奇偏好.md",
-      "owner_code": "achi",
-      "html_file": "achi.html",
-      "build_script": "build_achi.py",
-      "card_prefix": "achi-",
-      "platform": "FB Reels",
-      "dialogue_key": "台詞_阿奇",
-      "sub_industries": [
-        "房仲"
-      ]
     }
   }
 }

@@ -182,6 +182,9 @@ def wendi_yaml_adapter(yaml_data: dict, num: int) -> dict:
                 cta_kw = km.group(1).strip()
             break
 
+    # 封面文字（2026-09-02 拍板全業主可見；缺欄回空字串，不炸舊稿）
+    cover_text = str(yaml_data.get('cover_text', '') or '').strip()
+
     # caption（直接讀頂層 caption）
     caption = str(yaml_data.get('caption', '') or '')
 
@@ -210,6 +213,7 @@ def wendi_yaml_adapter(yaml_data: dict, num: int) -> dict:
         hashtags=hashtags,
         insight=insight,
         scene=scene,
+        cover_text=cover_text,
     )
 
 
@@ -442,6 +446,14 @@ def render_card(s):
     # insight 卡頭預覽（§2.5 標題下一句重點；無則用 hook fallback）
     preview = s['insight'] or hook
 
+    # 封面文字（2026-09-02 拍板全業主可見；cover_text 空/缺欄＝完全不輸出，舊稿 byte 不變）
+    _cover_text_v = str(s.get('cover_text', '') or '').strip()
+    cover_text_html = (
+        f'<div class="cover-text" style="margin:8px 0;padding:6px 10px;'
+        f'border-left:3px dashed #999;font-size:12px;color:#666;line-height:1.5;">'
+        f'封面文字：{esc(_cover_text_v)}</div>'
+    ) if _cover_text_v else ''
+
     return (
         f'<article class="card {tone}" data-cat="" id="wendi{esc(s["no"])}"'
         f' data-caption="{esc_attr(s["caption"])}" data-hashtags="{esc_attr(s["hashtags"])}">'
@@ -451,6 +463,7 @@ def render_card(s):
         f'<div class="c-meta">{"".join(pills)}</div>'
         f'<div class="c-ttl">{esc(s["title"])}</div>'
         f'<div class="insight">{esc(preview)}</div>'
+        f'{cover_text_html}'
         '<div class="more">展開完整腳本</div>'
         '</div>'
         '<div class="card-body">'

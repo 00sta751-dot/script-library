@@ -463,10 +463,16 @@ def normalize_script_to_canonical(source_dict: dict) -> dict:
     if not isinstance(hashtag, list):
         hashtag = [str(hashtag)] if hashtag else []
 
+    # cover_text（2026-09-01 拍板全業主永久制，L0 §1.4 第 8 元素）：
+    # 缺欄回空字串，不炸舊稿（130+ 現役稿無此欄）。無 markdown fallback
+    # （新欄位，舊格式稿本來就不會有；不比照 caption/hashtag 補抓）。
+    cover_text = str(data.get('cover_text', '') or '').strip()
+
     return {
         'script_id': str(data.get('script_id', '') or ''),
         'owner': str(data.get('owner', '') or ''),
         'title': str(data.get('title', '') or ''),
+        'cover_text': cover_text,
         'faction': faction,
         'platforms': platforms,
         'scenes': canonical_scenes,
@@ -530,6 +536,7 @@ def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> di
         timeline.append((ts, desc, sub_desc, mirror))
 
     caption = original_yaml.get('caption', '')
+    cover_text = str(original_yaml.get('cover_text', '') or '').strip()
     po_time = original_yaml.get('suggested_po_time', '')
     hashtag = original_yaml.get('hashtag', [])
     if not isinstance(hashtag, list):
@@ -578,6 +585,7 @@ def canonical_to_sc_kwargs(canonical: dict, original_yaml: dict, num: int) -> di
         'scene': scene_desc,
         'timeline': timeline,
         'caption': caption,
+        'cover_text': cover_text,
         'platform_chip': platform_chip,
         'po_time': po_time,
         'hashtag': hashtag,
@@ -694,6 +702,7 @@ def inject_v2_meta_attrs(html: str, kw: dict) -> str:
       data-publish-mode="manual_today/..."
       data-dist-mode="organic_only/..."
       data-trial-reels="true/false"
+      data-cover-text="..."（2026-09-01 拍板；空值不注入，同 caption 慣例）
 
     Args:
         html: 業主 article HTML string
@@ -703,12 +712,16 @@ def inject_v2_meta_attrs(html: str, kw: dict) -> str:
         注入 data-* 後的 HTML string
     """
     import re as _re
+    from _html_escape_utils import esc_attr as _esc_attr
     attrs = (
         f' data-voice-lock="{str(kw.get("voice_lock", False)).lower()}"'
         f' data-publish-mode="{kw.get("publish_mode", "manual_today")}"'
         f' data-dist-mode="{kw.get("distribution_mode", "organic_only")}"'
         f' data-trial-reels="{str(kw.get("trial_reels", False)).lower()}"'
     )
+    _cover_text = str(kw.get('cover_text', '') or '').strip()
+    if _cover_text:
+        attrs += f' data-cover-text="{_esc_attr(_cover_text)}"'
     # 找第一個 <article 或 <div 開 tag，在第一個空格（或結尾 >）前插入
     # 例："<article class=\"card\" ...>" → "<article class=\"card\" data-voice-lock=... ...>"
     def _inject(m):

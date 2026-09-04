@@ -108,7 +108,7 @@ Q = chr(39)
 
 def beauty_article(num, title, pie, insight, scene, timeline, cta,
                    img=None, batch=None, caption=None, platform=None,
-                   po_time=None, hashtag=None):
+                   po_time=None, hashtag=None, cover_text=None):
     if batch is None:
         batch = BATCH_09
     pid = 'b' + str(num) + ('_07' if batch == BATCH_07 else '_06' if batch == BATCH_06 else '')
@@ -171,6 +171,16 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
     if po_time:
         meta_extra += '      <span class="po-time">⏰ ' + esc_text(po_time) + '</span>\n'
 
+    # 封面文字（2026-09-02 拍板全業主可見；cover_text 空/缺欄＝完全不輸出，舊稿 byte 不變）
+    cover_text_html = ''
+    _cover_text_v = str(cover_text or '').strip()
+    if _cover_text_v:
+        cover_text_html = (
+            '    <div class="cover-text" style="margin:8px 0;padding:6px 10px;'
+            'border-left:3px dashed #999;font-size:12px;color:#666;line-height:1.5;">'
+            '封面文字：' + esc_text(_cover_text_v) + '</div>\n'
+        )
+
     return (
         '<article class="card" data-cat="" id="' + pid + '"' + cap_attr + hashtag_attr + '>\n'
         '  <div class="card-head" style="--pie:' + color + '">\n'
@@ -182,7 +192,8 @@ def beauty_article(num, title, pie, insight, scene, timeline, cta,
         '    </div>\n' +
         (('    <div class="card-meta-extra">\n' + meta_extra + '    </div>\n') if meta_extra else '') +
         '    <h3 class="title">' + title_e + '</h3>\n'
-        '    <div class="insight">' + insight_e + '</div>\n'
+        '    <div class="insight">' + insight_e + '</div>\n' +
+        cover_text_html +
         '  </div>\n'
         '  <div class="card-body">\n'
         '    <div class="scene"><b>場景</b>　' + scene_e + '</div>\n' +
@@ -693,6 +704,7 @@ def beauty_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         platform=kw.get('platform_chip') or (kw['platforms'][0] if kw.get('platforms') else None),
         po_time=kw.get('po_time'),
         hashtag=kw.get('hashtag'),
+        cover_text=kw.get('cover_text'),
     )
     return inject_v2_meta_attrs(html, kw)
 

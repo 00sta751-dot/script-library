@@ -119,7 +119,8 @@ def _series_for(yaml_data):
 # ============================================================
 def owner_article(num, title, pie, insight, scene, timeline, cta,
                   img=None, batch=None, caption=None,
-                  platform=None, po_time=None, hashtag=None, series='月薪8萬房仲日記'):
+                  platform=None, po_time=None, hashtag=None, series='月薪8萬房仲日記',
+                  cover_text=None):
     """渲染單篇腳本為 HTML article（新業主標準格式，對齊瑞祥 cd6f5bd 標竿）"""
     if batch is None:
         batch = '第 01 批'
@@ -165,6 +166,16 @@ def owner_article(num, title, pie, insight, scene, timeline, cta,
     if po_time:
         meta_extra += '      <span class="po-time">⏰ ' + _esc_text(po_time) + '</span>\n'
 
+    # 封面文字（2026-09-02 拍板全業主可見；cover_text 空/缺欄＝完全不輸出，舊稿 byte 不變）
+    cover_text_html = ''
+    _cover_text_v = str(cover_text or '').strip()
+    if _cover_text_v:
+        cover_text_html = (
+            '    <div class="cover-text" style="margin:8px 0;padding:6px 10px;'
+            'border-left:3px dashed #999;font-size:12px;color:#666;line-height:1.5;">'
+            '封面文字：' + _esc_text(_cover_text_v) + '</div>\n'
+        )
+
     # article 組裝（P1#2 fix：title/insight/scene/cta/pie/batch 走 _esc_text）
     return (
         '<article class="card" id="' + _esc_attr(pid) + '" data-series="' + _esc_attr(series) + '"' + cap_attr + hashtag_attr + '>\n'
@@ -178,7 +189,8 @@ def owner_article(num, title, pie, insight, scene, timeline, cta,
         '    </div>\n' +
         (('    <div class="card-meta-extra">\n' + meta_extra + '    </div>\n') if meta_extra else '') +
         '    <h3 class="title">' + _esc_text(title) + '</h3>\n'
-        '    <div class="insight">' + _esc_text(insight) + '</div>\n'
+        '    <div class="insight">' + _esc_text(insight) + '</div>\n' +
+        cover_text_html +
         '  </div>\n'
         '  <div class="card-body">\n'
         '    <div class="scene"><b>場景</b>　' + _esc_text(scene) + '</div>\n' +
@@ -313,6 +325,7 @@ def owner_article_adapter(yaml_data: dict, num: int, batch_label: str) -> str:
         po_time=kw.get('po_time'),
         hashtag=kw.get('hashtag'),
         series=_series_for(yaml_data),
+        cover_text=kw.get('cover_text'),
     )
 
 

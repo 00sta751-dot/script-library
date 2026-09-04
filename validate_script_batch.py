@@ -59,6 +59,13 @@ YAML_LINE_CUTOVER = _datetime.date(2026, 9, 4)
 LEGACY_FROZEN_NOTICE = (
     "legacy-frozen: yaml 線 2026-09-04 退役，內容原樣保留、不再新增檢查"
 )
+MD_ORIGIN_FILENAME = "_md_origin.json"
+MD_ORIGIN_SCHEMA = "md_origin/v1"
+MD_ORIGIN_AUX_FILES = (
+    "caption_hashtag.md",
+    "脆文_7篇.md",
+    "_出貨檢查單_勾完.md",
+)
 
 # ── 共用派系解析器（第一刀 2026-06-05）──
 try:
@@ -309,6 +316,239 @@ def _script_yaml_files(batch_dir: Path) -> list[Path]:
         and path.suffix.lower() in {".yaml", ".yml"}
         and not path.name.lower().endswith((".bak.yaml", ".bak.yml"))
     )
+
+
+def _safe_manifest_name(value: Any, field: str) -> tuple[Optional[str], Optional[str]]:
+    """轉檔證明內的 md/yaml 只准放單層檔名，防止離開指定目錄。"""
+    if not isinstance(value, str) or not value.strip():
+        return None, f"{field} 缺失或不是非空字串"
+    name = value.strip()
+    if Path(name).name != name or Path(name).is_absolute():
+        return None, f"{field} 必須是單層檔名：{name}"
+    return name, None
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_md_origin_proof(batch_dir: Path) -> tuple[bool, Optional[str]]:
+    """驗 `_md_origin.json`；回 (valid, detail)。detail=None 代表沒有證明檔。"""
+    manifest_path = batch_dir / MD_ORIGIN_FILENAME
+    if not manifest_path.exists() and not manifest_path.is_symlink():
+        return False, None
+    if batch_dir.is_symlink():
+        return False, "批次資料夾為符號連結"
+    symlink_entries = sorted(path.name for path in batch_dir.iterdir() if path.is_symlink())
+    if symlink_entries:
+        return False, f"批次夾內含符號連結：{symlink_entries}"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        return False, f"{MD_ORIGIN_FILENAME} 不是批次夾內的一般檔案"
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return False, f"{MD_ORIGIN_FILENAME} 無法解析（{type(exc).__name__}: {exc}）"
+    if not isinstance(manifest, dict):
+        return False, f"{MD_ORIGIN_FILENAME} 頂層必須是 object"
+    if manifest.get("schema") != MD_ORIGIN_SCHEMA:
+        return False, f"schema 必須是 {MD_ORIGIN_SCHEMA}"
+
+    source_md_dir_raw = manifest.get("source_md_dir")
+    if not isinstance(source_md_dir_raw, str) or not source_md_dir_raw.strip():
+        return False, "source_md_dir 缺失或不是非空字串"
+    source_md_dir = Path(source_md_dir_raw).expanduser()
+    if not source_md_dir.exists() or not source_md_dir.is_dir():
+        return False, f"source_md_dir 不存在：{source_md_dir}"
+    if source_md_dir.is_symlink():
+        return False, f"source_md_dir 不得為符號連結：{source_md_dir}"
+
+    for field in ("converted_at", "converter"):
+        value = manifest.get(field)
+        if not isinstance(value, str) or not value.strip():
+            return False, f"{field} 缺失或不是非空字串"
+
+    records = manifest.get("files")
+    if not isinstance(records, list) or not records:
+        return False, "files 必須是非空陣列"
+
+    manifest_yamls: list[str] = []
+    manifest_mds: list[str] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            return False, f"files[{index}] 必須是 object"
+        md_name, error = _safe_manifest_name(record.get("md"), f"files[{index}].md")
+        if error:
+            return False, error
+        yaml_name, error = _safe_manifest_name(record.get("yaml"), f"files[{index}].yaml")
+        if error:
+            return False, error
+        digest = record.get("sha256")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            return False, f"files[{index}].sha256 必須是 64 位小寫十六進位"
+
+        md_path = source_md_dir / md_name
+        if md_path.is_symlink() or not md_path.is_file():
+            return False, f"來源 md 不存在或不是一般檔案：{md_name}"
+        try:
+            actual_digest = _sha256_path(md_path)
+        except OSError as exc:
+            return False, f"來源 md 無法實讀：{md_name}（{type(exc).__name__}: {exc}）"
+        if actual_digest != digest:
+            return False, f"來源 md sha256 不符：{md_name}"
+
+        yaml_path = batch_dir / yaml_name
+        if yaml_path.is_symlink() or not yaml_path.is_file():
+            return False, f"轉檔 yaml 不存在批次夾：{yaml_name}"
+        manifest_mds.append(md_name)
+        manifest_yamls.append(yaml_name)
+
+    if len(set(manifest_mds)) != len(manifest_mds):
+        return False, "files 內 md 檔名重複"
+    if len(set(manifest_yamls)) != len(manifest_yamls):
+        return False, "files 內 yaml 檔名重複"
+
+    actual_yamls = {path.name for path in _script_yaml_files(batch_dir)}
+    listed_yamls = set(manifest_yamls)
+    if listed_yamls != actual_yamls:
+        missing = sorted(actual_yamls - listed_yamls)
+        extra = sorted(listed_yamls - actual_yamls)
+        return False, f"yaml 清單與批次夾不一致（未列={missing}；多列={extra}）"
+
+    aux = manifest.get("aux")
+    if not isinstance(aux, dict):
+        return False, "aux 必須是 object"
+    if set(aux) != set(MD_ORIGIN_AUX_FILES):
+        missing = sorted(set(MD_ORIGIN_AUX_FILES) - set(aux))
+        extra = sorted(set(aux) - set(MD_ORIGIN_AUX_FILES))
+        return False, f"aux 清單不一致（缺={missing}；多={extra}）"
+    for name in MD_ORIGIN_AUX_FILES:
+        digest = aux.get(name)
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            return False, f"aux[{name}].sha256 必須是 64 位小寫十六進位"
+        aux_path = source_md_dir / name
+        if aux_path.is_symlink() or not aux_path.is_file():
+            return False, f"aux 原檔不存在或不是一般檔案：{name}"
+        try:
+            actual_digest = _sha256_path(aux_path)
+        except OSError as exc:
+            return False, f"aux 原檔無法實讀：{name}（{type(exc).__name__}: {exc}）"
+        if actual_digest != digest:
+            return False, f"aux sha256 不符：{name}"
+
+    return True, f"{len(records)} 筆 md→yaml 對應＋{len(MD_ORIGIN_AUX_FILES)} 個 aux hash 相符"
+
+
+def _load_md_origin_yaml(path: Path) -> tuple[Optional[dict], Optional[str]]:
+    try:
+        text = path.read_text(encoding="utf-8")
+        text = re.sub(r"^---\s*\n", "", text, count=1)
+        frontmatter_text = re.split(r"\n---\s*\n", text, maxsplit=1)[0]
+        frontmatter_text = re.sub(r"\n---\s*$", "", frontmatter_text)
+        data = yaml.safe_load(frontmatter_text)
+    except Exception as exc:
+        return None, f"yaml 無法解析（{type(exc).__name__}: {exc}）"
+    if not isinstance(data, dict):
+        return None, f"yaml 頂層不是 mapping（{type(data).__name__}）"
+    return data, None
+
+
+def _md_origin_structure_failures(data: dict) -> list[str]:
+    failures: list[str] = []
+
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
+        failures.append("title 缺失或為空")
+
+    scenes = data.get("scenes")
+    if not isinstance(scenes, list) or not scenes or any(not isinstance(scene, dict) for scene in scenes):
+        failures.append("scenes 必須是非空 object 陣列")
+
+    caption = data.get("caption")
+    if not isinstance(caption, str) or not caption.strip():
+        failures.append("caption 缺失或為空")
+    else:
+        banned = [word for word in BANNED_WORDS if word in caption]
+        if banned:
+            failures.append(f"caption 禁用詞命中：{banned}")
+
+    hashtag = data.get("hashtag")
+    hashtag_ok = (
+        isinstance(hashtag, list)
+        and bool(hashtag)
+        and all(isinstance(tag, str) and tag.strip() for tag in hashtag)
+    ) or (isinstance(hashtag, str) and bool(hashtag.strip()))
+    if not hashtag_ok:
+        failures.append("hashtag 缺失、為空或格式不符")
+
+    visible_parts: list[str] = []
+    for value in (title, caption, hashtag):
+        if isinstance(value, str):
+            visible_parts.append(value)
+        elif isinstance(value, list):
+            visible_parts.extend(str(item) for item in value)
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                continue
+            for key, value in scene.items():
+                if key.startswith("台詞") or key in ("翠文", "字幕", "旁白", "藏鏡人", "畫面"):
+                    visible_parts.append(str(value or ""))
+    top_mirror = data.get("藏鏡人")
+    if isinstance(top_mirror, dict):
+        visible_parts.extend(str(value or "") for value in top_mirror.values())
+    visible_text = " ".join(visible_parts)
+    faction_hits = [word for word in _FACTION_LEAK_WORDS if word in visible_text]
+    if faction_hits:
+        failures.append(f"C-016 派系名詞命中：{faction_hits}")
+
+    scene_mirror_count = 0
+    if isinstance(scenes, list):
+        scene_mirror_count = sum(
+            1
+            for scene in scenes
+            if isinstance(scene, dict) and str(scene.get("藏鏡人", "") or "").strip()
+        )
+    top_mirror_count = 0
+    if isinstance(top_mirror, dict):
+        for key, value in top_mirror.items():
+            match = re.fullmatch(r"位置(\d+)", str(key))
+            if not match or not str(value or "").strip():
+                continue
+            sentence = top_mirror.get(f"句子{match.group(1)}")
+            if str(sentence or "").strip():
+                top_mirror_count += 1
+    if max(scene_mirror_count, top_mirror_count) < 1:
+        failures.append("藏鏡人互動點 = 0，需要 >= 1")
+
+    return failures
+
+
+def run_md_origin_checks(batch_dir: Path, proof_detail: str) -> int:
+    """證明有效後只跑 md-origin 容許的結構類檢查。"""
+    print(f"[PASS] md-origin 轉檔層：{proof_detail}")
+    passed = 0
+    failures: list[tuple[str, str]] = []
+    for path in _script_yaml_files(batch_dir):
+        data, error = _load_md_origin_yaml(path)
+        if error is not None or data is None:
+            failures.append((path.name, error or "yaml 無法讀取"))
+            continue
+        file_failures = _md_origin_structure_failures(data)
+        if file_failures:
+            failures.append((path.name, "；".join(file_failures)))
+        else:
+            passed += 1
+            print(f"  [PASS] {path.name}：結構類檢查通過")
+
+    for name, detail in failures:
+        print(f"  [FAIL] {name}：{detail}")
+    print(f"品管彙總：{passed} PASS / {len(failures)} FAIL（md-origin 結構層）")
+    return 1 if failures else 0
 
 
 def _yaml_declared_date(path: Path) -> Optional[_datetime.date]:
@@ -7747,6 +7987,16 @@ def main():
         sys.exit(1)
     if not batch_dir.is_dir():
         print(f"[ERROR] batch-dir 不是資料夾：{batch_dir}")
+        sys.exit(1)
+
+    md_origin_valid, md_origin_detail = validate_md_origin_proof(batch_dir)
+    if md_origin_valid:
+        sys.exit(run_md_origin_checks(batch_dir, md_origin_detail or "證明已驗證"))
+    if md_origin_detail is not None:
+        print(
+            f"[FAIL] {YAML_LINE_RETIRED_NOTICE}；"
+            f"md-origin 證明無效：{md_origin_detail}"
+        )
         sys.exit(1)
 
     legacy_frozen_reason = detect_legacy_frozen_yaml_batch(batch_dir)

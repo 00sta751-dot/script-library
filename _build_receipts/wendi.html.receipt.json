@@ -1,15 +1,15 @@
 {
   "schema": "build_receipt/v1",
-  "generated_at": "2026-09-04T20:50:22",
-  "generated_at_epoch": 1788526222.142848,
+  "generated_at": "2026-09-04T20:53:05",
+  "generated_at_epoch": 1788526385.405212,
   "builder": "build_wendi.py",
   "owner": "溫蒂",
   "python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
   "output": {
     "name": "wendi.html",
     "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L4_工具腳本/_部署系統/script-library/wendi.html",
-    "sha256": "c6a0dafe5432077f019e47340e2ee897e09aa976fd1ee5de4f6c2b548a75a622",
-    "size": 197000
+    "sha256": "2ca194b61809c75cc5bfded3abf4f4c306056796526a1438d658299ab0e7efb5",
+    "size": 197027
   },
   "source_dirs": [
     "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第02批_2026-06-03",
@@ -230,68 +230,68 @@
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_01.yaml",
-      "sha256": "c313b3bdfbe82f2fff53c5745c0eae16dbef75129144e7c80780c5d00ab2122d",
-      "size": 4017
+      "sha256": "c479721e8c4fceaaa30244f5b8b4fe08ade551fea89f316b26444ca8e33bad11",
+      "size": 4016
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_02.yaml",
-      "sha256": "dc1c60ff970f2f49ff391f7b1c47f37cd8b2d41f543a31386bc1a37a87bb8352",
-      "size": 4151
+      "sha256": "6ae2d23e22eedbee1b2b45b9a80a1a1a78f8d75675ca31b253b4204b543d2d4f",
+      "size": 4153
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_03.yaml",
-      "sha256": "ddf65b4ca2e1fc48000d1133161920dc567e6827c0d1677916dabfa84ab40d09",
-      "size": 3837
+      "sha256": "9233459631fdb799066994f5d5886cea09e2858a9b767d30ec6b212ad8c3ca36",
+      "size": 3842
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_04.yaml",
-      "sha256": "19944ec60989a911f32bee2cf83011d8e2dfca95ec600dac0667f5a03b562b76",
-      "size": 3660
+      "sha256": "c35f907fc52b5bb0ff399764b8709b18ea11142bf5f22acad3e0a3d73941b2b9",
+      "size": 3668
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_05.yaml",
-      "sha256": "e43a3fc7a18c05fd8d7a2e17dfe593047765235c40de4a51e0239203b58c3c99",
-      "size": 3780
+      "sha256": "a0c1749cea50a288056e749b3dafb3414ea3fcd159be620bac3a8f93fff20123",
+      "size": 3779
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_06.yaml",
-      "sha256": "4a6200fc788d47285bab0b9fd71a5f09ceeb8a775042d8435e6e5a240eda5dd2",
-      "size": 3937
+      "sha256": "2adf2649155f64db4b91d0840a2e0e6372afc2582ea8f6d2f18673637b61ae70",
+      "size": 3942
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_07.yaml",
-      "sha256": "948cec88e148c0cd517821de964df6e15caf40ccd8b1905272a71e834ef19fa9",
-      "size": 3846
+      "sha256": "dbc8ff69b1a1c654de3343a6e5c0814f14f495a9a65d06b757106328b21e2510",
+      "size": 3842
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_08.yaml",
-      "sha256": "1df94a5f7104be9687bc48d0674a78369dd562807a4ffebaa99946107148d46a",
-      "size": 3917
+      "sha256": "ec5ff57557d3d10fdbf2ad60debca45b555852f238ae7d75886dc63e73d7bbf5",
+      "size": 3919
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_09.yaml",
-      "sha256": "d702421530f262fb92c11aa1f5f4714613012e8a82b22c2d745e1f2c99f104ad",
-      "size": 3852
+      "sha256": "702ed38c1d070991c767ffb8e35ae9b47fb21be0494a8f1fbb545a4c2894ea00",
+      "size": 3839
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_10.yaml",
-      "sha256": "57d63e0afe2249aa302a17ef2c94115b618e022edefd71b72cbf5a574bba1dd7",
-      "size": 3633
+      "sha256": "df5c858b16a68ced3e31735049191fe31f16dcf45a56d7cc5472fdf632089697",
+      "size": 3641
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_11.yaml",
-      "sha256": "90adaca6ea6981219f1a06d2273a12ecf504783aae95908b595404bfaa5838bb",
-      "size": 3812
+      "sha256": "a4f41b2382e92a841653b1c22953f2a0a25b97e9a351d97d52bd4882e191b6a2",
+      "size": 3823
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_12.yaml",
-      "sha256": "7e7dd389ca3873ae8ed4252be3f457f75087662e478ba9e32c95570654588adf",
-      "size": 3861
+      "sha256": "08d4c10b1a461f04768978296a6116ab3396e47922cacab15ecfc8491e617f6c",
+      "size": 3875
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/script_溫蒂_05_13.yaml",
-      "sha256": "36644014e968be28c1cd6ebe555cabab35f2a3ebb42e5ca7cf20f586d3340788",
-      "size": 3762
+      "sha256": "2a018ef6ec375952ee213dc462f8fda132d4646a0b212299568a324975de7e39",
+      "size": 3773
     },
     {
       "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第05批_2026-09-04/threads_溫蒂_第05批_2026-09-04.md",
@@ -368,6 +368,6 @@
         "result": "PASS"
       }
     ],
-    "ran_at": "2026-09-04T20:50:22"
+    "ran_at": "2026-09-04T20:53:05"
   }
 }

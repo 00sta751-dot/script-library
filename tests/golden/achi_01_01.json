@@ -123,6 +123,7 @@
   },
   "kwargs": {
     "num": 1001,
+    "template": "",
     "title": "胖奇不是因為老闆很胖",
     "pie": "故事戲劇派（派11）",
     "platforms": [

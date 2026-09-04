@@ -30,7 +30,6 @@ if str(LIB) not in sys.path:
 import derive_quotes as quotes  # noqa: E402
 import gen_chxp_plain_table as chxp_table  # noqa: E402
 import validate_script_batch as validator  # noqa: E402
-import yaml_skeleton_generator as skeleton  # noqa: E402
 
 
 def _load(name: str) -> dict:
@@ -716,74 +715,6 @@ class DeriveQuoteTests(unittest.TestCase):
         self.assertIsInstance(_old_quote(data), dict)
         self.assertNotEqual(view, data)
 
-    def test_skeleton_emits_ten_selectors_and_keeps_voice_asset_scalar(self) -> None:
-        item = {
-            "owner": "瑞祥",
-            "batch": "99",
-            "batch_tag": "第99批_測試",
-            "script_id": "ruixiang_99_01",
-            "seq": 1,
-            "派系": "直球派",
-            "雙身份": "生活日常",
-            "direction": "測試方向",
-            "content_axis": "offpro",
-            "lane": "demand_first",
-            "derived_flags": [],
-            "topic_category": "人生",
-        }
-        with patch.object(skeleton, "OWNER_DIALOGUE_KEY", {"瑞祥": "台詞_瑞祥"}), patch.object(
-            skeleton, "OWNER_PLATFORM", {"瑞祥": "FB Reels"}
-        ), patch.object(
-            skeleton,
-            "_load_l0_batch_spec",
-            return_value={
-                "duration_seconds": 60,
-                "title_max_chars": 15,
-                "actor_interaction_min": 2,
-            },
-        ), patch.object(
-            skeleton,
-            "build_time_slots",
-            return_value=copy.deepcopy(skeleton.HARDCODED_TIME_SLOTS),
-        ):
-            text = skeleton.build_yaml_skeleton(item)
-
-        docs = [doc for doc in yaml.safe_load_all(text) if doc is not None]
-        self.assertEqual(len(docs), 1)
-        data = docs[0]
-        self.assertEqual(data["quote_derivation_version"], 1)
-        self.assertNotIn("quote_source_hash", data)
-        self.assertIsInstance(data["voice_asset_quote"], str)
-
-        method = data["script_method"]["chxp_v1"]
-        selectors = [
-            method["four_materials"]["old_answer"]["quote"],
-            method["four_materials"]["new_answer"]["quote"],
-            method["optimization"]["concrete_signals"][0]["quote"],
-            method["optimization"]["hook_debts"][0]["opened_quote"],
-            method["optimization"]["hook_debts"][0]["closed_quote"],
-            method["packaging"]["hook_promise"],
-            method["packaging"]["final_payoff"],
-            data["friend_close"]["evidence"]["value_delivered_quote"],
-            data["friend_close"]["evidence"]["core_answer_quote"],
-            data["friend_close"]["evidence"]["cta_quote"],
-        ]
-        self.assertEqual(len(selectors), 10)
-        for selector in selectors:
-            self.assertEqual(set(selector), {"timestamp", "dialogue_key"})
-            self.assertEqual(selector["timestamp"], "[編劇填]")
-            self.assertEqual(selector["dialogue_key"], "台詞_瑞祥")
-
-        skeleton_results = _run_per_file(data, "script_modern_skeleton.yaml")
-        self.assertEqual(_result(skeleton_results, "C-quote-source")[1], "SKIP")
-        self.assertEqual(_result(skeleton_results, "C-method")[1], "SKIP")
-        self.assertEqual(_result(skeleton_results, "C-friend-close")[1], "SKIP")
-
-        partial_draft = copy.deepcopy(data)
-        partial_draft["title"] = "真標題已填"
-        partial_results = _run_per_file(partial_draft, "script_partial_draft.yaml")
-        self.assertEqual(_result(partial_results, "C-quote-source")[1], "FAIL")
-        self.assertIn("missing_selector", _result(partial_results, "C-quote-source")[3])
 
     def test_chxp_table_uses_one_shared_derived_view_per_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

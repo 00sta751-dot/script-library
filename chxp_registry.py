@@ -17,8 +17,7 @@
 
 被誰用：
   - validate_script_batch.py（C-CXP-COVERAGE／C-CXP-RECEIPT／C-CXP-0xx 八個閘）
-  - yaml_skeleton_generator.py（產 chxp_receipt 骨架欄）
-兩邊共用同一份規則 → 不可能分岔（同 T1 F1「單一真源」教訓）。
+舊 YAML 骨架端已於 2026-09-04 退役；本模組保留 validator 的單一真相源。
 """
 from __future__ import annotations
 

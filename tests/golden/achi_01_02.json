@@ -123,6 +123,7 @@
   },
   "kwargs": {
     "num": 1002,
+    "template": "",
     "title": "我有40cm，每天嚇到人",
     "pie": "自嘲反差派（派12）",
     "platforms": [

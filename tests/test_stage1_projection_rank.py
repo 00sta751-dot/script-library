@@ -20,10 +20,6 @@ if str(LIB) not in sys.path:
     sys.path.insert(0, str(LIB))
 
 import gen_topic_intel_projection as projection  # noqa: E402
-from topic_distributor import (  # noqa: E402
-    _load_owner_content_profile,
-    apply_hybrid_profile,
-)
 
 
 def _raw(video_id: str, *, topic_id: str = "", rich: bool = True) -> dict:
@@ -225,21 +221,6 @@ class Stage1ProjectionRankTests(unittest.TestCase):
                 [entry], ["3" * 64], "2" * 64, None, "adapter", 2
             )
             self.assertNotEqual(fp_a, fp_b)
-
-    def test_wildcard_route_is_closure_only_without_changing_9_2_2(self) -> None:
-        plan = [{"seq": index + 1} for index in range(13)]
-        annotated, _, _ = apply_hybrid_profile(
-            plan, _load_owner_content_profile()
-        )
-        axes = [item["content_axis"] for item in annotated]
-        self.assertEqual(axes.count("offpro"), 9)
-        self.assertEqual(axes.count("personal_anchor"), 2)
-        self.assertEqual(axes.count("professional"), 2)
-        wildcard = [item for item in annotated if item.get("wildcard")]
-        self.assertEqual(len(wildcard), 1)
-        self.assertIn("topic_intel_closure", wildcard[0]["wildcard_reason"])
-        self.assertIn("closure-only", wildcard[0]["wildcard_reason"])
-
 
 if __name__ == "__main__":
     unittest.main()

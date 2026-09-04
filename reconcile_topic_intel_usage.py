@@ -399,7 +399,7 @@ def is_recently_used_by_other_owner(
     same_industry_only=True（預設）→ 只查同行業其他 owner（不同行業不算衝突）。
     失敗 → False（fail-soft，避免擋路）。
 
-    設計：僅供 topic_distributor assign 前查、shadow WARN 不擋（enforce 屬 S3 gate）。
+    設計：供 topic_intel assignment consumer 綁定前查、shadow WARN 不擋（enforce 屬 S3 gate）。
     """
     try:
         _, by_topic = load_topic_usage_index(cfg)

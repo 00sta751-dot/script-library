@@ -79,11 +79,11 @@ def _invalid(detail: str) -> dict:
 
 # ════════════════════════════════════════════════════════════════════
 # W1-W5（cxp-gapfix-w1／2026-08-13）：_batch_flags.yml **唯一** canonical loader
-# 規格＝Codex 體檢洞 08：validator:7585 / taste_panel_gate:98 / 本檔:131 三處
+# 規格＝Codex 體檢洞 08：退役前 validator／taste-panel／本檔三處
 # 各自寫 `yaml.safe_load(...) or {}`，於是檔案內容為 falsy（`false` / `0` /
 # `null` / 空檔 / `[]`）時 raw 被 `or {}` 洗成空 dict，後面的
 # `isinstance(raw, dict)` 永遠成立 → 錯誤路徑永不觸發 → 靜默關閉
-# hybrid / taste / time_axis / topic_intel 四道閘。
+# hybrid / taste / time_axis / topic_intel 四道閘。舊 YAML 兩個 consumer 已退役。
 #
 # 本 loader 的契約（三處消費端一律共用，不得各自再寫一份）：
 #   檔案不存在            → ({}, None)          ＝合法「本批未宣告 flags」

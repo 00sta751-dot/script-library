@@ -3,8 +3,8 @@
 """
 _faction_parser.py — 共用派系解析器（第一刀 2026-06-05）
 
-用途：topic_distributor + validate_script_batch 共用同一個 heading-based 派系 parse，
-      不再各自 regex，消除「第5章/第8章矛盾」放水洞。
+用途：validate_script_batch 的 heading-based 派系 parse；舊 YAML 分配端已退役，
+      保留單一 parser，消除「第5章/第8章矛盾」放水洞。
 
 公開 API：
     load_l0_faction_names(sop_yaml=None) -> set[str]

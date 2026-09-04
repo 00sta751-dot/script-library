@@ -3,8 +3,8 @@
 """
 _identity_parser.py — 雙身份比例解析器（第二刀 2026-06-05）
 
-用途：topic_distributor + validate_script_batch 共用同一個 heading-based 雙身份比例 parse，
-      修 C-012 no-op 放水洞（TOC 假命中 + ## break 過早）。
+用途：validate_script_batch 的 heading-based 雙身份比例 parse，
+      修 C-012 no-op 放水洞（TOC 假命中 + ## break 過早）；舊 YAML 分配端已退役。
 
 公開 API：
     parse_identity_mix_from_headings(markdown_text) -> IdentityParseResult

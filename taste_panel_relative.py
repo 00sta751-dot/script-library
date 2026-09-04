@@ -2,7 +2,7 @@
 """
 taste_panel_relative.py — 評審團「相對放行線 + 兩軌」決策 helper（v6 設計）
 
-定位：純函式、無副作用、無外部 import。被 taste_panel_gate.py + validate_script_batch.py 共用。
+定位：純函式、無副作用、無外部 import。舊 YAML 評審線已退役；檔案依相容邊界保留。
 鐵律：default-OFF。env `TASTE_PANEL_RELATIVE` 未開（預設 false）→ deploy 決策鏡射舊 90 行為（legacy_mirror），
       整檔 dormant、對 production 零影響。開啟才走相對線。
 來源：澤君 2026-06-24「評審團+編劇都處理好」directive + GPT 7 輪 codex 設計（thread 019efb1d）。

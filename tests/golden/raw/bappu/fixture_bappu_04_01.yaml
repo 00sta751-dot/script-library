@@ -1,0 +1,47 @@
+script_id: bappu_cc_04_01
+owner: 叭噗_小C
+title: 感冒了能不能搭飛機，他問我我也不確定
+派系: 模板L_知識反差
+main_platform: IG Reels
+suggested_po_time: 週六晚 10PM
+scenes:
+- timestamp: 0-3s
+  type: Hook
+  台詞_叭噗: 感冒搭飛機，耳朵真的會壞掉嗎？
+  台詞_小C: 等等，真的假的？我以為只是不舒服而已？
+  藏鏡人: 「真的假的？感冒還能搭飛機？」
+  畫面: 兩人坐沙發，叭噗一臉認真，小C眼睛睜大
+- timestamp: 3-20s
+  type: 主體解釋
+  台詞_叭噗: 對，非飛不可的話，耳塞或嚼口香糖幫助平衡，但鼻子完全塞住就建議改期。
+  台詞_小C: 所以不是不能飛，是要特別小心？
+  畫面: 叭噗手勢說明，小C認真點頭
+- timestamp: 20-35s
+  type: 情感收束
+  台詞_小C: 所以我們兩個都不知道（笑）。
+  台詞_叭噗: 我那時候也不確定啊，還好你沒事。
+  藏鏡人: 「哈哈兩個人都不知道，好可愛」
+  畫面: 兩人相視而笑，小C戳叭噗手臂
+- timestamp: 35-55s
+  type: CTA
+  台詞_小C: 你們也有那種「我以為你知道，你以為我知道，結果兩個人都不知道」的事嗎？
+  台詞_叭噗: 底下說說看。
+  畫面: 兩人同框自拍感，輕鬆收尾
+caption: 感冒能搭飛機嗎？我們兩個都不確定，一起查才發現原來這麼有學問。你跟另一半有沒有那種兩個人都以為對方知道的事？
+hashtag:
+- '#情侶日常'
+- '#台灣情侶'
+- '#感情'
+- '#生活常識'
+- '#19年'
+- '#長情'
+- '#高雄情侶'
+- '#真實情侶'
+- '#旅遊小知識'
+- '#感情經營'
+voice_lock: false
+policy_alignment: {}
+trial_reels: false
+publish_mode: manual_today
+distribution_mode: organic_only
+platform_variants: {}

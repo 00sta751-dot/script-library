@@ -1,0 +1,46 @@
+script_id: bappu_cc_04_02
+owner: 叭噗_小C
+title: J 人跟 P 人一起出門，是這樣的
+派系: 模板L_知識反差
+main_platform: IG Reels
+suggested_po_time: 週六晚 10PM
+scenes:
+- timestamp: 0-3s
+  type: Hook
+  台詞_叭噗: 你知道你是 J 人還是 P 人嗎？
+  台詞_小C: 啊？我是哪個？
+  藏鏡人: 「等等，J 人 P 人是什麼？」
+  畫面: 叭噗拿手機指著畫面問，小C一臉懵
+- timestamp: 3-20s
+  type: 主體解釋
+  台詞_叭噗: 對，所以我們出門前一晚我就打包好，你是出發前三十分鐘才開始找衣服。
+  台詞_小C: 所以你是 J 人，我是 P 人。
+  畫面: 小C邊笑邊無言，叭噗一臉「你知道的」
+- timestamp: 20-35s
+  type: 情感收束
+  台詞_小C: 但是我在你旁邊 19 年，到現在還是這樣（笑）。
+  台詞_叭噗: 對，我也沒改變你，你也沒改變我，但我們還是一起出發了。
+  藏鏡人: 「這根本就是我跟我男友！」
+  畫面: 兩人相看而笑
+- timestamp: 35-50s
+  type: CTA
+  台詞_小C: 你跟另一半是哪個組合？底下說說。
+  畫面: 兩人比出 J/P 手勢對著鏡頭
+caption: J 人跟 P 人一起出門，19 年了還是一個超前一個超後。但我們就這樣一起出發了，每次都是。你跟另一半是哪個組合？
+hashtag:
+- '#情侶日常'
+- '#台灣情侶'
+- '#J人P人'
+- '#個性互補'
+- '#19年'
+- '#長情'
+- '#高雄情侶'
+- '#真實情侶'
+- '#感情'
+- '#感情經營'
+voice_lock: false
+policy_alignment: {}
+trial_reels: false
+publish_mode: manual_today
+distribution_mode: organic_only
+platform_variants: {}

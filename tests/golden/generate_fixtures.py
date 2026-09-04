@@ -2,19 +2,18 @@
 # -*- coding: utf-8 -*-
 """
 generate_fixtures.py — 生成 golden fixtures
-用途：一次性建立 6 支 canonical + kwargs 快照（改動前後驗 byte 不變）
+用途：一次性建立 6 支 canonical + kwargs 現役快照
 注意：只在「第一次建立」或「刻意更新快照」時手動跑，平時 test_golden.py 用讀回比對。
 """
 import json, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from yaml_to_sc import load_yaml_articles, normalize_script_to_canonical, yaml_to_sc_kwargs
 
-BASE = r'C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層'
-RUX  = BASE + r'\房仲_瑞祥\01_腳本生產\第34批_試水批_2026-05-23'
-BAPPU = BASE + r'\情侶_叭噗_小C\02_腳本生產\第04批_試水批_2026-05-21'
-ACHI  = BASE + r'\餐飲_阿奇\01_腳本生產\第01批_2026-05-22'
-
 OUT_DIR = os.path.dirname(__file__)
+RAW_DIR = os.path.join(OUT_DIR, 'raw')
+RUX = os.path.join(RAW_DIR, 'rux')
+BAPPU = os.path.join(RAW_DIR, 'bappu')
+ACHI = os.path.join(RAW_DIR, 'achi')
 
 specs = [
     # (dir, idx, num, fixture_name)

@@ -176,7 +176,7 @@ def tc1_off_byte_compat() -> None:
     PYTHONHASHSEED=0 保證 list(set(...)) 穩定
     """
     print("\n[TC-1] off byte-compat")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     plan = _make_plan()
     plan_json_before = json.dumps(plan, ensure_ascii=False, sort_keys=True)
@@ -220,7 +220,7 @@ def tc1_off_byte_compat() -> None:
 def tc2_shadow_warn_insufficient() -> None:
     """shadow + 不足 min → WARN 且綁 qualified_count 個觀察"""
     print("\n[TC-2] shadow WARN（候選 1 支 < min_slots=2）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate("ti_tc2_A")]  # 1 支 < min=2
@@ -258,7 +258,7 @@ def tc2_shadow_warn_insufficient() -> None:
 def tc3_enforce_fail_insufficient() -> None:
     """enforce + 不足 min → error，不綁任何 slot"""
     print("\n[TC-3] enforce FAIL（候選 1 支 < min_slots=2）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate("ti_tc3_A")]  # 1 支 < min=2
@@ -291,7 +291,7 @@ def tc3_enforce_fail_insufficient() -> None:
 def tc4_enforce_pass() -> None:
     """enforce + 足夠候選（3 支 >= min=2） → 綁前 min(max,3) 個 slot"""
     print("\n[TC-4] enforce PASS（候選 3 支，min=2，max=4）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [
@@ -334,7 +334,7 @@ def tc4_enforce_pass() -> None:
 def tc5_cross_batch_dedup() -> None:
     """近期已被 owner 採用的 topic 被跳過，只綁剩餘"""
     print("\n[TC-5] 跨批去重（ti_tc5_USED 近期已用 → 跳過）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
     import reconcile_topic_intel_usage as _rcu  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -418,7 +418,7 @@ def tc5_cross_batch_dedup() -> None:
 def tc6_stale_projection() -> None:
     """projection expires_at 已過期 → enforce error；shadow WARN 且本批零綁。"""
     print("\n[TC-6] 新鮮度（過期 projection）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate(f"ti_tc6_{i}") for i in range(3)]
@@ -653,24 +653,24 @@ def tc7_v3002_batch_slot_count() -> None:
     )
 
 
-# ── TC-8：Fix H validator CLI golden（off 零足跡）+ end-to-end owner_code ──────
+# ── TC-8：新 YAML validator tombstone + end-to-end owner_code ────────────────
 
 def tc8_fix_h_golden_and_owner_code() -> None:
     """
     Fix H【P2】兩個驗收：
-    A) validator CLI golden：off 跑真 validate_script_batch --batch-dir，
-       stdout 不含 topic-intel / V3-001 / V3-002 / WP-B 字樣
+    A) validator CLI：切線日起的新 YAML 即使無 flags，也必須以退役訊息 fail-closed
     B) end-to-end owner_code：中文 owner 反查 owner_code → reconciler index key → 次批 assign recent skip
     """
-    print("\n[TC-8A] validator CLI golden（off 零足跡）")
+    print("\n[TC-8A] validator CLI new YAML tombstone")
     import subprocess
     import tempfile as _tmpfile
 
     # 建一個最小 batch dir（off = 無 _batch_flags.yml）
     with _tmpfile.TemporaryDirectory() as _bd:
         _bd_path = Path(_bd)
-        # 寫一支最簡 yaml（off 模式不跑 WP-B 相關 check）
+        # 寫一支切線日新 YAML；入口必須在任何舊 batch check 前擋下。
         _yaml_content = """\
+created: 2026-09-04
 title: TC-8 測試腳本
 owner: 瑞祥
 batch_tag: test_tc8
@@ -697,7 +697,7 @@ platform_variants:
 """
         (_bd_path / "script_test.yaml").write_text(_yaml_content, encoding="utf-8")
 
-        # 執行 validator（no _batch_flags.yml = off）
+        # 執行 validator（no _batch_flags.yml 也不能繞過退役判定）
         _sl_dir = str(_SL)
         result = subprocess.run(
             [sys.executable, str(_SL / "validate_script_batch.py"),
@@ -707,11 +707,12 @@ platform_variants:
         )
         stdout = result.stdout + result.stderr
 
-    # 驗 stdout 不含 topic-intel 字樣（Fix A：off 不 append V3-002，Fix G：V3-001 gated）
-    _ti_keywords = ["topic-intel", "V3-001", "V3-002", "WP-B", "topic_intel"]
-    found_ti = [kw for kw in _ti_keywords if kw in stdout]
-    ok("TC-8A: off stdout 零 topic-intel 行") if not found_ti else fail(
-        f"TC-8A: off stdout 含 topic-intel 字樣：{found_ti}",
+    retired = (
+        result.returncode == 1
+        and "舊 yaml 線已於 2026-09-04 退役" in stdout
+    )
+    ok("TC-8A: new YAML 無 flags 仍退役 FAIL") if retired else fail(
+        "TC-8A: new YAML 應退役 FAIL",
         f"stdout（前 500 字）：{stdout[:500]!r}",
     )
 
@@ -742,7 +743,7 @@ platform_variants:
         )
 
         # 建 projection：owner_code=ruixiang（即 _make_projection_json 的 owner_code）
-        from topic_distributor import assign_topic_sources  # type: ignore[import]
+        from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
         import reconcile_topic_intel_usage as _rcu  # type: ignore[import]
 
         candidates = [
@@ -938,7 +939,7 @@ def tc11_fix3_usage_index_tristate() -> None:
     """
     print("\n[TC-11] Fix 3 usage index 三態")
     import reconcile_topic_intel_usage as _rcu  # type: ignore[import]
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     # A) 壞 JSON → load_topic_usage_index 應 raise
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1073,7 +1074,7 @@ def tc13_fix5_evidence_path_empty_enforce_skip() -> None:
     - shadow → 仍綁但 warnings 含提示
     """
     print("\n[TC-13] Fix 5 evidence_path 空 → enforce 不綁 / shadow 綁但 WARN")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     def _cand_no_ev(topic_id: str, confidence: float = 80) -> dict:
         c = _make_candidate(topic_id, confidence)
@@ -1196,20 +1197,20 @@ def tc14_p01_projection_cache_corrupt_enforce_fail() -> None:
         _vsb._load_projection_candidate_index = _orig_load
 
 
-# ── TC-15：Fix P0-2 invalid policy → validator FAIL + assign error（非 off）──
+# ── TC-15：新 YAML validator 退役 FAIL + assignment invalid-policy fail-closed ──
 def tc15_p02_invalid_policy_fail_closed() -> None:
     """
     Fix P0-2：_batch_flags.yml 有 topic_intel_closure 但設定不合法（invalid）：
-    A) validator batch_checks 應含 V3-000-policy FAIL（非 off 靜默略過）
+    A) 切線日起的新 YAML validator 應以退役訊息 FAIL（不得掉入舊 batch checks）
     B) assign_topic_sources policy.mode=invalid → assign_report error（不綁）
-    C) off 批次（無 topic_intel_closure）仍 disabled 零足跡（確認 invalid 沒誤傷 off）
+    C) 即使無 topic_intel_closure，新 YAML 也一樣退役 FAIL
     """
-    print("\n[TC-15] Fix P0-2 invalid policy → validator FAIL + assign error")
+    print("\n[TC-15] 新 YAML validator 退役 FAIL + assign invalid-policy fail-closed")
     import subprocess
     import tempfile as _tmpfile
 
-    # A) validator：invalid policy → V3-000-policy FAIL（subprocess CLI 驗）
-    print("  [TC-15A] validator CLI invalid policy → V3-000-policy FAIL")
+    # A) 切線日起的新 YAML 在入口退役 FAIL（subprocess CLI 驗）
+    print("  [TC-15A] validator CLI new YAML → 退役 FAIL")
     with _tmpfile.TemporaryDirectory() as _bd:
         _bd_path = Path(_bd)
         # 有 topic_intel_closure 但 approved_by 錯 → invalid
@@ -1223,6 +1224,7 @@ topic_intel_closure:
 """
         (_bd_path / "_batch_flags.yml").write_text(_flags_content, encoding="utf-8")
         _yaml_content = """\
+created: 2026-09-04
 title: TC-15 測試腳本
 owner: 瑞祥
 batch_tag: test_tc15
@@ -1258,9 +1260,9 @@ platform_variants:
         )
         stdout_a = result.stdout + result.stderr
 
-    has_v3000 = "V3-000-policy" in stdout_a
-    ok("TC-15A: invalid policy → stdout 含 V3-000-policy") if has_v3000 else fail(
-        f"TC-15A: 期望 V3-000-policy，stdout 前 600 字：{stdout_a[:600]!r}",
+    has_retired_a = "舊 yaml 線已於 2026-09-04 退役" in stdout_a
+    ok("TC-15A: stdout 含 new YAML 退役訊息") if has_retired_a else fail(
+        f"TC-15A: 缺退役訊息，stdout 前 600 字：{stdout_a[:600]!r}",
     )
     has_fail_a = "FAIL" in stdout_a
     ok("TC-15A: stdout 含 FAIL") if has_fail_a else fail(
@@ -1269,7 +1271,7 @@ platform_variants:
 
     # B) assign_topic_sources：invalid policy → assign_report error（不綁）
     print("  [TC-15B] assign invalid policy → assign_report error")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
     from topic_intel_policy import load_topic_intel_policy  # type: ignore[import]
 
     with _tmpfile.TemporaryDirectory() as _bd2:
@@ -1297,8 +1299,8 @@ platform_variants:
         "TC-15B: invalid policy 不應綁任何 slot",
     )
 
-    # C) off 批次（無 topic_intel_closure）仍 disabled 零足跡
-    print("  [TC-15C] off 批次（無 _batch_flags.yml）→ 不含 V3-000-policy")
+    # C) 無 topic_intel_closure 也不能讓新 YAML 靜默通過
+    print("  [TC-15C] 無 _batch_flags.yml 的 new YAML → 同樣退役 FAIL")
     with _tmpfile.TemporaryDirectory() as _bd3:
         _bd3_path = Path(_bd3)
         (_bd3_path / "script_off.yaml").write_text(_yaml_content, encoding="utf-8")
@@ -1313,9 +1315,12 @@ platform_variants:
         )
         stdout_c = result_c.stdout + result_c.stderr
 
-    no_v3000_c = "V3-000-policy" not in stdout_c
-    ok("TC-15C: off 批次 stdout 無 V3-000-policy（zero-footprint）") if no_v3000_c else fail(
-        f"TC-15C: off 批次不應有 V3-000-policy，stdout={stdout_c[:300]!r}",
+    retired_c = (
+        result_c.returncode == 1
+        and "舊 yaml 線已於 2026-09-04 退役" in stdout_c
+    )
+    ok("TC-15C: new YAML 無 flags 仍退役 FAIL") if retired_c else fail(
+        f"TC-15C: 期望退役 FAIL，stdout={stdout_c[:300]!r}",
     )
 
 
@@ -1327,7 +1332,7 @@ def tc16_p1_evidence_path_missing_key_enforce_skip() -> None:
     此 TC 驗「欄存在且空」的 enforce 行為（補縱深驗證）。
     """
     print("\n[TC-16] Fix P1 evidence_path 空字串 enforce 跳過 → 不足 min error")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     def _cand_no_key(topic_id: str, confidence: float = 80) -> dict:
         """候選 evidence_path 欄存在但值為空字串"""
@@ -1377,7 +1382,7 @@ def tc17_p2_usage_index_state_three_values() -> None:
     C) error：index 讀取失敗（shadow 不中斷，usage_index_state=error）
     """
     print("\n[TC-17] Fix P2 usage_index_state 三值（ok / missing / error）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
     import reconcile_topic_intel_usage as _rcu  # type: ignore[import]
 
     # A) ok：有 owner_code，首批 index 不存在（{} 放行）
@@ -1473,7 +1478,7 @@ def tc18_bind_scope_all_offpro_pool_thin() -> None:
     + assign_report 含 bind_scope 欄
     """
     print("\n[TC-18] bind_scope=all_offpro 部分不足（5 候選 / 9 offpro slot）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate(f"ti_tc18_{i}") for i in range(5)]
@@ -1531,7 +1536,7 @@ def tc19_bind_scope_all_offpro_sufficient() -> None:
     → 綁 9（滿）+ 無 pool thin WARN + error=None + 非 offpro slot 無 STI
     """
     print("\n[TC-19] bind_scope=all_offpro 充足（11 候選 / 9 offpro slot）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate(f"ti_tc19_{i}") for i in range(11)]
@@ -1589,7 +1594,7 @@ def tc20_legacy_no_bind_scope_in_report() -> None:
     assign_report 不應含 bind_scope 欄位（§修 3：不打破舊 assign_report byte-compat）
     """
     print("\n[TC-20] legacy（無 bind_scope）assign_report 不含 bind_scope 欄")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate(f"ti_tc20_{i}") for i in range(5)]
@@ -1626,7 +1631,7 @@ def tc21_bind_scope_exact_boundary() -> None:
     → 綁 9、無 pool-thin WARN（不少一個）、error=None
     """
     print("\n[TC-21] bind_scope=all_offpro 邊界（9 候選 / 9 offpro slot）")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         candidates = [_make_candidate(f"ti_tc21_{i}") for i in range(9)]
@@ -1676,7 +1681,7 @@ def tc22_bind_scope_zero_offpro_slots() -> None:
     驗修 4：不再誤觸「qualified < min_slots」那條誤導分支
     """
     print("\n[TC-22] bind_scope=all_offpro 但 plan 無 offpro slot → 清楚 WARN + error=None")
-    from topic_distributor import assign_topic_sources  # type: ignore[import]
+    from topic_intel_assignment import assign_topic_sources  # type: ignore[import]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # 足夠候選（proof 有料），排除「候選不足」那條分支

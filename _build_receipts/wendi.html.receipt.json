@@ -1,15 +1,15 @@
 {
   "schema": "build_receipt/v1",
-  "generated_at": "2026-08-27T18:43:17",
-  "generated_at_epoch": 1787827397.061876,
+  "generated_at": "2026-09-04T12:16:37",
+  "generated_at_epoch": 1788495397.0425,
   "builder": "build_wendi.py",
   "owner": "溫蒂",
   "python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
   "output": {
     "name": "wendi.html",
     "path": "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L4_工具腳本/_部署系統/script-library/wendi.html",
-    "sha256": "c888a3d68ea0b898cfefc7349fcf05d0de8c651dc7eee476605d059bf1187542",
-    "size": 150157
+    "sha256": "7dfdc57c87d5452f487e4780dc87b16b5c8776ab1279bda9c93aaa9c23328adb",
+    "size": 150163
   },
   "source_dirs": [
     "/Users/chenzejun/AI/40-projects/短影音系統v3/00_系統本體/L2_業主層/美容_溫蒂/01_腳本生產/第02批_2026-06-03",
@@ -245,7 +245,7 @@
           "--strict"
         ],
         "returncode": 0,
-        "summary": "品管彙總：186 PASS / 100 WARN / 0 FAIL / 42 SKIP（共 328 件）",
+        "summary": "",
         "result": "PASS"
       },
       {
@@ -261,7 +261,7 @@
           "--strict"
         ],
         "returncode": 0,
-        "summary": "品管彙總：210 PASS / 89 WARN / 0 FAIL / 29 SKIP（共 328 件）",
+        "summary": "",
         "result": "PASS"
       },
       {
@@ -277,10 +277,10 @@
           "--strict"
         ],
         "returncode": 0,
-        "summary": "品管彙總：250 PASS / 76 WARN / 0 FAIL / 2 SKIP（共 328 件）",
+        "summary": "",
         "result": "PASS"
       }
     ],
-    "ran_at": "2026-08-27T18:43:17"
+    "ran_at": "2026-09-04T12:16:37"
   }
 }

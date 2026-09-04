@@ -4,7 +4,7 @@
 test_golden.py — canonical + kwargs golden fixture 驗證
 驗兩件：
   1. normalize_script_to_canonical() 輸出與快照一致（canonical dict 正確）
-  2. yaml_to_sc_kwargs() 輸出與快照一致（舊 API byte 不變）
+  2. yaml_to_sc_kwargs() 輸出與現役快照一致
 
 執行：python tests/golden/test_golden.py
 全 PASS 才算完工。
@@ -17,12 +17,11 @@ sys.path.insert(0, SCRIPT_LIB)
 
 from yaml_to_sc import load_yaml_articles, normalize_script_to_canonical, yaml_to_sc_kwargs
 
-BASE = r'C:\Users\00sta\Documents\Claude\Projects\短影音系統\L2_業主層'
-RUX   = BASE + r'\房仲_瑞祥\01_腳本生產\第34批_試水批_2026-05-23'
-BAPPU = BASE + r'\情侶_叭噗_小C\02_腳本生產\第04批_試水批_2026-05-21'
-ACHI  = BASE + r'\餐飲_阿奇\01_腳本生產\第01批_2026-05-22'
-
 FIXTURES_DIR = os.path.dirname(os.path.abspath(__file__))
+RAW_DIR = os.path.join(FIXTURES_DIR, 'raw')
+RUX = os.path.join(RAW_DIR, 'rux')
+BAPPU = os.path.join(RAW_DIR, 'bappu')
+ACHI = os.path.join(RAW_DIR, 'achi')
 
 SPECS = [
     (RUX,   0,  3401, 'rux_34_01'),
@@ -151,7 +150,7 @@ for (yaml_dir, idx, num, name) in SPECS:
     kwargs = yaml_to_sc_kwargs(raw, num=num)
     kwargs_ser = serialize_kwargs(kwargs)
     ok, msg = deep_eq(kwargs_ser, fixture['kwargs'])
-    check(f'{name}: kwargs 與快照一致（舊 API byte 不變）', ok, msg)
+    check(f'{name}: kwargs 與現役快照一致', ok, msg)
 
     print()
 

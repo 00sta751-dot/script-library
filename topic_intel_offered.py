@@ -5,7 +5,7 @@ topic_intel_offered.py -- WP-C.2 選題情報池「offered」事件帳本 writer
 潮汐 WP-C.2 / 2026-06-22 / 霸告出大腦 + Codex gpt-5.5 gauntlet + 保鏢 GO
 
 職責：
-  topic_distributor.assign_topic_sources 把候選綁進腳本 slot（offered）後，
+  topic_intel_assignment.assign_topic_sources 把候選綁進腳本 slot（offered）後，
   記一筆 topic_script_offered 事件 → 點亮兩 SLO（採用率 used/offered、情報品質率 offered/eligible）。
   與 reconcile_topic_intel_usage.py 的 adopted writer **tier 對稱**（enforce→正式 events.jsonl /
   shadow→_shadow/<batch>.offered.json）。
@@ -15,7 +15,7 @@ topic_intel_offered.py -- WP-C.2 選題情報池「offered」事件帳本 writer
      `if __name__ == "__main__"` guard。`import topic_intel_offered` 絕不執行 I/O、絕不 raise
      SystemExit、絕不印任何東西。（Codex R1 P1-5 / R2 P2）
   2. **lazy import**：reconciler 的 writer helper 全在 emit_offered_events() 函式內 import
-     （不在 top level）——保 distributor 在 flag OFF 時「不 import 本模組就零足跡」、且本模組
+     （不在 top level）——保 assignment consumer 在 flag OFF 時「不 import 本模組就零足跡」、且本模組
      被 import 時也不連帶載 reconciler。
   3. **fail-soft 全程**：emit 內部 try/except 包到所有 import/JSON/path/write 失敗 → 回 error 欄、
      **不 raise、不 SystemExit**（絕不擋 build/部署，對齊 reconciler line 152）。
